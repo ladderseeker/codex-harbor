@@ -1,12 +1,17 @@
 /** Installed UI/file/PTY/drain acceptance. No Harbor fixture and no backup transfer. */
 import { chromium, expect } from "@playwright/test";
-import { readFile, writeFile, chown } from "node:fs/promises";
+import { readFile, writeFile, chown, mkdir } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createPool } from "../../packages/storage/src/index.ts";
 const tools = process.env.HARBOR_DEPLOY_TEST_TOOLS!;
 const admission = JSON.parse(await readFile(tools + "/admission.json", "utf8"));
 const c = JSON.parse(await readFile(admission.config, "utf8"));
+const evidence =
+  process.env.HARBOR_MODULE_EVIDENCE_DIR ??
+  admission.control + "/modules-" + randomUUID();
+await mkdir(evidence, { mode: 0o700, recursive: true });
+console.log("Installed module evidence: " + evidence);
 const release = process.env.HARBOR_MANAGED_RELEASE!;
 if (
   process.getuid?.() !== 0 ||
@@ -32,10 +37,26 @@ const bridge = (action: string, fields: any = {}) =>
     ),
   );
 const db = createPool(process.env.DATABASE_URL!);
-const browser = await chromium.launch({ headless: true });
+const browser = process.env.HARBOR_TEST_BROWSER_ENDPOINT
+  ? await chromium.connect(process.env.HARBOR_TEST_BROWSER_ENDPOINT, {
+      exposeNetwork: [new URL(c.origin).host, new URL(c.oidcIssuer).host].join(
+        ",",
+      ),
+    })
+  : await chromium.launch({ headless: true });
 const context = await browser.newContext({ ignoreHTTPSErrors: true });
 const page = await context.newPage();
 const violations: string[] = [];
+let reconciledDroppedResponse = false;
+let droppedOperationId: string | undefined;
+let completeResponseDrop!: () => void;
+let rejectResponseDrop!: (reason: unknown) => void;
+const responseDropCompleted = new Promise<void>((resolve, reject) => {
+  completeResponseDrop = resolve;
+  rejectResponseDrop = reject;
+});
+void responseDropCompleted.catch(() => {});
+const dropSaveResponse = process.env.HARBOR_MODULE_DROP_SAVE_RESPONSE === "1";
 const transport: {
   method: string;
   path: string;
@@ -116,6 +137,9 @@ try {
     page.getByRole("button", { name: "Add project", exact: true }).first(),
   ).toBeVisible();
   const me = await (await context.request.get(c.origin + "/api/v1/me")).json();
+  const originalTerminalIds = (
+    await db.query("SELECT id FROM terminals")
+  ).rows.map((row) => row.id);
   const headers = { Origin: c.origin, "x-csrf-token": me.csrfToken };
   const command = (route: string, data: any) =>
     context.request.post(c.origin + "/api/v1" + route, {
@@ -165,26 +189,102 @@ try {
   await page.locator(".monaco-editor").first().click();
   await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.insertText("Saved through installed unprivileged API\n");
+  if (dropSaveResponse)
+    await page.route(
+      "**/api/v1" + `/workspaces/${w.id}/files/save`,
+      async (route) => {
+        try {
+          const response = await route.fetch();
+          expect(response.status()).toBe(202);
+          droppedOperationId = (await response.json()).operation.id;
+          expect(droppedOperationId).toMatch(/^[a-f0-9-]{36}$/);
+          await expect
+            .poll(
+              async () =>
+                (
+                  await db.query(
+                    "SELECT state FROM file_operations WHERE id=$1 AND workspace_id=$2",
+                    [droppedOperationId, w.id],
+                  )
+                ).rows[0]?.state,
+              { timeout: 30000 },
+            )
+            .toBe("succeeded");
+          await route.abort("failed");
+          completeResponseDrop();
+        } catch (error) {
+          rejectResponseDrop(error);
+          await route.abort("failed").catch(() => {});
+        }
+      },
+      { times: 1 },
+    );
   await page.getByRole("button", { name: "Save file", exact: true }).click();
   await expect
     .poll(() => readFile(file, "utf8"), { timeout: 30000 })
     .toBe("Saved through installed unprivileged API\n");
-  await expect(page.getByText("Unsaved draft", { exact: true })).toBeHidden({
-    timeout: 30000,
-  });
+  if (dropSaveResponse) {
+    await responseDropCompleted;
+    await expect(
+      page.getByRole("button", {
+        name: "Retry same file operation",
+        exact: true,
+      }),
+    ).toBeVisible();
+    const before = (
+      await db.query(
+        "SELECT id,state,request_hash FROM file_operations WHERE workspace_id=$1 ORDER BY created_at",
+        [w.id],
+      )
+    ).rows;
+    expect(before.find((o) => o.id === droppedOperationId)?.state).toBe(
+      "succeeded",
+    );
+    await page
+      .getByRole("button", { name: "Retry same file operation", exact: true })
+      .click();
+    await expect(page.getByText("Unsaved draft", { exact: true })).toBeHidden({
+      timeout: 30000,
+    });
+    const after = (
+      await db.query(
+        "SELECT id,state,request_hash FROM file_operations WHERE workspace_id=$1 ORDER BY created_at",
+        [w.id],
+      )
+    ).rows;
+    expect(after).toEqual(before);
+    expect(await readFile(file, "utf8")).toBe(
+      "Saved through installed unprivileged API\n",
+    );
+    reconciledDroppedResponse = true;
+  } else
+    await expect(page.getByText("Unsaved draft", { exact: true })).toBeHidden({
+      timeout: 30000,
+    });
   await page.screenshot({
-    path: admission.control + "/modules-editor.png",
+    path: evidence + "/modules-editor.png",
     fullPage: true,
   });
   await page.getByRole("button", { name: "Close files", exact: true }).click();
-  const copyResponse = await command(`/projects/${project.id}/workspaces`, {
-    name: "Installed copy",
-    kind: "copy",
-    sourceWorkspaceId: w.id,
-    dirtyPolicy: "snapshot",
-  });
-  expect(copyResponse.status(), await copyResponse.text()).toBe(202);
-  const copied = (await copyResponse.json()).workspace;
+  let copied =
+    process.env.HARBOR_MODULE_RESUME_OWNED === "1"
+      ? (
+          await db.query(
+            "SELECT id FROM workspaces WHERE project_id=$1 AND source_workspace_id=$2 AND name='Installed copy' AND kind='copy' AND state<>'removed' ORDER BY created_at LIMIT 1",
+            [project.id, w.id],
+          )
+        ).rows[0]
+      : undefined;
+  if (!copied) {
+    const copyResponse = await command(`/projects/${project.id}/workspaces`, {
+      name: "Installed copy",
+      kind: "copy",
+      sourceWorkspaceId: w.id,
+      dirtyPolicy: "snapshot",
+    });
+    expect(copyResponse.status(), await copyResponse.text()).toBe(200);
+    copied = (await copyResponse.json()).workspace;
+  }
   await expect
     .poll(
       async () =>
@@ -241,7 +341,7 @@ try {
     { timeout: 10000 },
   );
   await page.screenshot({
-    path: admission.control + "/modules-terminal.png",
+    path: evidence + "/modules-terminal.png",
     fullPage: true,
   });
   expect(violations).toEqual([]);
@@ -289,7 +389,9 @@ try {
   const registry = bridge("registry");
   expect(registry.modules.P004).toHaveLength(4);
   expect(registry.modules.P006).toHaveLength(3);
-  expect(registry.terminals).toHaveLength(2);
+  expect(registry.terminals.map((row: any) => row.id).sort()).toEqual(
+    [...originalTerminalIds, terminal.id, queued.id].sort(),
+  );
   bridge("interrupt");
   await expect
     .poll(() => bridge("status").activeTerminals, { timeout: 30000 })
@@ -325,11 +427,15 @@ try {
   expect(status.queuedTerminals).toBe(1);
   expect(status.deployment.maintenance).toBe(true);
   await writeFile(
-    admission.control + "/modules-result.json",
+    evidence + "/modules-result.json",
     JSON.stringify(
       {
         status: "passed",
         resumedOwnedFixture: process.env.HARBOR_MODULE_RESUME_OWNED === "1",
+        reconciledDroppedResponse,
+        browserTopology: process.env.HARBOR_TEST_BROWSER_ENDPOINT
+          ? "external Playwright client; Linux Harbor components"
+          : "colocated Linux Chromium",
         node: process.version,
         artifact: manifest.artifact,
         source: manifest.source,
@@ -353,7 +459,7 @@ try {
 } catch (error) {
   await page
     .screenshot({
-      path: admission.control + "/modules-failure.png",
+      path: evidence + "/modules-failure.png",
       fullPage: true,
     })
     .catch(() => {});
@@ -361,7 +467,7 @@ try {
     .get(c.origin + "/api/v1/me")
     .catch(() => null);
   await writeFile(
-    admission.control + "/modules-failure.json",
+    evidence + "/modules-failure.json",
     JSON.stringify(
       {
         path: new URL(page.url()).pathname,
