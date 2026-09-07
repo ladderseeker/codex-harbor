@@ -73,6 +73,15 @@ try {
           [c.terminalId],
         )
       ).rows[0].state,
+      "retiring",
+    );
+    assert.equal(
+      (
+        await db.query(
+          "SELECT historical->>'state' AS state FROM deployment_restored_operations WHERE kind='terminal-interruption' AND id=$1",
+          [c.terminalId],
+        )
+      ).rows[0].state,
       "uncertain",
     );
     console.log(

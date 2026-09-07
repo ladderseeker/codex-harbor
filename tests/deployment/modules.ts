@@ -36,6 +36,33 @@ const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ ignoreHTTPSErrors: true });
 const page = await context.newPage();
 const violations: string[] = [];
+const transport: {
+  method: string;
+  path: string;
+  status?: number;
+  failure?: string;
+}[] = [];
+page.on("response", (response) => {
+  if (
+    transport.length < 128 &&
+    new URL(response.url()).pathname.startsWith("/api/v1")
+  )
+    transport.push({
+      method: response.request().method(),
+      path: new URL(response.url()).pathname,
+      status: response.status(),
+    });
+});
+page.on("requestfailed", (request) => {
+  if (transport.length < 128)
+    transport.push({
+      method: request.method(),
+      path: new URL(request.url()).pathname,
+      failure: (request.failure()?.errorText ?? "unknown")
+        .replace(/https?:\/\/\S+/g, "[url]")
+        .slice(0, 160),
+    });
+});
 page.on("console", (m) => {
   if (
     m.type() === "error" &&
@@ -117,7 +144,7 @@ try {
     expect(response.status(), await response.text()).toBe(200);
     project = (await response.json()).project;
   }
-  const w = (
+  let w = (
     await db.query(
       "SELECT * FROM workspaces WHERE project_id=$1 AND kind='local'",
       [project.id],
@@ -150,6 +177,38 @@ try {
     fullPage: true,
   });
   await page.getByRole("button", { name: "Close files", exact: true }).click();
+  const copyResponse = await command(`/projects/${project.id}/workspaces`, {
+    name: "Installed copy",
+    kind: "copy",
+    sourceWorkspaceId: w.id,
+    dirtyPolicy: "snapshot",
+  });
+  expect(copyResponse.status(), await copyResponse.text()).toBe(202);
+  const copied = (await copyResponse.json()).workspace;
+  await expect
+    .poll(
+      async () =>
+        (
+          await db.query("SELECT state FROM workspaces WHERE id=$1", [
+            copied.id,
+          ])
+        ).rows[0]?.state,
+      { timeout: 30000 },
+    )
+    .toBe("ready");
+  w = (await db.query("SELECT * FROM workspaces WHERE id=$1", [copied.id]))
+    .rows[0];
+  expect(await readFile(w.canonical_path + "/tracked.txt", "utf8")).toBe(
+    "Saved through installed unprivileged API\n",
+  );
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Installed modules", exact: true })
+    .click();
+  await page
+    .getByLabel("New conversation workspace", { exact: true })
+    .selectOption(w.id);
+
   await page
     .getByRole("button", { name: "Open terminals", exact: true })
     .click();
@@ -197,6 +256,12 @@ try {
     execFileSync("docker", ["inspect", name], { encoding: "utf8" }),
   )[0];
   expect(inspection.HostConfig.NetworkMode).toBe("none");
+  expect(
+    inspection.Mounts.some(
+      (m: any) =>
+        m.Source === w.canonical_path && m.Destination === "/workspace",
+    ),
+  ).toBe(true);
   expect(inspection.Config.Image).toBe(manifest.images.runner.id);
   expect(
     inspection.Mounts.some((m: any) =>
@@ -302,6 +367,12 @@ try {
         path: new URL(page.url()).pathname,
         meStatus: health?.status() ?? null,
         consoleErrors: violations,
+        transport,
+        fileStates: (
+          await db.query(
+            "SELECT state,failure_code FROM file_operations ORDER BY created_at DESC LIMIT 8",
+          )
+        ).rows,
       },
       null,
       2,
