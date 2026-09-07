@@ -26,3 +26,13 @@ The probe used Node 24.11.1, the actual policy module, a run-owned database/cont
 A delayed authority check can admit work after the credential's stated validity window. Keep P002 active and unverified. Acquire authority locks in a consistent order, then evaluate current identity, revocation, absolute/idle expiry and resource grants after all relevant waits. Preserve the distinction between proven pre-wire rejection and uncertain delivery so a denied new control does not poison already-authorized work.
 
 Add real PostgreSQL lock-wait cases for token expiry and browser absolute/idle expiry, plus relevant final-dispatch/control scenarios and identity changes. Integrate the shared correction into P007 recovery and other affected new routes. The P002 implementer owns the focused fix; a separate agent must review it and its evidence. Record source identity, commands, environment, results, and remaining limitations before resolution and archival.
+
+## Focused review follow-up
+
+P002 review round 3 inspected the proposed correction at source digest `84cd8ec7f633217e4ee4aa2fd9bbeaf8d5550c34fe39739841b31ecbc6a4b35c` (808 files). The reviewer accepted the shared helper's lock-then-fresh-validation pattern and browser idle-touch logic, and identified three caller regressions for the same fix batch:
+
+- Logout's generic post-callback check sees its own deliberate revocation and rolls the transaction back. Logout must commit that authorized revocation.
+- Queued cancellation needs a fresh authority check after acquiring the target session lock, not only before waiting for it.
+- The repeated pre-wire check must preserve cancellation's existing permission-profile rule: a token with cancellation authority can stop an already-running workspace-write turn even when the token's ceiling would prevent starting that turn.
+
+These are unresolved review findings, not delivered corrections. The implementer accepted all three. Existing logout acceptance plus targeted queued-cancellation expiry and cross-profile cancellation scenarios must pass before the focused round closes.
