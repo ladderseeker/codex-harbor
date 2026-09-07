@@ -23,6 +23,13 @@ from preflight import preflight
 from backup import checkpoint, restic
 from promotion import promote
 from restore import restore, activate
+from destination import (
+    enroll,
+    for_backup,
+    verify_repository,
+    state as destination_state,
+    status as destination_status,
+)
 
 
 def main():
@@ -54,7 +61,14 @@ def main():
     recovery.add_argument("--acknowledge-unknown-effects", action="store_true")
     activation = sub.add_parser("activate")
     activation.add_argument("--restore-id", required=True)
-    sub.add_parser("repository-init")
+    repository = sub.add_parser("repository-init")
+    repository.add_argument("--expected-destination", required=True)
+    repository_check = sub.add_parser("backup-destination-verify")
+    repository_check.add_argument("--expected-destination", required=True)
+    destination = sub.add_parser("backup-destination-enroll")
+    destination.add_argument("--profile", required=True)
+    destination.add_argument("--expected-current", required=True)
+    sub.add_parser("backup-destination-status")
     backup = sub.add_parser("backup")
     backup.add_argument("--interrupt", action="store_true")
     for action in ["promote", "rollback"]:
@@ -69,12 +83,23 @@ def main():
     c = load(args.config)
     with lock(c) as paths:
         operation = str(uuid.uuid4())
-        readonly = args.action in ["status", "preflight", "inventory"]
+        readonly = args.action in [
+            "status",
+            "preflight",
+            "inventory",
+            "backup-destination-status",
+        ]
         if not readonly:
             record(paths, args.action, operation, state="running")
         try:
             if args.action == "status":
                 result = status(c)
+            elif args.action == "backup-destination-status":
+                result = destination_status(c)
+            elif args.action == "backup-destination-enroll":
+                result = enroll(c, args.profile, args.expected_current)
+            elif args.action == "backup-destination-verify":
+                result = verify_repository(c, selected(c)[0], args.expected_destination)
             elif args.action == "recover-runtime":
                 result = recover_runtime(
                     c,
@@ -119,8 +144,12 @@ def main():
             else:
                 release, state = selected(c)
                 if args.action == "repository-init":
-                    restic(c, release, ["init"])
-                    result = {"repositoryInitialized": True}
+                    if destination_state(c)["current"] != args.expected_destination:
+                        raise ValueError(
+                            "Exact destination initialization acknowledgement required"
+                        )
+                    restic(for_backup(c, allow_unverified=True), release, ["init"])
+                    result = verify_repository(c, release, args.expected_destination)
                 elif args.action == "status":
                     result = {"installation": state, "readiness": readiness(c, release)}
                 elif args.action == "preflight":

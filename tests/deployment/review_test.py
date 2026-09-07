@@ -84,7 +84,15 @@ class Review(unittest.TestCase):
 
             with patch(
                 "backup.layout", return_value={"state": root, "etc": root}
-            ), patch("backup.maintenance", return_value=("owned", {})), patch(
+            ), patch("backup.selected", return_value=("owned", {})), patch(
+                "destination.verify_repository"
+            ), patch(
+                "destination.state", return_value={"current": "synthetic"}
+            ), patch(
+                "destination.for_backup", side_effect=lambda c: c
+            ), patch(
+                "backup.maintenance", return_value=("owned", {})
+            ), patch(
                 "backup.run", command
             ), patch(
                 "backup.inventory",

@@ -57,7 +57,32 @@ with tempfile.TemporaryDirectory(prefix="harbor-public-restic-cli-") as temporar
             **kwargs
         )
 
+    try:
+        cli({}, "", ["cat", "config"])
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("Missing synthetic repository was treated as initialized")
     cli({}, "", ["init"])
+    # Exact pinned read-only repository metadata used by enrollment verification.
+    repository = json.loads(cli({}, "", ["cat", "config"]))
+    import destination as enrollment
+
+    ledger = {"current": "d" * 64, "versions": [{"id": "d" * 64}]}
+    with patch("destination.state", return_value=ledger), patch(
+        "destination.for_backup", return_value={}
+    ), patch("backup.restic", cli), patch(
+        "destination.layout", return_value={"state": str(base)}
+    ):
+        checked = enrollment.verify_repository({"instance": "public"}, "", "d" * 64)
+        assert checked["repositoryId"] == repository["id"]
+        ledger["versions"][0]["repositoryId"] = "e" * 64
+        try:
+            enrollment.verify_repository({"instance": "public"}, "", "d" * 64)
+        except ValueError as error:
+            assert "identity changed" in str(error)
+        else:
+            raise AssertionError("Changed repository identity accepted")
 
     def capture():
         cli({}, "", ["backup", str(project), str(dump), str(registry_file)])
@@ -96,6 +121,8 @@ with tempfile.TemporaryDirectory(prefix="harbor-public-restic-cli-") as temporar
                 "registryFilename": "pass",
                 "authenticatedSymlink": "pass",
                 "changedTargetRejected": True,
+                "repositoryMetadataVerified": True,
+                "changedRepositoryIdentityRejected": True,
                 "harborState": False,
                 "network": False,
             }

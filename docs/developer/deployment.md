@@ -16,7 +16,7 @@ An explicit lower-ID migration addition needs `--predecessor-manifest` naming th
 
 ## Host configuration and services
 
-The current JSON contract is implemented in [config.py](../../infra/deploy/config.py). Configuration and credential input files must be canonical, root-owned and protected. It selects the instance ID, HTTPS origin, OIDC issuer/client/owner, dedicated API UID, loopback API port, reserved denied database TCP port, registered roots, XFS profile, TLS certificate files or ACME, and fixed SFTP backup credentials. It accepts no arbitrary launcher flags or project executable paths.
+The current JSON contract is implemented in [config.py](../../infra/deploy/config.py). Configuration and credential input files must be canonical, root-owned and protected. It selects the instance ID, HTTPS origin, OIDC issuer/client/owner, dedicated API UID, loopback API port, reserved denied database TCP port, registered roots, XFS profile, TLS certificate files or ACME, and fixed SFTP restore-source credentials (the `backup` field is retained for configuration compatibility). It accepts no arbitrary launcher flags or project executable paths.
 
 Prepare dedicated XFS project-quota units according to [D003](../../design/decisions/003-quota-backed-project-storage.md). Each allowed-root/pool pair shares one trusted administrator parent. The initial installed profile requires a quota-enabled XFS fstab entry; `RequiresMountsFor` orders services after those mounts. A transient mount is insufficient. The API cannot traverse project roots or read the model encryption key; its authenticated private storage IPC creates and validates managed projects.
 
@@ -50,8 +50,21 @@ Restore requires a fresh instance and disabled database, an authenticated archiv
 
 Activation is a separate `activate --restore-id` command. It revalidates publication, retires possible interrupted probes, records native pre/post fingerprints and performs bounded read-only metadata inspection without a model/turn/resume request. Native initialization may update caches; original snapshot evidence is retained. A legitimately removed derived checkout remains removed; its native-history read uses the same project’s registered Local checkout as an explicitly read-only inspection mount, without changing the historical binding or resuming execution. Failed validation keeps the destination disabled.
 
-Promotion requires a verified checkpoint before migration. A pending switch resumes only the same candidate/checkpoint with `--resume`. Rollback requires equal applied migration maps; an incompatible downgrade is refused and requires deliberate fresh restore or forward repair. A repository hosted on restored B is not B's own off-host backup destination. Off-host destination enrollment, full restore fault tests and final release evidence remain outstanding review/acceptance work.
+Promotion requires a verified checkpoint before migration. A pending switch resumes only the same candidate/checkpoint with `--resume`. Rollback requires equal applied migration maps; an incompatible downgrade is refused and requires deliberate fresh restore or forward repair. A repository hosted on restored B is not B's own off-host backup destination. Future backups require separate off-host destination enrollment. Full restore fault tests and final release evidence remain outstanding.
 
 ## Verification entry points
 
 `pnpm test:deployment:contract` runs the extraction/lifecycle and real Unix-response truncation/deadline contracts. It is not a deployment E2E substitute. The run-owned Linux fixtures are in `tests/deployment/`; they exercise actual installed services, owner API allocation, privilege checks, identity preservation and the installed native/runner boundary. Reboot only explicitly disposable test hosts. Preserve source/artifact identities and distinguish partial checks from the mandatory P009-01–07 outcomes.
+
+## Future backup destination enrollment
+
+Use a root-owned mode-0600 JSON profile with exactly `destination`, `targetHostId`, and `hostKeySha256`. `destination` has the restricted SFTP fields from `config.py`; `targetHostId` is SHA256 of the intended remote `/etc/machine-id` bytes without the trailing newline, and `hostKeySha256` is SHA256 of the decoded Ed25519 SSH public-key blob. Supply these through the administrator's authenticated channel. The known-host file must contain one matching Ed25519 pin for that authority. The local host identity/key is refused; administrator identity binding is not a claim to automatically prove physical provider separation.
+
+```sh
+sudo ./harborctl --config /etc/harbor-install.json backup-destination-status
+sudo ./harborctl --config /etc/harbor-install.json backup-destination-enroll --profile /etc/harbor-destination.json --expected-current none
+```
+
+For an update, replace `none` with the exact current destination ID. Failed probes preserve the old record; identical retries reconcile the same admission. Enrollment sends only a public nonce and confirms its exact cleanup. It does not initialize Restic or send Harbor data. An empty destination remains explicitly not initialized/verified. After separately authorized initialization, `repository-init --expected-destination ID` initializes that enrolled destination; `backup-destination-verify --expected-destination ID` authenticates existing repository metadata and reconciles a lost initialization acknowledgement. These later commands are not permission to bypass the recorded blocked transfer. Changed SSH/password/known-host files require explicit re-enrollment. History is bounded to sixteen destination versions.
+
+`backup` uses only the admitted future destination and verifies its repository identity. `restore` uses the original configuration source, whose endpoint and protected-file fingerprints are pinned into its restore journal. Updating future backups cannot redirect a pending restore. Restored historical destination records do not regain authority.

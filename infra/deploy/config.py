@@ -147,7 +147,14 @@ def load(path):
         trusted(tls["key"], private=True, file=True)
     elif tls != {"mode": "acme"}:
         raise ValueError("ACME or verified administrator certificate files required")
-    backup = c["backup"]
+    validate_backup(c["backup"])
+    for key in ["oidcSecretFile", "extraCaFile"]:
+        if key in c:
+            trusted(c[key], private=key == "oidcSecretFile", file=True)
+    return c
+
+
+def validate_backup(backup):
     if set(backup) != {
         "host",
         "port",
@@ -170,10 +177,6 @@ def load(path):
         raise ValueError("Invalid SFTP destination")
     for key in ["sshKey", "knownHosts", "passwordFile"]:
         trusted(backup[key], private=True, file=True)
-    for key in ["oidcSecretFile", "extraCaFile"]:
-        if key in c:
-            trusted(c[key], private=key == "oidcSecretFile", file=True)
-    return c
 
 
 def layout(instance):

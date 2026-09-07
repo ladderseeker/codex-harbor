@@ -3,7 +3,8 @@
 import os, json, stat, time, uuid, hashlib, shlex, shutil
 from common import run, atomic, digest
 from config import layout, trusted
-from control import maintenance, service, db
+from control import maintenance, service, db, selected
+from ssh_policy import options as ssh_options
 from artifact import verify
 from bounds import MAX_BYTES, MAX_FILES, MAX_FILE_BYTES
 
@@ -20,22 +21,14 @@ def restic(
     # Immutable snapshot reads use authenticated IDs and run under the Harbor
     # administrator lock. Avoid repository lock writes under a tiny dump FSIZE
     # bound; concurrent removal/corruption fails content verification closed.
-    snapshot_read = args[0] in {"ls", "dump"} or args[:2] == ["cat", "tree"]
+    snapshot_read = args[0] in {"ls", "dump"} or args[:2] in [
+        ["cat", "tree"],
+        ["cat", "config"],
+    ]
     b = c["backup"]
     ssh = [
         "ssh",
-        "-F",
-        "/dev/null",
-        "-o",
-        "BatchMode=yes",
-        "-o",
-        "IdentitiesOnly=yes",
-        "-o",
-        "StrictHostKeyChecking=yes",
-        "-o",
-        "UserKnownHostsFile=" + b["knownHosts"],
-        "-i",
-        b["sshKey"],
+        *ssh_options(b),
         "-p",
         str(b["port"]),
         b["user"] + "@" + b["host"],
@@ -115,6 +108,10 @@ def inventory(root, exclude_native_auth=False, maximum=200000, exclude_locks=Fal
 
 
 def checkpoint(c, interrupt=False):
+    from destination import for_backup, state, verify_repository
+
+    verify_repository(c, selected(c)[0], state(c)["current"])
+    c = for_backup(c)
     p = layout(c["instance"])
     folder = p["state"] + "/backups"
     os.makedirs(folder, mode=0o700, exist_ok=True)
@@ -263,6 +260,7 @@ def checkpoint(c, interrupt=False):
         raise ValueError("Database checkpoint bound")
     payload = {
         "format": 1,
+        "backupDestination": state(c),
         "backupSchema": manifest["backupSchema"],
         "instance": c["instance"],
         "ownerIssuer": c["oidcIssuer"],

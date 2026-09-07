@@ -59,12 +59,18 @@ def validate(registry, c, manifest, owner_rebind=False):
 def restore(c, archive, sha, snapshot, registry_sha, resume=False, owner_rebind=False):
     p = layout(c["instance"])
     statepath = p["state"] + "/restore.json"
-    old = json.load(open(statepath)) if os.path.exists(statepath) else None
+    old = None
+    if os.path.exists(statepath):
+        with open(statepath) as stream:
+            old = json.load(stream)
     if old and not resume:
         raise ValueError("Restore exists; explicit same-operation resume required")
     if resume and not old:
         raise ValueError("No interrupted restore exists")
+    from destination import source_identity
+
     identity = {
+        "restoreSource": source_identity(c["backup"]),
         "ownerRebind": owner_rebind,
         "archiveSha256": sha,
         "snapshot": snapshot,
