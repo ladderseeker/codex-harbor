@@ -11,6 +11,12 @@ Provide versioned images/artifacts, Compose configuration, prerequisite checks, 
 
 Cover all delivered module state through a backup registry: PostgreSQL, native Codex state, project roots/worktrees, attachments if delivered, and required protected configuration. Later data-owning features extend the registry and restore assertions in their own changes. This feature does not depend on terminal/file-editor/scheduler UI. Unimplemented module entries are absent, not fake empty backups.
 
+## Source issues
+
+- [Codex runtime compatibility finding](../../issues/archive/2026-09-07-073831-codex-runtime-compatibility.md): Medium severity; transferred on 2026-09-07, not resolved. P009 owns target-host kernel/container prerequisites, deployed account/runtime capabilities, real isolation, and release/restore readiness. These map to **P009-01/02/04/06/07**, the [Release and recovery contract](#release-and-recovery-contract), and [Delivery and verification](#delivery-and-verification).
+- Evidence is pending. Publish supported, unsupported, and experimental capabilities for the delivered deployment profile with measured prerequisites, versions, limitations, and tested rollback/restore compatibility. Re-run applicable runtime and isolation checks before upgrades under the [architecture's compatibility boundary](../architecture.md#official-foundation-and-compatibility-boundary) and [release rules](../architecture.md#release-retention-and-rollback-rules); later delivered features extend this evidence through their own acceptance.
+- [P001](001-secure-persistent-conversations.md#source-issues) owns the local runtime/Linux baseline. Its evidence does not replace the target-host checks. Missing P009 evidence blocks this proposal's verification and deployment-readiness claims. Update the source issue's P009 evidence when verified; resolve the transfer only after both owners' mapped obligations pass.
+
 ## Release and recovery contract
 
 Separate editable source, immutable installed release, and persistent state. Record source/artifact digest, dependency/runtime/schema versions, configuration schema, backup manifest, and supported host capabilities. Bind internal services privately and expose only the authenticated gateway plus explicitly controlled administration. Validate real Linux sandbox/network requirements before accepting work.

@@ -18,6 +18,8 @@ Official documentation presents app-server as an integration interface with conv
 
 Start with a capability spike against a pinned executable and generated schemas. Put protocol handling behind one adapter, test supported behavior, and disable unsupported controls. Upgrade deliberately with compatibility tests and rollback packages. Browser automation, voice, plugins/connectors, pull-request workflows, and desktop integrations each require separate assessment; none should appear functional merely because the desktop offers it.
 
+Publish supported, unsupported, and experimental capabilities with versioned evidence for the features delivered at each gate. P001 establishes the local runtime/Linux baseline; P009 establishes the deployed profile and release/restore gate. Later feature owners extend the relevant capability evidence, and runtime upgrades repeat applicable compatibility/isolation checks while preserving tested rollback packages and compatibility limits.
+
 The SDK documentation recommends app-server for custom clients and the SDK for coding automation; our interactive interface fits the former. Official Remote currently describes mobile access to a connected Mac or Windows PC, not this provider-neutral browser/API deployment. [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk), [Codex Remote](https://learn.chatgpt.com/docs/remote)
 
 ## Stack and component boundaries
@@ -240,14 +242,16 @@ packages/workspaces/      files, attachments, Git worktrees
 packages/storage/         database migrations and repositories
 infra/                    Compose, Caddy, runner templates, bootstrap
 tests/                    integration, security, recovery, browser
-design/                   architecture, decisions, feature proposals
+design/                   architecture, decisions, active and archived proposals
 docs/                     user/developer guides and verification reports
-issues/                   unresolved review findings
+issues/                   active findings, transfer tracking, and archived history
 ```
 
 ## Delivery through complete feature outcomes
 
 Use the [proposal index](proposals/README.md) and [proposal template](proposal-template.md) to define implementable feature outcomes. Split by a complete capability the owner can exercise, not by frontend/backend ownership, file count, or arbitrary size. Each proposal names earlier prerequisites, real setup and verification routes, failure behavior, test evidence, and a completion gate. Earlier capability dependencies are allowed; requiring a future proposal to demonstrate today's feature is not.
+
+The [repository lifecycle rules](../AGENTS.md#document-ownership-and-lifecycle) own work discovery, status, closing notes, archiving, transfer, reopening, and design maintenance. The proposal index links its archive; the [issue index](../issues/README.md) links active and transferred work plus issue history.
 
 All feature proposals currently have `Decision: Draft` and `Delivery: Planned`. The proposal registry owns the dependency graph and implementation order. P001 includes its capability spike, secure conversation, and executable local/E2E foundation as one complete outcome; each later feature owns the additional tests and security controls needed for that outcome. Security and recovery baselines are not postponed until a final hardening phase.
 
@@ -255,7 +259,7 @@ The registry includes an early path to P010 self-development without waiting for
 
 Use implementation → independent review → fixes → verification for each delivery slice. Aim for two to three review rounds, stopping earlier when no actionable findings remain. Record unresolved issues with severity, reproduction evidence, impact, and next steps. No critical blocker may be described as completed work.
 
-Remaining validation risk: [Codex runtime compatibility and Linux capability gate](../issues/2026-09-07-073831-codex-runtime-compatibility.md). This open implementation uncertainty does not prevent completion of the planning work; it must be addressed before deployment readiness is claimed.
+Remaining validation risk: [Codex runtime compatibility and Linux capability gate](../issues/archive/2026-09-07-073831-codex-runtime-compatibility.md), archived as Transferred with evidence pending in P001 and P009. This unresolved implementation uncertainty does not prevent completion of the planning work; transfer does not satisfy either gate or establish deployment readiness.
 
 ## Review record
 

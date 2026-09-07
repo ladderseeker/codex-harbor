@@ -1,6 +1,6 @@
 # Feature proposal template
 
-Copy this structure to `design/proposals/<stable-feature-name>.md` and replace every placeholder. Preserve a stable proposal identifier when its title changes. Scale explanation to the feature, but keep every required decision or mark it explicitly not applicable with a reason.
+Copy this structure to `design/proposals/<number>-<stable-feature-name>.md` and replace every placeholder. First check the [active index](proposals/README.md) and [archive index](proposals/archive/README.md) for existing work and allocated IDs. Follow the [canonical lifecycle rules](../AGENTS.md#document-ownership-and-lifecycle). Scale explanation to the feature, but keep every required decision or mark it explicitly not applicable with a reason.
 
 ## Status and outcome
 
@@ -9,6 +9,7 @@ Copy this structure to `design/proposals/<stable-feature-name>.md` and replace e
 - Delivery: `Planned` initially; allowed states are `Planned`, `In progress`, `Implemented`, `Verified`. Never infer delivery from decision status.
 - User outcome: `<one complete capability observable through Harbor>`
 - Evidence/status updated: `<date and relevant implementation/review references>`
+- Next action: `<concrete remaining work or dependency gate>`
 
 Describe the concrete trigger and visible result. State current behavior and the intended change. Link relevant architecture sections. Do not imply that the user has individually approved every technical detail.
 
@@ -17,6 +18,10 @@ Describe the concrete trigger and visible result. State current behavior and the
 List included behavior, meaningful exclusions, and earlier accepted capabilities this proposal requires. Split by a complete outcome rather than frontend/backend layers or estimated size.
 
 Explain how a fresh isolated environment installs or seeds those earlier prerequisites. No future proposal may be necessary to exercise or verify this feature. A dependency on an earlier capability does not waive independent acceptance of the feature's own behavior.
+
+## Source issues
+
+List linked source issues or state `None`. For each transferred issue, map every obligation owned here to named acceptance IDs or sections, retaining severity, remaining risk, the gate it blocks, and pending or completed evidence. Link other owning proposals for shared transfers. Apply the [issue transfer rules](../AGENTS.md#issue-resolution-and-transfer) when changing ownership or completing this proposal.
 
 ## User and API flows
 
@@ -62,3 +67,15 @@ Describe configuration, migrations, resource prerequisites, candidate validation
 ## Review record and remaining issues
 
 Record implementation → independent review → fixes → verification, with dates and evidence. Link unresolved issue records that include severity, affected files, reproduction/evidence, impact, and next steps. Critical unresolved requirements block implementation completion. Distinguish open dependency validation from defects and from unfinished planning.
+
+## Closing record
+
+Keep this section pending while active. On archive, fill the fields required by the [proposal completion rules](../AGENTS.md#proposal-completion-and-archive):
+
+- Archive disposition and date: `<Completed, Superseded, or Withdrawn; date>`
+- Outcome or reason: `<delivered result, replacement, or withdrawal reason>`
+- Validation and review: `<tested source revision or source/artifact digest; commands, environment, results, review rounds; linked report>`
+- Remaining impact: `<limitations, follow-ups, affected issues/dependencies, replacement links where applicable>`
+- Current documentation: `<links to implemented behavior and operational guidance, or not applicable with reason>`
+
+Retain dated status and reopening history below the closing record when needed.

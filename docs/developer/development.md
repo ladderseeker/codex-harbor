@@ -2,16 +2,16 @@
 
 Codex Harbor is currently a design-stage repository. There is no application workspace, package manifest, dependency lockfile, development server, or executable test suite. The workflow below distinguishes work that can be done now from the command contract future implementation must provide.
 
-The [architecture](../../design/architecture.md) defines the target system. The [proposal index](../../design/proposals/README.md) defines independently verifiable feature outcomes and their dependencies. [AGENTS.md](../../AGENTS.md) contains the repository's working rules.
+The [architecture](../../design/architecture.md) defines the target system. The [proposal index](../../design/proposals/README.md) defines independently verifiable feature outcomes and their dependencies. The [issue index](../../issues/README.md) exposes active findings and pending work transferred to proposals. Both indexes link their archives. [AGENTS.md](../../AGENTS.md#document-ownership-and-lifecycle) contains the canonical lifecycle and working rules.
 
 ## Working on documents now
 
-1. Inspect the working tree, including untracked files, and read the relevant design and proposal before editing.
+1. Inspect the working tree, including untracked files, and use the proposal/issue indexes and their archives to find the relevant design, existing work, and dependencies before editing.
 2. Put new design or feature proposals in `design/`. Update the canonical requirement instead of copying it into another document. Keep the relevant indexes and links current.
 3. Put documentation for actual behavior, developer procedures, and completed reports in `docs/`. State limitations and pending verification explicitly.
 4. Review changed documents for complete acceptance criteria, dependency consistency, portability, security boundaries, and agreement between architecture and proposals.
 5. Validate local Markdown links, document structure, and whitespace; include newly created files in the checks. `git diff --check` can check tracked diffs but does not validate untracked files or links.
-6. Complete independent review and any resulting fixes according to [the repository review cycle](../../AGENTS.md#delegation-and-review). Record unresolved findings in `issues/` with evidence and next steps.
+6. Complete independent review and any resulting fixes according to [the repository review cycle](../../AGENTS.md#delegation-and-review). Record findings and maintain their ownership through the [issue lifecycle](../../AGENTS.md#issue-resolution-and-transfer).
 
 Document validation establishes document quality. It does not establish that proposed application behavior, runtime compatibility, or isolation works.
 
@@ -19,11 +19,13 @@ Document validation establishes document quality. It does not establish that pro
 
 Select a proposal whose dependencies are delivered, then define its acceptance evidence before implementation. A proposal is a complete outcome: its UI, API, persistence, permissions, lifecycle, and failure paths belong together where applicable. A large feature may take several implementation steps without becoming several proposals. A small feature may remain a proposal if it produces a complete useful outcome.
 
-Track the proposal's decision state (`Draft`, `Accepted`, or `Superseded`) separately from its delivery state (`Planned`, `In progress`, `Implemented`, or `Verified`). The delivery state must reflect evidence. A design review cannot advance a proposal to `Verified`, and these states do not require a new permission step when existing task authorization already covers the work.
+Use the [proposal lifecycle](../../AGENTS.md#proposal-completion-and-archive) to track decision and delivery independently, starting implementation at `In progress`. Follow its evidence requirements before completion and archival; a design review establishes no application delivery.
 
 Use a branch/worktree for isolated implementation, especially when work happens in parallel. Preserve unrelated changes. Keep the proposal current if requirements change, and update actual user/developer documentation as behavior becomes available. Do not make commits or publish changes without task authorization.
 
 Implement the outcome, run its end-to-end acceptance scenarios and the critical regression suite, obtain independent review, fix actionable findings, and verify the fixes. Record the revision, environment, commands, results, skipped gates, and review rounds in an appropriate report linked from the proposal. Screenshots and test traces are supporting evidence, not a substitute for assertions about the result.
+
+Finish the lifecycle update with the proposal's closing notes, source-issue evidence, current user/developer documentation, and both active/archive indexes and links. Follow the [reopening and design maintenance rules](../../AGENTS.md#reopening-and-design-maintenance) when findings invalidate closure or materially change the design.
 
 ## Command availability
 

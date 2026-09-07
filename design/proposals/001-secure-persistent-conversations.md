@@ -11,6 +11,12 @@ Deliver the first usable vertical feature: executable local development stack, o
 
 Implement the actual runtime adapter, isolated runner, durable dispatch, history mapping, replay baseline, and test environment needed for this outcome. Bootstrap work stays inside this feature rather than becoming disconnected frontend/backend proposals. Programmatic PATs, rich attachments, advanced history search, multiple-workspace management, file-editor UI, terminal UI, and scheduling belong to later proposals.
 
+## Source issues
+
+- [Codex runtime compatibility finding](../../issues/archive/2026-09-07-073831-codex-runtime-compatibility.md): Medium severity; transferred on 2026-09-07, not resolved. P001 owns the pinned runtime and matching schemas, conversation/streaming/approval/cancel/recovery contracts, and local Linux runner prerequisites/isolation. These map to **P001-03–08** and [Delivery and verification](#delivery-and-verification), under the [architecture's compatibility boundary](../architecture.md#official-foundation-and-compatibility-boundary).
+- Evidence is pending. Publish the supported, unsupported, and experimental capabilities demonstrated by this local baseline, with versions, limitations, and reproducible checks. Missing real runtime/account or Linux evidence blocks P001 verification. Later feature owners extend this baseline through their own acceptance under the [shared runtime verification contract](../architecture.md#repeatable-verification-through-the-application).
+- [P009](009-portable-deployment-and-restore.md#source-issues) owns the separate target-host/release/restore evidence and upgrade gates. Local success does not establish deployment readiness or require P001 to wait for P009. Update this finding's P001 evidence when verified; leave the issue Transferred while P009's part remains pending.
+
 ## Contracts and security
 
 Use the [architecture's state/API contract](../architecture.md#api-events-and-state-transitions). Persist project/workspace, facade session/native thread mapping, operation intent, effective execution grant, approvals, and events. One active turn per conversation; additional input is explicitly queued or steered. Duplicate submissions resolve to the same operation. An ambiguous runtime delivery is never silently replayed.
