@@ -19,5 +19,6 @@ This directory describes available behavior, developer workflows, and completed 
 - [P003 workspace verification](reports/2026-09-07-p003-workspaces.md): reviewed workspace/storage behavior, combined token/workspace checks, Linux evidence and remaining live/upstream gates.
 - [P007 history/recovery integration](reports/2026-09-07-p007-history-integration.md): bounded history, explicit uncertainty recovery, combined Node 24 acceptance, review and resolved source findings.
 - [Gateway transport diagnostic](reports/2026-09-07-gateway-transport-diagnostic.md): measured DNS/TLS failure stages in a second disposable Linux VM, with the availability issue still open.
+- [P012 native capability spike](reports/2026-09-08-p012-protocol-spike.md): account-free skill discovery/disable and local MCP call/form checks on pinned Codex; feature, Linux and live evidence remain pending.
 
 Add user documentation when the corresponding features work. Add reports for completed investigations or verification, including the revision and environment checked. Keep future feature specifications in `design/`, and unresolved findings in `issues/`.
