@@ -1,6 +1,8 @@
 /** Real PostgreSQL deferred COMMIT failure after actual private storage allocation. */
 import { request } from "@playwright/test";
-import { readFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { readFile, writeFile } from "node:fs/promises";
 import { stat } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
@@ -21,6 +23,22 @@ const password = (
 const db = createPool(
   `postgres://harbor:${password}@localhost/harbor?host=${encodeURIComponent(`/run/codex-harbor/${manifest.id}/postgres`)}`,
 );
+const installation = JSON.parse(
+  await readFile(
+    `/var/lib/codex-harbor/${manifest.id}/installation.json`,
+    "utf8",
+  ),
+);
+const inventory = async () =>
+  JSON.parse(
+    (
+      await promisify(execFile)(
+        installation.release + "/bin/harborctl",
+        ["--config", manifest.config, "inventory"],
+        { timeout: 30000, maxBuffer: 65536 },
+      )
+    ).stdout,
+  );
 const owner = JSON.parse(
   await readFile(manifest.control + "/owner.json", "utf8"),
 );
@@ -59,6 +77,11 @@ try {
   );
   const path = c.roots[0].path + "/" + name + "/workspace";
   const before = await stat(path, { bigint: true });
+  const detected = (await inventory()).unregistered.find(
+    (r: any) => r.managedName === name,
+  );
+  assert.ok(detected);
+  assert.equal(detected.registrationPath, name + "/workspace");
   await db.query(
     `DROP TRIGGER ${trigger} ON projects; DROP FUNCTION ${trigger}()`,
   );
@@ -89,15 +112,25 @@ try {
   ).rows[0];
   assert.equal(stored.device, before.dev.toString());
   assert.equal(stored.inode, before.ino.toString());
-  console.log(
-    JSON.stringify({
-      actualCommitLossReproduced: true,
-      unregisteredAllocationRetained: true,
-      sameCreateRetryFailedExplicitly: true,
-      explicitExistingRegistrationRecoveredSameInode: true,
-      projectId: project.id,
-    }),
+  assert.ok(
+    !(await inventory()).unregistered.some((r: any) => r.managedName === name),
   );
+  const evidence = {
+    installedArtifact: installation.artifact,
+    actualAllocationInventoryDetected: true,
+    reconciliationRemovedOnlyRegisteredEntry: true,
+    actualCommitLossReproduced: true,
+    unregisteredAllocationRetained: true,
+    sameCreateRetryFailedExplicitly: true,
+    explicitExistingRegistrationRecoveredSameInode: true,
+    projectId: project.id,
+  };
+  await writeFile(
+    manifest.control + "/allocation-loss-result.json",
+    JSON.stringify(evidence, null, 2) + "\n",
+    { mode: 0o600 },
+  );
+  console.log(JSON.stringify(evidence));
 } finally {
   await db.query(
     `DROP TRIGGER IF EXISTS ${trigger} ON projects; DROP FUNCTION IF EXISTS ${trigger}()`,

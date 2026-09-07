@@ -16,3 +16,7 @@ The production ordinary-IP bucket permits 200 requests in a 10-second interval s
 ## Correction and next steps
 
 Replace the test loop with a finite, fixed-concurrency read-only burst and an explicit elapsed deadline, retaining sanitized status counts and duration on failure. Assert ordinary success as well as the declared retryable rate-limit response. Preserve the production 200/10-second policy; add no request retry or mutation. Review the correction independently and run the complete critical suite on the corrected source before closing this record. The historical failure remains unexplained unless new evidence supports attribution.
+
+## Reviewed correction checkpoint — 8 September 2026
+
+The separate reviewer found no actionable defect in the test-only correction: concurrency 8, at most 405 reads, a nine-second request budget, an explicit sub-ten-second assertion, and status/elapsed evidence. Run `harbor-e2e-82771d0087` recorded 195 successful reads and five retryable HTTP 429 responses in 375 milliseconds. Production rate policy was unchanged. The complete run subsequently failed in [P007 cleanup](2026-09-08-020429-p007-regression-evidence.md), so this checkpoint is specific rate-test evidence, not a successful full critical regression or an explanation of the original uninstrumented failure.
