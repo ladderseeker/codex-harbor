@@ -1,7 +1,7 @@
 # D007 — Separate project-preview origins and a confined runner connection
 
 - Decision: Accepted
-- Delivery: Planned
+- Delivery: In progress
 - Date: 7 September 2026
 - Owner: [P011 — Private project previews](../proposals/011-private-project-previews.md)
 - Context: [execution isolation](../architecture.md#execution-and-filesystem-isolation), [public identity](../architecture.md#public-access-and-identity), and [D001 egress](001-confined-runtime-egress.md)

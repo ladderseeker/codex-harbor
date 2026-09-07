@@ -1,7 +1,7 @@
 # D008 — Confined workers for Harbor self-development
 
 - Decision: Accepted
-- Delivery: Planned
+- Delivery: In progress
 - Recorded: 2026-09-08
 - Scope: [P010](../proposals/010-self-development.md), refining the [architecture's trusted build/test broker](../architecture.md#developing-harbor-through-harbor)
 - Supersedes: None. This selects a concrete worker boundary; it does not grant candidate code the stable supervisor's authority.
@@ -58,4 +58,4 @@ Preparing a release verifies the artifact digest, trusted report, required gates
 
 ## Verification status
 
-One independent design review and focused correction check closed on 2026-09-08. The correction places verification/report authority outside the entire potentially compromised worker and requires a forged-report denial. No actionable design finding remained. Implementation remains pending. A separate task-owned Linux test host has bootstrapped with no host mounts or agent forwarding and bounded resources; that preparation is not worker confinement evidence. P010's acceptance must exercise real source edits, broker/guest/candidate services, fixed external checks, malicious worker inputs, host and cross-job denials, actual resource exhaustion, exact cleanup, stable responsiveness, and tested-artifact promotion rules. A compromised-worker canary attempts to change the trusted verifier/report store and submit a forged success; neither may qualify the artifact. Local documentation checks cannot establish any of those results.
+One independent design review and focused correction check closed on 2026-09-08. The correction places verification/report authority outside the entire potentially compromised worker and requires a forged-report denial. No actionable design finding remained. Implementation is in progress; complete feature and isolation acceptance remain pending. A separate task-owned Linux test host has bootstrapped with no host mounts or agent forwarding and bounded resources; that preparation is not worker confinement evidence. P010's acceptance must exercise real source edits, broker/guest/candidate services, fixed external checks, malicious worker inputs, host and cross-job denials, actual resource exhaustion, exact cleanup, stable responsiveness, and tested-artifact promotion rules. A compromised-worker canary attempts to change the trusted verifier/report store and submit a forged success; neither may qualify the artifact. Local documentation checks cannot establish any of those results.

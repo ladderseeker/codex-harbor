@@ -15,3 +15,9 @@ The verifier SHA-256 was `dba3f4bffbfcb197d6b22fd1093eb3529ec32831bb687425c284c9
 ## Impact and next steps
 
 The outside-worker static check can accept an artifact that violates its release-containment rule and will fail the downstream installer. Reject both the exact parent target and parent-prefixed paths, retain supported internal dependency links, and add a focused hostile-archive regression. Independently inspect the correction and matching test evidence before archiving this bounded issue. P010's full verifier, application and Linux acceptance remain separate requirements.
+
+## Reviewed correction checkpoint
+
+The implementer added the exact-parent check and a self-consistent hostile-archive regression. Main independently confirmed rejection of `../..`, `../../elsewhere` and `/outside`, while the contained `../apps/main.ts` link remains accepted. All four cases constructed/read archive bytes only; static success still reported `runtimeVerified: false`. The corrected verifier SHA-256 is `b04f698ea2bfa754f6608eb7562a2d8176bb3291a9b6512a46db8e0a1b7ca2a0`, with test SHA-256 `f71206d4f697eb5e637d6d868830d483f3e6967b041d6b5f6c1730080cd4234f`. Evidence is retained separately in `.test-runs/p010-artifact-boundary-fixed-20260908.json`; the original accepted-invalid-link result remains intact.
+
+One independent bounded source/evidence review found no remaining actionable finding in this correction. The implementation remains in the isolated P010 worktree; record its committed integration before archiving this issue. These parser checks are not P010's complete independent feature review or runtime acceptance.

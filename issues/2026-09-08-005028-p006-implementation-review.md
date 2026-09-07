@@ -1,7 +1,7 @@
 # Correct terminal dispatch and restart findings
 
 - Severity: High
-- Status: In progress
+- Status: Blocked
 - Owner: P006 implementer; independent reviewer and main-agent integration
 - Recorded: 2026-09-08
 - Affected files: apps/web/src/Terminals.tsx; packages/terminals/src/store.ts; apps/api/src/terminal-stream.ts; apps/supervisor/src/terminals.ts, in the P006 implementation worktree
@@ -52,3 +52,9 @@ Independent merge review at combined source `5019bd543d6969614163eb7608f6a849d93
 The integration owner accepted a focused correction and a combined admission test, including the reverse ordering where a terminal already owns a writer. The reviewer found no other actionable defect in the inspected scope union, shared nonce/plugins, typed epoch or deployment-image/terminal-purpose merge. Compilation and branch acceptance do not close this newly identified interaction; preserve the record until corrected-source verification and independent closure.
 
 The correction subsequently passed focused real-stack `harbor-e2e-5e4cbbc6b2` on Node 24.11.1, exact start/end `f0a4cdf2aea0738bc790f9bff6eb539ffc0b4ccbdfd7dd83410464d9c8cced99`, 951 files. The separate reviewer closed its source/evidence recheck. The [integration report](../docs/reports/2026-09-08-p004-p006-integration.md) distinguishes real derived checkouts/PTY from explicitly synthetic file lifecycle checkpoints, preserves the initial mistaken HTTP-status assertion, and records remaining cumulative/Linux/deployment work.
+
+## Current integration evidence and remaining blocker — 8 September 2026
+
+Root `04ab86b` includes the reviewed final file/terminal deployment integration. Exact production `f13afc57…ad1d27` passed the recorded host suites and managed Linux checks; immutable artifact `8c11ca94…84f22` passed both ordinary installed browser use and deliberate save-response-loss recovery, actual native PTY/background retirement, inventory and a fresh local synthetic database rebind. Two bounded module review rounds closed, with no remaining actionable source finding in that scope. The [final module report](../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure) distinguishes artifact/source/test-driver identity, reused-fixture qualifications and earlier failed attempts.
+
+Shared writer, nonce, registry, service/image, drain and local restored-authority implementation obligations are now delivered. The proposal is Implemented. This issue remains active and Blocked specifically for its required fresh-host protected filesystem restore/authority evidence under [P009-04](../design/proposals/009-portable-deployment-and-restore.md#independent-acceptance) and the [blocked backup-transfer prerequisite](2026-09-07-231526-p009-backup-transfer-approval.md). The local clone explicitly reports no filesystem restore and cannot close that remaining obligation. No original finding, gate or failed result is silently discarded; append the required fresh-host evidence before resolution/archival.
