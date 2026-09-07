@@ -1738,3 +1738,91 @@ body,
   font-size: 12px;
   color: #526575;
 }
+
+.terminal-panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.terminal-panel label {
+  display: grid;
+  gap: 6px;
+}
+.terminal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+}
+.terminal-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0;
+}
+.terminal-canvas {
+  width: 100%;
+  height: 360px;
+  min-width: 0;
+  padding: 8px;
+  background: #101a27;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.terminal-session {
+  min-width: 0;
+}
+.terminal-paste {
+  display: grid;
+  gap: 8px;
+}
+.terminal-paste pre {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+dialog:has(.terminal-panel) {
+  width: min(1000px, calc(100vw - 24px));
+}
+@media (max-width: 640px) {
+  .terminal-canvas {
+    height: 300px;
+    padding: 4px;
+  }
+  .terminal-summary {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+.terminal-create summary,
+.terminal-details summary,
+.terminal-secondary summary {
+  cursor: pointer;
+  color: #45617a;
+  font-size: 12px;
+}
+.terminal-create[open] > .terminal-actions,
+.terminal-secondary[open] > .terminal-actions {
+  margin-top: 12px;
+}
+.terminal-details {
+  margin: 6px 0;
+}
+.terminal-secondary {
+  margin: 8px 0;
+}
+@media (max-width: 640px) {
+  .terminal-panel {
+    gap: 10px;
+  }
+  .terminal-summary {
+    margin: 0 0 6px;
+    flex-direction: row;
+    gap: 8px;
+  }
+  .terminal-session > p {
+    margin: 8px 0;
+  }
+}

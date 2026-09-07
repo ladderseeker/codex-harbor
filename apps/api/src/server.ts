@@ -1,3 +1,5 @@
+import { terminalStreams } from "./terminal-stream.ts";
+import { terminalRoutes } from "./terminals.ts";
 import { attachmentRoutes } from "./attachments.ts";
 import { associateAttachments } from "../../../packages/attachments/src/store.ts";
 import {
@@ -140,7 +142,9 @@ export async function buildServer(c: Config) {
       window = login ? 60000 : 10000,
       limit = login ? 30 : 200;
     const reserved =
-      req.url.includes("/security/") || req.url.endsWith("/cancel");
+      req.url.includes("/security/") ||
+      req.url.endsWith("/cancel") ||
+      req.url.endsWith("/terminate");
     const bucketKey =
       req.ip + ":" + (login ? "login" : reserved ? "control" : "ordinary");
     const bucket = rateBuckets.get(bucketKey);
@@ -348,6 +352,7 @@ export async function buildServer(c: Config) {
       }
       const reserved =
         route.endsWith("/cancel") ||
+        route.endsWith("/terminate") ||
         route.endsWith("/answer") ||
         route.endsWith("/recovery") ||
         route.endsWith("/recovery/continue") ||
@@ -360,7 +365,10 @@ export async function buildServer(c: Config) {
         route.includes("/file-operations/") &&
         (route.endsWith("/inspect") || route.endsWith("/release"));
       if (auth.get(req)!.kind === "token" && !reservedFileControl) {
-        const reserve = route.endsWith("/cancel") || route.endsWith("/answer");
+        const reserve =
+          route.endsWith("/cancel") ||
+          route.endsWith("/answer") ||
+          route.endsWith("/terminate");
         if (
           Number(
             (
@@ -397,15 +405,17 @@ export async function buildServer(c: Config) {
             ? "file-release:" + req.params.operationId
             : route === "/api/v1/security/logout"
               ? "logout:" + auth.get(req)!.hash
-              : route.endsWith("/cancel")
-                ? "cancel:" + req.params.id
-                : route.endsWith("/answer")
-                  ? "approval:" + req.params.id
-                  : route.endsWith("/recovery/continue")
-                    ? "continue:" + req.body.recoveryId
-                    : route.endsWith("/recovery")
-                      ? "recovery:" + (result as any).recovery.id
-                      : null;
+              : route.endsWith("/terminate")
+                ? "terminal:" + req.params.id
+                : route.endsWith("/cancel")
+                  ? "cancel:" + req.params.id
+                  : route.endsWith("/answer")
+                    ? "approval:" + req.params.id
+                    : route.endsWith("/recovery/continue")
+                      ? "continue:" + req.body.recoveryId
+                      : route.endsWith("/recovery")
+                        ? "recovery:" + (result as any).recovery.id
+                        : null;
       const limit = controlTarget
         ? controlTarget.startsWith("continue:") ||
           controlTarget.startsWith("logout:") ||
@@ -887,6 +897,18 @@ export async function buildServer(c: Config) {
     },
   );
   attachmentRoutes(app, pool, command);
+  terminalRoutes(app, {
+    pool,
+    c,
+    command,
+    actor: (req) => auth.get(req)!.hash,
+  });
+  terminalStreams(app, {
+    pool,
+    c,
+    command,
+    actor: (req) => auth.get(req)!.hash,
+  });
   app.get<{ Params: { id: string } }>("/api/v1/operations/:id", async (req) => {
     const r = await pool.query("SELECT * FROM operations WHERE id=$1", [
       req.params.id,

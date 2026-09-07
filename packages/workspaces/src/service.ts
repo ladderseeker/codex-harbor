@@ -204,7 +204,16 @@ export async function requireWorkspaceIdle(
     `SELECT 1 FROM file_operations WHERE ${wholeProject ? "project_id" : "workspace_id"}=$1 AND state IN ('queued','dispatching') LIMIT 1`,
     [wholeProject ? w.project_id : w.id],
   );
-  if (busy.rowCount || queued.rowCount || filePending.rowCount)
+  const terminals = await db.query(
+    `SELECT 1 FROM terminals WHERE ${wholeProject ? "project_id" : "workspace_id"}=$1 AND state='queued' LIMIT 1`,
+    [wholeProject ? w.project_id : w.id],
+  );
+  if (
+    busy.rowCount ||
+    queued.rowCount ||
+    filePending.rowCount ||
+    terminals.rowCount
+  )
     throw new HarborError(
       409,
       "WORKSPACE_BUSY",

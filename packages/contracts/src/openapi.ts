@@ -1,4 +1,12 @@
 import { filePaths, fileSchemas } from "./files-openapi.ts";
+import {
+  terminalCreate,
+  terminalControl,
+  terminalInput,
+  terminalResize,
+  terminalHeartbeat,
+  terminalTerminate,
+} from "../../terminals/src/contracts.ts";
 import { tokenSchema } from "./tokens.ts";
 import { z } from "zod";
 import { projectSchema, sessionSchema, turnSchema } from "./index.ts";
@@ -19,6 +27,39 @@ export const publicSchemas = {
       requestId: string,
       retryable: { type: "boolean" },
     }),
+  }),
+  Terminal: object({
+    id: uuid,
+    projectId: uuid,
+    workspaceId: uuid,
+    workspaceName: { type: ["string", "null"] },
+    profile: { enum: ["read-only", "workspace-write"] },
+    state: {
+      enum: [
+        "queued",
+        "dispatching",
+        "running",
+        "shell_exited",
+        "retiring",
+        "terminated",
+        "interrupted",
+        "failed",
+        "uncertain",
+      ],
+    },
+    generation: { type: "integer", minimum: 1 },
+    createdAt: timestamp,
+    deadline: timestamp,
+    retired: { type: "boolean" },
+    exitCode: { type: ["integer", "null"] },
+    failureCode: { type: ["string", "null"] },
+    controllerEpoch: { type: "integer", minimum: 0 },
+    controllerUntil: { type: ["string", "null"], format: "date-time" },
+    inputSequence: { type: "integer", minimum: 0 },
+    inputUncertain: { type: "boolean" },
+    outputSequence: { type: "integer", minimum: 0 },
+    outputFloor: { type: "integer", minimum: 0 },
+    outputLost: { type: "boolean" },
   }),
   Workspace: object({
     id: uuid,
@@ -203,6 +244,9 @@ const tokenRecord = object({
       "files:write",
       "git:read",
       "git:write",
+      "terminal:read",
+      "terminal:control",
+      "terminal:terminate",
     ],
   }),
   project_ids: array(uuid),
@@ -592,6 +636,131 @@ Object.assign(paths, {
     ),
   },
 });
+const terminalResult = object({ terminal: ref("Terminal") });
+const terminalOutput = object({
+  floor: { type: "integer", minimum: 0 },
+  latest: { type: "integer", minimum: 0 },
+  gap: { type: "boolean" },
+  lost: { type: "boolean" },
+  cursor: { type: "integer", minimum: 0 },
+  chunks: array(
+    object({
+      sequence: { type: "integer", minimum: 1 },
+      data: { type: "string", maxLength: 21848 },
+    }),
+  ),
+});
+const sequencedMutation = (input: unknown, result: unknown) => {
+  const op = mutation(input, result);
+  op.parameters = op.parameters.filter((p) => p.name !== "Idempotency-Key");
+  return op;
+};
+Object.assign(paths, {
+  "/workspaces/{id}/terminals": {
+    get: read(object({ terminals: array(ref("Terminal")) })),
+    post: mutation(z.toJSONSchema(terminalCreate), terminalResult, 202),
+  },
+  "/terminals/{id}": {
+    get: read(terminalResult),
+    delete: mutation(empty, object({ removed: { const: true } })),
+  },
+  "/terminals/{id}/output": {
+    get: {
+      ...read(terminalOutput),
+      parameters: [
+        {
+          in: "query",
+          name: "cursor",
+          schema: { type: "integer", minimum: 0 },
+          description:
+            "Last rendered sequence, default0. Output is bounded to16 chunks/256KiB; gap requires resetting the terminal parser before replay.",
+        },
+      ],
+    },
+  },
+  "/terminals/{id}/control": {
+    post: mutation(
+      z.toJSONSchema(terminalControl),
+      object({
+        control: object({
+          controllerId: uuid,
+          epoch: { type: "integer" },
+          generation: { type: "integer" },
+          sequence: { const: 0 },
+          until: timestamp,
+        }),
+      }),
+    ),
+  },
+  "/terminals/{id}/input": {
+    post: sequencedMutation(
+      z.toJSONSchema(terminalInput),
+      object({
+        input: object({
+          epoch: { type: "integer" },
+          sequence: { type: "integer" },
+          state: {
+            enum: [
+              "accepted",
+              "dispatching",
+              "delivered",
+              "denied",
+              "uncertain",
+            ],
+          },
+        }),
+      }),
+    ),
+  },
+  "/terminals/{id}/input/outcome": {
+    post: sequencedMutation(
+      z.toJSONSchema(terminalInput),
+      object({
+        input: object({
+          epoch: { type: "integer" },
+          sequence: { type: "integer" },
+          state: {
+            enum: [
+              "accepted",
+              "dispatching",
+              "delivered",
+              "denied",
+              "uncertain",
+              "missing",
+              "expired",
+            ],
+          },
+        }),
+      }),
+    ),
+  },
+  "/terminals/{id}/resize": {
+    post: sequencedMutation(
+      z.toJSONSchema(terminalResize),
+      object({ accepted: { const: true } }),
+    ),
+  },
+  "/terminals/{id}/heartbeat": {
+    post: sequencedMutation(
+      z.toJSONSchema(terminalHeartbeat),
+      object({ until: timestamp }),
+    ),
+  },
+  "/terminals/{id}/terminate": {
+    post: mutation(z.toJSONSchema(terminalTerminate), terminalResult, 202),
+  },
+  "/terminals/{id}/stream": {
+    get: {
+      ...secure,
+      description:
+        "WebSocket upgrade only, no query parameters or subprotocol credentials. Cookie browser requires exact Origin and first hello frame {version:1,type:'hello',generation,cursor,csrf}; cookie-free Authorization:Bearer permits missing Origin, but a supplied Origin must match. First hello within5s; max8192-byte JSON, compression disabled. Input/resize/heartbeat use corresponding Terminal schemas plus type. Viewer watch {version:1,type:'watch',generation} at most once/5s; idle60s. Server state carries terminal DTO; output carries cursor/floor/latest/gap/lost/chunks, ack carries action and result; error carries code/message. Read access never acquires a controller. 4 viewers/terminal,8/actor,16/instance and256KiB backlog; explicit reconnect resets parser on gaps and never replays input. Current authority is checked throughout streams and before every native input. Limits and epoch/sequence retries are shared with HTTP.",
+      responses: {
+        "101": { description: "Authenticated bounded terminal stream" },
+        ...errors,
+      },
+    },
+  },
+});
 for (const [name, item] of Object.entries(paths))
   if (name.includes("{id}"))
     item.parameters = [...name.matchAll(/\{([^}]+)\}/g)].map((m) => ({
@@ -600,6 +769,18 @@ for (const [name, item] of Object.entries(paths))
     }));
 const tokenRoutes: Record<string, string> = {
   "GET /openapi.json": "read",
+  "GET /workspaces/{id}/terminals": "terminal:read",
+  "POST /workspaces/{id}/terminals": "terminal:control",
+  "GET /terminals/{id}": "terminal:read",
+  "GET /terminals/{id}/output": "terminal:read",
+  "GET /terminals/{id}/stream": "terminal:read",
+  "POST /terminals/{id}/control": "terminal:control",
+  "POST /terminals/{id}/input": "terminal:control",
+  "POST /terminals/{id}/input/outcome": "terminal:control",
+  "POST /terminals/{id}/resize": "terminal:control",
+  "POST /terminals/{id}/heartbeat": "terminal:control",
+  "POST /terminals/{id}/terminate": "terminal:terminate",
+  "DELETE /terminals/{id}": "terminal:terminate",
   "GET /capabilities": "read",
   "GET /projects": "read",
   "GET /sessions": "read",
@@ -618,6 +799,7 @@ for (const [path, item] of Object.entries(paths))
       operation.security = [{ ownerCookie: [] }, { personalToken: [] }];
       operation["x-required-token-scope"] = scope;
       operation.description =
+        (operation.description ? operation.description + " " : "") +
         "Bearer authority intersects project grants, current policy, and token execution ceiling. Revocation denies queued dispatch and closes streams; already-running work continues.";
       operation.parameters = (operation.parameters ?? []).filter(
         (p: any) => p.name !== "X-CSRF-Token" && p.name !== "Origin",
@@ -646,7 +828,7 @@ export const openapi = {
     title: "Codex Harbor owner API",
     version: "1.1.0",
     description:
-      "Versioned cookie/bearer facade. Use Authorization: Bearer; query tokens are never accepted. App-server and token/credential administration remain browser-only. Mutations require timestamped Idempotency-Key, reuse exact key/input after uncertain transport within 24h; conflict409 forbids changed input. 429 is retryable after 10 seconds (login60s), maximum200 requests per10s per IP/control class. Unknown versions fail closed. Uncertain execution is never automatically replayed. Token creation retries return secretUnavailable; revoke/recreate if the one-time secret was lost.",
+      "Versioned cookie/bearer facade. Use Authorization: Bearer; query tokens are never accepted. App-server and token/credential administration remain browser-only. Domain commands require timestamped Idempotency-Key; terminal input/resize/heartbeat instead use their explicit controller epoch and sequence contract. For commands, reuse exact key/input after uncertain transport within 24h; conflict409 forbids changed input. 429 is retryable after 10 seconds (login60s), maximum200 requests per10s per IP/control class. Unknown versions fail closed. Uncertain execution is never automatically replayed. Token creation retries return secretUnavailable; revoke/recreate if the one-time secret was lost.",
   },
   servers: [{ url: "/api/v1" }],
   components: {
@@ -660,6 +842,9 @@ export const openapi = {
     },
     schemas: {
       ...publicSchemas,
+      TerminalInput: z.toJSONSchema(terminalInput),
+      TerminalResize: z.toJSONSchema(terminalResize),
+      TerminalHeartbeat: z.toJSONSchema(terminalHeartbeat),
       ProjectInput: z.toJSONSchema(projectSchema),
       SessionInput: z.toJSONSchema(sessionSchema),
       TurnInput: z.toJSONSchema(turnSchema),

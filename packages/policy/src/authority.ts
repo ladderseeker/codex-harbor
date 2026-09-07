@@ -11,6 +11,9 @@ export const tokenScopes = [
   "files:write",
   "git:read",
   "git:write",
+  "terminal:read",
+  "terminal:control",
+  "terminal:terminate",
 ] as const;
 export type Scope = (typeof tokenScopes)[number];
 export interface Authority {

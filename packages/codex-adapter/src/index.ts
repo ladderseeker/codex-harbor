@@ -30,6 +30,9 @@ export type TurnOptions = {
 export class RuntimeUncertainError extends Error {
   override name = "RuntimeUncertainError";
 }
+export class TerminalNotPresentError extends Error {
+  override name = "TerminalNotPresentError";
+}
 export class TurnAlreadyCompletedError extends Error {
   override name = "TurnAlreadyCompletedError";
   readonly code = "TURN_ALREADY_COMPLETED";
@@ -49,16 +52,20 @@ export class CodexAdapter {
       resolve: (value: any) => void;
       reject: (error: Error) => void;
       timer: NodeJS.Timeout;
+      terminalProbe?: string;
     }
   >();
   private requests = new Map<RpcId, string>();
   private turnStates = new Map<string, "started" | "completed">();
+  private terminal?: { processId: string; exited: boolean };
   constructor(
     private process: OwnedRuntimeProcess,
     private callbacks: RuntimeCallbacks = {},
     private timeoutMs = 15_000,
     private withDispatch?: <T>(send: () => T) => Promise<T>,
     private workspaceRoots: string[] = ["/workspace"],
+    private purpose: "conversation" | "terminal" = "conversation",
+    private terminalOuterSandbox = false,
   ) {
     process.stdout.setEncoding("utf8");
     process.stdout.on("data", (chunk: string) => this.receive(chunk));
@@ -168,7 +175,14 @@ export class CodexAdapter {
           clearTimeout(pending.timer);
           this.pending.delete(message.id);
           if (message.error)
-            pending.reject(new Error("Codex request rejected"));
+            pending.reject(
+              pending.terminalProbe &&
+                message.error.code === -32600 &&
+                message.error.message ===
+                  `no active command/exec for process id ${JSON.stringify(pending.terminalProbe)}`
+                ? new TerminalNotPresentError("Terminal not yet present")
+                : new Error("Codex request rejected"),
+            );
           else pending.resolve(message.result);
         }
       } catch {
@@ -177,7 +191,12 @@ export class CodexAdapter {
       }
     }
   }
-  private request(method: string, params: unknown): Promise<any> {
+  private request(
+    method: string,
+    params: unknown,
+    timeoutMs = this.timeoutMs,
+    terminalProbe?: string,
+  ): Promise<any> {
     if (this.closed)
       return Promise.reject(new RuntimeUncertainError("runtime disconnected"));
     if (this.pending.size >= 32)
@@ -189,9 +208,9 @@ export class CodexAdapter {
           this.disconnect(
             "runtime acknowledgement timed out; delivery uncertain",
           ),
-        this.timeoutMs,
+        timeoutMs,
       );
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, { resolve, reject, timer, terminalProbe });
       try {
         this.send({ id, method, params });
       } catch (error) {
@@ -214,6 +233,129 @@ export class CodexAdapter {
     this.send({ method: "initialized" });
     this.initialized = true;
     return result;
+  }
+  /** One explicit shell launch per dedicated transport; exit is a separate promise. */
+  async startTerminal(options: {
+    processId: string;
+    permissionProfile: "read-only" | "workspace-write";
+    cols: number;
+    rows: number;
+  }): Promise<{ completion: Promise<{ exitCode: number }> }> {
+    if (this.purpose !== "terminal" || this.terminal || !this.initialized)
+      throw Error("Terminal transport is unavailable or already used");
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(options.processId))
+      throw Error("Invalid terminal identity");
+    this.terminalSize(options.cols, options.rows);
+    const state = { processId: options.processId, exited: false };
+    this.terminal = state;
+    const send = () => {
+      const completion = this.request(
+        "command/exec",
+        {
+          processId: options.processId,
+          command: ["/bin/bash", "--noprofile", "--norc", "-i"],
+          tty: true,
+          streamStdin: true,
+          streamStdoutStderr: true,
+          disableOutputCap: true,
+          timeoutMs: 86_400_000,
+          cwd: this.workspaceRoots[0],
+          env: {
+            TERM: "xterm-256color",
+            HISTFILE: "/dev/null",
+            BASH_ENV: null,
+            ENV: null,
+            PROMPT_COMMAND: null,
+          },
+          size: { cols: options.cols, rows: options.rows },
+          sandboxPolicy: this.terminalOuterSandbox
+            ? { type: "externalSandbox", networkAccess: "restricted" }
+            : options.permissionProfile === "workspace-write"
+              ? {
+                  type: "workspaceWrite",
+                  writableRoots: this.workspaceRoots,
+                  networkAccess: false,
+                  excludeTmpdirEnvVar: true,
+                  excludeSlashTmp: true,
+                }
+              : { type: "readOnly", networkAccess: false },
+        },
+        86_415_000,
+      ).then(
+        (result) => {
+          state.exited = true;
+          if (!Number.isInteger(result?.exitCode))
+            throw new RuntimeUncertainError("Invalid terminal exit response");
+          return { exitCode: result.exitCode as number };
+        },
+        (error) => {
+          state.exited = true;
+          throw error;
+        },
+      );
+      void completion.catch(() => undefined);
+      return { completion };
+    };
+    const launched = this.withDispatch ? await this.withDispatch(send) : send();
+    const deadline = Date.now() + this.timeoutMs;
+    while (Date.now() < deadline) {
+      if (state.exited || this.closed)
+        throw new RuntimeUncertainError("Terminal exited before readiness");
+      try {
+        await this.resizeTerminal(options.cols, options.rows, true);
+        return launched;
+      } catch (error) {
+        if (!(error instanceof TerminalNotPresentError)) throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    this.disconnect("terminal readiness deadline exceeded");
+    throw new RuntimeUncertainError("Terminal launch remains uncertain");
+  }
+  private terminalSize(cols: number, rows: number) {
+    if (
+      !Number.isInteger(cols) ||
+      cols < 20 ||
+      cols > 240 ||
+      !Number.isInteger(rows) ||
+      rows < 5 ||
+      rows > 80
+    )
+      throw Error("Invalid terminal dimensions");
+  }
+  private async terminalControl(method: string, params: object, probe = false) {
+    const state = this.terminal;
+    if (this.purpose !== "terminal" || !state || state.exited)
+      throw Error("Terminal is not running");
+    const send = () => {
+      const response = this.request(
+        method,
+        { processId: state.processId, ...params },
+        this.timeoutMs,
+        probe ? state.processId : undefined,
+      );
+      void response.catch(() => undefined);
+      return { response };
+    };
+    return (this.withDispatch ? await this.withDispatch(send) : send())
+      .response;
+  }
+  writeTerminal(bytes: Uint8Array) {
+    if (bytes.byteLength < 1 || bytes.byteLength > 4096)
+      throw Error("Terminal input exceeds bounds");
+    return this.terminalControl("command/exec/write", {
+      deltaBase64: Buffer.from(bytes).toString("base64"),
+    });
+  }
+  resizeTerminal(cols: number, rows: number, probe = false) {
+    this.terminalSize(cols, rows);
+    return this.terminalControl(
+      "command/exec/resize",
+      {
+        size: { cols, rows },
+      },
+      probe,
+    );
   }
   startThread(options: {
     cwd: string;

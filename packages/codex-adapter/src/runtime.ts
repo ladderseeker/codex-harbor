@@ -8,6 +8,7 @@ import {
 } from "./index.js";
 import { launchRunner } from "../../../infra/runner/launcher.js";
 export type RuntimeConfig = RuntimeCallbacks & {
+  purpose?: "conversation" | "terminal";
   attachmentProject?: import("../../../infra/storage/admission.ts").NativeStorage;
   attachmentDirectory?: import("../../../infra/storage/admission.ts").NativeStorage;
   onTransport?: (adapter: CodexAdapter) => void;
@@ -42,6 +43,8 @@ export async function createRuntime(
           "/git-common",
         ]
       : ["/workspace"],
+    config.purpose,
+    !config.fixture && config.purpose === "terminal",
   );
   try {
     config.onTransport?.(adapter);
@@ -60,18 +63,27 @@ function fixtureProcess(config: RuntimeConfig) {
     throw Error("Private fixture mode is disabled");
   if (!/^[a-zA-Z0-9_-]{1,64}$/.test(config.sessionId))
     throw Error("Invalid fixture identity");
+  const terminal = config.purpose === "terminal";
   const child = spawn(
-    process.execPath,
+    terminal ? "python3" : process.execPath,
     [
       fileURLToPath(
-        new URL("../../../tests/fixtures/codex/server.mjs", import.meta.url),
+        new URL(
+          terminal
+            ? "../../../tests/fixtures/codex/terminal.py"
+            : "../../../tests/fixtures/codex/server.mjs",
+          import.meta.url,
+        ),
       ),
     ],
     {
-      stdio: ["pipe", "pipe", "pipe", "ipc"],
+      stdio: terminal
+        ? ["pipe", "pipe", "pipe"]
+        : ["pipe", "pipe", "pipe", "ipc"],
       env: {
         PATH: process.env.PATH,
         NODE_ENV: "test",
+        HARBOR_FIXTURE_MODE: "private-test",
         HARBOR_FIXTURE_WORKSPACE: config.workspacePath,
         HARBOR_FIXTURE_INIT_DELAY_MS: process.env.HARBOR_FIXTURE_INIT_DELAY_MS,
         HARBOR_FIXTURE_TRACE_FILE: process.env.HARBOR_FIXTURE_TRACE_FILE,

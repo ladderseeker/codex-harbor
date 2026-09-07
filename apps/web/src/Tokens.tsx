@@ -157,6 +157,9 @@ export function Tokens({
               "files:write",
               "git:read",
               "git:write",
+              "terminal:read",
+              "terminal:control",
+              "terminal:terminate",
             ].map((scope) => (
               <label key={scope}>
                 <input

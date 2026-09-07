@@ -1,3 +1,4 @@
+import { TerminalSupervisor } from "./terminals.ts";
 import { prepareAttachments } from "../../../packages/attachments/src/materialize.ts";
 import { maintainAttachments } from "../../../packages/attachments/src/store.ts";
 import {
@@ -72,6 +73,7 @@ if (
 )
   throw Error("Another supervisor owns this instance");
 let alive = true;
+let terminals: TerminalSupervisor | undefined;
 type RuntimeState = {
   adapter: CodexAdapter;
   generation: number;
@@ -91,6 +93,7 @@ const retirement = new RetirementRegistry<CodexAdapter>();
 const retire = (adapter: CodexAdapter) => retirement.retire(adapter);
 fence.on("error", () => {
   alive = false;
+  void terminals?.stop();
   const owned = [...runtimes.values()].map((runtime) => runtime.adapter);
   if (discoveryTransport) owned.push(discoveryTransport);
   for (const adapter of owned) adapter.close();
@@ -135,6 +138,8 @@ const generation = await transaction(pool, async (db) => {
   return g;
 });
 await recoverFileStartup(pool);
+terminals = new TerminalSupervisor(pool, c, () => alive);
+terminals.start();
 if (c.HARBOR_FIXTURE_MODE) {
   const probe = await createRuntime({
     sessionId: randomUUID(),
@@ -1234,6 +1239,7 @@ const timer = setInterval(() => {
 }, 250);
 async function stop() {
   alive = false;
+  await terminals?.stop();
   clearInterval(timer);
   discoveryTransport?.close();
   for (const r of runtimes.values()) r.adapter.close();

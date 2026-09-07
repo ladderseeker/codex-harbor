@@ -58,7 +58,7 @@ export async function releaseWorkspace(
     );
     if (!uncertain.rowCount)
       await db.query(
-        "UPDATE workspaces SET writer_session_id=NULL,writer_generation=NULL WHERE id=$1 AND writer_session_id=$2 AND writer_generation=$3",
+        "UPDATE workspaces SET writer_session_id=NULL,writer_generation=NULL WHERE id=$1 AND writer_kind='conversation' AND writer_session_id=$2 AND writer_generation=$3",
         [s.workspace_id, sessionId, generation],
       );
   });

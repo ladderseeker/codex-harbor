@@ -6,6 +6,7 @@ import {
 import { Files } from "./Files.tsx";
 import { History, ConversationDetails } from "./History.tsx";
 import { Recovery } from "./Recovery.tsx";
+import { Terminals } from "./Terminals.tsx";
 import { Tokens } from "./Tokens.tsx";
 import {
   useCallback,
@@ -124,6 +125,7 @@ export function App() {
   const workspaceData = useWorkspaces(projectId);
   const [newWorkspaceId, setNewWorkspaceId] = useState("");
   const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false);
+  const [terminalWorkspace, setTerminalWorkspace] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   useEffect(() => {
     setNewWorkspaceId("");
@@ -766,6 +768,13 @@ export function App() {
               onClick={() => setFilesOpen(true)}
             >
               Files and changes
+            </button>
+            <button
+              className="quiet-button"
+              disabled={!newWorkspaceId}
+              onClick={() => setTerminalWorkspace(newWorkspaceId)}
+            >
+              Open terminals
             </button>
             {workspaceData.error && (
               <p className="inline-error">{workspaceData.error}</p>
@@ -1437,6 +1446,32 @@ export function App() {
           />
         </Modal>
       )}
+      {terminalWorkspace &&
+        identity &&
+        workspaceData.workspaces.find((w) => w.id === terminalWorkspace) && (
+          <Modal
+            title="Workspace terminals"
+            failure={error}
+            retry={
+              pending
+                ? () => void execute(pending.intent, pending.complete)
+                : undefined
+            }
+            close={() => setTerminalWorkspace("")}
+          >
+            <Terminals
+              key={terminalWorkspace}
+              workspace={
+                workspaceData.workspaces.find(
+                  (w) => w.id === terminalWorkspace,
+                )!
+              }
+              csrf={identity.csrfToken}
+              execute={execute}
+              disabled={blocked}
+            />
+          </Modal>
+        )}
       {tokensOpen && identity && (
         <Modal title="API tokens" close={() => setTokensOpen(false)}>
           <Tokens csrf={identity.csrfToken} projects={projects} />

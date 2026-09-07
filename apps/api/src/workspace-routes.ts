@@ -101,6 +101,7 @@ export function registerWorkspaceRoutes(
         const w = await selectedWorkspace(db, req.params.id, true);
         await authority(db, req);
         if (
+          w.writer_kind !== "conversation" ||
           w.writer_session_id !== b.expectedSessionId ||
           Number(w.writer_generation) !== b.expectedGeneration
         )

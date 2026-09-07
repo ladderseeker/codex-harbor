@@ -1,3 +1,7 @@
+if (process.argv.includes("--terminals")) {
+  await import("../terminals/e2e.ts");
+  process.exit(process.exitCode ?? 0);
+}
 import { p005 } from "./p005.ts";
 import { p007 } from "./p007.ts";
 import { createPool } from "../../packages/storage/src/index.ts";

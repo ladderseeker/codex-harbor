@@ -6,4 +6,5 @@ Harbor's conversation, attachment, API-token, workspace and history/recovery fea
 - [Attachments and saved drafts](attachments.md): select, drop, paste, upload recovery, supported files and limits.
 - [API tokens](api-tokens.md): create, limit, and revoke credentials for external clients.
 - [Projects and workspaces](workspaces.md): choose Local, Git Worktree or Copy, coordinate conversations and recover an uncertain reservation.
+- [Workspace terminals](terminals.md): run a confined shell, detach/reconnect, take control, inspect a bounded output tail and terminate background work.
 - [Developer setup](../developer/development.md): disposable local instance and current runtime prerequisites.

@@ -1,4 +1,4 @@
-import { stat } from "node:fs/promises";
+import { stat, writeFile } from "node:fs/promises";
 import { digest } from "../../packages/policy/src/index.ts";
 import path from "node:path";
 import { Ajv2020 } from "ajv/dist/2020.js";
@@ -1149,17 +1149,56 @@ export async function p002({
       ignoreHTTPSErrors: true,
       extraHTTPHeaders: { Authorization: "Bearer " + created.secret },
     });
-    let limited = false;
-    for (let i = 0; i < 205; i++) {
-      const response = await rateClient.get(origin + "/api/v1/projects");
-      if (response.status() === 429) {
-        expect((await response.json()).error.retryable).toBe(true);
-        limited = true;
-        break;
+    await new Promise((resolve) => setTimeout(resolve, 10500));
+    // A burst can straddle one fixed-window boundary. Exceed both windows'
+    // finite capacity within ten seconds, with bounded concurrency and no retry.
+    let limited = false,
+      sent = 0;
+    const began = Date.now(),
+      statuses: Record<number, number> = {};
+    let elapsedMs = 0;
+    try {
+      while (!limited && sent < 405 && Date.now() - began < 9000) {
+        const count = Math.min(8, 405 - sent);
+        const responses = await Promise.all(
+          Array.from({ length: count }, () =>
+            rateClient.get(origin + "/api/v1/projects", {
+              timeout: Math.max(1, 9000 - (Date.now() - began)),
+            }),
+          ),
+        );
+        sent += count;
+        for (const response of responses) {
+          const status = response.status();
+          statuses[status] = (statuses[status] ?? 0) + 1;
+          expect(
+            [200, 429],
+            "Only authenticated reads or rate rejection",
+          ).toContain(status);
+          if (status === 429) {
+            expect((await response.json()).error.retryable).toBe(true);
+            limited = true;
+          }
+        }
       }
+    } finally {
+      elapsedMs = Date.now() - began;
+      await writeFile(
+        path.join(artifacts, "p002-rate-burst.json"),
+        JSON.stringify({ sent, elapsedMs, statuses }, null, 2),
+      );
+      await rateClient.dispose();
     }
-    expect(limited).toBe(true);
-    await rateClient.dispose();
+    const evidence = JSON.stringify({ sent, elapsedMs, statuses });
+    expect(
+      statuses[200] ?? 0,
+      "Successful authenticated reads: " + evidence,
+    ).toBeGreaterThan(0);
+    expect(elapsedMs, "Bounded rate burst: " + evidence).toBeLessThan(10000);
+    expect(
+      limited,
+      "Rate rejection within at most two windows: " + evidence,
+    ).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 10500));
     for (const raw of [secret, restricted.secret, created.secret])
       expect(logs().includes(raw)).toBe(false);
