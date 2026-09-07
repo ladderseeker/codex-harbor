@@ -2,6 +2,8 @@ if (process.argv.includes("--previews")) {
   await import("../previews/e2e.ts");
   process.exit(process.exitCode ?? 0);
 }
+import { scheduleDstE2e } from "../schedules/dst-e2e.ts";
+import { scheduleE2e } from "../schedules/e2e.ts";
 if (process.argv.includes("--terminals")) {
   await import("../terminals/e2e.ts");
   process.exit(process.exitCode ?? 0);
@@ -37,6 +39,8 @@ const children: ChildProcess[] = [];
 let diagnosticText = "";
 let rotationBearer = "";
 const serve = process.argv.includes("--serve");
+const schedulesDstOnly = process.argv.includes("--schedules-dst");
+const schedulesOnly = process.argv.includes("--schedules") || schedulesDstOnly;
 const dir = await mkdtemp(
     path.join(
       process.platform === "darwin" ? "/private/tmp" : os.tmpdir(),
@@ -65,6 +69,7 @@ const env = {
   ...process.env,
   NODE_ENV: "test",
   HARBOR_FIXTURE_MODE: "private-test",
+  ...(schedulesOnly ? { HARBOR_SCHEDULE_TEST_CLOCK: "1" } : {}),
   HARBOR_INSTANCE_ID: instance,
   HARBOR_DATABASE_PASSWORD: password,
   HARBOR_DATABASE_PORT: String(dbPort),
@@ -155,6 +160,81 @@ try {
       process.once("SIGINT", resolve);
       process.once("SIGTERM", resolve);
     });
+  } else if (schedulesOnly) {
+    browser = await chromium.launch({ headless: true });
+    await expect
+      .poll(
+        async () => {
+          try {
+            return (await fetch(`http://127.0.0.1:${apiPort}/api/v1/me`))
+              .status;
+          } catch {
+            return 0;
+          }
+        },
+        { timeout: 30000 },
+      )
+      .toBe(401);
+    const db = new pg.Pool({ connectionString: env.DATABASE_URL });
+    try {
+      await (schedulesDstOnly ? scheduleDstE2e : scheduleE2e)({
+        fixtureState: env.HARBOR_FIXTURE_STATE_DIR,
+        browser,
+        db,
+        origin,
+        artifacts,
+        pauseSupervisor: () => {
+          supervisor.kill("SIGSTOP");
+        },
+        resumeSupervisor: () => {
+          supervisor.kill("SIGCONT");
+        },
+        restartSupervisor: async (whileStopped?: () => Promise<void>) => {
+          supervisor.kill("SIGKILL");
+          await new Promise((r) => supervisor.once("exit", r));
+          try {
+            await whileStopped?.();
+          } finally {
+            supervisor = start("apps/supervisor/src/main.ts");
+          }
+        },
+      });
+    } catch (error) {
+      const failurePage = browser
+        .contexts()
+        .flatMap((c) => c.pages())
+        .at(-1);
+      if (
+        failurePage &&
+        (await failurePage.locator(".schedules-panel").count())
+      )
+        await failurePage
+          .locator(".schedules-panel")
+          .screenshot({ path: path.join(artifacts, "schedule-failure.png") })
+          .catch(() => {});
+      await writeFile(path.join(artifacts, "failure.log"), diagnosticText);
+      throw error;
+    } finally {
+      await db.end();
+    }
+    await writeFile(
+      path.join(artifacts, "result.json"),
+      JSON.stringify(
+        {
+          instance,
+          status: "passed",
+          sourceAtStart,
+          sourceAtEnd: sourceDigest(),
+          node: process.version,
+          scope: schedulesDstOnly
+            ? "P008-02 real API/UI previews and persisted gap/fold/non-hour/skipped-day occurrences; external OIDC/Codex fixtures; no live or protected restore claim"
+            : "P008 real UI/API/PG/pg-boss/supervisor offline scheduling, lifecycle, faults, authority, quotas and maintenance; external OIDC/Codex fixtures; DST-specific end-to-end, live-account and protected restore gates require separate evidence",
+        },
+        null,
+        2,
+      ),
+    );
+    console.log("P008 real-stack result: " + artifacts);
   } else {
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ ignoreHTTPSErrors: true });

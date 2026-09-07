@@ -46,9 +46,9 @@ The implemented workflow and commands are documented in [Managed project workspa
 
 ## Source issues
 
-[Created workspace validation identity](../../issues/2026-09-08-035221-workspace-validation-identity.md) is a High integration blocker: completed derived/copy creation loses required identity at the managed IPC validation call and becomes unavailable. Require corrected actual application creation and use on Linux, plus independent review; direct helper acceptance does not cover this handoff.
+[Created workspace validation identity](../../issues/archive/2026-09-08-035221-workspace-validation-identity.md) is High and Resolved. Root `e1b754a` includes both the shared caller/common correction and P008 worker handoff. Independent review, actual managed Linux creation/use, installed file/terminal acceptance and subsequent scheduling integration passed on their recorded sources. Direct helper evidence was not substituted for that application-level handoff.
 
-[Workspace quota import](../../issues/2026-09-08-031857-workspace-quota-import.md) is a High active integration blocker shared with P009. Its later guarded quota dispatcher is incompatible with this feature's textual definition loader. Preserve the earlier tested sources as historical evidence; require corrected actual Linux workspace/file behavior and independent review before current cumulative verification.
+[Workspace quota import](../../issues/archive/2026-09-08-031857-workspace-quota-import.md) is Resolved. The guarded import passed independently reviewed actual Linux workspace/full file and installed acceptance on production `f13afc57…ad1d27`. Earlier failures remain historical evidence; live and the separately tracked worker integration gate remain open.
 
 [Dedicated live-test credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md) remains a High release blocker for **P003-06**. The bounded two-runtime native workspace lane exists, but missing dedicated credentials leave actual authenticated parallel-turn effects unverified. Fixture and accountless Linux results do not waive this gate.
 

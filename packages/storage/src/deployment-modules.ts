@@ -8,6 +8,14 @@ export const installedModules = {
     "file_events",
   ],
   P006: ["terminals", "terminal_input", "terminal_output"],
+  P008: [
+    "schedules",
+    "schedule_versions",
+    "schedule_grants",
+    "schedule_occurrences",
+    "schedule_commands",
+    "schedule_test_clock",
+  ],
 } as const;
 export async function installedModuleStatus(db: DB) {
   const row = (
@@ -17,7 +25,10 @@ export async function installedModuleStatus(db: DB) {
     (SELECT count(*) FROM file_operations WHERE state='uncertain' AND acknowledged_at IS NULL) AS "uncertainFiles",
     (SELECT count(*) FROM file_inspections WHERE state IN ('queued','inspecting')) AS "pendingFileInspections",
     (SELECT count(*) FROM terminals WHERE state='queued' AND NOT retired) AS "queuedTerminals",
-    (SELECT count(*) FROM terminals WHERE state<>'queued' AND NOT retired) AS "activeTerminals"
+    (SELECT count(*) FROM terminals WHERE state<>'queued' AND NOT retired) AS "activeTerminals",
+    (SELECT count(*) FROM schedules WHERE state='enabled') AS "enabledSchedules",
+    (SELECT count(*) FROM schedule_occurrences WHERE state IN ('accepted','preparing_workspace','queued_turn')) AS "queuedScheduleOccurrences",
+    (SELECT count(*) FROM schedule_occurrences o WHERE EXISTS(SELECT 1 FROM operations t WHERE t.id=o.turn_id AND t.state IN ('dispatching','running','waiting_approval','waiting_input')) OR EXISTS(SELECT 1 FROM workspace_storage_operations w WHERE w.id=o.storage_operation_id AND w.state IN ('queued','dispatching'))) AS "activeScheduleEffects"
   `)
   ).rows[0];
   return Object.fromEntries(
@@ -36,6 +47,23 @@ export async function restoreInstalledModules(db: DB, source: string) {
       `INSERT INTO deployment_restored_operations(kind,id,source_instance,historical) SELECT $2,id,$1,to_jsonb(${table}) FROM ${table} ON CONFLICT DO NOTHING`,
       [source, kind],
     );
+  for (const [kind, table] of [
+    ["schedule", "schedules"],
+    ["schedule-occurrence", "schedule_occurrences"],
+  ] as const)
+    await db.query(
+      `INSERT INTO deployment_restored_operations(kind,id,source_instance,historical) SELECT $2,id,$1,to_jsonb(${table}) FROM ${table} ON CONFLICT DO NOTHING`,
+      [source, kind],
+    );
+  await pauseInstalledSchedules(db, "RESTORED_AUTHORITY_REVOKED");
+  await db.query(
+    "UPDATE schedule_occurrences o SET state=CASE WHEN EXISTS(SELECT 1 FROM operations t WHERE t.id=o.turn_id AND t.state='uncertain') THEN 'uncertain' ELSE 'cancelled' END,reason='RESTORED_AUTHORITY_REVOKED',ended_at=COALESCE(ended_at,clock_timestamp()),updated_at=clock_timestamp() WHERE state IN ('accepted','preparing_workspace','queued_turn','running','attention')",
+  );
+  await db.query(
+    "UPDATE schedule_commands SET actor_hash='restored:'||$1||':'||actor_hash",
+    [source],
+  );
+  await db.query("DELETE FROM schedule_test_clock");
   await db.query(
     "UPDATE file_operations SET restored_from=$1,state=CASE WHEN state='queued' THEN 'failed' WHEN state='dispatching' THEN 'uncertain' ELSE state END,failure_code=CASE WHEN state IN ('queued','dispatching','uncertain') THEN 'RESTORED_AUTHORITY_REVOKED' ELSE failure_code END,payload=CASE WHEN state='queued' THEN NULL ELSE payload END,payload_bytes=CASE WHEN state='queued' THEN 0 ELSE payload_bytes END",
     [source],
@@ -59,4 +87,16 @@ export async function restoreInstalledModules(db: DB, source: string) {
   await db.query(
     "UPDATE terminal_input SET state=CASE WHEN state='dispatching' THEN 'uncertain' ELSE 'denied' END,bytes=NULL,settled_at=clock_timestamp(),failure_code='RESTORED_AUTHORITY_REVOKED' WHERE state IN ('accepted','dispatching')",
   );
+}
+
+/** Fixed administrator mutation: no queued source intent is reauthorized. */
+export async function pauseInstalledSchedules(
+  db: DB,
+  reason: "RESTORED_AUTHORITY_REVOKED" | "ADMINISTRATOR_INTERRUPTED",
+) {
+  await db.query(
+    "UPDATE schedules SET state='paused',reason=$1,catch_up=NULL,active_grant_id=NULL,updated_at=clock_timestamp()",
+    [reason],
+  );
+  await db.query("UPDATE schedule_grants SET revoked=true WHERE NOT revoked");
 }

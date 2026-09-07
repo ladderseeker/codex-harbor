@@ -1,3 +1,14 @@
+if (process.argv.includes("--schedules")) {
+  if (!process.env.HARBOR_TEST_OPENAI_API_KEY) {
+    console.error(
+      "UNVERIFIED P008-07: dedicated HARBOR_TEST_OPENAI_API_KEY unavailable; no model request or test resources created.",
+    );
+    process.exit(2);
+  }
+  process.argv.push("--schedules-live");
+  await import("../schedules/linux.ts");
+  process.exit(process.exitCode ?? 0);
+}
 if (process.argv.includes("--attachments")) {
   if (!process.env.HARBOR_TEST_OPENAI_API_KEY) {
     console.error(

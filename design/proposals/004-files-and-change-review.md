@@ -1,14 +1,14 @@
 # P004 — Files and change review
 
 - Decision: Accepted
-- Delivery: In progress
+- Delivery: Implemented
 - Dependencies: [P003](003-parallel-project-workspaces.md)
 - Outcome: The owner inspects workspace files and changes, edits a file safely, and deliberately applies a reviewed Git action.
 
 ## Source issues
 
-- [Created workspace validation identity](../../issues/2026-09-08-035221-workspace-validation-identity.md): High, In progress with P003/P009. The managed derived-workspace prerequisite becomes unavailable after successful storage creation. Correct and verify this application handoff before completing the derived file/Git acceptance lane.
-- [P004 implementation review](../../issues/2026-09-08-012652-p004-implementation-review.md): High, In progress. Two feature review rounds closed the draft, byte/mode and receipt-parent durability findings with exact-source managed-XFS and critical regression evidence. Shared P006/P009 writer, module inventory, drain and restore behavior still require integration and verification.
+- [Created workspace validation identity](../../issues/archive/2026-09-08-035221-workspace-validation-identity.md): High, Resolved across P003/P008/P009. Shared caller/common validation and the corresponding P008 worker correction are integrated in `e1b754a`; actual managed file/Git, installed module and scheduling evidence passed with independent review.
+- [P004 implementation review](../../issues/2026-09-08-012652-p004-implementation-review.md): High, Blocked for required fresh-host protected restore/authority evidence under P009-04. Two feature rounds and module source/evidence review closed the code corrections and installed writer/inventory/drain/local rebind scope.
 
 ## Scope and user/API flow
 
@@ -153,3 +153,5 @@ Candidate verification and pending independent review are recorded in the [8 Sep
 - 8 September 2026: The complete managed-XFS file outcome and critical Node 24 regressions pass at `324022da4ddc36128348a01427cba6028a2bd44bb176848f9b47a34d56d37fa2` (882 files). Two independent implementation review rounds closed after draft, byte/mode and receipt-parent durability corrections. P006/P009 integration and inherited verification gates remain explicit in the report; this is not Verified or archived.
 
 - 8 September 2026 cumulative integration: root `2bdb5ef` includes reviewed module checkpoint `77b2ad5`, source `f13afc57f3956a7b457e567da02f1bb00ad214405c52c7a3d28f2d5c94ad1d27` /961 files. The installed registry, private file IPC, maintenance dispatch fence and local restore-authority changes are implemented. Exact-source critical/workspace/terminal suites and actual Linux workspace validation passed; complete managed-XFS file acceptance passed with a test-driver-only delta. Final installed browser evidence and release gates remain open in the [module report](../../docs/reports/2026-09-08-installed-module-integration.md).
+
+- 2026-09-08 delivery checkpoint: final installed ordinary and response-loss lanes on immutable `8c11ca94…84f22` passed, with independent module source/evidence review and the full recorded host/Linux regression map. Root `04ab86b` includes the final report/test handoff. Scoped behavior is Implemented; mandatory fresh-host protected restore and inherited live/release gates remain open, so the proposal stays active and is not Verified. See the [final module evidence](../../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure).

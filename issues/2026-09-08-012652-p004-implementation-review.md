@@ -1,7 +1,7 @@
 # Review file workflow corrections and complete integration
 
 - Severity: High
-- Status: In progress
+- Status: Blocked
 - Owner: P004 implementer; independent reviewer and main-agent integration
 - Recorded: 2026-09-08
 - Affected files: apps/web/src/Files.tsx; apps/api/src/files.ts; infra/files/; tests/files/, in the P004 implementation worktree
@@ -39,3 +39,9 @@ The held-response browser case preserves a draft edited during file opening; a r
 The [feature report](../docs/reports/2026-09-08-p004-files.md) preserves historical checkpoints and their limitations. Main-branch P006/P009 integration remains owned and pending: shared style nonce, typed reservation epoch, module inventory, checkpoint drain and fresh-host restored authority without effect replay. Keep this issue and P004 active until those obligations are closed.
 
 The [combined integration checkpoint](../docs/reports/2026-09-08-p004-p006-integration.md) now records the merged nonce/typed writer behavior and independently corrected shared-Git terminal admission. Focused actual-stack acceptance passed on `f0a4cdf2…cced99` /951; installed module/image/service, drain and restored-authority behavior remains in progress.
+
+## Current integration evidence and remaining blocker — 8 September 2026
+
+Root `04ab86b` includes the reviewed final file/terminal deployment integration. Exact production `f13afc57…ad1d27` passed the recorded host suites and managed Linux checks; immutable artifact `8c11ca94…84f22` passed both ordinary installed browser use and deliberate save-response-loss recovery, actual native PTY/background retirement, inventory and a fresh local synthetic database rebind. Two bounded module review rounds closed, with no remaining actionable source finding in that scope. The [final module report](../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure) distinguishes artifact/source/test-driver identity, reused-fixture qualifications and earlier failed attempts.
+
+Shared writer, nonce, registry, service/image, drain and local restored-authority implementation obligations are now delivered. The proposal is Implemented. This issue remains active and Blocked specifically for its required fresh-host protected filesystem restore/authority evidence under [P009-04](../design/proposals/009-portable-deployment-and-restore.md#independent-acceptance) and the [blocked backup-transfer prerequisite](2026-09-07-231526-p009-backup-transfer-approval.md). The local clone explicitly reports no filesystem restore and cannot close that remaining obligation. No original finding, gate or failed result is silently discarded; append the required fresh-host evidence before resolution/archival.

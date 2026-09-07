@@ -2,6 +2,7 @@
 
 - Decision: Accepted
 - Delivery: In progress
+- Implementation started: 2026-09-08 from reviewed root `80560da`, with an isolated worktree and private pinned dependencies. Browser/relay/runtime implementation and acceptance remain in progress.
 - Dependencies: [P003](003-parallel-project-workspaces.md)
 - Outcome: The owner starts a project's application and views it through an authenticated preview without exposing an arbitrary VPS port.
 

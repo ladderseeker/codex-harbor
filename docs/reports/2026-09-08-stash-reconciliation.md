@@ -12,7 +12,7 @@ Every changed path has a counterpart in the inspected main revision. The P005 im
 
 P004's snapshot covers the file API/supervisor/helper, editor and Monaco nonce, file/Git scopes, typed workspace writer, migration, lockfile and acceptance wiring. These are represented by the [P004 feature](2026-09-08-p004-files.md) and [cumulative file/terminal integration](2026-09-08-p004-p006-integration.md). P009's snapshots cover deployment packaging and administration, private IPC and service identities, schema validation, maintenance admission, pinned images, restored authority and TLS identity-provider fixtures. The later snapshot also includes the already integrated P007 history/recovery work. Their subsequent implementation is recorded in the [P009 report](2026-09-08-p009-development.md) and [P007 integration report](2026-09-07-p007-history-integration.md).
 
-This audit does not close feature acceptance gates. In particular, the stashed quota module guard survives in the current implementation; its separate [workspace loader integration defect](../../issues/2026-09-08-031857-workspace-quota-import.md) remains tracked rather than being mistaken for missing stash work.
+This audit does not close feature acceptance gates. In particular, the stashed quota module guard survives in the current implementation; its separate [workspace loader integration defect](../../issues/archive/2026-09-08-031857-workspace-quota-import.md) is tracked with its separate correction evidence rather than being mistaken for missing stash work.
 
 ## Recovery and cleanup
 

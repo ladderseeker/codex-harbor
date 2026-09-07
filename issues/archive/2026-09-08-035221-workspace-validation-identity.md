@@ -1,10 +1,12 @@
 # Managed workspace validation loses the created workspace identity
 
 - Severity: High
-- Status: In progress
+- Status: Resolved
+- Archive disposition: Resolved
+- Archived: 2026-09-08
 - Owner: P003/P009 installed-module integration; P008 owns the corresponding schedule worker call
 - Affected files: `apps/supervisor/src/workspace-storage.ts`, `packages/workspaces/src/service.ts`, `infra/storage/workspace-service.ts`, `infra/storage/workspace-paths.py`, P008 standalone workspace preparation
-- Acceptance: [P003-01–06](../design/proposals/003-parallel-project-workspaces.md#independent-acceptance), installed [P009-01](../design/proposals/009-portable-deployment-and-restore.md#independent-acceptance), derived-workspace P004 acceptance and standalone P008 execution
+- Acceptance: [P003-01–06](../../design/proposals/003-parallel-project-workspaces.md#independent-acceptance), installed [P009-01](../../design/proposals/009-portable-deployment-and-restore.md#independent-acceptance), derived-workspace P004 acceptance and standalone P008 execution
 
 ## Evidence — 8 September 2026
 
@@ -21,3 +23,17 @@ The bounded caller audit also found that `workspaceValidate` sends checkout iden
 Installed derived/copy creation cannot provide the ready workspace required by file workflows or standalone schedules. Validation fails closed; the observed runs did not dispatch an ordinary turn. Preserve the completed storage receipt and exact filesystem identity rather than creating the workspace again or weakening validation.
 
 Pass the captured workspace ID, root and kind together with the returned canonical/device/inode and optional common-directory identity into post-create validation. Audit other `verifyWorkspace` callers for this contract. Apply the corresponding correction to the schedule worker. Check the supplied common-directory identity under the existing trusted storage lock, including explicit wrong-inode and symlink denials. Independently review these corrections, run actual managed application creation/ready/use for Git and copy workspaces, and retain strict wrong-identity denials. Record exact source/run evidence and critical regressions before archiving this issue. Direct helper acceptance or macOS process-only tests cannot close the installed application gate.
+
+## Corrected module checkpoint — 8 September 2026
+
+Root `2bdb5ef` imports the complete caller/common correction at `77b2ad5`, production `f13afc57…ad1d27`. Independent review accepted first Local-to-Git compatibility and explicit wrong-common-inode/symlink denials. Exact-source Linux workspace acceptance `xfs-25f78396-daf3-43bb-86dd-06db9585a177` and complete managed file run `44ad9cde66` (test-driver-only source delta) passed; final installed ordinary/fault lanes `61563bc3`/`cff10b97` also passed on immutable `8c11ca94…84f22`. The [module report](../../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure) retains their precise scopes.
+
+The corresponding P008 standalone worker correction is in reviewed `cc38b94` and its integration worktree, with actual managed copy evidence and a passing later integrated feature/critical run. Complete that committed root handoff and its remaining metadata bridge check before archiving this multi-owner issue. The shared module defect is corrected; the active next action is P008 integration, not weakening or repeating workspace allocation.
+
+## Resolution — 8 September 2026
+
+Root `e1b754a` integrates the reviewed P008 correction and module checkpoint `9f3b414`. Both owners now preserve the complete accepted workspace identity through post-create validation. The shared verifier checks each supplied common-directory identity under its trusted lock; first Local-to-Git creation remains supported without weakening wrong-inode or symlink denials.
+
+The actual P008 Linux copy execution and later integrated schedule/critical runs passed on their exact recorded sources. Final source `ce8ad2847e116ac6f6f059198bd9bbaf1564fc74edfc09bdf78113fe72858a9e` /998 also passed the actual Linux administrator metadata bridge. Two P008 feature rounds and bounded module integration review closed; the shared correction and installed ordinary/fault evidence were independently inspected. The [schedule report](../../docs/reports/2026-09-08-p008-development.md) and [module report](../../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure) retain the precise source, command, environment and test-driver qualifications.
+
+Combined root source `9ee4984a923384cdcfabef54b660553d186bd0a8615ffb670d0f7afb71400333` /1000 passed Node 24.11.1 `pnpm check` and 26 Python deployment contracts. Relative to the reviewed scheduling source, its only production difference is the separately reviewed resume-readiness CLI; it also retains the final module/resume test drivers. This closes the workspace handoff defect. P008-02 real-stack DST coverage, dedicated live-account checks and protected full filesystem restore remain explicit proposal obligations; none is claimed by this resolution.

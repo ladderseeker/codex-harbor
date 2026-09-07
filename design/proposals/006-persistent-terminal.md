@@ -1,14 +1,14 @@
 # P006 — Persistent terminal
 
 - Decision: Accepted
-- Delivery: In progress
+- Delivery: Implemented
 - Dependencies: [P003](003-parallel-project-workspaces.md)
 - Outcome: The owner opens a shell in the selected workspace, leaves the page, and reconnects to its bounded output and running process.
-- Implementation checkpoint: [8 September development evidence and remaining gates](../../docs/reports/2026-09-08-p006-development.md). Two implementation review rounds and branch acceptance are complete; P004/P009 cumulative integration remains open. This is not a Verified delivery.
+- Implementation checkpoint: [Feature evidence](../../docs/reports/2026-09-08-p006-development.md) and [final installed module evidence](../../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure) record completed source/acceptance review. Required fresh-host protected restore and upstream gates remain open; delivery is not Verified.
 
 ## Source issues
 
-- [P006 implementation review](../../issues/2026-09-08-005028-p006-implementation-review.md): High, In progress. Two corrective feature rounds and complete terminal acceptance closed input lookup, emergency-stop, output-loss, explicit retirement and output-retention lock-order findings. Final critical/workspace regressions passed; P004/P009 integration remains pending; the proposal is unverified.
+- [P006 implementation review](../../issues/2026-09-08-005028-p006-implementation-review.md): High, Blocked for required fresh-host protected restore/authority evidence under P009-04. Two corrective feature rounds and module review closed the dispatch, input, output, retention and installed retirement/local rebind scope.
 
 ## Scope and user/API flow
 
@@ -100,3 +100,5 @@ Design review: an independent agent checked runtime separation, authority, typed
 - 2026-09-07: Started isolated implementation on the reviewed attachment/workspace/history integration `cb6be0d`, under the accepted contract. Migration 011 is reserved. Coordinate the generic typed writer interface with P004 migration 010; terminal semantics remain independently owned by P006.
 
 - 2026-09-08: Two feature review rounds and complete terminal acceptance closed on their recorded sources. Root `2bdb5ef` adds reviewed installed module checkpoint `77b2ad5`, source `f13afc57f3956a7b457e567da02f1bb00ad214405c52c7a3d28f2d5c94ad1d27` /961 files. It includes bounded drain, exact retirement/recovery and revoked restored controller/input authority; matching critical/workspace/full-terminal application suites passed. The [module report](../../docs/reports/2026-09-08-installed-module-integration.md) preserves distinct Linux/installed evidence and pending final installed/release gates. Delivery remains In progress.
+
+- 2026-09-08 delivery checkpoint: final installed ordinary and response-loss lanes on immutable `8c11ca94…84f22` passed, with independent module source/evidence review and the full recorded host/Linux regression map. Root `04ab86b` includes the final report/test handoff. Scoped behavior is Implemented; mandatory fresh-host protected restore and inherited live/release gates remain open, so the proposal stays active and is not Verified. See the [final module evidence](../../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure).

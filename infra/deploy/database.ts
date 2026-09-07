@@ -2,6 +2,7 @@ import {
   installedModules,
   installedModuleStatus,
   restoreInstalledModules,
+  pauseInstalledSchedules,
 } from "../../packages/storage/src/deployment-modules.ts";
 /** Fixed administrator database bridge. JSON stdin is never evaluated as SQL or code. */
 import { readFile } from "node:fs/promises";
@@ -99,8 +100,22 @@ async function registry() {
   ).rows;
   if (terminalRows.length > 256 || fileEffects.length > 4096)
     throw Error("Installed module registry bound");
+  const scheduleRows = (
+    await pool.query(
+      "SELECT id,project_id,state,config_revision,grant_epoch FROM schedules ORDER BY id LIMIT 257",
+    )
+  ).rows;
+  const scheduleEffects = (
+    await pool.query(
+      "SELECT id,schedule_id,workspace_id,session_id,turn_id,storage_operation_id,state FROM schedule_occurrences ORDER BY id LIMIT 8193",
+    )
+  ).rows;
+  if (scheduleRows.length > 256 || scheduleEffects.length > 8192)
+    throw Error("Schedule registry bound");
   return {
     format: 1,
+    schedules: scheduleRows,
+    scheduleEffects,
     fileEffects,
     modules: present,
     projects,
@@ -198,6 +213,7 @@ try {
   else if (input.action === "interrupt") {
     await transaction(pool, async (db) => {
       await db.query("UPDATE harbor_meta SET emergency=true");
+      await pauseInstalledSchedules(db, "ADMINISTRATOR_INTERRUPTED");
       await db.query(
         "INSERT INTO deployment_restored_operations(kind,id,source_instance,historical) SELECT 'terminal-interruption',id,$1,to_jsonb(terminals) FROM terminals WHERE NOT retired AND state='uncertain' AND termination_attempts<3 ON CONFLICT DO NOTHING",
         [process.env.HARBOR_INSTANCE_ID],

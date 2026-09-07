@@ -1,6 +1,6 @@
 # P006 terminal implementation checkpoint — 8 September 2026
 
-P006 is in progress. The terminal UI, authenticated HTTP/WebSocket facade, durable input/output and controller state, supervisor ownership, dedicated native PTY and confined Linux launcher purpose are implemented in the isolated P006 branch. Two independent implementation review rounds and the branch terminal, workspace and critical acceptance checks are complete. Cumulative P004/P009 integration remains open. This report does not mark the proposal Verified or authorize a release.
+This report records the P006 feature checkpoint before cumulative integration. The terminal UI, authenticated HTTP/WebSocket facade, durable input/output and controller state, supervisor ownership, dedicated native PTY and confined Linux launcher purpose are implemented. Two independent implementation review rounds and the branch terminal, workspace and critical acceptance checks completed on the sources below. The subsequent [installed module report](2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure) closes the scoped integration; P006 is now Implemented with required protected fresh-host restore and upstream gates still open. Neither report marks it Verified or authorizes a release.
 
 ## Source and environment
 

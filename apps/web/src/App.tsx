@@ -1,3 +1,4 @@
+import { Schedules } from "./Schedules.tsx";
 import {
   useRichDraft,
   AttachmentPicker,
@@ -126,6 +127,7 @@ export function App() {
   const workspaceData = useWorkspaces(projectId);
   const [newWorkspaceId, setNewWorkspaceId] = useState("");
   const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false);
+  const [schedulesOpen, setSchedulesOpen] = useState(false);
   const [terminalWorkspace, setTerminalWorkspace] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   useEffect(() => {
@@ -722,6 +724,9 @@ export function App() {
             <p className="rail-empty">Add a project folder to begin.</p>
           )}
         </nav>
+        <button className="quiet-button" onClick={() => setSchedulesOpen(true)}>
+          Schedules
+        </button>
         <label className="archive-toggle">
           <input
             type="checkbox"
@@ -1452,6 +1457,22 @@ export function App() {
             refresh={workspaceData.refresh}
             selected={newWorkspaceId}
             select={setNewWorkspaceId}
+          />
+        </Modal>
+      )}
+      {schedulesOpen && identity && (
+        <Modal title="Scheduled work" close={() => setSchedulesOpen(false)}>
+          <Schedules
+            csrf={identity.csrfToken}
+            projects={projects}
+            sessions={sessions}
+            models={capabilities?.models ?? []}
+            profiles={capabilities?.permissionProfiles ?? []}
+            initialProject={projectId}
+            openConversation={(id) => {
+              selectSession(id);
+              setSchedulesOpen(false);
+            }}
           />
         </Modal>
       )}

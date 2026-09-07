@@ -7,4 +7,5 @@ Harbor's conversation, attachment, API-token, workspace and history/recovery fea
 - [API tokens](api-tokens.md): create, limit, and revoke credentials for external clients.
 - [Projects and workspaces](workspaces.md): choose Local, Git Worktree or Copy, coordinate conversations and recover an uncertain reservation.
 - [Workspace terminals](terminals.md): run a confined shell, detach/reconnect, take control, inspect a bounded output tail and terminate background work.
+- [Scheduled work](schedules.md): timing previews, bounded grants, standalone results and explicit attention/recovery; P008 remains in progress.
 - [Developer setup](../developer/development.md): disposable local instance and current runtime prerequisites.

@@ -1,3 +1,4 @@
+import { scheduleSchemas, schedulePaths } from "./schedules-openapi.ts";
 import { filePaths, fileSchemas } from "./files-openapi.ts";
 import { previewPaths, previewSchemas } from "./previews-openapi.ts";
 import {
@@ -242,6 +243,8 @@ const tokenRecord = object({
       "execute",
       "approve",
       "cancel",
+      "schedules:read",
+      "schedules:manage",
       "files:read",
       "files:write",
       "git:read",
@@ -845,6 +848,7 @@ export const openapi = {
     },
     schemas: {
       ...publicSchemas,
+      ...scheduleSchemas,
       TerminalInput: z.toJSONSchema(terminalInput),
       TerminalResize: z.toJSONSchema(terminalResize),
       TerminalHeartbeat: z.toJSONSchema(terminalHeartbeat),
@@ -853,5 +857,5 @@ export const openapi = {
       TurnInput: z.toJSONSchema(turnSchema),
     },
   },
-  paths,
+  paths: { ...paths, ...schedulePaths },
 };

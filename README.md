@@ -1,12 +1,12 @@
 # Codex Harbor
 
-A single-owner web interface and authenticated API for Codex, being built for compatible Linux VPS hosts. Persistent conversations, scoped API tokens, managed parallel workspaces, attachments and history/recovery run locally. File editing, terminal access and portable deployment are in development.
+A single-owner web interface and authenticated API for Codex, being built for compatible Linux VPS hosts. Implemented features include persistent conversations, scoped API tokens, managed parallel workspaces, file and Git editing, attachments, terminals, history/recovery and scheduling. Portable deployment, isolated self-development, private previews and managed extensions are in development.
 
 ## Status
 
-P001–P003, P005 and P007 are Implemented. The foundation, token controls, workspace lifecycle and recovery passed their recorded browser/API and contract checks, including combined Node 24 integration. Runtime isolation has separately recorded Linux evidence. Required live-account evidence and follow-ups remain open, so no proposal is marked finished. See the [foundation report](docs/reports/2026-09-07-p001-foundation.md), [API-token report](docs/reports/2026-09-07-p002-api-tokens.md), [workspace report](docs/reports/2026-09-07-p003-workspaces.md), [history/recovery report](docs/reports/2026-09-07-p007-history-integration.md), [attachment integration report](docs/reports/2026-09-07-p005-integration.md), and [developer workflow](docs/developer/development.md) for tested commands and limits.
+P001–P008 are Implemented. Their reports record independently reviewed browser/API, contract and Linux evidence on specific source revisions. The [installed module report](docs/reports/2026-09-08-installed-module-integration.md) covers file/terminal integration; the [scheduling report](docs/reports/2026-09-08-p008-development.md) covers scheduling and its qualified metadata recovery checks. Mandatory verification and follow-ups remain open, so no proposal is marked finished. Use the [proposal index](design/proposals/README.md) for current delivery gates and the [developer workflow](docs/developer/development.md) for tested commands and limits.
 
-The reviewed P009 deployment candidate is integrated with installation, preflight, maintenance and recovery tooling. Its [operator guide](docs/developer/deployment.md) and [evidence report](docs/reports/2026-09-08-p009-development.md) separate tested behavior from remaining module integration and blocked checkpoint/restore, promotion and live acceptance. Scheduling and isolated self-development are also in progress; use the proposal index for current ownership.
+The reviewed P009 deployment candidate is integrated with installation, preflight, maintenance and recovery tooling. Its [operator guide](docs/developer/deployment.md) and [evidence report](docs/reports/2026-09-08-p009-development.md) separate tested behavior from remaining later-module integration and blocked checkpoint/restore, promotion and live acceptance. P010–P012 implementation continues in isolated worktrees.
 
 ## Start here
 

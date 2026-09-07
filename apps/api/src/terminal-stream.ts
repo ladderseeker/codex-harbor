@@ -252,6 +252,9 @@ export function terminalStreams(app: FastifyInstance, h: TerminalApi) {
           if (!cookie) throw Error("Authentication required");
           authority = await authenticateBrowser(h.pool, h.c, digest(cookie));
         }
+        if (authority.kind === "schedule")
+          throw Error("Interactive authentication required");
+        const viewerKind = authority.kind;
         const t = await transaction(h.pool, async (db) => {
           const t = await terminalRow(db, match[1]!);
           await terminalGrant(db, t, authority.hash, h.c, "terminal:read");
@@ -269,7 +272,7 @@ export function terminalStreams(app: FastifyInstance, h: TerminalApi) {
           const v: Viewer = {
             socket: ws,
             actor: authority.hash,
-            kind: authority.kind,
+            kind: viewerKind,
             id: t.id,
             generation: Number(t.generation),
             cursor: 0,

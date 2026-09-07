@@ -61,6 +61,13 @@ export function config(env = process.env) {
       !["localhost", "127.0.0.1"].includes(new URL(c.HARBOR_ORIGIN).hostname))
   )
     throw new Error("Fixture mode requires a private loopback test instance");
+  if (
+    env.HARBOR_SCHEDULE_TEST_CLOCK &&
+    (env.HARBOR_SCHEDULE_TEST_CLOCK !== "1" ||
+      env.NODE_ENV !== "test" ||
+      !c.HARBOR_FIXTURE_MODE)
+  )
+    throw new Error("Schedule test clock requires a private test instance");
   return { ...c, roots, models: c.HARBOR_MODELS.split(",") };
 }
 export type Config = ReturnType<typeof config>;
