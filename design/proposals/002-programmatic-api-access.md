@@ -1,7 +1,7 @@
 # P002 — Programmatic API access
 
-- Decision: Draft
-- Delivery: Planned
+- Decision: Accepted
+- Delivery: In progress
 - Dependencies: [P001](001-secure-persistent-conversations.md)
 - Outcome: The owner can create a limited access token and use an external script to operate Harbor without a browser session.
 
@@ -33,3 +33,7 @@ Seed P001 in a fresh instance with its allowed project and a synthetic resource 
 Run the P002 browser/API cases through actual Harbor services using P001 external fixtures. Use planned `pnpm check`, `pnpm test`, and `pnpm test:e2e`; run real contract/live lanes if the adapter or account interaction changes. Follow the [shared evidence and cleanup contract](README.md#shared-verification-contract). No future workspace UI or scheduler is required to test tokens.
 
 Add token tables/indexes with an additive migration; revocation must work across service restarts. Document token use and API versioning under `docs/` only after implementation. Rollback disables token authentication and preserves revocation records without falling back to unauthenticated access. Link actual acceptance and independent-review evidence before `Verified`.
+
+## Implementation record
+
+- 2026-09-07: Started isolated implementation on the committed P001 foundation under the owner's roadmap authorization. The first slice delivers scoped token management, current-authority enforcement, the supported external contract, and browser/API acceptance together. P001's remaining gates stay visible; this record is not implementation evidence.

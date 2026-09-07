@@ -1,6 +1,6 @@
 # Feature proposals
 
-P001 is Accepted and Implemented, with required live-account evidence and medium follow-ups still open. The remaining proposals are Draft and Planned. No proposal has passed its completion gate. Design review, implementation, and verification are separate events. Follow the [proposal template](../proposal-template.md) and [canonical lifecycle rules](../../AGENTS.md#document-ownership-and-lifecycle) when changing status.
+P001 is Accepted and Implemented, with required live-account evidence and medium follow-ups still open. P002 and P003 are Accepted and In progress; the remaining proposals are Draft and Planned. No proposal has passed its completion gate. Design review, implementation, and verification are separate events. Follow the [proposal template](../proposal-template.md) and [canonical lifecycle rules](../../AGENTS.md#document-ownership-and-lifecycle) when changing status.
 
 The [proposal archive](archive/README.md) is empty. Review it and the [issue index](../../issues/README.md) when discovering work or allocating IDs.
 
@@ -13,8 +13,8 @@ An independently verifiable feature may rely on its declared dependencies. Imple
 | ID | Complete outcome | Decision | Delivery | Direct dependencies | Acceptance IDs / specialist lanes |
 | --- | --- | --- | --- | --- | --- |
 | [P001](001-secure-persistent-conversations.md) | Sign in and conduct a protected Codex conversation that survives browser closure | Accepted | Implemented | None | P001-01–08; contracts/E2E/Linux passed, live and medium follow-ups pending |
-| [P002](002-programmatic-api-access.md) | Use revocable, scoped credentials from an external API client | Draft | Planned | P001 | P002-01–06; contract/live when adapter behavior changes |
-| [P003](003-parallel-project-workspaces.md) | Work across projects and parallel conversations with clear workspace ownership | Draft | Planned | P001 | P003-01–06; isolation, live |
+| [P002](002-programmatic-api-access.md) | Use revocable, scoped credentials from an external API client | Accepted | In progress | P001 | P002-01–06; contract/live when adapter behavior changes |
+| [P003](003-parallel-project-workspaces.md) | Work across projects and parallel conversations with clear workspace ownership | Accepted | In progress | P001 | P003-01–06; isolation, live |
 | [P004](004-files-and-change-review.md) | Inspect, edit, download, and review project changes through Harbor | Draft | Planned | P003 | P004-01–06; isolation |
 | [P005](005-attachments-and-rich-input.md) | Submit validated files and pasted images with a conversation | Draft | Planned | P001 | P005-01–06; contract, live, isolation |
 | [P006](006-persistent-terminal.md) | Use and reconnect to a terminal in a selected project workspace | Draft | Planned | P003 | P006-01–06; contract, live, isolation |

@@ -1,7 +1,7 @@
 # P003 — Parallel project workspaces
 
-- Decision: Draft
-- Delivery: Planned
+- Decision: Accepted
+- Delivery: In progress
 - Dependencies: [P001](001-secure-persistent-conversations.md)
 - Outcome: The owner switches among projects and works in several conversations concurrently with clear control of each workspace.
 
@@ -33,3 +33,7 @@ Use P001 setup with two known Git repositories and one non-Git fixture. No file-
 Use planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm test:isolation`, and relevant contract/live lanes. Record per-run repositories, branch/base revisions, runner IDs, and cleanup ownership as described in the [shared contract](README.md#shared-verification-contract). Tests must never create branches or worktrees in the user's real project repositories.
 
 Extend migrations and backup/restore registration for project/workspace metadata. If P009 is not yet delivered, define the registration contract and test project persistence now; P009 later proves host restore. When P009 exists, add this feature's restore assertions. Review new mount or Git-launch authority independently. Only actual acceptance evidence advances delivery status.
+
+## Implementation record
+
+- 2026-09-07: Started isolated implementation on the committed P001 foundation under the owner's roadmap authorization. Managed Local/Git Worktree/copy behavior, trusted metadata ownership, writer coordination, and complete UI/API/Linux acceptance belong to this delivery. Material storage/Git decisions are recorded before use; P001's remaining gates stay visible.
