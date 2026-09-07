@@ -48,7 +48,7 @@ The implemented workflow and commands are documented in [Managed project workspa
 
 [Dedicated live-test credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md) remains a High release blocker for **P003-06**. The bounded two-runtime native workspace lane exists, but missing dedicated credentials leave actual authenticated parallel-turn effects unverified. Fixture and accountless Linux results do not waive this gate.
 
-The [P003 implementation review](../../issues/archive/2026-09-07-210500-p003-implementation-review.md) is Resolved after bounded IPC, durable removal/retry, filesystem barrier and combined authorization checks. The [shared authority finding](../../issues/2026-09-07-202308-authority-expiry-after-lock-wait.md) has passed its P003 integration; P007 remains its active integration owner.
+The [P003 implementation review](../../issues/archive/2026-09-07-210500-p003-implementation-review.md) is Resolved after bounded IPC, durable removal/retry, filesystem barrier and combined authorization checks. The [shared authority finding](../../issues/archive/2026-09-07-202308-authority-expiry-after-lock-wait.md) is Resolved after P003 and P007 passed current-authority and writer-generation checks. P003 remains active for the dedicated live-account gate.
 
 ## Implementation record
 

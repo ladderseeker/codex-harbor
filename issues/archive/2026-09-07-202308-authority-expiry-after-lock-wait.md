@@ -1,8 +1,10 @@
 # Recheck credential expiry after acquiring authority locks
 
 - Severity: High
-- Status: In progress
-- Owner: [P002](../design/proposals/002-programmatic-api-access.md); [P003](../design/proposals/003-parallel-project-workspaces.md) and [P007](../design/proposals/007-session-history-and-recovery.md) own their resource/recovery-path integrations
+- Status: Resolved
+- Archive disposition: Resolved
+- Archived: 2026-09-07
+- Owner: [P002](../../design/proposals/002-programmatic-api-access.md); [P003](../../design/proposals/003-parallel-project-workspaces.md) and [P007](../../design/proposals/007-session-history-and-recovery.md) own their resource/recovery-path integrations
 - Recorded: 2026-09-07
 - Affected files: packages/policy/src/authority.ts; browser/recovery authority queries using the same locking pattern
 - Acceptance: P002-03/05; P003-05; P007-04/06 and inherited browser expiry/dispatch guarantees
@@ -41,8 +43,16 @@ These are unresolved review findings, not delivered corrections. The implementer
 
 The three caller corrections and shared helper are now implemented in feature commit `482f632`, source digest `9b01ead96025c7b47664911b76ed08496f245fa8b03d3640a6e52d6fa4e6672a` (808 files). Independent focused round 3 closed with no remaining actionable critical findings in that scope. The preceding paragraph records the initial review disposition; this is its subsequent correction evidence.
 
-Check/build, nine integration tests, thirteen pinned-runtime contracts and full P001/P002 E2E passed in the feature worktree (Node 26.7.0, `harbor-e2e-cc7b466f60`) and integrated main source (Node 24.11.1, `harbor-e2e-402f47b9ab`). Both E2E artifacts have matching start/end source digests. The original fresh-PostgreSQL probe now rejects the expired token after the same lock wait: `{"outcome":"rejected","expiredBeforeRelease":true,"elapsedMs":3112}`. See the [corrective report](../docs/reports/2026-09-07-p002-api-tokens.md#authority-correction-and-integration--7-september-2026).
+Check/build, nine integration tests, thirteen pinned-runtime contracts and full P001/P002 E2E passed in the feature worktree (Node 26.7.0, `harbor-e2e-cc7b466f60`) and integrated main source (Node 24.11.1, `harbor-e2e-402f47b9ab`). Both E2E artifacts have matching start/end source digests. The original fresh-PostgreSQL probe now rejects the expired token after the same lock wait: `{"outcome":"rejected","expiredBeforeRelease":true,"elapsedMs":3112}`. See the [corrective report](../../docs/reports/2026-09-07-p002-api-tokens.md#authority-correction-and-integration--7-september-2026).
 
 This issue remains In progress for P007 recovery and P003 resource-lock integration. The corrected P002 baseline does not establish the combined feature behavior or waive dedicated live-account evidence.
 
-P003 integration is now established by reviewed commit `ea8816f`, source `b012ef67ca4bc6cf35c190256f50504f53b6c32f4d3e4f1e77bdb50f35cdd972` (831 files), present on main. Node 24 combined P001/P002 and P003 E2E passed, including expiry while API and supervisor release commands wait for workspace locks, with the reservation preserved. Thirty contracts/integration/workspace tests and actual Linux checks also passed; a separate integration reviewer found no actionable issue. The [workspace report](../docs/reports/2026-09-07-p003-workspaces.md) records the evidence. P007 remains the pending integration owner.
+P003 integration is now established by reviewed commit `ea8816f`, source `b012ef67ca4bc6cf35c190256f50504f53b6c32f4d3e4f1e77bdb50f35cdd972` (831 files), present on main. Node 24 combined P001/P002 and P003 E2E passed, including expiry while API and supervisor release commands wait for workspace locks, with the reservation preserved. Thirty contracts/integration/workspace tests and actual Linux checks also passed; a separate integration reviewer found no actionable issue. The [workspace report](../../docs/reports/2026-09-07-p003-workspaces.md) records the evidence. P007 remains the pending integration owner.
+
+## Resolution — 7 September 2026
+
+P002 policy/caller corrections, P003 resource checks and P007 recovery integration passed their mapped acceptance and separate reviews. Recovery locks current authority before project/workspace/session state and rechecks it after waits and before exact retirement/release. P002 completed focused review round 3; P003 and P007 each received separate integration review. The original expired-token probe rejects, as recorded above.
+
+Reviewed integration `0118dfe`/`ca1a2cf` has source `2976f6286a9aea9645e2a27dfcb497e677c5268d5ff034593752dc98211b40bd` (842 files). Node 24.11.1 on macOS arm64 passed check/build, 9 integration tests, 15 pinned Codex 0.153.4 contracts and 8 workspace tests. Full real Harbor P001/P002/P007 E2E `harbor-e2e-10d1a7178a` and workspace E2E `harbor-workspaces-a5ce817a7b` exited 0 with identical start/end digests. Runs used PostgreSQL 17.6, Chromium 1194 and disposable external OIDC/Codex fixtures; cleanup affected only run-owned resources. Independent review accepted the unchanged native boundary's separate P003 Linux evidence.
+
+The [integration report](../../docs/reports/2026-09-07-p007-history-integration.md) records exact checks and limitations. This resolves this finding, not its proposals: the [dedicated live-account gate](../2026-09-07-171225-live-runtime-credentials.md) and separately tracked gateway/deployment obligations remain open. Earlier sections preserve historical discovery and intermediate status.

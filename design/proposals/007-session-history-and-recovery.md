@@ -1,7 +1,7 @@
 # P007 — Session history and recovery
 
 - Decision: Accepted
-- Delivery: In progress
+- Delivery: Implemented
 - Dependencies: [P001](001-secure-persistent-conversations.md)
 - Outcome: The owner finds previous work, reconnects across storage/restart gaps, and resolves interrupted or uncertain operations without accidental replay.
 
@@ -75,7 +75,7 @@ If the optional P003 reservation-release hook fails or rejects its exact ownersh
 
 ## Source issues
 
-[Replay and control bounds](../../issues/2026-09-07-185228-p001-retention-control-bounds.md), Medium, remains open. P007 receives the corrective implementation for strict replay age/count and reserved cancellation/recovery storage, with acceptance mapped to P007-02, P007-05, P007-06 and inherited P001-03/P001-07. The original issue remains active until implementation, independent review, exact boundary tests and documentation pass; this mapping is not a resolution or archival transfer.
+[Replay and control bounds](../../issues/archive/2026-09-07-185228-p001-retention-control-bounds.md), Medium, is Resolved after strict replay age/count and reserved cancellation/recovery storage passed exact boundary tests and independent combined review for P007-02/05/06 and inherited P001-03/07. The archive records discovery and closing evidence.
 
 [Dedicated live credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md) keeps the bounded live part of P007-07 unverified. Pinned non-model contracts and fixtures cannot waive it.
 
@@ -102,3 +102,7 @@ The integrated recovery path locks the current actor, project, workspace and con
 The P002/P003 integration candidate passed `pnpm check`, `pnpm build`, `pnpm test` (9 tests), `pnpm test:contract` (15 pinned-runtime contracts), and the real workspace E2E lane `harbor-workspaces-5e0a57a497` on source `2976f6286a9aea9645e2a27dfcb497e677c5268d5ff034593752dc98211b40bd` (842 files; matching start/end digests). The full P001/P002/P007 real-stack run `harbor-e2e-3890f83dff` passed on the identical production source, before adding only the derived-workspace test, with source `44285c761c564728834de678114711e3ff296b242224c39c3e7924617901fbf9`. Combined cases cover active conversation archival, recovery across the restart-changed session epoch and original workspace writer epoch, new-input continuation, derived checkout preservation and final reservation release with acknowledged historical uncertainty. Environment remains macOS arm64, Node 26.7.0, PostgreSQL 17.6, pinned Codex 0.153.4 and Chromium 1194. Independent integration review, matching Node 24/Linux integration and the dedicated live-account gate remain separate pending evidence.
 
 The narrow independent P002/P003/P007 integration review closed with no actionable finding on `2976f6286a9aea9645e2a27dfcb497e677c5268d5ff034593752dc98211b40bd`. It confirmed the unchanged native launcher/adapter boundary can retain the prior Linux checkpoint without a duplicate run. The [integration report](../../docs/reports/2026-09-07-p007-history-integration.md) distinguishes the matching candidate checks, test-only digest change, inherited isolation evidence and outstanding dedicated live gate.
+
+### Integrated delivery — 7 September 2026
+
+P007 is Implemented at source `2976f6286a9aea9645e2a27dfcb497e677c5268d5ff034593752dc98211b40bd` (842 files), reviewed integration `0118dfe`/`ca1a2cf`. Two feature review rounds and a separate integration review are complete. Node 24 check/build, 9 integration checks, 15 contracts, 8 workspace checks, full P001/P002/P007 E2E `harbor-e2e-10d1a7178a` and workspace E2E `harbor-workspaces-a5ce817a7b` passed; both E2E artifacts have matching start/end source. The [integration report](../../docs/reports/2026-09-07-p007-history-integration.md) records inherited unchanged Linux evidence separately. The [implementation review](../../issues/archive/2026-09-07-203000-p007-implementation-review.md), [shared authority correction](../../issues/archive/2026-09-07-202308-authority-expiry-after-lock-wait.md) and replay/control finding are resolved and archived. Required live-account acceptance remains blocked, so P007 stays active and is not Verified.

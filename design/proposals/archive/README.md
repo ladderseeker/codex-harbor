@@ -1,6 +1,6 @@
 # Proposal archive
 
-No proposals are archived. All 12 proposals remain in the [active index](../README.md); P001–P003 are Implemented with unfinished verification/follow-ups, P005/P007/P009 are In progress, and the others are planned.
+No proposals are archived. All 12 proposals remain in the [active index](../README.md); P001–P003/P007 are Implemented with unfinished verification/follow-ups, P004/P005/P009 are In progress, and the others are planned.
 
 Use the [canonical lifecycle rules](../../../AGENTS.md#document-ownership-and-lifecycle) for completion, supersession, withdrawal, reopening, and ID allocation. This index records the disposition separately from decision and delivery state.
 
