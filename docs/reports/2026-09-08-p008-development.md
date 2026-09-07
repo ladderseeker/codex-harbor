@@ -1,6 +1,6 @@
 # P008 scheduling development checkpoint — 8 September 2026
 
-[P008](../../design/proposals/008-scheduled-tasks.md) remains **Accepted / In progress**. This is an implementation/review checkpoint, not an installed release, independent feature closure or completion of the dedicated live-account gate. The initial unreviewed implementation commit is `8c5ab9e`; the worktree then integrated the reviewed file/terminal baseline `cfc49d2` and continued scheduling acceptance.
+[P008](../../design/proposals/008-scheduled-tasks.md) is **Accepted / Implemented**, not Verified. Two feature review rounds and bounded module integration review have closed at integration commit `9f3b414`. The dated checkpoints below retain their original scope. Dedicated DST end-to-end, live-account and protected full restore/promotion evidence remain pending; the current acceptance mapping below qualifies the historical results.
 
 ## Implemented checkpoint
 
@@ -54,3 +54,20 @@ Actual Linux/root source administrator bridge acceptance passed on the final tes
 The dedicated B namespace used a preallocated 2 GiB XFS image (allocated bytes2,147,487,744 versus size2,147,483,648); PostgreSQL data was limited to a256MiB tmpfs. Existing installations, native state and SFTP resources were preserved. A first startup attempt correctly failed because copied esbuild was the macOS binary; the actual run used the already-pinned public Linux esbuild0.25.12 cache without changing it. The owned database container was removed; Docker showed no running containers afterward. The secret-free result, successful log and matched source identity were copied locally; the exact disposable source/dependency directory was then removed. B was returned idle with previous resources untouched.
 
 The independent reviewer closed the bounded module merge source, feature and critical scope. The reviewer inspected the exact Linux bridge artifact and closed the final bounded integration evidence scope with no actionable finding. Full dedicated live-account and protected off-host restore/promotion gates remain unverified; this integration does not waive them.
+
+
+## Acceptance evidence audit — 8 September 2026
+
+Run `9cefdbb8f5` executed the expanded real-stack suite, despite its stale intermediate/smoke result label. Its historical JSON is unchanged. The emitter now names the executed lifecycle, fault, authority, quota and maintenance scope without claiming every acceptance gate closed.
+
+| Acceptance | Executed evidence and limit |
+| --- | --- |
+| P008-01 | Real UI one-time standalone creation and offline recurring existing-conversation execution, persisted unique occurrence and reopened result. |
+| P008-02 | Production calendar tests cover New York gap/fold, Lord Howe non-hour gap and Apia skipped day. Real-stack tests cover UTC preview and forward/backward clock changes. Non-UTC/DST API/UI preview plus persisted occurrence assertions remain a targeted end-to-end gap. |
+| P008-03 | Real supervisor restarts, skip and fixed three-item catch-up, overlap and retained cursor assertions. |
+| P008-04 | Real PostgreSQL deferred COMMIT faults at occurrence/job and storage-result settlement, supervisor restart and native-fixture crash with original uncertainty/no replay. |
+| P008-05 | Real pause/activation/run-now exact-key replay, active cancellation, grant-frontier and emergency future/current outcome assertions. |
+| P008-06 | Offline approval expiry, scoped profile/edit and source-policy denial, expired/revoked PAT with zero dispatch, and persisted capacity/control-reserve assertions. Metadata quota prefill is not physical resource exhaustion. |
+| P008-07 | Missing dedicated credentials: remains unverified; no fixture or metadata bridge result substitutes for it. |
+
+The separate actual Linux metadata bridge checks fresh-instance paused/revoked authority and stale-job denial, with the exact predecessor/migration checks described above. They do not establish protected full filesystem restoration or promotion. No broad suite was rerun solely for this label and documentation correction.
