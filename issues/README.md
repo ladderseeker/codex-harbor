@@ -10,7 +10,7 @@ The critical P001 implementation review is resolved in the archive. A live-accou
 | --- | --- | --- | --- | --- |
 | [Dedicated live-test credentials](2026-09-07-171225-live-runtime-credentials.md) | High | Blocked | P001; later live-test owners | Supply dedicated test credentials through the documented test configuration, then run bounded real-account acceptance. Continue other implementation and verification. |
 | [Replay and control bounds](2026-09-07-185228-p001-retention-control-bounds.md) | Medium | In progress | P007 corrective implementation; P001 acceptance | Enforce replay age/count and bounded reserved cancellation/recovery storage; verify P007-02/05/06 and inherited P001-03/07 before closure. |
-| [Linux gateway availability](2026-09-07-185228-linux-gateway-availability.md) | Medium | Open | P001; P009 target-host lane | Diagnose intermittent approved-endpoint502 responses; retain denial policy and measure deployment connectivity. |
+| [Linux gateway availability](2026-09-07-185228-linux-gateway-availability.md) | Medium | Open | P001; P009 target-host lane | Second VM reproduced DNS/TLS transport failures in 5/20 probes; retain denial policy and compare target-host connectivity. |
 
 ## Pending work transferred to proposals
 

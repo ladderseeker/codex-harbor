@@ -14,6 +14,10 @@ The standalone Linux gateway lane passed all denials and received the expected u
 
 The environment is a disposable Ubuntu 24.04 VM with Linux 6.8, Docker 29.1.3, and the fixed Cloudflare DNS-over-HTTPS profile. No account credential was sent. See the [foundation verification report](../docs/reports/2026-09-07-p001-foundation.md) for the final passing artifact.
 
+### Second-VM diagnostic — 7 September 2026
+
+Twenty bounded unauthenticated requests through the unchanged gateway reproduced five failures: four aggregate trusted-DNS failures at 4,011–4,019 ms and one connection reset after TCP connected but before TLS establishment. Fifteen requests completed with certificate-verified upstream 401 responses. The harness observed existing production lookup/request seams without changing policy or retrying requests. This identifies failure stages, not the responsible DNS family/network hop or every historical 502's cause. The [diagnostic report](../docs/reports/2026-09-07-gateway-transport-diagnostic.md) records exact image/source/harness identity, results, limitations, and verified scoped cleanup. The issue remains open for target-host comparison.
+
 ## Impact and next steps
 
 Approved outbound requests can fail in this verification environment. Rejection remains closed: no general tunnel, alternate host, insecure TLS, or private-address fallback was enabled. A failed model request can still interrupt useful work, so passing isolation assertions do not establish reliable deployment connectivity.

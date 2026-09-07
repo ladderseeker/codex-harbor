@@ -13,5 +13,6 @@ This directory describes available behavior, developer workflows, and completed 
 - [Proposal and issue lifecycle review](reports/2026-09-07-proposal-issue-lifecycle.md): lifecycle rules, archive migration, and documentation verification.
 - [P001 foundation verification](reports/2026-09-07-p001-foundation.md): delivered behavior, source/artifact identity, four review rounds, passing checks, and remaining gates.
 - [P002 API-token verification](reports/2026-09-07-p002-api-tokens.md): scoped credentials, two review rounds, actual browser/API and contract evidence, and remaining gates.
+- [Gateway transport diagnostic](reports/2026-09-07-gateway-transport-diagnostic.md): measured DNS/TLS failure stages in a second disposable Linux VM, with the availability issue still open.
 
 Add user documentation when the corresponding features work. Add reports for completed investigations or verification, including the revision and environment checked. Keep future feature specifications in `design/`, and unresolved findings in `issues/`.
