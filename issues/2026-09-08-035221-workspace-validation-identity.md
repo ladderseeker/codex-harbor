@@ -3,7 +3,7 @@
 - Severity: High
 - Status: In progress
 - Owner: P003/P009 installed-module integration; P008 owns the corresponding schedule worker call
-- Affected files: `apps/supervisor/src/workspace-storage.ts`, `packages/workspaces/src/service.ts`, `infra/storage/workspace-service.ts`, P008 standalone workspace preparation
+- Affected files: `apps/supervisor/src/workspace-storage.ts`, `packages/workspaces/src/service.ts`, `infra/storage/workspace-service.ts`, `infra/storage/workspace-paths.py`, P008 standalone workspace preparation
 - Acceptance: [P003-01–06](../design/proposals/003-parallel-project-workspaces.md#independent-acceptance), installed [P009-01](../design/proposals/009-portable-deployment-and-restore.md#independent-acceptance), derived-workspace P004 acceptance and standalone P008 execution
 
 ## Evidence — 8 September 2026
@@ -14,8 +14,10 @@ At reviewed module checkpoint `a2f9389b5ec477076b159175108d121ea90ba3b3`, source
 
 This failure occurs after correcting the separate [quota module import](2026-09-08-031857-workspace-quota-import.md). It is not evidence that the import correction failed. The initial independent module source review found no issue before these actual application results; its closure is superseded for this boundary pending the correction and review below.
 
+The bounded caller audit also found that `workspaceValidate` sends checkout identity in `source` and the common-directory identity in `identity.common`. The Python validator chooses `source` before `identity`, so its common inode check is skipped on this path; the Node service checks the expected common pathname and kind. Main identified this from source, and the implementer independently confirmed it. The downstream fixed helper/runner still performs its own identity validation; no out-of-scope execution is established. Readiness validation itself must check the recorded common directory rather than relying on that later boundary.
+
 ## Impact and next steps
 
 Installed derived/copy creation cannot provide the ready workspace required by file workflows or standalone schedules. Validation fails closed; the observed runs did not dispatch an ordinary turn. Preserve the completed storage receipt and exact filesystem identity rather than creating the workspace again or weakening validation.
 
-Pass the captured workspace ID, root and kind together with the returned canonical/device/inode and optional common-directory identity into post-create validation. Audit other `verifyWorkspace` callers for this contract. Apply the corresponding correction to the schedule worker. Independently review both call sites, run actual managed application creation/ready/use for Git and copy workspaces, and retain strict wrong-identity denials. Record exact source/run evidence and critical regressions before archiving this issue. Direct helper acceptance or macOS process-only tests cannot close the installed application gate.
+Pass the captured workspace ID, root and kind together with the returned canonical/device/inode and optional common-directory identity into post-create validation. Audit other `verifyWorkspace` callers for this contract. Apply the corresponding correction to the schedule worker. Check the supplied common-directory identity under the existing trusted storage lock, including explicit wrong-inode and symlink denials. Independently review these corrections, run actual managed application creation/ready/use for Git and copy workspaces, and retain strict wrong-identity denials. Record exact source/run evidence and critical regressions before archiving this issue. Direct helper acceptance or macOS process-only tests cannot close the installed application gate.

@@ -21,7 +21,7 @@ Revalidate current project access, model support, resource limits, and permissio
 
 ## Implementation contract — 7 September 2026
 
-The owner authorized implementation of the complete roadmap. These refinements are accepted within that direction after the independent design review recorded below and make P008 concrete against the delivered P003/P007 baseline. They do not add a dependency on the file editor, terminal or deployment UI. P002 is already installed, so its explicit route/scope extension is included. P009 integration applies when that deployment module is present. Scheduling is Harbor supervisor behavior, with no invented upstream Codex scheduling method. Delivery remains Planned until implementation begins.
+The owner authorized implementation of the complete roadmap. These refinements are accepted within that direction after the independent design review recorded below and make P008 concrete against the delivered P003/P007 baseline. They do not add a dependency on the file editor, terminal or deployment UI. P002 is already installed, so its explicit route/scope extension is included. P009 integration applies when that deployment module is present. Scheduling is Harbor supervisor behavior, with no invented upstream Codex scheduling method. Delivery is In progress; implementation and review evidence are tracked below.
 
 ### Time rules and bounded evaluation
 
@@ -79,6 +79,7 @@ Prepared on 7 September 2026 against main `fa65f6a` and delivered P003/P007/P005
 
 ## Source issues
 
+- [P008 implementation review](../../issues/2026-09-08-044007-p008-implementation-review.md): High, In progress. Two corrective source/feature rounds closed for admitted Git source, edit authority, idle retention, pause frontier and emergency state. Final committed regression evidence and P009 module integration remain required; the unrelated P005 regression observation stays explicit.
 - [Created workspace validation identity](../../issues/2026-09-08-035221-workspace-validation-identity.md): High, In progress with P003/P009. Standalone preparation must preserve the captured workspace/root/kind and returned filesystem/common identity through managed validation. Actual Linux copy execution passed after the worker correction; independent feature review and cumulative integration remain required.
 - [Dedicated live credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md): High, active and Blocked. P008-07 requires a bounded real-account unattended occurrence; fixture scheduling, non-model contracts and inherited isolation do not close that gate.
 - [P009 backup transfer authorization](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, active and Blocked in P009. When deployment integration is present, protected off-host restore coverage for P008's registry/state inherits the blocked checkpoint prerequisite. P008 implementation and unaffected local acceptance continue.

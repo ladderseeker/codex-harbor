@@ -4,10 +4,13 @@ Use this index and the [issue archive](archive/README.md) to find existing findi
 
 ## Active issues
 
-The archive contains resolved P001/P003/P005/P007/P009 review findings, authority and retention corrections, allocation detection/reconciliation, and the P002/P005 harness corrections. P004/P006 integration reviews, installed web-asset, workspace-import and post-create identity defects, the P007 regression observation, live-account and backup-transfer blockers, and gateway availability remain active. The earlier runtime finding remains Transferred with partial local evidence below.
+The archive contains resolved P001/P003/P005/P007/P009 review findings, authority and retention corrections, allocation detection/reconciliation, and the P002/P005 harness corrections. Current feature/integration reviews, installed deployment/workspace defects, P005/P007 regression observations, live-account and backup-transfer blockers, and gateway availability remain active. The earlier runtime finding remains Transferred with partial local evidence below.
 
 | Issue | Severity | Status | Owner | Next action |
 | --- | --- | --- | --- | --- |
+| [P008 implementation review](2026-09-08-044007-p008-implementation-review.md) | High | In progress | P008 | Two corrective source/feature rounds closed; record committed correction and independent regression-evidence review. |
+| [Resume readiness](2026-09-08-044008-p009-resume-readiness.md) | Medium | In progress | P009 | Preserve maintenance until bounded readiness, independently review the correction and verify the actual Linux command outcome. |
+| [P005 selection regression](2026-09-08-044009-p005-selection-regression.md) | Medium | In progress | Regression maintainer | Review bounded diagnostics and preserve unexplained failures separately from the passing critical run; establish cause on recurrence. |
 | [Created workspace identity](2026-09-08-035221-workspace-validation-identity.md) | High | In progress | P003/P009; P008 worker | Preserve complete identity in post-create managed validation, independently review and verify actual derived/copy application readiness/use on Linux. |
 | [Workspace quota import](2026-09-08-031857-workspace-quota-import.md) | High | In progress | P003/P009; installed-module integration | Replace the broken textual quota import and verify real Linux workspace/file paths with independent review. |
 | [Installed web assets](2026-09-08-031032-p009-installed-web-assets.md) | High | In progress | P009; installed-module integration | Package the actual served Vite output and verify authenticated UI/assets plus file/terminal outcomes on a fresh immutable artifact; independently review the correction. |

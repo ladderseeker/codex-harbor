@@ -1,7 +1,7 @@
 # P012 — Managed skills and MCP
 
 - Decision: Accepted
-- Delivery: Planned
+- Delivery: In progress
 - Dependencies: [P003](003-parallel-project-workspaces.md)
 - Outcome: The owner configures a trusted skill or MCP service for a project, invokes it in a conversation, and can disable its future use.
 - Design updated: 2026-09-08; one independent design review and focused correction check closed under the owner's authorized direction. The pinned account-free capability spike passed; it is not Harbor implementation or Linux/live evidence.
@@ -71,6 +71,8 @@ Use two P003 projects, Local and a derived workspace, synthetic skills with supp
 6. **P012-06:** With Codex 0.153.4, load/list/disable the skill, start local MCP, invoke its harmless tool and answer real form elicitation in an account-free contract. Separately use dedicated live credentials for a bounded real skill invocation and model-directed MCP call, with actual effect and approval/input evidence. The account-free spike covers only its listed capabilities; direct calls or synthetic picker entries cannot replace model-backed evidence.
 
 ## Delivery, rollout and review
+
+Implementation started on 2026-09-08 in an isolated worktree based on the reviewed module checkpoint `77b2ad5`. Initial work maps immutable extension storage, fixed account-free probes, effective-configuration checks and conversation integration to the accepted contract. This records started work, not an available endpoint or completed acceptance.
 
 Implement contracts/storage and fixed publication/launcher changes together with supervisor lifecycle, conversation/approval integration and responsive UI. Extend `pnpm test:e2e`, `pnpm test:contract`, `pnpm test:live` and `pnpm test:isolation` with owned cases; run check/build and critical regressions under the [shared verification contract](README.md#shared-verification-contract). No command becomes available merely because this design names it.
 

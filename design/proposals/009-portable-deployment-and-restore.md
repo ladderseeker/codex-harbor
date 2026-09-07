@@ -13,6 +13,7 @@ Cover all delivered module state through a backup registry: PostgreSQL, native C
 
 ## Source issues
 
+- [Resume readiness](../../issues/2026-09-08-044008-p009-resume-readiness.md): Medium, In progress. An installed resume returned failure after maintenance was released. Preserve maintenance through bounded readiness and independently verify the corrected administrator command on Linux; later healthy status does not retroactively pass the failed command.
 - [Created workspace validation identity](../../issues/2026-09-08-035221-workspace-validation-identity.md): High, In progress with P003/P008. The installed post-create verifier discards identity required by the private storage service, blocking derived/copy readiness. P009-01 requires actual corrected application acceptance and independent review.
 - [Workspace quota import](../../issues/2026-09-08-031857-workspace-quota-import.md): High, In progress with P003. The cumulative installed validator cannot load quota definitions after the guarded-dispatcher change. P009-01 requires the corrected Linux workspace/file path and matching independent review.
 - [Installed web assets](../../issues/2026-09-08-031032-p009-installed-web-assets.md): High, In progress. Fresh installed browser acceptance exposed omitted `apps/web/dist/` content despite passing backend readiness. P009-01 requires corrected immutable packaging, actual installed browser/assets and independent review; the earlier administrator evidence does not close this new finding.
