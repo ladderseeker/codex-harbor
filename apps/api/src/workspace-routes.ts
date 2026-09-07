@@ -1,3 +1,4 @@
+import { requireAuthority } from "../../../packages/policy/src/authority.ts";
 import type { FastifyInstance } from "fastify";
 import type { Pool, PoolClient } from "pg";
 import { randomUUID } from "node:crypto";
@@ -42,6 +43,10 @@ export function registerWorkspaceRoutes(
   },
 ) {
   const { pool, c, command, actor } = context;
+  const authority = async (db: PoolClient, req: any) => {
+    if ((await requireAuthority(db, actor(req), c)).kind !== "browser")
+      throw new HarborError(403, "BROWSER_REQUIRED", "Owner browser required");
+  };
   app.get<{ Params: { id: string } }>(
     "/api/v1/projects/:id/workspaces",
     async (req) => {
@@ -94,6 +99,7 @@ export function registerWorkspaceRoutes(
             "Workspace recovery requires the owner browser",
           );
         const w = await selectedWorkspace(db, req.params.id, true);
+        await authority(db, req);
         if (
           w.writer_session_id !== b.expectedSessionId ||
           Number(w.writer_generation) !== b.expectedGeneration
@@ -165,6 +171,7 @@ export function registerWorkspaceRoutes(
         const b = createSchema.parse(req.body);
         authorizePermission("workspace-write", c.HARBOR_PERMISSION_CEILING);
         const source = await selectedWorkspace(db, b.sourceWorkspaceId, true);
+        await authority(db, req);
         if (source.project_id !== req.params.id)
           throw new HarborError(
             403,
@@ -271,6 +278,7 @@ export function registerWorkspaceRoutes(
           .strict()
           .parse(req.body ?? {});
         const w = await selectedWorkspace(db, req.params.id, true);
+        await authority(db, req);
         await requireWorkspaceIdle(db, w);
         if (w.state === "removed")
           throw new HarborError(
@@ -294,6 +302,7 @@ export function registerWorkspaceRoutes(
           .parse(req.body ?? {});
         authorizePermission("workspace-write", c.HARBOR_PERMISSION_CEILING);
         const w = await selectedWorkspace(db, req.params.id, true);
+        await authority(db, req);
         if (w.kind === "local")
           throw new HarborError(
             409,
@@ -418,6 +427,7 @@ export function registerWorkspaceRoutes(
           [s.id],
         );
         const w = await selectedWorkspace(db, s.workspace_id, true);
+        await authority(db, req);
         if (active.rowCount || w.writer_session_id === s.id)
           throw new HarborError(
             409,

@@ -1,3 +1,4 @@
+import { requireAuthority } from "../../../packages/policy/src/authority.ts";
 import {
   createCipheriv,
   createDecipheriv,
@@ -128,15 +129,12 @@ export class CredentialStore {
     if (request.action !== "status") this.mutating = true;
     try {
       return await transaction(this.pool, async (db) => {
-        const actor = await db.query(
-          "SELECT 1 FROM browser_sessions WHERE hash=$1 AND NOT revoked AND expires_at>now() AND last_seen>now()-($2*interval '1 second') AND identity_pin=$3 AND (SELECT identity_pin FROM harbor_meta)=$3 FOR UPDATE",
-          [request.actor, this.c.HARBOR_IDLE_SECONDS, ownerPin],
-        );
-        if (!actor.rowCount)
+        const actor = await requireAuthority(db, request.actor, this.c);
+        if (actor.kind !== "browser")
           throw new HarborError(
-            401,
-            "AUTH_EXPIRED",
-            "Owner session expired or revoked",
+            403,
+            "BROWSER_REQUIRED",
+            "Owner browser session required",
           );
         if (request.action === "status") {
           const stored = (
@@ -177,9 +175,11 @@ export class CredentialStore {
               "IDEMPOTENCY_CONFLICT",
               "Intent already identifies another credential change",
             );
+          await requireAuthority(db, request.actor, this.c);
           return prior.rows[0].result;
         }
         checkKey(request.idempotencyKey);
+        await requireAuthority(db, request.actor, this.c);
         await this.beforeChange();
         if (
           !(

@@ -149,6 +149,10 @@ export async function bindIdentity(pool: pg.Pool, pin: string) {
       "UPDATE browser_sessions SET revoked=true WHERE identity_pin<>$1",
       [pin],
     );
+    await db.query(
+      "UPDATE api_tokens SET revoked=true WHERE identity_pin<>$1 OR instance_id<>$2",
+      [pin, process.env.HARBOR_INSTANCE_ID ?? "harbor"],
+    );
     await db.query("UPDATE harbor_meta SET identity_pin=$1", [pin]);
   });
 }

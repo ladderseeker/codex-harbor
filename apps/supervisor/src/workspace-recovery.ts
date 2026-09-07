@@ -1,3 +1,7 @@
+import {
+  requireAuthority,
+  type AuthorityConfig,
+} from "../../../packages/policy/src/authority.ts";
 import type { Pool, PoolClient } from "pg";
 import { transaction } from "../../../packages/storage/src/index.ts";
 import { selectedWorkspace } from "../../../packages/workspaces/src/service.ts";
@@ -35,8 +39,8 @@ export async function releaseRecoveredWorkspace(
 export async function processWorkspaceReleases(
   pool: Pool,
   options: {
-    idleSeconds: number;
-    ownerPin: string;
+    config: AuthorityConfig;
+    current: () => boolean;
     retire: (sessionId: string, projectId: string) => Promise<void>;
   },
 ) {
@@ -48,11 +52,16 @@ export async function processWorkspaceReleases(
   for (const row of rows) {
     try {
       await transaction(pool, async (db) => {
-        const grant = await db.query(
-          "SELECT 1 FROM browser_sessions WHERE hash=$1 AND NOT revoked AND expires_at>now() AND last_seen>now()-($2*interval '1 second') AND identity_pin=$3 AND (SELECT identity_pin FROM harbor_meta)=$3 FOR UPDATE",
-          [row.actor_hash, options.idleSeconds, options.ownerPin],
-        );
-        if (!grant.rowCount) throw Error("AUTHORITY_REVOKED");
+        const authority = async () => {
+          if (!options.current()) throw Error("AUTHORITY_REVOKED");
+          const grant = await requireAuthority(
+            db,
+            row.actor_hash,
+            options.config,
+          );
+          if (grant.kind !== "browser") throw Error("AUTHORITY_REVOKED");
+        };
+        await authority();
         const w = await selectedWorkspace(db, row.workspace_id, true);
         if (
           w.writer_session_id !== row.session_id ||
@@ -71,7 +80,9 @@ export async function processWorkspaceReleases(
         );
         // Hold workspace ownership through exact retirement and CAS: a concurrent
         // recovery cannot admit a successor between inspection and removal.
+        await authority();
         await options.retire(row.session_id, w.project_id);
+        await authority();
 
         await releaseRecoveredWorkspace(db, {
           workspaceId: row.workspace_id,
@@ -83,6 +94,7 @@ export async function processWorkspaceReleases(
           "UPDATE workspace_releases SET state='completed',updated_at=now() WHERE id=$1",
           [row.id],
         );
+        await authority();
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";

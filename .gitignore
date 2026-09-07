@@ -10,3 +10,6 @@ playwright-report/
 
 __pycache__/
 *.pyc
+
+# Worktree dependency links
+node_modules

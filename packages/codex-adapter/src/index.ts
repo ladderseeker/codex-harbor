@@ -301,7 +301,13 @@ export class CodexAdapter {
     }
     if (this.turnStates.get(key) === "completed")
       throw new TurnAlreadyCompletedError();
-    return this.request("turn/interrupt", { threadId, turnId });
+    const send = () => {
+      const response = this.request("turn/interrupt", { threadId, turnId });
+      void response.catch(() => undefined);
+      return { response };
+    };
+    return (this.withDispatch ? await this.withDispatch(send) : send())
+      .response;
   }
   async respond(
     id: RpcId,
@@ -339,9 +345,19 @@ export class CodexAdapter {
         throw Error("Invalid approval decision");
       result = { decision: answer.decision };
     }
-    if (this.withDispatch)
-      await this.withDispatch(() => this.send({ id, result }));
-    else this.send({ id, result });
+    let sent = false;
+    try {
+      const send = () => {
+        sent = true;
+        this.send({ id, result });
+      };
+      if (this.withDispatch) await this.withDispatch(send);
+      else send();
+    } catch (error) {
+      // A guard that rejected before the wire leaves the native request pending.
+      if (!sent && !this.closed) this.requests.set(id, method);
+      throw error;
+    }
   }
   inspectProcesses(): Promise<ProcessInspection> {
     return (

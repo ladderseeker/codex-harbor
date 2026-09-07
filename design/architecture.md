@@ -225,6 +225,8 @@ Promotion is a distinct trusted operation referencing an immutable artifact dige
 
 ## Release, retention, and rollback rules
 
+[D006](decisions/006-portable-release-and-restore.md) specifies P009's immutable installed layout, actual trusted supervisor/storage privilege, encrypted backup checkpoint and module registry, fresh-host authority/filesystem rebinding, and SSH recovery. It is an accepted design under development; its administrator commands and A-to-B restore gate are not yet implemented or verified.
+
 Use additive, backward-compatible database migrations before swapping traffic. Back up and validate restore prerequisites before migrations that could lose data. A single migration owner acquires a deployment lock; candidates never migrate the stable database. Record application, schema, runner, Codex, and native-history format versions together in the release manifest. Compatibility across all of them is a release gate.
 
 Before replacing a supervisor or runner, stop admitting new work to the old generation and drain its active turns and terminals. Keep the existing generation alive until drained, or defer promotion. Forced termination is an explicit operation with visible interrupted work. A compatible HTTP-only release can change the proxy's active upstream atomically while the existing supervisor continues; it must still preserve browser/API contracts and stream reconnection. Do not suggest proxy switching makes database or external side effects transactional.

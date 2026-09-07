@@ -1,7 +1,7 @@
 # P007 — Session history and recovery
 
-- Decision: Draft
-- Delivery: Planned
+- Decision: Accepted
+- Delivery: In progress
 - Dependencies: [P001](001-secure-persistent-conversations.md)
 - Outcome: The owner finds previous work, reconnects across storage/restart gaps, and resolves interrupted or uncertain operations without accidental replay.
 

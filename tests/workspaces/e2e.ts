@@ -1,3 +1,4 @@
+import { workspaceAuthorityExpiry } from "./authority-expiry.ts";
 import { sourceDigest } from "../../scripts/source-digest.ts";
 import { localComposeFiles } from "../../infra/compose.ts";
 import { maintain } from "../../packages/storage/src/maintenance.ts";
@@ -386,6 +387,21 @@ try {
   const reservation = (
     await get(`/projects/${project.id}/workspaces`)
   ).workspaces.find((w: any) => w.id === local.id);
+  await workspaceAuthorityExpiry({
+    browser,
+    owner: context,
+    origin,
+    database: env.DATABASE_URL,
+    workspaceId: local.id,
+    sessionId: doomed.id,
+    generation: reservation.writerGeneration,
+    pause: () => {
+      supervisor.kill("SIGSTOP");
+    },
+    resume: () => {
+      supervisor.kill("SIGCONT");
+    },
+  });
   expect(
     (
       await command(`/workspaces/${local.id}/release`, {

@@ -4,6 +4,8 @@ P001's foundation is implemented and has completed four independent review round
 
 The [architecture](../../design/architecture.md) defines the target system. The [proposal index](../../design/proposals/README.md) defines independently verifiable feature outcomes and their dependencies. The [issue index](../../issues/README.md) exposes active findings and pending work transferred to proposals. Both indexes link their archives. [AGENTS.md](../../AGENTS.md#document-ownership-and-lifecycle) contains the canonical lifecycle and working rules.
 
+P002 adds scoped credentials for external clients; use the [programmatic API guide](programmatic-api.md). Its [implementation report](../reports/2026-09-07-p002-api-tokens.md) records the original two review rounds, a focused third authority-correction round, and Node 24 validation separately from the still-open live-account and feature-integration gates.
+
 ## Run the deterministic application locally
 
 The tested macOS toolchain uses Node 24.11.1, pnpm 12.3.4, and a running Linux Docker engine with Compose. The repository pins JavaScript dependencies and the external Codex protocol baseline at 0.153.4. PostgreSQL 17.6 and Caddy 2.10.2 are provisioned by the run-specific Compose instance.

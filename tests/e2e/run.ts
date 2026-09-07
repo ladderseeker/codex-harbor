@@ -2,6 +2,8 @@ if (process.argv.includes("--workspaces")) {
   await import("../workspaces/e2e.ts");
   process.exit(process.exitCode ?? 0);
 }
+import { authorityExpiry } from "./authority-expiry.ts";
+import { p002 } from "./p002.ts";
 import { sourceDigest } from "../../scripts/source-digest.ts";
 import { localComposeFiles } from "../../infra/compose.ts";
 import { maintain } from "../../packages/storage/src/maintenance.ts";
@@ -14,9 +16,11 @@ import { mkdtemp, mkdir, writeFile, rm, readFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { createServer } from "node:net";
-import { chromium, expect } from "@playwright/test";
+import { chromium, expect, request as apiRequest } from "@playwright/test";
 const sourceAtStart = sourceDigest();
 const children: ChildProcess[] = [];
+let diagnosticText = "";
+let rotationBearer = "";
 const serve = process.argv.includes("--serve");
 const dir = await mkdtemp(
     path.join(
@@ -80,6 +84,11 @@ const start = (file: string) => {
     env,
     stdio: ["ignore", "pipe", "pipe"],
   });
+  const capture = (b: Buffer) => {
+    diagnosticText = (diagnosticText + b.toString()).slice(-131072);
+  };
+  p.stdout?.on("data", capture);
+  p.stderr?.on("data", capture);
   let diagnostics = "";
   p.stderr?.on("data", (b) => {
     diagnostics = (diagnostics + b.toString()).slice(-4000);
@@ -609,6 +618,31 @@ try {
     ).toBe(beforeCredentialChange.state);
     const testDb = new pg.Pool({ connectionString: env.DATABASE_URL });
     try {
+      await authorityExpiry(
+        testDb,
+        {
+          HARBOR_OIDC_ISSUER: env.HARBOR_OIDC_ISSUER,
+          HARBOR_OWNER_SUBJECT: env.HARBOR_OWNER_SUBJECT,
+          HARBOR_IDLE_SECONDS: 300,
+        },
+        sessions.sessions[0].projectId,
+      );
+      rotationBearer = await p002({
+        page: reopened,
+        context,
+        origin,
+        csrf: me.csrfToken,
+        db: testDb,
+        projectId: sessions.sessions[0].projectId,
+        logs: () => diagnosticText,
+        artifacts,
+        pauseSupervisor: () => {
+          supervisor.kill("SIGSTOP");
+        },
+        resumeSupervisor: () => {
+          supervisor.kill("SIGCONT");
+        },
+      });
       const interruptCrashSession = await newSession();
       const interruptCrash = await (
         await command(`/sessions/${interruptCrashSession}/turns`, {
@@ -1219,6 +1253,14 @@ try {
         await oldOwner.request.get(origin + `/api/v1/sessions/${id}/events`)
       ).status(),
     ).toBe(401);
+    const machineAfterRotation = await apiRequest.newContext({
+      ignoreHTTPSErrors: true,
+      extraHTTPHeaders: { Authorization: "Bearer " + rotationBearer },
+    });
+    expect(
+      (await machineAfterRotation.get(origin + "/api/v1/projects")).status(),
+    ).toBe(401);
+    await machineAfterRotation.dispose();
     const newOwner = await browser.newContext({ ignoreHTTPSErrors: true }),
       newOwnerPage = await newOwner.newPage();
     await newOwnerPage.goto(origin + "/auth/login");
@@ -1241,8 +1283,9 @@ try {
           sourceAtEnd: sourceDigest(),
           runtime: "0.153.4",
           browser: "Chromium1194",
+          node: process.version,
           scope:
-            "P001 deterministic external-fixture acceptance; live/isolation separate",
+            "P001/P002 deterministic external-fixture acceptance; live/isolation separate",
         },
         null,
         2,

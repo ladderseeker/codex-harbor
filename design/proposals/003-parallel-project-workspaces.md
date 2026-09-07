@@ -47,3 +47,6 @@ The implemented workflow and commands are documented in [Managed project workspa
 ## Source issues
 
 [Dedicated live-test credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md) remains a High release blocker for **P003-06**. The bounded two-runtime native workspace lane exists, but missing dedicated credentials leave actual authenticated parallel-turn effects unverified. Fixture and accountless Linux results do not waive this gate.
+## Implementation record
+
+- 2026-09-07: Started isolated implementation on the committed P001 foundation under the owner's roadmap authorization. Managed Local/Git Worktree/copy behavior, trusted metadata ownership, writer coordination, and complete UI/API/Linux acceptance belong to this delivery. Material storage/Git decisions are recorded before use; P001's remaining gates stay visible.

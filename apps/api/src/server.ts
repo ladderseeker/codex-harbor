@@ -4,6 +4,15 @@ import {
   verifyWorkspace,
 } from "../../../packages/workspaces/src/service.ts";
 import {
+  authenticateBearer,
+  requireAuthority,
+  authenticateBrowser,
+  lockOwnerIdentity,
+  type Authority,
+} from "../../../packages/policy/src/authority.ts";
+import { authorizeTokenRoute } from "./token-access.ts";
+import { registerTokenRoutes } from "./tokens.ts";
+import {
   createManagedProject,
   validateManagedProject,
   inspectManagedStorage,
@@ -70,7 +79,9 @@ export async function buildServer(c: Config) {
   app.addHook("preClose", async () => {
     for (const stream of openStreams) stream.end();
   });
-  const auth = new WeakMap<object, { hash: string; csrf: string }>();
+  const auth = new WeakMap<object, Authority>();
+  const externalEffectsGranted = new WeakSet<object>();
+  const selfRevocations = new WeakSet<object>();
   app.setErrorHandler((error, request, reply) => {
     const e =
       error instanceof HarborError
@@ -147,25 +158,30 @@ export async function buildServer(c: Config) {
     });
     if (["/auth/login", "/auth/callback"].includes(req.url.split("?")[0]!))
       return;
+    if (req.headers.authorization !== undefined) {
+      auth.set(
+        req,
+        await authenticateBearer(pool, c, req.headers.authorization),
+      );
+      return;
+    }
     const token = req.cookies["__Host-harbor"];
     if (!token)
       throw new HarborError(401, "AUTH_REQUIRED", "Sign in to continue");
     const hash = digest(token);
-    const r = await pool.query(
-      "UPDATE browser_sessions SET last_seen=now() WHERE hash=$1 AND NOT revoked AND expires_at>now() AND last_seen>now()-($2*interval '1 second') AND identity_pin=$3 AND (SELECT identity_pin FROM harbor_meta)=$3 RETURNING csrf",
-      [hash, c.HARBOR_IDLE_SECONDS, ownerPin],
-    );
-    if (!r.rowCount)
-      throw new HarborError(401, "AUTH_EXPIRED", "Session expired or revoked");
-    auth.set(req, { hash, csrf: r.rows[0].csrf });
+    const authority = await authenticateBrowser(pool, c, hash);
+    auth.set(req, authority);
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
       requireOrigin(req.headers.origin, c.HARBOR_ORIGIN);
       if (
         typeof req.headers["x-csrf-token"] !== "string" ||
-        !equalSecret(req.headers["x-csrf-token"], r.rows[0].csrf)
+        !equalSecret(req.headers["x-csrf-token"], authority.csrf)
       )
         throw new HarborError(403, "CSRF_DENIED", "CSRF token required");
     }
+  });
+  app.addHook("preHandler", async (req) => {
+    if (auth.has(req)) await authorizeTokenRoute(pool, c, auth.get(req)!, req);
   });
   app.get("/auth/login", async (_req, reply) => {
     const state = oidc.randomState(),
@@ -247,7 +263,10 @@ export async function buildServer(c: Config) {
     return reply.redirect("/");
   });
   async function command(req: any, fn: (db: PoolClient) => Promise<unknown>) {
-    const actor = c.HARBOR_OWNER_SUBJECT,
+    const actor =
+        auth.get(req)!.kind === "token"
+          ? auth.get(req)!.hash
+          : c.HARBOR_OWNER_SUBJECT,
       route = req.routeOptions.url as string,
       key = req.headers["idempotency-key"];
     if (typeof key !== "string")
@@ -260,6 +279,19 @@ export async function buildServer(c: Config) {
       JSON.stringify({ params: req.params, body: req.body ?? {} }),
     );
     return transaction(pool, async (db) => {
+      if (route === "/api/v1/security/logout") {
+        await lockOwnerIdentity(db);
+        await db.query(
+          "SELECT hash FROM browser_sessions WHERE hash=$1 FOR UPDATE",
+          [auth.get(req)!.hash],
+        );
+      }
+      await requireAuthority(db, auth.get(req)!.hash, c);
+      if (auth.get(req)!.kind === "token")
+        await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+          "token-intents:" + actor,
+        ]);
+      await authorizeTokenRoute(db, c, auth.get(req)!, req);
       await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
         actor + route + key,
       ]);
@@ -274,10 +306,31 @@ export async function buildServer(c: Config) {
             "IDEMPOTENCY_CONFLICT",
             "Key already identifies different input",
           );
+        await requireAuthority(db, auth.get(req)!.hash, c);
         return old.rows[0].result;
       }
       checkKey(key);
+      if (auth.get(req)!.kind === "token") {
+        const reserve = route.endsWith("/cancel") || route.endsWith("/answer");
+        if (
+          Number(
+            (
+              await db.query("SELECT count(*) FROM intents WHERE actor=$1", [
+                actor,
+              ])
+            ).rows[0].count,
+          ) >= (reserve ? 1100 : 1000)
+        )
+          throw new HarborError(
+            429,
+            "TOKEN_INTENT_QUOTA",
+            "Token intent quota reached; existing intents remain retryable and owner browser controls remain available",
+          );
+      }
+      await requireAuthority(db, auth.get(req)!.hash, c);
       const result = await fn(db);
+      if (!externalEffectsGranted.has(req) && !selfRevocations.has(req))
+        await requireAuthority(db, auth.get(req)!.hash, c);
       await db.query(
         "INSERT INTO intents(actor,route,key,request_hash,result) VALUES($1,$2,$3,$4,$5)",
         [actor, route, key, hash, JSON.stringify(result)],
@@ -328,6 +381,7 @@ export async function buildServer(c: Config) {
     command,
     actor: (req) => auth.get(req)!.hash,
   });
+  registerTokenRoutes(app, pool, c, command);
   app.get("/api/v1/openapi.json", async () => openapi);
   app.get("/api/v1/security/runtime-credentials", async (req) =>
     credentialCommand(c.HARBOR_CONTROL_SOCKET, {
@@ -362,7 +416,7 @@ export async function buildServer(c: Config) {
   app.get("/api/v1/project-roots", async () => ({
     roots: c.roots.map(({ id, name }) => ({ id, name })),
   }));
-  app.get("/api/v1/capabilities", async () => ({
+  app.get("/api/v1/capabilities", async (req) => ({
     emergencyStopped: (await pool.query("SELECT emergency FROM harbor_meta"))
       .rows[0].emergency,
     models: (
@@ -381,7 +435,8 @@ export async function buildServer(c: Config) {
           .filter((e: string) => ["low", "medium", "high"].includes(e)),
       })),
     permissionProfiles:
-      c.HARBOR_PERMISSION_CEILING === "workspace-write"
+      c.HARBOR_PERMISSION_CEILING === "workspace-write" &&
+      auth.get(req)!.permissionProfile !== "read-only"
         ? ["read-only", "workspace-write"]
         : ["read-only"],
     limits: {
@@ -397,9 +452,12 @@ export async function buildServer(c: Config) {
     account: (await pool.query("SELECT data FROM runtime_capabilities")).rows[0]
       ?.data?.account ?? { authenticated: false, authMode: null },
   }));
-  app.get("/api/v1/projects", async () => ({
+  app.get("/api/v1/projects", async (req) => ({
     projects: (
-      await pool.query("SELECT * FROM projects ORDER BY created_at")
+      await pool.query(
+        "SELECT * FROM projects WHERE ($1::uuid[] IS NULL OR id=ANY($1)) ORDER BY created_at",
+        [auth.get(req)!.projectIds ?? null],
+      )
     ).rows.map(publicRow),
   }));
   app.get<{ Params: { id: string } }>(
@@ -437,6 +495,10 @@ export async function buildServer(c: Config) {
           "ROOT_DENIED",
           "Project root is not allowed",
         );
+      // Existing browser-authorized storage work keeps its accepted grant.
+      // Expiry after filesystem effects cannot undo them by rolling back SQL.
+      await requireAuthority(db, auth.get(req)!.hash, c);
+      externalEffectsGranted.add(req);
       const provisioned =
         c.HARBOR_FIXTURE_MODE && !process.env.HARBOR_STORAGE_SOCKET
           ? null
@@ -493,9 +555,12 @@ export async function buildServer(c: Config) {
       return { project: publicRow(row.rows[0]) };
     }),
   );
-  app.get("/api/v1/sessions", async () => ({
+  app.get("/api/v1/sessions", async (req) => ({
     sessions: (
-      await pool.query("SELECT * FROM sessions ORDER BY updated_at DESC")
+      await pool.query(
+        "SELECT * FROM sessions WHERE ($1::uuid[] IS NULL OR project_id=ANY($1)) ORDER BY updated_at DESC",
+        [auth.get(req)!.projectIds ?? null],
+      )
     ).rows.map(publicRow),
   }));
   app.post("/api/v1/sessions", async (req) =>
@@ -829,6 +894,22 @@ export async function buildServer(c: Config) {
               message:
                 "Stop already requested; interruption is not yet confirmed",
             };
+          if (
+            auth.get(req)!.kind === "token" &&
+            Number(
+              (
+                await db.query(
+                  "SELECT count(*) FROM operations WHERE session_id=$1",
+                  [o.session_id],
+                )
+              ).rows[0].count,
+            ) >= 550
+          )
+            throw new HarborError(
+              429,
+              "CONTROL_QUOTA",
+              "Conversation control reserve reached; owner browser administration remains available",
+            );
           const id = randomUUID();
           await db.query(
             "INSERT INTO operations(id,session_id,kind,state,payload,actor_hash) VALUES($1,$2,'cancel','queued',$3,$4)",
@@ -858,6 +939,8 @@ export async function buildServer(c: Config) {
   );
   app.post("/api/v1/security/logout", async (req, reply) => {
     const result = await command(req, async (db) => {
+      await requireAuthority(db, auth.get(req)!.hash, c);
+      selfRevocations.add(req);
       await db.query("UPDATE browser_sessions SET revoked=true WHERE hash=$1", [
         auth.get(req)!.hash,
       ]);
@@ -912,11 +995,12 @@ export async function buildServer(c: Config) {
         if (busy) return;
         busy = true;
         try {
-          const a = await pool.query(
-            "SELECT 1 FROM browser_sessions WHERE hash=$1 AND NOT revoked AND expires_at>now() AND last_seen>now()-($2*interval '1 second') AND identity_pin=$3 AND (SELECT identity_pin FROM harbor_meta)=$3",
-            [auth.get(req)!.hash, c.HARBOR_IDLE_SECONDS, ownerPin],
-          );
-          if (!a.rowCount) {
+          try {
+            await requireAuthority(pool, auth.get(req)!.hash, c, {
+              scope: "read",
+              projectId: (await session(pool as any, req.params.id)).project_id,
+            });
+          } catch {
             reply.raw.end();
             return;
           }

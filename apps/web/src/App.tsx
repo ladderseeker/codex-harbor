@@ -1,3 +1,4 @@
+import { Tokens } from "./Tokens.tsx";
 import {
   useCallback,
   useEffect,
@@ -163,6 +164,7 @@ export function App() {
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [tokensOpen, setTokensOpen] = useState(false);
   const [replayGap, setReplayGap] = useState(false);
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [stopped, setStopped] = useState(false);
@@ -778,6 +780,13 @@ export function App() {
           <span aria-hidden="true">+</span> New conversation
         </button>
         <div className="rail-footer">
+          <button
+            className="account-button"
+            disabled={!identity}
+            onClick={() => setTokensOpen(true)}
+          >
+            API tokens
+          </button>
           <button
             className="account-button"
             onClick={() => setAccountOpen(true)}
@@ -1409,6 +1418,11 @@ export function App() {
               Archive conversation
             </button>
           </div>
+        </Modal>
+      )}
+      {tokensOpen && identity && (
+        <Modal title="API tokens" close={() => setTokensOpen(false)}>
+          <Tokens csrf={identity.csrfToken} projects={projects} />
         </Modal>
       )}
       {accountOpen && identity && (
