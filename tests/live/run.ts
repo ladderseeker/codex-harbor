@@ -1,3 +1,14 @@
+if (process.argv.includes("--attachments")) {
+  if (!process.env.HARBOR_TEST_OPENAI_API_KEY) {
+    console.error(
+      "UNVERIFIED P005-06: dedicated HARBOR_TEST_OPENAI_API_KEY is unavailable; no model request was made.",
+    );
+    process.exit(2);
+  }
+  process.env.HARBOR_TEST_LIVE_ATTACHMENTS = "1";
+  await import("../isolation/attachments.js");
+  process.exit(0);
+}
 if (process.argv.includes("--workspaces")) {
   await import("../workspaces/live.ts");
   process.exit(process.exitCode ?? 0);

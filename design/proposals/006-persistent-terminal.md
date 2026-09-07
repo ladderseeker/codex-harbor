@@ -1,7 +1,7 @@
 # P006 — Persistent terminal
 
 - Decision: Accepted
-- Delivery: Planned
+- Delivery: In progress
 - Dependencies: [P003](003-parallel-project-workspaces.md)
 - Outcome: The owner opens a shell in the selected workspace, leaves the page, and reconnects to its bounded output and running process.
 
@@ -83,3 +83,7 @@ Extend P009's installed module registry with terminal metadata, retained output 
 Extend the six acceptance cases with actual no-account pinned PTY readiness and delayed exit beyond the ordinary RPC timeout; Local and derived Git workspace mounts; browser close and API-only restart while a real shell emits output; two controllers/takeover/stale frames; duplicate/lost input acknowledgements without duplicate bytes; expiry behind locks and queued control denial; database loss before/after input dispatch; output retention and snapshot race; split UTF-8/ANSI payloads, hostile OSC/HTML/links and replay-generated input suppression; slow readers/floods; shell exit with a surviving background process; all queued/live/retained/input/output limits; and P003/P004/P007 typed-reservation conflicts. The supported Linux lane must exercise the actual launcher, pinned PTY and negative filesystem/network/privilege probes. A native PTY which needs no model key can be verified without claiming a live model turn; any account-dependent operation added later retains its separate live gate.
 
 Design review: an independent agent checked runtime separation, authority, typed reservations, input ambiguity, replay and restore. One Medium clarification added a nonempty input requirement, separate pending-row cap and numeric frame/control rates so zero-byte traffic cannot evade byte quotas. These bounded corrections preserve scope; implementation and actual PTY/Linux evidence remain pending.
+
+## Implementation record
+
+- 2026-09-07: Started isolated implementation on the reviewed attachment/workspace/history integration `cb6be0d`, under the accepted contract. Migration 011 is reserved. Coordinate the generic typed writer interface with P004 migration 010; terminal semantics remain independently owned by P006.

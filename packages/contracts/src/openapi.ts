@@ -73,6 +73,7 @@ export const publicSchemas = {
   }),
   Message: object({
     id: uuid,
+    operationId: { type: ["string", "null"] },
     role: { enum: ["user", "assistant", "system"] },
     text: string,
     status: string,
@@ -187,6 +188,29 @@ const tokenRecord = object({
   created_at: timestamp,
   last_used_at: { type: ["string", "null"] },
 });
+const attachmentRecord = object({
+  id: uuid,
+  sessionId: uuid,
+  name: string,
+  state: { enum: ["uploading", "staged", "attached", "deleted", "expired"] },
+  mediaType: { enum: ["image/png", "text/plain"] },
+  size: { type: "integer" },
+  digest: string,
+  operationId: { type: ["string", "null"] },
+  expiresAt: timestamp,
+});
+const draftRecord = object({
+  text: string,
+  attachmentIds: array(uuid),
+  revision: { type: "integer" },
+});
+const uploadMutation = mutation(
+  { type: "string", format: "binary" },
+  object({ attachment: attachmentRecord }),
+);
+uploadMutation.requestBody.content = {
+  "application/octet-stream": { schema: { type: "string", format: "binary" } },
+} as any;
 const recovery = object({
   id: uuid,
   state: { enum: ["queued", "fencing", "ready", "failed", "consumed"] },
@@ -203,6 +227,68 @@ const recovery = object({
   updatedAt: timestamp,
 });
 const paths: Record<string, any> = {
+  "/sessions/{id}/attachments": {
+    get: read(object({ attachments: array(attachmentRecord) })),
+    post: mutation(
+      object({
+        name: string,
+        mediaType: { enum: ["image/png", "text/plain"] },
+        size: { type: "integer", minimum: 1, maximum: 262144 },
+        sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
+      }),
+      object({ attachment: attachmentRecord }),
+    ),
+  },
+  "/attachments/{id}": {
+    delete: mutation(empty, object({ deleted: { type: "boolean" } })),
+  },
+  "/attachments/{id}/content": {
+    put: uploadMutation,
+    get: {
+      ...secure,
+      responses: {
+        "200": {
+          description:
+            "Validated private download; attachment disposition and nosniff",
+          content: {
+            "image/png": { schema: { type: "string", format: "binary" } },
+            "text/plain": { schema: { type: "string" } },
+          },
+        },
+        ...errors,
+      },
+    },
+  },
+  "/attachments/{id}/preview": {
+    get: {
+      ...secure,
+      responses: {
+        "200": {
+          description: "Validated PNG only; CSP sandbox",
+          content: {
+            "image/png": { schema: { type: "string", format: "binary" } },
+          },
+        },
+        ...errors,
+      },
+    },
+  },
+  "/sessions/{id}/draft": {
+    get: read(object({ draft: draftRecord })),
+    post: mutation(
+      object({
+        text: { type: "string", maxLength: 32768 },
+        attachmentIds: {
+          type: "array",
+          items: uuid,
+          maxItems: 4,
+          uniqueItems: true,
+        },
+        expectedRevision: { type: "integer", minimum: 0 },
+      }),
+      object({ draft: draftRecord }),
+    ),
+  },
   "/history": {
     get: {
       ...read(

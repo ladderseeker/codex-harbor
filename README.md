@@ -1,10 +1,10 @@
 # Codex Harbor
 
-A single-owner web interface and authenticated API for Codex, being built for compatible Linux VPS hosts. Persistent conversations, scoped API tokens, managed parallel workspaces and history/recovery run locally. Attachments are being integrated; file editing and portable deployment are in development.
+A single-owner web interface and authenticated API for Codex, being built for compatible Linux VPS hosts. Persistent conversations, scoped API tokens, managed parallel workspaces, attachments and history/recovery run locally. File editing, terminal access and portable deployment are in development.
 
 ## Status
 
-P001–P003 and P007 are Implemented. The foundation, token controls, workspace lifecycle and recovery passed their recorded browser/API and contract checks, including combined Node 24 integration. The unchanged runtime boundary retains its separately tested Linux evidence. Required live-account evidence and follow-ups remain open, so no proposal is marked finished. See the [foundation report](docs/reports/2026-09-07-p001-foundation.md), [API-token report](docs/reports/2026-09-07-p002-api-tokens.md), [workspace report](docs/reports/2026-09-07-p003-workspaces.md), [history/recovery report](docs/reports/2026-09-07-p007-history-integration.md), and [developer workflow](docs/developer/development.md) for tested commands and limits.
+P001–P003, P005 and P007 are Implemented. The foundation, token controls, workspace lifecycle and recovery passed their recorded browser/API and contract checks, including combined Node 24 integration. The unchanged runtime boundary retains its separately tested Linux evidence. Required live-account evidence and follow-ups remain open, so no proposal is marked finished. See the [foundation report](docs/reports/2026-09-07-p001-foundation.md), [API-token report](docs/reports/2026-09-07-p002-api-tokens.md), [workspace report](docs/reports/2026-09-07-p003-workspaces.md), [history/recovery report](docs/reports/2026-09-07-p007-history-integration.md), [attachment integration report](docs/reports/2026-09-07-p005-integration.md), and [developer workflow](docs/developer/development.md) for tested commands and limits.
 
 ## Start here
 

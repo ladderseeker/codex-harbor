@@ -1,3 +1,8 @@
+import {
+  useRichDraft,
+  AttachmentPicker,
+  AttachmentPreview,
+} from "./Attachments.tsx";
 import { History, ConversationDetails } from "./History.tsx";
 import { Recovery } from "./Recovery.tsx";
 import { Tokens } from "./Tokens.tsx";
@@ -39,7 +44,12 @@ interface Root {
   label?: string;
 }
 interface Capabilities {
-  models: { id: string; name: string; efforts: string[] }[];
+  models: {
+    id: string;
+    name: string;
+    efforts: string[];
+    inputModalities?: string[];
+  }[];
   permissionProfiles: PermissionProfile[];
   runtime?: unknown;
   account?: { authenticated: boolean; authMode: string | null };
@@ -170,7 +180,7 @@ export function App() {
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [stopped, setStopped] = useState(false);
   const [notice, setNotice] = useState("");
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const richDraft = useRichDraft(selectedId, identity?.csrfToken);
   const [model, setModel] = useState("");
   const [effort, setEffort] = useState("medium");
   const [permission, setPermission] = useState<PermissionProfile>("read-only");
@@ -525,7 +535,7 @@ export function App() {
   );
   const active = !!current && busyStates.has(current.state);
   const uncertain = current?.state === "uncertain";
-  const text = drafts[selectedId] ?? "";
+  const text = richDraft.draft.text;
   const settingsReady =
     capabilities?.account?.authenticated === true &&
     !!capabilities?.models.some(
@@ -561,7 +571,7 @@ export function App() {
     );
   }
 
-  function send(event: FormEvent) {
+  async function send(event: FormEvent) {
     event.preventDefault();
     if (
       !current ||
@@ -570,6 +580,9 @@ export function App() {
       active ||
       uncertain ||
       !settingsReady ||
+      !richDraft.ready ||
+      richDraft.saving ||
+      !!richDraft.error ||
       !workspaceWritable
     )
       return;
@@ -582,16 +595,23 @@ export function App() {
       setError("This message is too large. Shorten it before sending.");
       return;
     }
+    const saved = richDraft.dirty ? await richDraft.save() : richDraft.draft;
+    if (!saved) return;
     void execute(
       newIntent(
         `/sessions/${encodeURIComponent(id)}/turns`,
-        { text: sentText, model, effort, permissionProfile: permission },
+        {
+          text: sentText,
+          model,
+          effort,
+          permissionProfile: permission,
+          attachmentIds: saved.attachmentIds,
+          draftRevision: saved.revision,
+        },
         "Send message",
       ),
       () => {
-        setDrafts((previous) =>
-          previous[id] === sentText ? { ...previous, [id]: "" } : previous,
-        );
+        richDraft.accepted();
         followsBottom.current = true;
       },
     );
@@ -1039,6 +1059,15 @@ export function App() {
                       </time>
                     </div>
                     <div className="message-text">{message.text}</div>
+                    {richDraft.files
+                      .filter(
+                        (a) =>
+                          a.operationId === message.operationId &&
+                          message.role === "user",
+                      )
+                      .map((a) => (
+                        <AttachmentPreview key={a.id} attachment={a} />
+                      ))}
                     {message.status === "streaming" && (
                       <span className="streaming-label">Writing…</span>
                     )}
@@ -1170,13 +1199,16 @@ export function App() {
                   value={text}
                   placeholder="Describe your task…"
                   onChange={(event) =>
-                    setDrafts((previous) => ({
-                      ...previous,
-                      [selectedId]: event.target.value,
-                    }))
+                    richDraft.edit({ text: event.target.value })
                   }
                   maxLength={capabilities?.limits?.maxInputBytes ?? 32768}
-                  disabled={!!pending || expired || uncertain}
+                  disabled={
+                    sending ||
+                    !!pending ||
+                    expired ||
+                    uncertain ||
+                    !richDraft.ready
+                  }
                   rows={3}
                   onKeyDown={(event) => {
                     if (
@@ -1189,6 +1221,19 @@ export function App() {
                     }
                   }}
                 />
+                {identity && (
+                  <AttachmentPicker
+                    key={selectedId}
+                    state={richDraft}
+                    csrf={identity.csrfToken}
+                    session={selectedId}
+                    modalities={
+                      capabilities?.models.find((m) => m.id === model)
+                        ?.inputModalities ?? []
+                    }
+                    disabled={blocked || !richDraft.ready}
+                  />
+                )}
                 <div className="composer-bottom">
                   <div className="settings">
                     <label>
@@ -1287,6 +1332,19 @@ export function App() {
                         uncertain ||
                         !text.trim() ||
                         !settingsReady ||
+                        !richDraft.ready ||
+                        richDraft.saving ||
+                        !!richDraft.error ||
+                        richDraft.files.some(
+                          (a) =>
+                            richDraft.draft.attachmentIds.includes(a.id) &&
+                            !(
+                              capabilities?.models.find((m) => m.id === model)
+                                ?.inputModalities ?? []
+                            ).includes(
+                              a.mediaType === "image/png" ? "image" : "text",
+                            ),
+                        ) ||
                         !workspaceWritable
                       }
                     >
@@ -1618,8 +1676,9 @@ function ApprovalCard({
           changes?: unknown;
         })
       : {};
-  const questions = Array.isArray(scope.questions) ? scope.questions : [];
-  const isInput = questions.length > 0;
+  const isInput = approval.kind === "item/tool/requestUserInput";
+  const questions =
+    isInput && Array.isArray(scope.questions) ? scope.questions : [];
   const answering = approval.state === "answering";
   return (
     <section

@@ -1,3 +1,5 @@
+import { attachmentRoutes } from "./attachments.ts";
+import { associateAttachments } from "../../../packages/attachments/src/store.ts";
 import { registerWorkspaceRoutes } from "./workspace-routes.ts";
 import {
   selectedWorkspace,
@@ -508,6 +510,9 @@ export async function buildServer(c: Config) {
       .map((m: any) => ({
         id: m.model ?? m.id,
         name: m.displayName ?? m.model ?? m.id,
+        inputModalities: (m.inputModalities ?? []).filter((v: string) =>
+          ["text", "image"].includes(v),
+        ),
         efforts: (m.supportedReasoningEfforts ?? [])
           .map((e: any) => e.reasoningEffort)
           .filter((e: string) => ["low", "medium", "high"].includes(e)),
@@ -714,7 +719,7 @@ export async function buildServer(c: Config) {
           },
           messages: (
             await db.query(
-              "SELECT id,role,text,status,created_at FROM messages WHERE session_id=$1 ORDER BY created_at,id",
+              "SELECT id,operation_id,role,text,status,created_at FROM messages WHERE session_id=$1 ORDER BY created_at,id",
               [s.id],
             )
           ).rows.map(publicRow),
@@ -797,6 +802,14 @@ export async function buildServer(c: Config) {
       "INSERT INTO operations(id,session_id,kind,state,payload,actor_hash) VALUES($1,$2,'turn','queued',$3,$4) RETURNING *",
       [id, s.id, JSON.stringify(b), auth.get(req)!.hash],
     );
+    await associateAttachments(
+      db,
+      s.id,
+      id,
+      b.attachmentIds,
+      b.model,
+      b.draftRevision,
+    );
     await db.query(
       "INSERT INTO messages(id,session_id,operation_id,role,text,status) VALUES($1,$2,$3,'user',$4,'complete')",
       [randomUUID(), s.id, id, b.text],
@@ -817,6 +830,7 @@ export async function buildServer(c: Config) {
       return reply.code(202).send(result);
     },
   );
+  attachmentRoutes(app, pool, command);
   app.get<{ Params: { id: string } }>("/api/v1/operations/:id", async (req) => {
     const r = await pool.query("SELECT * FROM operations WHERE id=$1", [
       req.params.id,

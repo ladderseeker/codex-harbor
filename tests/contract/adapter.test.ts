@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -229,5 +229,40 @@ test("P002 rejected pre-send approval preserves the native request for an author
     assert.equal(answers, 1);
   } finally {
     adapter.close();
+  }
+});
+
+test("P005 adapter emits exact scoped localImage and rejects caller paths", async () => {
+  const home = await mkdtemp(join(tmpdir(), "harbor-attachment-contract-"));
+  const trace = join(home, "trace.jsonl");
+  const child = spawn(process.execPath, ["tests/fixtures/codex/server.mjs"], {
+    stdio: "pipe",
+    env: { PATH: process.env.PATH, HARBOR_FIXTURE_TRACE_FILE: trace },
+  });
+  const adapter = new CodexAdapter(child, {});
+  const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  try {
+    await adapter.initialize();
+    const { thread } = await adapter.startThread({ cwd: "/workspace" });
+    await assert.rejects(
+      adapter.startTurn(thread.id, "read", {
+        attachments: [{ id, kind: "image", path: "/etc/passwd" }],
+      }),
+      /reference/,
+    );
+    await adapter.startTurn(thread.id, "read", {
+      attachments: [{ id, kind: "image", path: `/attachments/${id}` }],
+    });
+    const records = (await readFile(trace, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    const turns = records.filter((x) => x.method === "turn/start");
+    assert.equal(turns.length, 1);
+    assert.deepEqual(turns[0].attachmentTypes, ["text", "localImage"]);
+    assert.deepEqual(turns[0].attachmentPaths, [`/attachments/${id}`]);
+  } finally {
+    adapter.close();
+    await rm(home, { recursive: true, force: true });
   }
 });

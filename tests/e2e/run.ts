@@ -1,3 +1,4 @@
+import { p005 } from "./p005.ts";
 import { p007 } from "./p007.ts";
 import { createPool } from "../../packages/storage/src/index.ts";
 if (process.argv.includes("--workspaces")) {
@@ -620,6 +621,16 @@ try {
     ).toBe(beforeCredentialChange.state);
     const testDb = new pg.Pool({ connectionString: env.DATABASE_URL });
     try {
+      await p005({
+        page: reopened,
+        context,
+        origin,
+        csrf: me.csrfToken,
+        db: testDb,
+        projectId: sessions.sessions[0].projectId,
+        traceFile: env.HARBOR_FIXTURE_TRACE_FILE,
+        artifacts,
+      });
       await authorityExpiry(
         testDb,
         {
@@ -1367,7 +1378,7 @@ try {
           browser: "Chromium1194",
           node: process.version,
           scope:
-            "P001/P002/P007 deterministic external-fixture acceptance; workspace/Linux lanes separate",
+            "P001/P002/P003/P005/P007 deterministic external-fixture acceptance; Linux/live separate",
         },
         null,
         2,

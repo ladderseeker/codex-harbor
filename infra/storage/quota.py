@@ -67,7 +67,7 @@ def verify(quota_root,profile,headroom=True):
 
 def main():
     if sys.platform!='linux'or os.getuid()!=0:raise ValueError('trusted Linux storage authority required')
-    profile=json.loads(os.environ['HARBOR_XFS_PROFILE']);request=json.loads(sys.stdin.read(4097))
+    profile=json.loads(os.environ['HARBOR_XFS_PROFILE']);request=json.loads(sys.stdin.read(800001))
     root=next(r for r in profile['roots']if r['id']==request['rootId'])
     trusted(root['path']);trusted(root['pool']);state=os.environ['HARBOR_LAUNCHER_STATE_DIR'];trusted(state)
     relative=request['relativePath'];parts=relative.split('/')
@@ -93,8 +93,13 @@ def main():
             if not slots or len(slots)>1000:raise ValueError('quota pool unavailable')
             slot=os.path.join(root['pool'],slots[0]);verify(slot,profile)
             os.rename(slot,target)
-        elif action not in ['validate','native','clearCredentials','inspect']:raise ValueError('unsupported action')
+        elif action not in ['validate','native','clearCredentials','inspect','attachments']:raise ValueError('unsupported action')
         workspace,storage=verify(target,profile,action not in ['clearCredentials','inspect'])
+        if action=='attachments':
+            expected=request['project'];identity=os.stat(workspace,follow_symlinks=False)
+            if workspace!=expected['canonical']or str(identity.st_dev)!=expected['device']or str(identity.st_ino)!=expected['inode']:raise ValueError('attachment project identity changed')
+            from attachments import publish
+            print(json.dumps(publish(target,request)));return
         if action=='inspect':print(json.dumps(storage));return
         if action=='clearCredentials':
             parent=os.open(os.path.join(target,'native'),os.O_DIRECTORY|os.O_NOFOLLOW)

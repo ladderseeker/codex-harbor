@@ -165,7 +165,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
           modelSpecialty: null,
           hidden: false,
           defaultReasoningEffort: "medium",
-          inputModalities: ["text"],
+          inputModalities: ["text", "image"],
           supportsPersonality: false,
           multiAgentVersion: null,
           additionalSpeedTiers: [],
@@ -198,7 +198,14 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     if (process.env.HARBOR_FIXTURE_TRACE_FILE)
       appendFileSync(
         process.env.HARBOR_FIXTURE_TRACE_FILE,
-        JSON.stringify({ method: "turn/start", threadId: p.threadId }) + "\n",
+        JSON.stringify({
+          method: "turn/start",
+          threadId: p.threadId,
+          attachmentTypes: p.input.map((i) => i.type),
+          attachmentPaths: p.input
+            .filter((i) => i.type === "localImage")
+            .map((i) => i.path),
+        }) + "\n",
       );
     const text = p.input[0].text;
     const marker=text.match(/\[workspace-marker:([a-zA-Z0-9_-]{1,64})\]/);
@@ -295,16 +302,22 @@ createInterface({ input: process.stdin }).on("line", (line) => {
               itemId: randomUUID(),
               startedAtMs: 0,
               command: "printf fixture",
-              questions: [
-                {
-                  id: "choice",
-                  header: "Choice",
-                  question: "Continue?",
-                  isOther: false,
-                  isSecret: false,
-                  options: [{ label: "Yes", description: "Continue fixture" }],
-                },
-              ],
+              ...(text.includes("[input]")
+                ? {
+                    questions: [
+                      {
+                        id: "choice",
+                        header: "Choice",
+                        question: "Continue?",
+                        isOther: false,
+                        isSecret: false,
+                        options: [
+                          { label: "Yes", description: "Continue fixture" },
+                        ],
+                      },
+                    ],
+                  }
+                : {}),
             },
           }),
         30,

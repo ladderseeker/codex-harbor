@@ -15,6 +15,8 @@ export const turnSchema = z
     model: z.string().min(1).max(100),
     effort: z.enum(["low", "medium", "high"]),
     permissionProfile: permissionSchema,
+    attachmentIds: z.array(z.uuid()).max(4).default([]),
+    draftRevision: z.number().int().nonnegative().optional(),
   })
   .strict();
 export const projectSchema = z
@@ -62,6 +64,7 @@ export interface Session {
   archivedAt?: string | null;
 }
 export interface Message {
+  operationId?: string | null;
   id: string;
   role: "user" | "assistant" | "system";
   text: string;
