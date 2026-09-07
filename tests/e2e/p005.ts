@@ -2,7 +2,7 @@ import { attachmentWorkspaces } from "./p005-workspaces.ts";
 import { expect, type Page, type BrowserContext } from "@playwright/test";
 import type { Pool } from "pg";
 import { randomUUID, createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { request as httpsRequest } from "node:https";
 import { request as playwrightRequest } from "@playwright/test";
@@ -35,20 +35,16 @@ export async function p005({
   });
   const command = async (route: string, body: unknown, k = key()) => {
     await new Promise((r) => setTimeout(r, 100));
-    for (let attempt = 0; ; attempt++) {
-      const response = await context.request.post(origin + "/api/v1" + route, {
-        headers: { ...headers(), "Idempotency-Key": k },
-        data: body,
-      });
-      if (
-        response.status() !== 429 ||
-        (await response.json()).error?.code !== "RATE_LIMIT" ||
-        attempt >= 2
-      )
-        return response;
-      await new Promise((r) => setTimeout(r, 10000));
-    }
+    return context.request.post(origin + "/api/v1" + route, {
+      headers: { ...headers(), "Idempotency-Key": k },
+      data: body,
+    });
   };
+  // These deliberately dense rejection/setup phases share the real 200/10s IP
+  // allowance with browser bootstrap and polling. Start browser fault scenarios
+  // in a new bounded window; never retry a rejected user mutation to hide 429.
+  const browserPhaseBoundary = () =>
+    new Promise<void>((resolve) => setTimeout(resolve, 10500));
   const settings = {
     model: "fixture",
     effort: "medium",
@@ -539,6 +535,7 @@ export async function p005({
     409,
   );
 
+  await browserPhaseBoundary();
   const uploadSession = await newSession("Upload response recovery");
   const uploadNavigation = await page.goto(
     origin + "/?conversation=" + uploadSession.id,
@@ -672,6 +669,7 @@ export async function p005({
     ).rows[0],
   ).toEqual({ n: 1, files: 2 });
   await page.getByRole("button", { name: "Decline", exact: true }).click();
+  await browserPhaseBoundary();
   // Pausing during the metadata response is a logical cancellation, before XHR exists.
   const preflight = await newSession("Paused metadata admission");
   await page.goto(origin + "/?conversation=" + preflight.id);
@@ -709,12 +707,63 @@ export async function p005({
   ).toBeVisible();
   expect(binaryCalls).toBe(0);
   page.off("request", countBinary);
-  await page.reload();
-  await expect(
-    page.getByText("Upload incomplete: choose the same file to resume", {
-      exact: true,
-    }),
-  ).toBeVisible();
+  const reloadResponses: Array<{
+    path: string;
+    method: string;
+    status: number;
+  }> = [];
+  const observeReload = (response: import("@playwright/test").Response) => {
+    const url = new URL(response.url());
+    if (url.origin !== origin) return;
+    reloadResponses.push({
+      path: url.pathname,
+      method: response.request().method(),
+      status: response.status(),
+    });
+    if (reloadResponses.length > 100) reloadResponses.shift();
+  };
+  page.on("response", observeReload);
+  try {
+    const navigation = await page.reload();
+    try {
+      await expect(
+        page.getByText("Upload incomplete: choose the same file to resume", {
+          exact: true,
+        }),
+      ).toBeVisible();
+    } catch (failure) {
+      await writeFile(
+        path.join(artifacts, "p005-paused-reload-failure.json"),
+        JSON.stringify(
+          {
+            navigationStatus: navigation?.status(),
+            intendedConversation:
+              new URL(page.url()).searchParams.get("conversation") ===
+              preflight.id,
+            composerCount: await page.getByLabel("Message Codex").count(),
+            draftLoadingCount: await page
+              .getByText("Loading saved draft…", { exact: true })
+              .count(),
+            rateLimitCount: await page
+              .getByText("Request rate limit reached", { exact: true })
+              .count(),
+            attachments: (
+              await db.query(
+                "SELECT state,expected_size,content IS NOT NULL AS has_content FROM attachments WHERE session_id=$1 ORDER BY id",
+                [preflight.id],
+              )
+            ).rows,
+            responses: reloadResponses,
+          },
+          null,
+          2,
+        ),
+      );
+      throw failure;
+    }
+  } finally {
+    page.off("response", observeReload);
+  }
   await page.getByLabel("Choose attachment").setInputFiles({
     name: "preflight.txt",
     mimeType: "text/plain",
