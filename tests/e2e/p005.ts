@@ -260,21 +260,114 @@ export async function p005({
   expect(
     recorded.filter((x) => x.attachmentPaths?.includes(`/attachments/${a.id}`)),
   ).toHaveLength(1);
-  await page.goto(origin + "/?conversation=" + other.id);
+  const selectionTraffic: {
+    method: string;
+    route: string;
+    status?: number;
+    failure?: string;
+  }[] = [];
+  const recordSelection = (entry: (typeof selectionTraffic)[number]) => {
+    if (selectionTraffic.length < 100) selectionTraffic.push(entry);
+  };
+  const selectionResponse = (response: import("@playwright/test").Response) => {
+    const url = new URL(response.url());
+    if (url.origin === origin && url.pathname.startsWith("/api/"))
+      recordSelection({
+        method: response.request().method(),
+        route: url.pathname,
+        status: response.status(),
+      });
+  };
+  const selectionFailed = (request: import("@playwright/test").Request) => {
+    const url = new URL(request.url());
+    if (url.origin === origin && url.pathname.startsWith("/api/"))
+      recordSelection({
+        method: request.method(),
+        route: url.pathname,
+        failure: request.failure()?.errorText?.slice(0, 100),
+      });
+  };
+  page.on("response", selectionResponse);
+  page.on("requestfailed", selectionFailed);
   const text = Buffer.from("<script>window.attachmentExecuted=true</script>");
-  await page
-    .getByLabel("Choose attachment")
-    .setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: text });
-  await expect(
-    page.getByText("Selected for this message", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Draft saved for 24 hours.", { exact: true }),
-  ).toBeVisible();
-  await page.reload();
-  await expect(
-    page.getByText("Selected for this message", { exact: true }),
-  ).toBeVisible();
+  let textPhase = "load";
+  try {
+    await page.goto(origin + "/?conversation=" + other.id);
+    await writeFile(
+      path.join(artifacts, "p005-text-selection-readiness.json"),
+      JSON.stringify({
+        visibleAttachEnabled: await page
+          .getByRole("button", { name: "Attach file", exact: true })
+          .isEnabled(),
+        hiddenInputEnabled: await page
+          .getByLabel("Choose attachment")
+          .isEnabled(),
+      }),
+    );
+    textPhase = "readiness";
+    // setInputFiles bypasses the hidden input's visible button. Observe the same
+    // readiness gate a real file-picker interaction must pass; never retry a mutation.
+    await expect(
+      page.getByRole("button", { name: "Attach file", exact: true }),
+    ).toBeEnabled();
+    textPhase = "selection";
+    await page.getByLabel("Choose attachment").setInputFiles({
+      name: "notes.txt",
+      mimeType: "text/plain",
+      buffer: text,
+    });
+    await expect(
+      page.getByText("Selected for this message", { exact: true }),
+    ).toBeVisible();
+    textPhase = "draft-save";
+    await expect(
+      page.getByText("Draft saved for 24 hours.", { exact: true }),
+    ).toBeVisible();
+    textPhase = "reload";
+    await page.reload();
+    await expect(
+      page.getByText("Selected for this message", { exact: true }),
+    ).toBeVisible();
+  } catch (error) {
+    try {
+      await writeFile(
+        path.join(artifacts, "p005-text-selection-failure.json"),
+        JSON.stringify(
+          {
+            phase: textPhase,
+            traffic: selectionTraffic,
+            attachEnabled: await page
+              .getByRole("button", { name: "Attach file", exact: true })
+              .isEnabled()
+              .catch(() => false),
+            selectedCount: await page
+              .getByText("Selected for this message", { exact: true })
+              .count(),
+            attachments: (
+              await db.query(
+                "SELECT id,state,size,operation_id FROM attachments WHERE session_id=$1",
+                [other.id],
+              )
+            ).rows,
+            draft: (
+              await db.query(
+                "SELECT revision,attachment_ids FROM conversation_drafts WHERE session_id=$1",
+                [other.id],
+              )
+            ).rows,
+          },
+          null,
+          2,
+        ),
+      );
+    } catch {
+      /* Diagnostic failure must never replace the original assertion. */
+    }
+    throw error;
+  } finally {
+    page.off("response", selectionResponse);
+    page.off("requestfailed", selectionFailed);
+  }
   expect(
     await page.evaluate(() => Boolean((window as any).attachmentExecuted)),
   ).toBe(false);
@@ -563,6 +656,9 @@ export async function p005({
     },
     { times: 1 },
   );
+  await expect(
+    page.getByRole("button", { name: "Attach file", exact: true }),
+  ).toBeEnabled();
   await page.getByLabel("Choose attachment").setInputFiles({
     name: "retry.txt",
     mimeType: "text/plain",
@@ -604,6 +700,9 @@ export async function p005({
     },
     { times: 1 },
   );
+  await expect(
+    page.getByRole("button", { name: "Attach file", exact: true }),
+  ).toBeEnabled();
   await page.getByLabel("Choose attachment").setInputFiles({
     name: "lost.txt",
     mimeType: "text/plain",
@@ -694,6 +793,9 @@ export async function p005({
     },
     { times: 1 },
   );
+  await expect(
+    page.getByRole("button", { name: "Attach file", exact: true }),
+  ).toBeEnabled();
   await page.getByLabel("Choose attachment").setInputFiles({
     name: "preflight.txt",
     mimeType: "text/plain",
@@ -764,6 +866,9 @@ export async function p005({
   } finally {
     page.off("response", observeReload);
   }
+  await expect(
+    page.getByRole("button", { name: "Attach file", exact: true }),
+  ).toBeEnabled();
   await page.getByLabel("Choose attachment").setInputFiles({
     name: "preflight.txt",
     mimeType: "text/plain",

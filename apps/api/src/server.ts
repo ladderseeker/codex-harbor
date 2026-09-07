@@ -1,7 +1,13 @@
+import { emergencyPauseSchedules } from "../../../packages/schedules/src/management.ts";
+import { PgBoss } from "pg-boss";
+import { scheduleRoutes } from "./schedules.ts";
+import { initializeScheduleQueue } from "../../../packages/schedules/src/queue.ts";
+import { requestTurnCancellation } from "../../../packages/storage/src/cancellation.ts";
+import { attachmentRoutes } from "./attachments.ts";
+import { acceptConversationTurn } from "../../../packages/storage/src/turns.ts";
+import { effectiveSettings as requireEffectiveSettings } from "../../../packages/policy/src/models.ts";
 import { terminalStreams } from "./terminal-stream.ts";
 import { terminalRoutes } from "./terminals.ts";
-import { attachmentRoutes } from "./attachments.ts";
-import { associateAttachments } from "../../../packages/attachments/src/store.ts";
 import {
   deploymentAdmission,
   deploymentState,
@@ -144,6 +150,9 @@ export async function buildServer(c: Config) {
     const reserved =
       req.url.includes("/security/") ||
       req.url.endsWith("/cancel") ||
+      /^\/api\/v1\/schedules\/[a-f0-9-]{36}\/pause$/.test(
+        req.url.split("?")[0],
+      ) ||
       req.url.endsWith("/terminate");
     const bucketKey =
       req.ip + ":" + (login ? "login" : reserved ? "control" : "ordinary");
@@ -310,6 +319,11 @@ export async function buildServer(c: Config) {
       JSON.stringify({ params: req.params, body: req.body ?? {} }),
     );
     return transaction(pool, async (db) => {
+      if (route === "/api/v1/security/emergency-stop") {
+        await lockOwnerIdentity(db);
+        // Match schedule owner/meta -> actor -> schedule/resource ordering.
+        await db.query("SELECT generation FROM harbor_meta FOR UPDATE");
+      }
       if (route === "/api/v1/security/logout") {
         await lockOwnerIdentity(db);
         await db.query(
@@ -454,37 +468,8 @@ export async function buildServer(c: Config) {
       return result;
     });
   }
-  async function effectiveSettings(
-    db: PoolClient,
-    model: string,
-    effort: string,
-  ) {
-    const discovered =
-      (
-        await db.query(
-          "SELECT data FROM runtime_capabilities WHERE updated_at>now()-interval '1 hour'",
-        )
-      ).rows[0]?.data?.data ?? [];
-    const selected = discovered.find(
-      (candidate: any) => (candidate.model ?? candidate.id) === model,
-    );
-    if (!c.models.includes(model) || !selected)
-      throw new HarborError(
-        403,
-        "MODEL_DENIED",
-        "Model is not in current discovered capabilities and administrator policy",
-      );
-    if (
-      !(selected.supportedReasoningEfforts ?? []).some(
-        (entry: any) => entry.reasoningEffort === effort,
-      )
-    )
-      throw new HarborError(
-        403,
-        "EFFORT_DENIED",
-        "Reasoning effort is unavailable for this model",
-      );
-  }
+  const effectiveSettings = (db: PoolClient, model: string, effort: string) =>
+    requireEffectiveSettings(db, model, effort, c.models);
   async function session(db: any, id: string) {
     const r = await db.query("SELECT * FROM sessions WHERE id=$1", [id]);
     if (!r.rowCount)
@@ -510,6 +495,22 @@ export async function buildServer(c: Config) {
     actor: (req) => auth.get(req)!.hash,
   });
   registerTokenRoutes(app, pool, c, command);
+  const scheduleBoss = new PgBoss({
+    connectionString: c.DATABASE_URL,
+    supervise: false,
+    schedule: false,
+  });
+  scheduleBoss.on("error", () => {});
+  await scheduleBoss.start();
+  await initializeScheduleQueue(scheduleBoss);
+  scheduleRoutes(app, {
+    pool,
+    c,
+    boss: scheduleBoss,
+    authority: (req) => auth.get(req)!,
+    command,
+  });
+  app.addHook("onClose", async () => scheduleBoss.stop());
   app.get("/api/v1/openapi.json", async () => openapi);
   app.get("/api/v1/security/runtime-credentials", async (req) =>
     credentialCommand(c.HARBOR_CONTROL_SOCKET, {
@@ -808,87 +809,15 @@ export async function buildServer(c: Config) {
       }),
   );
   async function acceptTurn(req: any, db: PoolClient, input: unknown) {
-    const b = turnSchema.parse(input);
-    authorizePermission(b.permissionProfile, c.HARBOR_PERMISSION_CEILING);
-    await effectiveSettings(db, b.model, b.effort);
-    if (!c.models.includes(b.model))
-      throw new HarborError(403, "MODEL_DENIED", "Model unavailable");
-    const selected = await sessionWorkspace(db, req.params.id, true);
-    await db.query("SELECT * FROM sessions WHERE id=$1 FOR UPDATE", [
-      req.params.id,
-    ]);
-    const s = await session(db, req.params.id);
-    if (selected.project_archived || selected.state !== "ready")
-      throw new HarborError(
-        409,
-        "WORKSPACE_UNAVAILABLE",
-        "Conversation workspace is unavailable or archived",
-      );
-    await verifyWorkspace(selected);
-    await capacity(db, s.id, "turn");
-    const total = await db.query(
-      "SELECT coalesce(sum(octet_length(text)),0) AS bytes,count(*) AS count FROM messages WHERE session_id=$1",
-      [s.id],
-    );
-    if (
-      Number(total.rows[0].bytes) + Buffer.byteLength(b.text) > 2097152 ||
-      Number(total.rows[0].count) >= 2000
-    )
-      throw new HarborError(
-        429,
-        "HISTORY_QUOTA",
-        "Conversation storage limit reached",
-      );
-    if (
-      (
-        await db.query(
-          "SELECT 1 FROM operations WHERE session_id=$1 AND state='uncertain' AND uncertainty_acknowledged_at IS NULL LIMIT 1",
-          [s.id],
-        )
-      ).rowCount
-    )
-      throw new HarborError(
-        409,
-        "UNCERTAIN",
-        "Resolve uncertain delivery before new work",
-      );
-    if ((await db.query("SELECT emergency FROM harbor_meta")).rows[0].emergency)
-      throw new HarborError(409, "EMERGENCY_STOP", "Dispatch is stopped");
-    await db.query("SELECT pg_advisory_xact_lock(740015)");
-    if (
-      Number(
-        (
-          await db.query(
-            "SELECT count(*) FROM operations WHERE state IN ('queued','dispatching','running','waiting_approval','waiting_input')",
-          )
-        ).rows[0].count,
-      ) >= c.HARBOR_MAX_QUEUED
-    )
-      throw new HarborError(429, "QUEUE_QUOTA", "Queue limit reached");
-    const id = randomUUID();
-    const r = await db.query(
-      "INSERT INTO operations(id,session_id,kind,state,payload,actor_hash) VALUES($1,$2,'turn','queued',$3,$4) RETURNING *",
-      [id, s.id, JSON.stringify(b), auth.get(req)!.hash],
-    );
-    await associateAttachments(
-      db,
-      s.id,
-      id,
-      b.attachmentIds,
-      b.model,
-      b.draftRevision,
-    );
-    await db.query(
-      "INSERT INTO messages(id,session_id,operation_id,role,text,status) VALUES($1,$2,$3,'user',$4,'complete')",
-      [randomUUID(), s.id, id, b.text],
-    );
-    await db.query(
-      "UPDATE sessions SET state=CASE WHEN state IN ('running','waiting_approval','waiting_input') THEN state ELSE 'queued' END WHERE id=$1",
-      [s.id],
-    );
-    await event(db, s.id, "operation.queued", { operationId: id });
-    return { operation: publicRow(r.rows[0]) };
+    return acceptConversationTurn(db, req.params.id, input, c, {
+      actor: auth.get(req)!.hash,
+      authorize: async (db) => {
+        await requireAuthority(db, auth.get(req)!.hash, c);
+        await authorizeTokenRoute(db, c, auth.get(req)!, req);
+      },
+    });
   }
+
   app.post<{ Params: { id: string } }>(
     "/api/v1/sessions/:id/turns",
     async (req, reply) => {
@@ -1007,81 +936,20 @@ export async function buildServer(c: Config) {
     async (req, reply) =>
       reply.code(202).send(
         await command(req, async (db) => {
-          await db.query(
-            "SELECT s.id FROM sessions s JOIN operations o ON o.session_id=s.id WHERE o.id=$1 FOR UPDATE OF s",
-            [req.params.id],
-          );
-          const r = await db.query(
-            "SELECT * FROM operations WHERE id=$1 FOR UPDATE",
-            [req.params.id],
-          );
-          const o = r.rows[0];
-          if (!o || o.kind !== "turn")
-            throw new HarborError(404, "NOT_FOUND", "Turn not found");
-          if (
-            ![
-              "queued",
-              "dispatching",
-              "running",
-              "waiting_approval",
-              "waiting_input",
-            ].includes(o.state)
-          )
-            throw new HarborError(
-              409,
-              "TURN_TERMINAL",
-              "This turn is no longer cancellable",
-            );
-          const pending = await db.query(
-            "SELECT id,state,control_attempts FROM operations WHERE session_id=$1 AND kind='cancel' AND payload->>'operationId'=$2 LIMIT 1",
-            [o.session_id, o.id],
-          );
-          if (pending.rows[0] && pending.rows[0].state !== "failed")
-            return {
-              operation: pending.rows[0],
-              message:
-                "Stop already requested; interruption is not yet confirmed",
-            };
-          if (pending.rows[0]) {
-            if (pending.rows[0].control_attempts >= 3)
-              throw new HarborError(
-                429,
-                "CONTROL_ATTEMPTS",
-                "Cancellation attempts exhausted; use emergency stop",
-              );
-            await db.query(
-              "UPDATE operations SET state='queued',actor_hash=$2,control_attempts=control_attempts+1,updated_at=now() WHERE id=$1",
-              [pending.rows[0].id, auth.get(req)!.hash],
-            );
-            return {
-              operation: { id: pending.rows[0].id, state: "queued" },
-              message: "Stop requested again",
-            };
-          }
-          await capacity(db, o.session_id, "cancel");
-          const id = randomUUID();
-          await db.query(
-            "INSERT INTO operations(id,session_id,kind,state,payload,actor_hash) VALUES($1,$2,'cancel','queued',$3,$4)",
-            [
-              id,
-              o.session_id,
-              JSON.stringify({ operationId: o.id }),
-              auth.get(req)!.hash,
-            ],
-          );
-          await event(db, o.session_id, "cancel.requested", {
-            operationId: o.id,
+          return requestTurnCancellation(db, req.params.id, {
+            actor: auth.get(req)!.hash,
+            authorize: async (db) => {
+              await requireAuthority(db, auth.get(req)!.hash, c);
+              await authorizeTokenRoute(db, c, auth.get(req)!, req);
+            },
           });
-          return {
-            operation: { id, state: "queued" },
-            message: "Stop requested; interruption is not yet confirmed",
-          };
         }),
       ),
   );
   app.post("/api/v1/security/emergency-stop", async (req) =>
     command(req, async (db) => {
       await db.query("UPDATE harbor_meta SET emergency=true");
+      await emergencyPauseSchedules(db);
       await db.query("INSERT INTO audits(kind) VALUES('emergency-stop')");
       return { stopped: true };
     }),

@@ -121,3 +121,7 @@ Migration 007 adds history metadata, replay watermarks, recovery attempts and bo
 Migration 011 adds terminal metadata, input outcomes and byte output, plus the shared typed workspace writer reservation. Its persistent reservation epoch is independent of the native conversation generation. Older binaries do not understand terminal ownership; do not run them on this upgraded database. Backups cannot resume a native PTY, and portable drain/restore integration remains a P009 integration gate.
 
 The API exposes explicit terminal routes and a restricted WebSocket protocol; input is sequenced by terminal generation and controller epoch rather than an ordinary command idempotency key. Creation/control/termination retain timestamped Idempotency-Key handling. The trusted factory selects the fixed external-sandbox policy only after confined Linux runner admission. No API request can choose a sandbox, argv, environment or host path. The authenticated application document supplies a style-only nonce to the pinned xterm build adapter; script policy stays self-only.
+
+## Scheduled work development
+
+P008 is in progress. The [schedule API and verification guide](schedules.md) describes its current isolated UI/API and specialist test entry points, including the unverified managed/live and deployment integration gates.

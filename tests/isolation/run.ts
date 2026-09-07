@@ -1,3 +1,7 @@
+if (process.argv.includes("--schedules")) {
+  await import("../schedules/linux.ts");
+  process.exit(process.exitCode ?? 0);
+}
 if (process.argv.includes("--files")) {
   process.argv.push("--managed");
   await import("../files/e2e.ts");

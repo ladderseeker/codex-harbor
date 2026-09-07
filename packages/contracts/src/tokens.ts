@@ -4,6 +4,8 @@ const tokenScopes = [
   "execute",
   "approve",
   "cancel",
+  "schedules:read",
+  "schedules:manage",
   "files:read",
   "files:write",
   "git:read",
