@@ -1,10 +1,11 @@
 # P010 — Develop Harbor through Harbor
 
 - Decision: Accepted
-- Delivery: Planned
+- Delivery: In progress
 - Dependencies: [P002](002-programmatic-api-access.md), [P003](003-parallel-project-workspaces.md), [P009](009-portable-deployment-and-restore.md)
 - Outcome: A conversation in stable Harbor edits Harbor source, builds and tests a separate candidate, and produces a reviewable release while stable Harbor remains usable.
 - Design updated: 2026-09-08; [D008](../decisions/008-isolated-self-development-workers.md) and the concrete contracts below completed one independent design review and focused correction check.
+- Implementation started: 2026-09-08; fixed worker and broker work is isolated from stable/deployment instances. A separate supported Linux VM has enforced project/worker XFS quotas and pinned tool images; this preparation does not establish worker isolation or candidate acceptance. P009 checkpoint and dedicated live-account gates remain blocked below.
 
 ## Source issues
 
