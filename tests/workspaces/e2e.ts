@@ -316,6 +316,54 @@ try {
   expect(await readFile(path.join(source, "tracked.txt"), "utf8")).toBe(
     "dirty local\n",
   );
+  // P007 reconciles a derived checkout using its registered common store,
+  // releases the exact writer reservation and preserves original uncertainty.
+  const derivedCrash = await turn(a.id, "[crash] derived recovery");
+  await expect
+    .poll(() => state(a.id, derivedCrash.id), { timeout: 30000 })
+    .toBe("uncertain");
+  const beforeFence = (await get(`/sessions/${a.id}/snapshot`)).session;
+  const derivedRecovery = (
+    await success(`/sessions/${a.id}/recovery`, {
+      expectedGeneration: beforeFence.generation,
+    })
+  ).recovery;
+  await expect
+    .poll(
+      async () => (await get(`/sessions/${a.id}/recovery`)).recovery.state,
+      { timeout: 30000 },
+    )
+    .toBe("ready");
+  expect(
+    (await get(`/workspaces/${first.id}`)).workspace.writerSessionId,
+  ).toBeNull();
+  const afterFence = (await get(`/sessions/${a.id}/snapshot`)).session;
+  const resumed = (
+    await success(`/sessions/${a.id}/recovery/continue`, {
+      ...setting,
+      text: "Fresh derived input after inspected recovery",
+      recoveryId: derivedRecovery.id,
+      expectedGeneration: afterFence.generation,
+      acknowledgeUnknownEffects: true,
+    })
+  ).operation;
+  await expect
+    .poll(() => state(a.id, resumed.id), { timeout: 30000 })
+    .toBe("succeeded");
+  await expect
+    .poll(
+      async () =>
+        (await get(`/workspaces/${first.id}`)).workspace.writerSessionId,
+      { timeout: 30000 },
+    )
+    .toBeNull();
+  expect(await state(a.id, derivedCrash.id)).toBe("uncertain");
+  expect(
+    await readFile(path.join(firstPath, "harbor-marker.txt"), "utf8"),
+  ).toBe("first");
+  expect(await readFile(path.join(source, "tracked.txt"), "utf8")).toBe(
+    "dirty local\n",
+  );
   const remove = async (id: string) =>
     context.request.delete(origin + "/api/v1/workspaces/" + id, {
       data: {},

@@ -1,3 +1,5 @@
+import { History, ConversationDetails } from "./History.tsx";
+import { Recovery } from "./Recovery.tsx";
 import { Tokens } from "./Tokens.tsx";
 import {
   useCallback,
@@ -111,7 +113,6 @@ export function App() {
   const [newWorkspaceId, setNewWorkspaceId] = useState("");
   const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const [archiveSessionOpen, setArchiveSessionOpen] = useState(false);
   useEffect(() => {
     setNewWorkspaceId("");
   }, [projectId]);
@@ -424,12 +425,18 @@ export function App() {
   useEffect(() => {
     const transcript = transcriptRef.current;
     if (!transcript) return;
-    const approvalId = snapshot?.approvals.find(
-      (approval) =>
-        approval.state === "pending" || approval.state === "answering",
-    )?.id;
+    const approvalId =
+      snapshot?.approvals.find(
+        (approval) =>
+          approval.state === "pending" || approval.state === "answering",
+      )?.id ??
+      (snapshot?.session.state === "uncertain"
+        ? "recovery:" + snapshot.session.id
+        : undefined);
     if (approvalId && visibleApproval.current !== approvalId) {
-      const card = transcript.querySelector<HTMLElement>(".approval");
+      const card = transcript.querySelector<HTMLElement>(
+        ".approval, .recovery",
+      );
       if (card)
         transcript.scrollTop +=
           card.getBoundingClientRect().top -
@@ -503,9 +510,7 @@ export function App() {
     (workspace) => workspace.id === current?.workspaceId,
   );
   const workspaceWritable =
-    boundWorkspace?.state === "ready" &&
-    !project?.archivedAt &&
-    !(current as Session | undefined)?.archivedAt;
+    boundWorkspace?.state === "ready" && !project?.archivedAt;
   const canCreateConversation =
     workspaceData.workspaces.some(
       (workspace) =>
@@ -676,47 +681,13 @@ export function App() {
                   </span>
                 </button>
                 {projectId === item.id && (
-                  <div className="conversation-list">
-                    {sessions
-                      .filter(
-                        (session) =>
-                          session.projectId === item.id &&
-                          (showArchived ||
-                            !session.archivedAt ||
-                            session.id === selectedId),
-                      )
-                      .map((session) => (
-                        <button
-                          key={session.id}
-                          className={`conversation-link ${session.id === selectedId ? "selected" : ""}`}
-                          aria-current={
-                            session.id === selectedId ? "page" : undefined
-                          }
-                          onClick={() => selectSession(session.id)}
-                        >
-                          <span
-                            className={`rail-dot dot-${session.state}`}
-                            aria-hidden="true"
-                          />
-                          <span>
-                            {session.title}
-                            {session.archivedAt ? " (archived)" : ""}
-                            <small className="conversation-workspace">
-                              {workspaceData.workspaces.find(
-                                (workspace) =>
-                                  workspace.id === session.workspaceId,
-                              )?.name ?? "Loading workspace…"}
-                            </small>
-                          </span>
-                          <span className="sr-only">
-                            {stateNames[session.state]}
-                          </span>
-                        </button>
-                      ))}
-                    {!sessions.some(
-                      (session) => session.projectId === item.id,
-                    ) && <p className="rail-empty">No conversations yet</p>}
-                  </div>
+                  <History
+                    projectId={item.id}
+                    selectedId={selectedId}
+                    revision={JSON.stringify(sessions)}
+                    select={selectSession}
+                    workspaces={workspaceData.workspaces}
+                  />
                 )}
               </div>
             ))}
@@ -1037,20 +1008,6 @@ export function App() {
                     history remain available.
                   </p>
                 )}
-                {(current as Session).archivedAt && (
-                  <p className="writer-notice">
-                    This conversation is archived. Its history is preserved.
-                  </p>
-                )}
-                {!(current as Session).archivedAt && (
-                  <button
-                    className="quiet-button archive-conversation"
-                    disabled={active || uncertain || blocked}
-                    onClick={() => setArchiveSessionOpen(true)}
-                  >
-                    Archive conversation
-                  </button>
-                )}
                 {!snapshot?.messages.length && (
                   <div className="conversation-start">
                     <h2>What would you like to work on?</h2>
@@ -1109,16 +1066,21 @@ export function App() {
                     }
                   />
                 ))}
+                <ConversationDetails
+                  key={`details:${current.id}`}
+                  session={current}
+                  disabled={blocked}
+                  execute={execute}
+                />
                 {uncertain && (
-                  <div className="state-explanation" role="status">
-                    <h2>The outcome is uncertain</h2>
-                    <p>
-                      Some work may have happened. Harbor has preserved the
-                      conversation and will not send your request again
-                      automatically. Inspect the current result before starting
-                      more work.
-                    </p>
-                  </div>
+                  <Recovery
+                    key={`recovery:${current.id}`}
+                    id={current.id}
+                    cursor={snapshot?.cursor ?? 0}
+                    disabled={blocked}
+                    settings={{ model, effort, permissionProfile: permission }}
+                    execute={execute}
+                  />
                 )}
                 {current.state === "interrupted" && (
                   <div className="state-explanation">
@@ -1190,7 +1152,15 @@ export function App() {
               </div>
             )}
             <section className="composer-region" aria-label="Message composer">
-              <form className="composer" onSubmit={send}>
+              <form
+                className={`composer ${uncertain ? "recovery-settings" : ""}`}
+                onSubmit={send}
+              >
+                {uncertain && (
+                  <p className="recovery-settings-label">
+                    Settings for the separate new operation
+                  </p>
+                )}
                 <label className="sr-only" htmlFor="message">
                   Message Codex
                 </label>
@@ -1206,7 +1176,7 @@ export function App() {
                     }))
                   }
                   maxLength={capabilities?.limits?.maxInputBytes ?? 32768}
-                  disabled={!!pending || expired}
+                  disabled={!!pending || expired || uncertain}
                   rows={3}
                   onKeyDown={(event) => {
                     if (
@@ -1381,43 +1351,6 @@ export function App() {
             selected={newWorkspaceId}
             select={setNewWorkspaceId}
           />
-        </Modal>
-      )}
-      {archiveSessionOpen && current && (
-        <Modal
-          title="Archive conversation?"
-          failure={error}
-          retry={
-            pending
-              ? () => void execute(pending.intent, pending.complete)
-              : undefined
-          }
-          close={() => setArchiveSessionOpen(false)}
-        >
-          <p>
-            Preserve this conversation’s history and prevent new work in it.
-            Workspace files remain in place.
-          </p>
-          <div className="dialog-actions">
-            <button onClick={() => setArchiveSessionOpen(false)}>
-              Keep conversation
-            </button>
-            <button
-              disabled={blocked || active || uncertain}
-              onClick={() =>
-                void execute(
-                  newIntent(
-                    `/sessions/${encodeURIComponent(current.id)}/archive`,
-                    {},
-                    "Archive conversation",
-                  ),
-                  () => setArchiveSessionOpen(false),
-                )
-              }
-            >
-              Archive conversation
-            </button>
-          </div>
         </Modal>
       )}
       {tokensOpen && identity && (

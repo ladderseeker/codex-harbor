@@ -4,9 +4,11 @@ P001's foundation is implemented and has completed four independent review round
 
 The [architecture](../../design/architecture.md) defines the target system. The [proposal index](../../design/proposals/README.md) defines independently verifiable feature outcomes and their dependencies. The [issue index](../../issues/README.md) exposes active findings and pending work transferred to proposals. Both indexes link their archives. [AGENTS.md](../../AGENTS.md#document-ownership-and-lifecycle) contains the canonical lifecycle and working rules.
 
-P002 adds scoped credentials for external clients; use the [programmatic API guide](programmatic-api.md). Its [implementation report](../reports/2026-09-07-p002-api-tokens.md) records the original two review rounds, a focused third authority-correction round, and Node 24 validation separately from the still-open live-account and feature-integration gates.
+P002 adds scoped credentials for external clients; use the [programmatic API guide](programmatic-api.md). Its [implementation report](../reports/2026-09-07-p002-api-tokens.md) records the original two review rounds, a focused third authority-correction round, and Node 24 validation including the now-resolved P003/P007 authority integration and the still-open live-account gate.
 
 P003 adds managed parallel workspaces; see the [workspace guide](workspaces.md) and [implementation evidence](../reports/2026-09-07-p003-workspaces.md). Its combined P001/P002/P003 application and actual Linux checks passed on Node 24; the real-account parallel-turn gate remains open.
+
+P007 adds bounded history search, visibility-only conversation archival and explicit uncertainty fencing/continuation. Its [integration report](../reports/2026-09-07-p007-history-integration.md) records two feature reviews, separate integration review, Node 24 combined acceptance, and the unchanged Linux boundary. Review, authority-expiry and replay/control-bound findings are resolved; dedicated live-account evidence remains open.
 
 ## Run the deterministic application locally
 
@@ -93,3 +95,13 @@ Assign each run a unique identity and clean up only its own processes, container
 Development starts locally on macOS/Linux and later uses the same entry points on compatible Linux VPS hosts. The [local environment design](../../design/architecture.md#local-first-development-and-portable-environments) owns the planned topology and Linux VM requirements. [P010](../../design/proposals/010-self-development.md) owns developing Harbor through its stable instance; [P009](../../design/proposals/009-portable-deployment-and-restore.md) owns deployment, restore, and external recovery.
 
 Those capabilities are planned, not operational today. As they are implemented, add tested setup and recovery instructions here or in linked operational guides. Keep future broker, candidate, and promotion specifications in their canonical design/proposals rather than copying them into this handbook. Existing authorization still governs work; self-development does not create a separate standing permission gate.
+
+## History and recovery API
+
+The authenticated versioned OpenAPI document includes `/history`, `/sessions/{id}/metadata`, `/sessions/{id}/recovery`, and `/sessions/{id}/recovery/continue`. All mutations use the existing owner browser cookie, exact Origin, CSRF header, and timestamped Idempotency-Key. These administrative recovery routes have no implicit programmatic-token permission.
+
+History pagination uses a filter-bound cursor and a maximum page size of 50. Metadata edits require `expectedRevision`; changing archive visibility never cancels execution. Recovery requests capture `expectedGeneration`; a failed attempt is explicitly retried with its existing `recoveryId` and `expectedAttempt`. The old key always reconciles its original accepted attempt. A ready fence can be consumed once by a separately acknowledged new turn. The original operation remains uncertain, with an acknowledgement reference; it is not reclassified as successful or automatically replayed.
+
+Migration 007 adds history metadata, replay watermarks, recovery attempts and bounded control reservations. New conversations have a 500-record ceiling with ordinary turn admission stopped at 400 retained records. Existing histories receive a one-time ceiling sufficient to preserve all records and reserve missing cancellation/fencing slots. This does not permit further ordinary work above the admission limit. Recovery reports and audit slots have separate fixed bounds. Restore a matching database backup when rolling back across this migration; older binaries do not understand acknowledged uncertainty and must not be pointed at the upgraded database.
+
+`tests/e2e/p007.ts` runs inside the same real-stack harness as the P001 regressions. It exercises UI search/rename/archive, API and supervisor restart, a dropped accepted continuation response, native projection repair/conflict, actual PostgreSQL stop/start, deferred-commit recovery failures, replay age/count and saturated control reservations. `tests/contract/history.test.ts` checks pinned native non-model behavior on a fresh CODEX_HOME and persisted fixture history. A dedicated live native turn remains an explicit unavailable gate; the fixture does not establish Linux isolation or live-account recovery.

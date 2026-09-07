@@ -1,8 +1,10 @@
 # P007 implementation review findings
 
 - Severity: High
-- Status: In progress
-- Owner: [P007](../design/proposals/007-session-history-and-recovery.md)
+- Status: Resolved
+- Archive disposition: Resolved
+- Archived: 2026-09-07
+- Owner: [P007](../../design/proposals/007-session-history-and-recovery.md)
 - Recorded: 2026-09-07
 - Affected files: apps/api/src/server.ts; apps/api/src/history.ts; apps/api/src/recovery.ts; apps/supervisor/src/recovery.ts; apps/web/src/Recovery.tsx; packages/storage/src/capacity.ts; tests/e2e/p007.ts
 - Acceptance: P007-01/02/05/06; corresponding inherited P001 safety and storage bounds
@@ -26,7 +28,7 @@ The reviewer withdrew an initial continuation-result-size concern after inspecti
 
 ## Disposition
 
-The implementer is batching fixes, followed by focused regressions, the complete changed-feature/critical suite, and independent re-review. P007 remains active and In progress. The [dedicated live-account gate](2026-09-07-171225-live-runtime-credentials.md) remains a separate prerequisite; fixture/native non-model checks cannot close it. Record the corrected source identity and results before resolving and archiving this review issue.
+The implementer is batching fixes, followed by focused regressions, the complete changed-feature/critical suite, and independent re-review. P007 remains active and In progress. The [dedicated live-account gate](../2026-09-07-171225-live-runtime-credentials.md) remains a separate prerequisite; fixture/native non-model checks cannot close it. Record the corrected source identity and results before resolving and archiving this review issue.
 
 ## Corrective review checkpoint — 7 September 2026
 
@@ -35,3 +37,11 @@ Two independent review rounds now close on feature commit `93a034a444cc95b6d8da8
 The second review required an event inserted between snapshot and subscription, plus supervisor restart while durable recovery settlement remained pending. Those assertions were corrected. A later real database-outage run exposed an unhandled error from a checked-out PostgreSQL client, beyond the earlier idle-pool handling. The final fix keeps query errors and the supervisor's fatal lease response intact while preventing an unrelated API process crash; exact owned-backend termination and full database-outage/recovery tests passed and received focused independent review. Duplicate React keys in adjacent history/recovery controls were also corrected and visually checked.
 
 All six original findings and the subsequent bounded corrections passed their feature-branch checks. This issue stays active until P003/P002 integration and the combined regression are recorded; independent branch evidence does not establish shared writer/recovery behavior.
+
+## Resolution — 7 September 2026
+
+All findings are resolved after two feature review rounds and separate P002/P003/P007 integration review with no remaining actionable finding. Combined acceptance covers active archival, current authority, restart settlement, exact workspace generation release, derived-checkout preservation, repeated recovery and explicit new-input continuation. Original uncertain work remains visible and is never automatically replayed.
+
+Reviewed integration `0118dfe`/`ca1a2cf` has source `2976f6286a9aea9645e2a27dfcb497e677c5268d5ff034593752dc98211b40bd` (842 files). Node 24.11.1 on macOS arm64 passed check/build, 9 integration tests, 15 pinned Codex 0.153.4 contracts and 8 workspace tests. Full real Harbor P001/P002/P007 E2E `harbor-e2e-10d1a7178a` and workspace E2E `harbor-workspaces-a5ce817a7b` exited 0 with identical start/end digests. Runs used PostgreSQL 17.6, Chromium 1194 and disposable external OIDC/Codex fixtures; cleanup affected only run-owned resources. Independent review accepted the unchanged native boundary's separate P003 Linux evidence.
+
+The [integration report](../../docs/reports/2026-09-07-p007-history-integration.md) records exact checks and limitations. This resolves this finding, not its proposals: the [dedicated live-account gate](../2026-09-07-171225-live-runtime-credentials.md) and separately tracked gateway/deployment obligations remain open. Earlier sections preserve historical discovery and intermediate status.

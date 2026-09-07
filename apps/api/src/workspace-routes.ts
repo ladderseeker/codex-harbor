@@ -406,44 +406,4 @@ export function registerWorkspaceRoutes(
         };
       }),
   );
-  app.post<{ Params: { id: string } }>(
-    "/api/v1/sessions/:id/archive",
-    async (req) =>
-      command(req, async (db) => {
-        z.object({})
-          .strict()
-          .parse(req.body ?? {});
-        const s = (
-          await db.query("SELECT * FROM sessions WHERE id=$1", [req.params.id])
-        ).rows[0];
-        if (!s)
-          throw new HarborError(404, "NOT_FOUND", "Conversation not found");
-        await selectedWorkspace(db, s.workspace_id, true);
-        await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
-          s.id,
-        ]);
-        const active = await db.query(
-          "SELECT 1 FROM operations WHERE session_id=$1 AND state IN ('queued','dispatching','running','waiting_approval','waiting_input','uncertain')",
-          [s.id],
-        );
-        const w = await selectedWorkspace(db, s.workspace_id, true);
-        await authority(db, req);
-        if (active.rowCount || w.writer_session_id === s.id)
-          throw new HarborError(
-            409,
-            "SESSION_BUSY",
-            "Active or uncertain conversations cannot be archived",
-          );
-        return {
-          session: publicRow(
-            (
-              await db.query(
-                "UPDATE sessions SET archived_at=now() WHERE id=$1 RETURNING *",
-                [s.id],
-              )
-            ).rows[0],
-          ),
-        };
-      }),
-  );
 }

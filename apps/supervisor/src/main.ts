@@ -1,7 +1,15 @@
+import { processRecovery } from "./recovery.ts";
 import { processWorkspaceStorage } from "./workspace-storage.ts";
-import { processWorkspaceReleases } from "./workspace-recovery.ts";
+import {
+  processWorkspaceReleases,
+  releaseRecoveredWorkspace,
+} from "./workspace-recovery.ts";
 import { claimWorkspace, releaseWorkspace } from "./workspace-admission.ts";
-import { verifyWorkspace } from "../../../packages/workspaces/src/service.ts";
+import {
+  selectedWorkspace,
+  sessionWorkspace,
+  verifyWorkspace,
+} from "../../../packages/workspaces/src/service.ts";
 import {
   requireAuthority,
   lockOwnerIdentity,
@@ -94,6 +102,9 @@ const generation = await transaction(pool, async (db) => {
   );
   const rows = await db.query(
     "UPDATE operations SET state='uncertain',updated_at=now() WHERE kind='turn' AND state IN ('dispatching','running','waiting_approval','waiting_input') RETURNING session_id",
+  );
+  await db.query(
+    'UPDATE session_recoveries SET state=\'failed\',report=\'{"status":"unavailable","reason":"Supervisor restarted during fencing; retry explicitly"}\'::jsonb,updated_at=now() WHERE state=\'fencing\'',
   );
   await db.query(
     "UPDATE approvals SET state='expired' WHERE state IN ('pending','answering')",
@@ -538,6 +549,103 @@ async function tick() {
   });
 
   await discover().catch(() => {});
+  discovering = true;
+  try {
+    await processRecovery({
+      pool,
+      authority: async (db, actor) => {
+        const meta = (
+          await db.query("SELECT generation,identity_pin FROM harbor_meta")
+        ).rows[0];
+        if (
+          !alive ||
+          Number(meta.generation) !== generation ||
+          meta.identity_pin !== ownerPin ||
+          credentials.mutating
+        )
+          throw Error("Recovery authority lost");
+        const authority = await requireAuthority(db, actor, c);
+        if (authority.kind !== "browser")
+          throw Error("Browser authority required");
+      },
+      lockWorkspace: async (db, id) => {
+        const w = await sessionWorkspace(db, id, true);
+        if (
+          w.state !== "ready" ||
+          (w.writer_session_id && w.writer_session_id !== id)
+        )
+          throw Error("Workspace owned by another operation or unavailable");
+        if (
+          (
+            await db.query(
+              "SELECT 1 FROM workspace_storage_operations WHERE project_id=$1 AND state IN ('queued','dispatching')",
+              [w.project_id],
+            )
+          ).rowCount
+        )
+          throw Error("Workspace storage operation pending");
+      },
+      releaseWorkspace: async (db, input) => {
+        const w = await selectedWorkspace(db, input.workspaceId, true);
+        if (input.generation === null) {
+          if (w.writer_session_id !== null) throw Error("Reservation changed");
+          return;
+        }
+        await releaseRecoveredWorkspace(db, {
+          ...input,
+          generation: input.generation,
+        });
+      },
+      retireSession: async (session) => {
+        const current = runtimes.get(session.id);
+        if (current) {
+          runtimes.delete(session.id);
+          if (!(await retire(current.adapter)))
+            throw Error("Runtime retirement unconfirmed");
+        }
+        if (discoveryTransport) {
+          if (!(await retire(discoveryTransport)))
+            throw Error("Probe retirement unconfirmed");
+          discoveryTransport = undefined;
+        }
+        if (!c.HARBOR_FIXTURE_MODE)
+          await retireRuntimeIdentity({
+            instanceId: process.env.HARBOR_INSTANCE_ID ?? "harbor",
+            projectId: session.project_id,
+            sessionId: session.id,
+          });
+        if (!(await retirement.confirmed()))
+          throw Error("Owned transport retirement unconfirmed");
+      },
+      probe: async (session, epoch) =>
+        createRuntime({
+          onTransport: (adapter) => {
+            discoveryTransport = adapter;
+            if (!alive) adapter.close();
+          },
+          sessionId: session.id,
+          projectId: session.project_id,
+          workspacePath: await verifyWorkspace(session),
+          workspaceId: session.workspace_id,
+          gitCommon: session.common_path
+            ? {
+                canonical: session.common_path,
+                device: session.common_device,
+                inode: session.common_inode,
+              }
+            : undefined,
+          workspaceDevice: session.device,
+          workspaceInode: session.inode,
+          generation: epoch,
+          instanceId: process.env.HARBOR_INSTANCE_ID ?? "harbor",
+          fixture: !!c.HARBOR_FIXTURE_MODE,
+          permissionProfile: "read-only",
+        }),
+      retireProbe: retire,
+    });
+  } finally {
+    discovering = false;
+  }
   const emergency = (await pool.query("SELECT emergency FROM harbor_meta"))
     .rows[0].emergency;
   if (emergency) {
@@ -756,7 +864,7 @@ async function tick() {
       ]);
   }
   const candidates = await pool.query(
-    "SELECT o.*,s.native_thread_id,s.project_id,s.workspace_id,p.root_id,w.relative_path,w.device,w.inode,w.canonical_path,w.common_path,w.common_device,w.common_inode FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id WHERE w.state='ready' AND p.archived_at IS NULL AND s.archived_at IS NULL AND w.writer_session_id IS NULL AND o.kind='turn' AND o.state='queued' AND s.state<>'uncertain' AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.session_id=o.session_id AND active.kind='turn' AND active.state IN ('uncertain','dispatching','running','waiting_approval','waiting_input')) ORDER BY o.created_at LIMIT 4",
+    "SELECT o.*,s.native_thread_id,s.project_id,s.workspace_id,p.root_id,w.relative_path,w.device,w.inode,w.canonical_path,w.common_path,w.common_device,w.common_inode FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id WHERE w.state='ready' AND p.archived_at IS NULL AND w.writer_session_id IS NULL AND o.kind='turn' AND o.state='queued' AND s.state<>'uncertain' AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.session_id=o.session_id AND active.kind='turn' AND (active.state IN ('dispatching','running','waiting_approval','waiting_input') OR (active.state='uncertain' AND active.uncertainty_acknowledged_at IS NULL))) ORDER BY o.created_at LIMIT 4",
   );
   for (const o of candidates.rows) {
     if ([...runtimes.values()].filter((r) => r.operation).length >= 4) break;
@@ -927,7 +1035,7 @@ async function tick() {
                 [o.session_id],
               );
               const uncertain = await fence.query(
-                "SELECT 1 FROM operations WHERE session_id=$1 AND state='uncertain' LIMIT 1",
+                "SELECT 1 FROM operations WHERE session_id=$1 AND state='uncertain' AND uncertainty_acknowledged_at IS NULL LIMIT 1",
                 [o.session_id],
               );
               if (
@@ -1028,6 +1136,10 @@ async function tick() {
         o.payload as TurnOptions,
       );
       r.turn = turn.turn.id;
+      await pool.query("UPDATE operations SET native_turn_id=$2 WHERE id=$1", [
+        o.id,
+        r.turn,
+      ]);
       await pool.query("UPDATE sessions SET native_turn_id=$2 WHERE id=$1", [
         o.session_id,
         r.turn,

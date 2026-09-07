@@ -1,7 +1,7 @@
 # P004 — Files and change review
 
 - Decision: Accepted
-- Delivery: Planned
+- Delivery: In progress
 - Dependencies: [P003](003-parallel-project-workspaces.md)
 - Outcome: The owner inspects workspace files and changes, edits a file safely, and deliberately applies a reviewed Git action.
 
@@ -121,3 +121,7 @@ The P004 module registry includes operation/receipt metadata and only owned pend
 Keep P004-01–06 unchanged and extend their fixtures with partial staging plus unrelated staged/unstaged content, exact repeat/response-loss commit identity, two-client revision conflict, index/HEAD change between review and admission, queued-grant expiry/revocation, parent/hardlink/symlink replacement, hostile Git configuration/hooks/filters, search/download limits, invalidation resync, API/supervisor/helper loss before and after index/ref publication, and database commit failure after filesystem success. Assert zero host execution/network, exact selected disk/index/tree bytes and OIDs, retained draft and uncertainty, no second effect, and only owned cleanup. Test Local Git metadata and derived Git workspaces sharing their imported common store with actual Linux helper mounts, including typed reservation conflicts with P003/P007. This design neither narrows the six acceptance outcomes nor establishes their implementation evidence.
 
 Design review: the main agent required the explicit uncertain-operation inspection/release flow above. An independent workspace implementer then required distinct Local/derived Git publication authority and exact applied-effect validation before the durability barrier. Those clarifications are incorporated and checked against the P003 contract. Documentation links and whitespace pass; application implementation and its independent review remain pending.
+
+## Implementation record
+
+- 2026-09-07: Started isolated implementation from reviewed P001/P002/P003/P007 integration `ca1a2cf` under the accepted design and roadmap authorization. Migration 010 is reserved. Application acceptance and independent review remain in progress.

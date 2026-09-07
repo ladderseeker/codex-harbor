@@ -172,3 +172,16 @@ export const workspaceRelative = (
   rootId: string,
   canonical: string,
 ) => path.relative(roots.find((r) => r.id === rootId)!.path, canonical);
+
+/** Acquire project -> workspace before a caller locks the conversation. */
+export async function sessionWorkspace(
+  db: DB,
+  sessionId: string,
+  lock = false,
+) {
+  const row = (
+    await db.query("SELECT workspace_id FROM sessions WHERE id=$1", [sessionId])
+  ).rows[0];
+  if (!row) throw new HarborError(404, "NOT_FOUND", "Conversation not found");
+  return selectedWorkspace(db, row.workspace_id, lock);
+}

@@ -1,3 +1,5 @@
+import { p007 } from "./p007.ts";
+import { createPool } from "../../packages/storage/src/index.ts";
 if (process.argv.includes("--workspaces")) {
   await import("../workspaces/e2e.ts");
   process.exit(process.exitCode ?? 0);
@@ -1143,6 +1145,86 @@ try {
     expect((await command(`/sessions/${id}/turns`, payload)).status()).toBe(
       409,
     );
+    const historyDb = createPool(env.DATABASE_URL);
+    try {
+      await p007({
+        page: reopened,
+        context,
+        origin,
+        db: historyDb,
+        artifacts,
+        fixtureState: env.HARBOR_FIXTURE_STATE_DIR,
+        pauseSupervisor: () => {
+          supervisor.kill("SIGSTOP");
+        },
+        resumeSupervisor: () => {
+          supervisor.kill("SIGCONT");
+        },
+        trace: env.HARBOR_FIXTURE_TRACE_FILE,
+        command,
+        newSession,
+        snapshot: getSnapshot,
+        assertResponse,
+        restartApi: async () => {
+          api.kill("SIGTERM");
+          await new Promise((r) => api.once("exit", r));
+          api = start("apps/api/src/main.ts");
+          await expect
+            .poll(
+              async () => {
+                try {
+                  return (
+                    await context.request.get(origin + "/api/v1/me")
+                  ).status();
+                } catch {
+                  return 0;
+                }
+              },
+              { timeout: 30000 },
+            )
+            .toBe(200);
+        },
+        restartSupervisor: async () => {
+          supervisor.kill("SIGKILL");
+          await new Promise((r) => supervisor.once("exit", r));
+          supervisor = start("apps/supervisor/src/main.ts");
+        },
+        databaseOutage: async () => {
+          compose(["stop", "postgres"]);
+          await new Promise((r) => setTimeout(r, 2500));
+          expect(
+            (
+              await command("/sessions", {
+                projectId: sessions.sessions[0].projectId,
+                model: "fixture",
+                effort: "medium",
+                permissionProfile: "read-only",
+              })
+            ).status(),
+          ).toBe(500);
+          compose(["start", "postgres"]);
+          await expect
+            .poll(
+              async () => {
+                try {
+                  return (await historyDb.query("SELECT 1 AS ok")).rows[0].ok;
+                } catch {
+                  return 0;
+                }
+              },
+              { timeout: 30000 },
+            )
+            .toBe(1);
+          if (supervisor.exitCode === null) {
+            supervisor.kill("SIGTERM");
+            await new Promise((r) => supervisor.once("exit", r));
+          }
+          supervisor = start("apps/supervisor/src/main.ts");
+        },
+      });
+    } finally {
+      await historyDb.end();
+    }
     const initSession = await newSession();
     supervisor.kill("SIGTERM");
     await new Promise((r) => supervisor.once("exit", r));
@@ -1285,7 +1367,7 @@ try {
           browser: "Chromium1194",
           node: process.version,
           scope:
-            "P001/P002 deterministic external-fixture acceptance; live/isolation separate",
+            "P001/P002/P007 deterministic external-fixture acceptance; workspace/Linux lanes separate",
         },
         null,
         2,
