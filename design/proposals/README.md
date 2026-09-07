@@ -13,7 +13,7 @@ An independently verifiable feature may rely on its declared dependencies. Imple
 | ID | Complete outcome | Decision | Delivery | Direct dependencies | Acceptance IDs / specialist lanes |
 | --- | --- | --- | --- | --- | --- |
 | [P001](001-secure-persistent-conversations.md) | Sign in and conduct a protected Codex conversation that survives browser closure | Accepted | Implemented | None | P001-01–08; contracts/E2E/Linux passed, live and medium follow-ups pending |
-| [P002](002-programmatic-api-access.md) | Use revocable, scoped credentials from an external API client | Accepted | Implemented | P001 | P002-01–06, contracts and Node 24 integration passed; two review rounds closed; live/upstream gates pending |
+| [P002](002-programmatic-api-access.md) | Use revocable, scoped credentials from an external API client | Accepted | Implemented | P001 | Original P002-01–06/contracts/Node 24 integration and two reviews passed; subsequent High expiry-lock finding, live/upstream gates pending |
 | [P003](003-parallel-project-workspaces.md) | Work across projects and parallel conversations with clear workspace ownership | Accepted | In progress | P001 | P003-01–06; isolation, live |
 | [P004](004-files-and-change-review.md) | Inspect, edit, download, and review project changes through Harbor | Draft | Planned | P003 | P004-01–06; isolation |
 | [P005](005-attachments-and-rich-input.md) | Submit validated files and pasted images with a conversation | Accepted | In progress | P001 | P005-01–06; contract, live, isolation |

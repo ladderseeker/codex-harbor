@@ -4,11 +4,13 @@ Use this index and the [issue archive](archive/README.md) to find existing findi
 
 ## Active issues
 
-The critical P001 implementation review is resolved in the archive. A live-account blocker and two medium follow-ups remain active. The earlier runtime finding remains Transferred with partial local evidence below.
+The critical P001 implementation review is resolved in the archive. P007's first implementation review, a newly reproduced authority-expiry defect, the live-account blocker, and two medium follow-ups remain active. The earlier runtime finding remains Transferred with partial local evidence below.
 
 | Issue | Severity | Status | Owner | Next action |
 | --- | --- | --- | --- | --- |
 | [Dedicated live-test credentials](2026-09-07-171225-live-runtime-credentials.md) | High | Blocked | P001; later live-test owners | Supply dedicated test credentials through the documented test configuration, then run bounded real-account acceptance. Continue other implementation and verification. |
+| [Authority expiry after a lock wait](2026-09-07-202308-authority-expiry-after-lock-wait.md) | High | In progress | P002 policy; P007 recovery integration | Validate current authority after locks are acquired; test token/browser expiry and final dispatch, then independently review. |
+| [P007 implementation review](2026-09-07-203000-p007-implementation-review.md) | High | In progress | P007 | Batch recovery/admission/pagination fixes and missing boundary assertions, then independently re-review and verify. |
 | [Replay and control bounds](2026-09-07-185228-p001-retention-control-bounds.md) | Medium | In progress | P007 corrective implementation; P001 acceptance | Enforce replay age/count and bounded reserved cancellation/recovery storage; verify P007-02/05/06 and inherited P001-03/07 before closure. |
 | [Linux gateway availability](2026-09-07-185228-linux-gateway-availability.md) | Medium | Open | P001; P009 target-host lane | Second VM reproduced DNS/TLS transport failures in 5/20 probes; retain denial policy and compare target-host connectivity. |
 
