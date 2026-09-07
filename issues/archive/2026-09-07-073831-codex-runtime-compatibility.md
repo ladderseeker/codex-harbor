@@ -53,5 +53,11 @@ P001's authenticated real-account gate remains blocked, so its transferred part 
 
 ## History
 
+### Deployment implementation evidence — 8 September 2026
+
+P009's [reviewed development report](../../docs/reports/2026-09-08-p009-development.md) now records actual immutable installation, HTTPS owner login/project creation, UID/private socket/SCRAM denials, a reboot preserving the registered project identity, and account-free confined Codex initialization on the disposable supported Linux profile. Each installed artifact retains its own identity and scope. Reboot used zero conversations; it does not establish restored or rebooted native conversation history. Main integrated the reviewed deployment source in `f7872ed`; matching-source `b6599ab3…7a4289` passed the full Node 24 application regression and two bounded independent review rounds.
+
+The deployment part remains partial. Restored-host destination enrollment and available administrator checks are still being completed. Protected A-to-B checkpoint/restore, actual release promotion/rollback, native-history activation and dedicated live-account gates remain unverified. This record stays Transferred, not Resolved; no completed local or installed check waives the remaining mapped obligations.
+
 - 2026-09-07 07:38:31 Asia/Shanghai: Recorded Open during design planning, with P001 and P009 identified as future validation owners.
 - 2026-09-07: Formally transferred the full finding to P001/P009 acceptance and delivery sections, added reciprocal links and pending evidence tracking, and moved the same filename to `issues/archive/`. No implementation or release gate was passed or waived.

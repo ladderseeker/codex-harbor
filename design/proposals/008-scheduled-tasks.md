@@ -1,7 +1,7 @@
 # P008 — Scheduled tasks
 
 - Decision: Accepted
-- Delivery: Planned
+- Delivery: In progress
 - Dependencies: [P003](003-parallel-project-workspaces.md), [P007](007-session-history-and-recovery.md)
 - Outcome: The owner schedules project work, leaves Harbor, and later reviews each occurrence's result or request for attention.
 

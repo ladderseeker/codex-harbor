@@ -5,6 +5,10 @@
 - Dependencies: [P003](003-parallel-project-workspaces.md)
 - Outcome: The owner inspects workspace files and changes, edits a file safely, and deliberately applies a reviewed Git action.
 
+## Source issues
+
+- [P004 implementation review](../../issues/2026-09-08-012652-p004-implementation-review.md): High, In progress. The frozen candidate passed managed-XFS and critical regressions; round 1 found pending-open draft loss, BOM/mode preservation and receipt-parent durability defects. Correct and verify these findings before terminal/deployment integration and completion.
+
 ## Scope and user/API flow
 
 Add a workspace file tree, bounded filename/text search, text editor, authenticated downloads, Git status, and code/diff views. Show unsaved edits, stale revisions, unavailable/binary/oversized files, and external changes. Provide explicit stage/unstage and commit actions, with exact selected changes visible before mutation. Each action has an authenticated API equivalent and an observable result.
