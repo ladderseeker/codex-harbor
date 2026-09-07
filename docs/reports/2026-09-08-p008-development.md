@@ -59,7 +59,7 @@ The independent reviewer closed the bounded module merge source, feature and cri
 
 ## Acceptance evidence audit — 8 September 2026
 
-Run `9cefdbb8f5` executed the expanded real-stack suite, despite its stale intermediate/smoke result label. Its historical JSON is unchanged. The emitter now names the executed lifecycle, fault, authority, quota and maintenance scope without claiming every acceptance gate closed.
+Run `9cefdbb8f5` executed the expanded real-stack suite, despite its stale intermediate/smoke result label. Its historical JSON is unchanged. The table records that run's scope and the gaps found at the audit; the targeted follow-up below subsequently closes its DST gap. The emitter names the executed lifecycle, fault, authority, quota and maintenance scope without claiming every acceptance gate closed.
 
 | Acceptance | Executed evidence and limit |
 | --- | --- |

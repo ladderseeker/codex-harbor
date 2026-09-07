@@ -15,7 +15,7 @@ This directory describes available behavior, developer workflows, and completed 
 - [Attachment verification](developer/attachments.md): upload/draft persistence, Linux publication checks and the separate live gate.
 - [Schedule user guide](user/schedules.md): recurrence, offline execution, attention and pause/cancel behavior.
 - [Schedule developer guide](developer/schedules.md): API authority, test commands and recovery boundaries.
-- [P008 scheduling evidence](reports/2026-09-08-p008-development.md): two feature reviews, qualified schedule/critical results and module integration, with remaining DST/live/restore gates explicit.
+- [P008 scheduling evidence](reports/2026-09-08-p008-development.md): two feature reviews, qualified schedule/critical results, module integration and reviewed real-stack DST follow-up; live/restore gates remain explicit.
 - [Programmatic API](developer/programmatic-api.md): bearer authentication, current scopes, streaming, and safe retries.
 - [User guides](user/README.md): available conversation and account controls, with current verification limits.
 - [Design index](../design/README.md): the target architecture, feature proposals, and acceptance criteria.

@@ -16,7 +16,7 @@ P005 adds bounded image/text attachments and saved drafts. See [attachment verif
 
 P007 adds bounded history search, visibility-only conversation archival and explicit uncertainty fencing/continuation. Its [integration report](../reports/2026-09-07-p007-history-integration.md) records two feature reviews, separate integration review, Node 24 combined acceptance, and the unchanged Linux boundary. Review, authority-expiry and replay/control-bound findings are resolved; dedicated live-account evidence remains open.
 
-P008 adds recurring and one-time schedules, offline execution, scoped grants and bounded occurrence history. The [schedule guide](schedules.md) documents the API and maintained test lanes. Its [development report](../reports/2026-09-08-p008-development.md) records two feature reviews, module integration and qualified browser/API/Linux evidence. Targeted real-stack DST coverage is in progress; dedicated live-account and protected full restore gates remain unverified.
+P008 adds recurring and one-time schedules, offline execution, scoped grants and bounded occurrence history. The [schedule guide](schedules.md) documents the API and maintained test lanes. Its [development report](../reports/2026-09-08-p008-development.md) records two feature reviews, module integration and qualified browser/API/Linux evidence. Targeted real-stack DST coverage and its bounded review passed; dedicated live-account and protected full restore gates remain unverified.
 
 P009 deployment work is In progress. Its [development command guide](deployment.md) documents the implemented administrator interface, tested subset and explicit transfer/live blockers; it is not a production-readiness claim.
 

@@ -8,6 +8,7 @@ The archive contains resolved source-review findings, installed web/workspace co
 
 | Issue | Severity | Status | Owner | Next action |
 | --- | --- | --- | --- | --- |
+| [P010 relay deadline](2026-09-08-061531-p010-relay-deadline.md) | Medium | In progress | P010 | Corrected lifetime guard passed focused local checks and bounded independent review; finish committed integration and actual Linux channel cleanup evidence. |
 | [P010 artifact link boundary](2026-09-08-045236-p010-artifact-link-boundary.md) | Medium | In progress | P010 | Exact-parent containment correction and independent hostile-archive checks passed; record committed P010 integration before archiving. |
 | [P005 attachment draft regression](2026-09-08-044009-p005-selection-regression.md) | Medium | Open | Regression maintainer | Reviewed bounded diagnostics integrated in e1b754a; inspect them on recurrence to establish the unexplained failing phase and cause. |
 | [P007 regression evidence](2026-09-08-020429-p007-regression-evidence.md) | Medium | Open | Regression maintainer | Original-error/cleanup diagnostics are reviewed and a full critical run passed; inspect them on recurrence to establish the earlier409 cause. |
