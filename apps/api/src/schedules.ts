@@ -276,7 +276,14 @@ export function scheduleRoutes(
       .strict()
       .parse(req.body);
     return mutate(req, "schedules:manage", undefined, (db, s) =>
-      editSchedule(db, s, b.expectedRevision, b.schedule),
+      editSchedule(
+        db,
+        s,
+        b.expectedRevision,
+        b.schedule,
+        authority(req).hash,
+        c,
+      ),
     );
   });
   app.post("/api/v1/schedules/:id/activation", async (req: any) => {

@@ -42,6 +42,8 @@ export async function editSchedule(
   s: any,
   revision: number,
   input: unknown,
+  actor: string,
+  c: ScheduleAuthorityConfig,
 ) {
   expectedRevision(s, revision);
   const b = createScheduleSchema.parse(input);
@@ -51,6 +53,21 @@ export async function editSchedule(
       "SCHEDULE_PROJECT",
       "Create a new schedule to change project",
     );
+  const need = {
+    scope: "schedules:manage" as const,
+    projectId: s.project_id,
+    permissionProfile:
+      b.config.workspaceMode === "standalone"
+        ? ("workspace-write" as const)
+        : b.config.permissionProfile,
+  };
+  await requireAuthority(db, actor, c, need);
+  await requireAuthority(db, actor, c, { ...need, scope: "execute" });
+  authorizePermission(need.permissionProfile, c.HARBOR_PERMISSION_CEILING);
+  await effectiveSettings(db, b.config.model, b.config.effort, c.models);
+  await scheduleTarget(db, s.project_id, b.config, !!c.HARBOR_FIXTURE_MODE);
+  await requireAuthority(db, actor, c, need);
+  await requireAuthority(db, actor, c, { ...need, scope: "execute" });
   const old = (
     await db.query(
       "SELECT config FROM schedule_versions WHERE schedule_id=$1 AND revision=$2",
@@ -115,6 +132,12 @@ export async function activateSchedule(
   oneShot = false,
 ) {
   expectedRevision(s, revision);
+  if ((await db.query("SELECT emergency FROM harbor_meta")).rows[0].emergency)
+    throw new HarborError(
+      409,
+      "EMERGENCY_STOPPED",
+      "Emergency stop prevents schedule activation",
+    );
   if (!Number.isInteger(days) || days < 1 || days > 90)
     throw new HarborError(
       400,
@@ -296,4 +319,15 @@ export async function runScheduleNow(
     occurrence: { id: result.id, state: "accepted" },
     schedule: { id: s.id, revision: s.config_revision, state: s.state },
   };
+}
+
+/** Caller holds owner identity and the emergency meta row before actor/resource locks. */
+export async function emergencyPauseSchedules(db: PoolClient) {
+  await db.query("SELECT pg_advisory_xact_lock(740028)");
+  await db.query("SELECT id FROM schedules ORDER BY id FOR UPDATE");
+  await db.query(
+    "UPDATE schedules SET state='paused',reason='EMERGENCY_STOP',catch_up=NULL,updated_at=clock_timestamp()",
+  );
+  await db.query("UPDATE schedule_grants SET revoked=true WHERE NOT revoked");
+  // Occurrences keep their original native/storage outcome and running grant history.
 }

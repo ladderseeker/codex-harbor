@@ -97,6 +97,66 @@ export async function scheduleAuthorityE2e(o: {
     } finally {
       await readOnly.dispose();
     }
+    for (const [scopes, config] of [
+      [["schedules:manage"], input.config],
+      [
+        ["schedules:manage", "execute"],
+        { ...input.config, permissionProfile: "workspace-write" },
+      ],
+      [
+        ["schedules:manage", "execute"],
+        {
+          ...settings,
+          rule: input.config.rule,
+          workspaceMode: "standalone",
+          sourcePolicy: "snapshot",
+          sourceWorkspaceId: (
+            await db.query("SELECT workspace_id FROM sessions WHERE id=$1", [
+              o.sessionId,
+            ])
+          ).rows[0].workspace_id,
+        },
+      ],
+    ] as const) {
+      const limited = await createToken([...scopes]);
+      const editClient = await request.newContext({
+        ignoreHTTPSErrors: true,
+        extraHTTPHeaders: { Authorization: "Bearer " + limited.secret },
+      });
+      const before = (
+        await db.query(
+          "SELECT config_revision,grant_epoch,active_grant_id FROM schedules WHERE id=$1",
+          [created.id],
+        )
+      ).rows[0];
+      try {
+        const edit = await editClient.put(
+          origin + `/api/v1/schedules/${created.id}`,
+          {
+            headers: { "Idempotency-Key": `${Date.now()}:${randomUUID()}` },
+            data: { expectedRevision: 1, schedule: { ...input, config } },
+          },
+        );
+        expect(edit.status(), await edit.text()).toBe(403);
+        expect(
+          (
+            await db.query(
+              "SELECT config_revision,grant_epoch,active_grant_id FROM schedules WHERE id=$1",
+              [created.id],
+            )
+          ).rows[0],
+        ).toEqual(before);
+        expect(
+          (
+            await db.query("SELECT revoked FROM schedule_grants WHERE id=$1", [
+              before.active_grant_id,
+            ])
+          ).rows[0].revoked,
+        ).toBe(false);
+      } finally {
+        await editClient.dispose();
+      }
+    }
     const foreign = (
       await post("/projects", {
         name: "Other schedule project",

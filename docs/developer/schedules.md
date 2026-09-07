@@ -7,9 +7,11 @@ The versioned `/api/v1/openapi.json` document declares request/response schemas,
 | Operation | Token scopes |
 | --- | --- |
 | List, detail, occurrence history, attention, preview | `schedules:read` |
-| Edit or pause | `schedules:manage` |
-| Create/activate or run now | `schedules:manage`, `execute` |
+| Pause | `schedules:manage` |
+| Create/edit/activate or run now | `schedules:manage`, `execute` |
 | Cancel an occurrence | `schedules:manage`, `cancel` |
+
+Material edits also require the selected execution profile; standalone edits require a workspace-write ceiling even when their later turn is read-only.
 
 Routes are `GET/POST /schedules`, `POST /schedules/preview`, `GET/PUT /schedules/{id}`, `POST /schedules/{id}/activation`, `POST /schedules/{id}/pause`, `GET/POST /schedules/{id}/runs`, `POST /schedules/{id}/runs/{occurrenceId}/cancel`, and `GET /schedule-attention`. Preview is read-only despite using POST for its structured rule; browser CSRF/Origin checks still apply.
 

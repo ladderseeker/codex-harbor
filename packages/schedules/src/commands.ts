@@ -83,14 +83,8 @@ export async function scheduleCommand(
     );
     let epoch: number | null = null,
       occurrence: string | null = null;
-    if (input.control?.kind === "pause" && schedule.active_grant_id)
-      epoch = Number(
-        (
-          await db.query("SELECT epoch FROM schedule_grants WHERE id=$1", [
-            schedule.active_grant_id,
-          ])
-        ).rows[0].epoch,
-      );
+    // The frontier includes one-shot grants as well as the active recurrence grant.
+    if (input.control?.kind === "pause") epoch = Number(schedule.grant_epoch);
     if (input.control?.kind === "cancel") {
       occurrence = input.control.occurrenceId;
       if (

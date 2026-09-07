@@ -339,7 +339,7 @@ export const schedulePaths: Record<string, any> = {
   "/schedules/{id}": {
     get: operation(read, object({ schedule: ref("Schedule") })),
     put: operation(
-      manage,
+      execute,
       object({ schedule: result }),
       object({ expectedRevision: positive, schedule: ref("ScheduleInput") }),
     ),

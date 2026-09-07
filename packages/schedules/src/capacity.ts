@@ -62,6 +62,11 @@ export async function pruneScheduleHistory(db: PoolClient) {
   await lockScheduleOwner(db);
   await deploymentAdmission(db, true);
   await db.query("SELECT pg_advisory_xact_lock(740028)");
+  // Retained control receipts protect history only through their retry window.
+  // Maintenance must reclaim them even when a paused schedule has no new commands.
+  await db.query(
+    "DELETE FROM schedule_commands WHERE (schedule_id,slot) IN (SELECT schedule_id,slot FROM schedule_commands WHERE retry_until<clock_timestamp() ORDER BY retry_until,schedule_id,slot LIMIT 512)",
+  );
   const rows = (
     await db.query(
       `SELECT id,schedule_id,intended_at FROM schedule_occurrences WHERE ${settled} AND ended_at<clock_timestamp()-interval '90 days' ORDER BY ended_at LIMIT 256`,

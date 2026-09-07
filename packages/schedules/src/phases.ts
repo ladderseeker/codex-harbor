@@ -87,6 +87,17 @@ export async function advanceOccurrence(
           "SOURCE_POLICY",
           "Source Git/snapshot policy changed; review the schedule before activating",
         );
+      if (
+        inspection.git &&
+        !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(
+          hint.snapshot.sourceRevision ?? "",
+        )
+      )
+        throw new HarborError(
+          409,
+          "SOURCE_REVISION_MISSING",
+          "Accepted occurrence has no captured source commit; create a new occurrence",
+        );
       await createWorkspace(
         db,
         hint.project_id,
@@ -95,7 +106,7 @@ export async function advanceOccurrence(
           sourceWorkspaceId: source.id,
           kind: inspection.git ? "worktree" : "copy",
           dirtyPolicy: inspection.git ? "exclude" : "snapshot",
-          ...(config.baseRevision ? { revision: config.baseRevision } : {}),
+          ...(inspection.git ? { revision: hint.snapshot.sourceRevision } : {}),
         },
         c,
         {

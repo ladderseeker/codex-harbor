@@ -183,10 +183,14 @@ try {
         resumeSupervisor: () => {
           supervisor.kill("SIGCONT");
         },
-        restartSupervisor: async () => {
+        restartSupervisor: async (whileStopped?: () => Promise<void>) => {
           supervisor.kill("SIGKILL");
           await new Promise((r) => supervisor.once("exit", r));
-          supervisor = start("apps/supervisor/src/main.ts");
+          try {
+            await whileStopped?.();
+          } finally {
+            supervisor = start("apps/supervisor/src/main.ts");
+          }
         },
       });
     } catch (error) {

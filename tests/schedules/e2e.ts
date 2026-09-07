@@ -1,3 +1,4 @@
+import { scheduleReviewControlsE2e } from "./review-controls-e2e.ts";
 import { scheduleWorkspacesE2e } from "./workspaces-e2e.ts";
 import { scheduleBoundsE2e } from "./bounds-e2e.ts";
 import { scheduleFaultsE2e } from "./faults-e2e.ts";
@@ -17,7 +18,7 @@ export async function scheduleE2e(options: {
   fixtureState: string;
   pauseSupervisor: () => void;
   resumeSupervisor: () => void;
-  restartSupervisor: () => Promise<void>;
+  restartSupervisor: (whileStopped?: () => Promise<void>) => Promise<void>;
 }) {
   const { browser, db, origin } = options;
   const ajv = new Ajv2020({ strict: false, validateFormats: false });
@@ -324,8 +325,10 @@ export async function scheduleE2e(options: {
     origin,
     csrf: me.csrfToken,
     post,
+    restartSupervisor: options.restartSupervisor,
+    pauseSupervisor: options.pauseSupervisor,
+    resumeSupervisor: options.resumeSupervisor,
   });
-  await context.close();
   await expect
     .poll(
       async () =>
@@ -336,4 +339,13 @@ export async function scheduleE2e(options: {
         ).rows[0].state,
     )
     .toBe("completed");
+  await scheduleReviewControlsE2e({
+    db,
+    projectId: project.id,
+    sessionId: session.id,
+    post,
+    pauseSupervisor: options.pauseSupervisor,
+    resumeSupervisor: options.resumeSupervisor,
+  });
+  await context.close();
 }

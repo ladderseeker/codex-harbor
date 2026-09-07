@@ -1,3 +1,8 @@
+import {
+  selectedWorkspace,
+  inspectWorkspace,
+  requireWorkspaceIdle,
+} from "../../workspaces/src/service.ts";
 import { lockScheduleOwner } from "./locking.ts";
 import { deploymentAdmission } from "../../storage/src/deployment.ts";
 import { scheduleTarget } from "./targets.ts";
@@ -41,6 +46,12 @@ export async function createActivatedSchedule(
         : b.config.permissionProfile,
   };
   await lockScheduleOwner(db);
+  if ((await db.query("SELECT emergency FROM harbor_meta")).rows[0].emergency)
+    throw new HarborError(
+      409,
+      "EMERGENCY_STOPPED",
+      "Emergency stop prevents schedule activation",
+    );
   const authority = await requireAuthority(db, actor, c, need);
   await deploymentAdmission(db);
   await requireAuthority(db, actor, c, { ...need, scope: "execute" });
@@ -285,6 +296,54 @@ export async function insertOccurrence(
       "SCHEDULE_TARGET",
       "Conversation target is unavailable",
     );
+  let sourceRevision: string | undefined;
+  if (row.config.workspaceMode === "standalone") {
+    const source = await selectedWorkspace(
+      db,
+      row.config.sourceWorkspaceId,
+      true,
+    );
+    if (
+      source.project_id !== row.project_id ||
+      source.project_archived ||
+      source.state !== "ready"
+    )
+      throw new HarborError(
+        409,
+        "WORKSPACE_UNAVAILABLE",
+        "Source workspace unavailable",
+      );
+    await requireWorkspaceIdle(db, source, true);
+    const inspection = await inspectWorkspace(
+      db,
+      source,
+      !!c.HARBOR_FIXTURE_MODE,
+    );
+    if (!inspection.available)
+      throw new HarborError(
+        409,
+        "WORKSPACE_UNAVAILABLE",
+        "Source inspection unavailable",
+      );
+    if (inspection.git !== (row.config.sourcePolicy === "committed"))
+      throw new HarborError(
+        409,
+        "SOURCE_POLICY",
+        "Source snapshot policy changed",
+      );
+    if (inspection.git) {
+      sourceRevision = row.config.baseRevision ?? inspection.head;
+      if (
+        !sourceRevision ||
+        !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(sourceRevision)
+      )
+        throw new HarborError(
+          409,
+          "WORKSPACE_UNAVAILABLE",
+          "Source commit unavailable",
+        );
+    }
+  }
   await db.query(
     `INSERT INTO schedule_occurrences(id,schedule_id,config_revision,rule_revision,grant_id,kind,local_minute,intended_at,snapshot,prompt,state,workspace_id,session_id,turn_id,storage_operation_id,cancel_operation_id)
     VALUES($1,$2,$3,$4,$5,$15,$6,$7,$8,$9,'accepted',$10,$11,$12,$13,$14)`,
@@ -298,6 +357,7 @@ export async function insertOccurrence(
       intendedAt,
       JSON.stringify({
         configRevision: row.config_revision,
+        ...(sourceRevision ? { sourceRevision } : {}),
         ...(minute ?? {
           instant: intendedAt,
           timezone: row.config.rule.timezone,

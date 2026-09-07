@@ -207,6 +207,32 @@ export async function scheduleBoundsE2e(o: {
   ).json();
   expect(expiredPage.occurrences).toHaveLength(0);
   await post(`/schedules/${history.id}/pause`, { expectedRevision: 1 });
+  // A paused, otherwise idle schedule must not retain its prompt through expired control receipts.
+  await db.query(
+    "UPDATE schedule_commands SET retry_until=clock_timestamp()-interval '1 second' WHERE occurrence_id=$1",
+    [protectedId],
+  );
+  await transaction(db, pruneScheduleHistory);
+  expect(
+    Number(
+      (
+        await db.query(
+          "SELECT count(*) FROM schedule_occurrences WHERE schedule_id=$1",
+          [history.id],
+        )
+      ).rows[0].count,
+    ),
+  ).toBe(0);
+  expect(
+    Number(
+      (
+        await db.query(
+          "SELECT count(*) FROM schedule_commands WHERE occurrence_id=$1",
+          [protectedId],
+        )
+      ).rows[0].count,
+    ),
+  ).toBe(0);
   // Per-project enabled capacity is independent of global/retained history capacity.
   const active = Number(
     (

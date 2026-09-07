@@ -141,7 +141,7 @@ export async function planSchedule(
     } catch (error) {
       if (
         error instanceof HarborError &&
-        error.code === "SCHEDULE_OVERLAP" &&
+        ["SCHEDULE_OVERLAP", "WORKSPACE_BUSY"].includes(error.code) &&
         !batch.rangeFrom
       ) {
         await transaction(pool, async (db) => {
@@ -200,9 +200,12 @@ export async function planSchedule(
       }
       if (
         error instanceof HarborError &&
-        !["SCHEDULE_OVERLAP", "SCHEDULE_CHANGED", "SCHEDULE_PAUSED"].includes(
-          error.code,
-        )
+        ![
+          "SCHEDULE_OVERLAP",
+          "WORKSPACE_BUSY",
+          "SCHEDULE_CHANGED",
+          "SCHEDULE_PAUSED",
+        ].includes(error.code)
       )
         await transaction(pool, async (db) => {
           await lockScheduleOwner(db);

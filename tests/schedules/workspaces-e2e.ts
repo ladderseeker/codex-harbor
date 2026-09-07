@@ -10,6 +10,9 @@ export async function scheduleWorkspacesE2e(o: {
   origin: string;
   csrf: string;
   post: (route: string, data: unknown, key?: string) => Promise<any>;
+  pauseSupervisor: () => void;
+  resumeSupervisor: () => void;
+  restartSupervisor: (whileStopped?: () => Promise<void>) => Promise<void>;
 }) {
   const { db, post } = o;
   const roots = (
@@ -154,6 +157,67 @@ export async function scheduleWorkspacesE2e(o: {
     ).toBe("dirty source must remain private to Local\n");
     await post(`/schedules/${schedule.id}/pause`, { expectedRevision: 1 });
   }
+  // Accept default HEAD, then move the source while the owned dispatcher is held.
+  const capturedSchedule = await post("/schedules", input);
+  let captured: any;
+  await o.restartSupervisor(async () => {
+    captured = (
+      await post(`/schedules/${capturedSchedule.id}/runs`, {
+        expectedRevision: 1,
+      })
+    ).occurrence;
+    expect(
+      (
+        await db.query(
+          "SELECT snapshot->>'sourceRevision' AS oid FROM schedule_occurrences WHERE id=$1",
+          [captured.id],
+        )
+      ).rows[0].oid,
+    ).toBe(second);
+    await chmod(local.canonical_path, 0o777);
+    await writeFile(
+      path.join(local.canonical_path, "version.txt"),
+      "third committed after admission\n",
+    );
+    git(["-C", "/source", "add", "version.txt"]);
+    git([
+      "-C",
+      "/source",
+      "-c",
+      "user.name=Fixture",
+      "-c",
+      "user.email=fixture@example.test",
+      "commit",
+      "-m",
+      "After accepted occurrence",
+    ]);
+    expect(git(["-C", "/source", "rev-parse", "HEAD"])).not.toBe(second);
+    await chmod(local.canonical_path, 0o755);
+  });
+  await expect
+    .poll(
+      async () =>
+        (
+          await db.query("SELECT state FROM schedule_occurrences WHERE id=$1", [
+            captured.id,
+          ])
+        ).rows[0].state,
+      { timeout: 45000 },
+    )
+    .toBe("succeeded");
+  const pinned = (
+    await db.query(
+      "SELECT w.* FROM workspaces w JOIN schedule_occurrences o ON o.workspace_id=w.id WHERE o.id=$1",
+      [captured.id],
+    )
+  ).rows[0];
+  expect(pinned.base_revision).toBe(second);
+  expect(
+    await readFile(path.join(pinned.canonical_path, "version.txt"), "utf8"),
+  ).toBe("second committed source\n");
+  await post(`/schedules/${capturedSchedule.id}/pause`, {
+    expectedRevision: 1,
+  });
   // Actual terminal ownership prevents preparation and never becomes schedule authority.
   const busy = await post("/schedules", input);
   const terminal = (
@@ -174,26 +238,25 @@ export async function scheduleWorkspacesE2e(o: {
       { timeout: 30000 },
     )
     .toBe("running");
-  const skipped = (
-    await post(`/schedules/${busy.id}/runs`, { expectedRevision: 1 })
-  ).occurrence;
-  await expect
-    .poll(
-      async () =>
-        (
-          await db.query("SELECT state FROM schedule_occurrences WHERE id=$1", [
-            skipped.id,
-          ])
-        ).rows[0].state,
-      { timeout: 30000 },
-    )
-    .toBe("skipped");
+  const deniedBusy = await o.context.request.post(
+    o.origin + `/api/v1/schedules/${busy.id}/runs`,
+    {
+      headers: {
+        Origin: o.origin,
+        "X-CSRF-Token": o.csrf,
+        "Idempotency-Key": `${Date.now()}:${randomUUID()}`,
+      },
+      data: { expectedRevision: 1 },
+    },
+  );
+  expect(deniedBusy.status(), await deniedBusy.text()).toBe(409);
+  expect((await deniedBusy.json()).error.code).toBe("WORKSPACE_BUSY");
   expect(
     Number(
       (
         await db.query(
-          "SELECT count(*) FROM operations t JOIN schedule_occurrences o ON o.turn_id=t.id WHERE o.id=$1",
-          [skipped.id],
+          "SELECT count(*) FROM schedule_occurrences WHERE schedule_id=$1",
+          [busy.id],
         )
       ).rows[0].count,
     ),

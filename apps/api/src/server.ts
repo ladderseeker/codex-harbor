@@ -1,3 +1,4 @@
+import { emergencyPauseSchedules } from "../../../packages/schedules/src/management.ts";
 import { PgBoss } from "pg-boss";
 import { scheduleRoutes } from "./schedules.ts";
 import { initializeScheduleQueue } from "../../../packages/schedules/src/queue.ts";
@@ -318,6 +319,11 @@ export async function buildServer(c: Config) {
       JSON.stringify({ params: req.params, body: req.body ?? {} }),
     );
     return transaction(pool, async (db) => {
+      if (route === "/api/v1/security/emergency-stop") {
+        await lockOwnerIdentity(db);
+        // Match schedule owner/meta -> actor -> schedule/resource ordering.
+        await db.query("SELECT generation FROM harbor_meta FOR UPDATE");
+      }
       if (route === "/api/v1/security/logout") {
         await lockOwnerIdentity(db);
         await db.query(
@@ -941,6 +947,7 @@ export async function buildServer(c: Config) {
   app.post("/api/v1/security/emergency-stop", async (req) =>
     command(req, async (db) => {
       await db.query("UPDATE harbor_meta SET emergency=true");
+      await emergencyPauseSchedules(db);
       await db.query("INSERT INTO audits(kind) VALUES('emergency-stop')");
       return { stopped: true };
     }),

@@ -333,7 +333,10 @@ await boss.work(SCHEDULE_QUEUE, { pollingIntervalSeconds: 0.5 }, async () => {
     );
 });
 let scheduleTick: Promise<void> | undefined;
-const scheduleFence = async (db: import("pg").PoolClient) => {
+const scheduleFence = async (
+  db: import("pg").PoolClient,
+  settlementOnly = false,
+) => {
   const deployment = await deploymentState(db);
   if (deployment.maintenance || deployment.activation_required)
     throw Error("Schedule deployment admission closed");
@@ -345,7 +348,7 @@ const scheduleFence = async (db: import("pg").PoolClient) => {
     credentials.mutating ||
     Number(meta.generation) !== generation ||
     meta.identity_pin !== ownerPin ||
-    meta.emergency
+    (meta.emergency && !settlementOnly)
   )
     throw Error("Schedule dispatcher fenced or stopped");
 };

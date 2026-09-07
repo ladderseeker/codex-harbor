@@ -13,7 +13,7 @@ export async function processSchedules(
   pool: Pool,
   boss: PgBoss,
   c: ScheduleExecutionConfig,
-  fence: (db: PoolClient) => Promise<void>,
+  fence: (db: PoolClient, settlementOnly?: boolean) => Promise<void>,
 ) {
   await settleOccurrences(pool);
   if (Date.now() - maintainedAt > 60000) {
@@ -69,7 +69,7 @@ export async function processSchedules(
         await lockScheduleOwner(db);
         await deploymentAdmission(db, true);
         await db.query("SELECT pg_advisory_xact_lock(740028)");
-        await fence(db);
+        await fence(db, true);
         await db.query("SELECT id FROM schedules WHERE id=$1 FOR UPDATE", [
           row.schedule_id,
         ]);
@@ -84,6 +84,18 @@ export async function processSchedules(
           !["accepted", "preparing_workspace"].includes(occurrence.state)
         )
           return;
+        // Revocation cannot prove that a dispatched storage receipt has settled.
+        // Retain the occurrence until the ordinary storage reconciler confirms it.
+        if (occurrence.state === "preparing_workspace") {
+          const storage = (
+            await db.query(
+              "SELECT state FROM workspace_storage_operations WHERE id=$1",
+              [occurrence.storage_operation_id],
+            )
+          ).rows[0];
+          if (!storage || ["queued", "dispatching"].includes(storage.state))
+            return;
+        }
         const overlap = ["WORKSPACE_BUSY", "SCHEDULE_OVERLAP"].includes(
           error.code,
         );
