@@ -1,3 +1,7 @@
+import {
+  deploymentAdmission,
+  deploymentState,
+} from "../../storage/src/deployment.ts";
 import { transaction } from "../../storage/src/index.ts";
 import type { Pool, PoolClient } from "pg";
 import { randomUUID } from "node:crypto";
@@ -56,6 +60,7 @@ export async function lockedTerminal(
 ) {
   const before = await terminalRow(db, id);
   await terminalGrant(db, before, actor, c, scope);
+  await deploymentState(db, true);
   const t = await lockTerminalResource(db, id);
   await terminalGrant(db, t, actor, c, scope);
   return t;
@@ -109,6 +114,7 @@ export async function acquireControl(
   actor: string,
   b: any,
 ) {
+  await deploymentAdmission(db);
   if (t.state !== "running") throw gone();
   if (
     Number(t.generation) !== b.generation ||
@@ -228,6 +234,7 @@ export async function acceptInput(
   actor: string,
   b: any,
 ) {
+  await deploymentAdmission(db);
   const outcome = await inputOutcome(db, t, actor, b);
   if (!["missing", "expired"].includes(outcome.state)) return outcome;
   const bytes = decodeInput(b.data),
@@ -294,6 +301,7 @@ export async function pruneInput(db: PoolClient, id: string) {
   );
 }
 export async function resize(db: PoolClient, t: any, actor: string, b: any) {
+  await deploymentAdmission(db);
   await requireController(db, t, actor, b);
   if (b.sequence < Number(t.resize_sequence))
     throw new HarborError(
@@ -325,6 +333,7 @@ export async function resize(db: PoolClient, t: any, actor: string, b: any) {
   return { accepted: true };
 }
 export async function heartbeat(db: PoolClient, t: any, actor: string, b: any) {
+  await deploymentAdmission(db);
   await requireController(db, t, actor, b);
   const result = await db.query(
     "UPDATE terminals SET heartbeat_at=clock_timestamp(),controller_until=least(deadline,clock_timestamp()+interval '20 seconds') WHERE id=$1 AND (heartbeat_at IS NULL OR heartbeat_at<=clock_timestamp()-interval '5 seconds') RETURNING controller_until",

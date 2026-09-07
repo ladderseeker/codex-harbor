@@ -388,6 +388,8 @@ export async function buildServer(c: Config) {
       await deploymentAdmission(
         db,
         route.endsWith("/cancel") ||
+          route.endsWith("/terminate") ||
+          reservedFileControl ||
           route.endsWith("/answer") ||
           [
             "/api/v1/security/emergency-stop",

@@ -215,16 +215,17 @@ async function validateApplied(command: FileCommand, result: any) {
 export async function inspectFileEffect(
   command: FileCommand,
   fixture = false,
+  restored = false,
 ): Promise<any> {
   await validate(command, fixture);
   if (!command.operationId) throw Error("Exact file operation required");
   if (active.has(command.workspaceId))
     throw Error("File operation still active");
-  await retireFileHelper(command.operationId);
+  if (!restored) await retireFileHelper(command.operationId);
   const file = join(await authority(fixture), command.operationId + ".json");
   let record: any;
   try {
-    record = JSON.parse(await readFile(file, "utf8"));
+    if (!restored) record = JSON.parse(await readFile(file, "utf8"));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
@@ -272,6 +273,7 @@ export async function inspectFileEffect(
   }
   return {
     status: "uncertain",
+    restored,
     receipt: record?.state ?? "missing",
     recorded: record?.result ?? null,
     observation,

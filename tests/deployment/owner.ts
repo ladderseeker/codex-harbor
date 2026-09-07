@@ -3,7 +3,11 @@ import { readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 const manifest = JSON.parse(
-  await readFile("/var/lib/harbor-p009-tools/admission.json", "utf8"),
+  await readFile(
+    (process.env.HARBOR_DEPLOY_TEST_TOOLS ?? "/var/lib/harbor-p009-tools") +
+      "/admission.json",
+    "utf8",
+  ),
 );
 const c = JSON.parse(await readFile(manifest.config, "utf8"));
 const api = await request.newContext();

@@ -200,6 +200,19 @@ def checkpoint(c, interrupt=False):
             r = json.load(open(receipt + "/" + name))
             if r.get("state") not in ["completed", "failed"]:
                 raise ValueError("Unsettled storage effect prevents checkpoint")
+    effects = {r["id"]: r for r in registry["fileEffects"]}
+    files = p["state"] + "/launcher/file-receipts"
+    if os.path.isdir(files):
+        for name in os.listdir(files):
+            if not name.endswith(".json"):
+                raise ValueError("Unsettled file receipt authority")
+            r = json.load(open(files + "/" + name))
+            effect = effects.get(name[:-5])
+            if not effect or not (r.get("state") == "completed" or effect["state"] == "failed" or (effect["state"] == "uncertain" and effect["acknowledged_at"])):
+                raise ValueError("Unsettled file effect prevents checkpoint")
+    slots = p["state"] + "/launcher/file-slots.json"
+    if os.path.exists(slots) and json.load(open(slots)) != []:
+        raise ValueError("File helper slot retirement unconfirmed")
     # Native auth copies are deliberately absent from both expected inventory and restic.
     protected = [
         p["etc"],

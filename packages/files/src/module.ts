@@ -8,7 +8,7 @@ export const fileModule = {
     "file_operation_audits",
     "file_events",
   ],
-  controlPaths: ["file-receipts", "file-slots.json", "file-slots.lock"],
+  controlPaths: ["file-receipts", "file-slots.json"],
   projectPaths: ["complete-project-quota-unit"],
   unsettledSql:
     "SELECT 1 FROM file_operations WHERE state IN ('queued','dispatching') UNION ALL SELECT 1 FROM file_inspections WHERE state IN ('queued','inspecting') LIMIT 1",

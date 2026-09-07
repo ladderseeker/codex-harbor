@@ -15,6 +15,10 @@ def preflight(c, release):
     ):
         raise ValueError("Fixture configuration forbidden in installed services")
     m = verify(release)
+    if set(m["images"]) != {"postgres", "caddy", "runner", "gateway", "git", "files"}:
+        raise ValueError("Complete installed image registry required")
+    if m.get("terminalSeccomp") != m["files"]["infra/runner/seccomp-terminal.json"]["sha256"]:
+        raise ValueError("Terminal confinement manifest missing")
     for tool in [
         "docker",
         "systemctl",

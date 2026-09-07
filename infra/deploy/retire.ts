@@ -1,3 +1,4 @@
+import { retireOwnedFileHelpers } from "../files/launcher.ts";
 import { retireRuntimeIdentity } from "../runner/authority.ts";
 let body = "";
 for await (const chunk of process.stdin) {
@@ -28,4 +29,19 @@ if (registry.bootstrap)
       projectId: project.id,
       sessionId: registry.bootstrap,
     });
-process.stdout.write(JSON.stringify({ retired: true }));
+if (!Array.isArray(registry.terminals) || registry.terminals.length > 256)
+  throw Error("Terminal retirement registry limit");
+for (const terminal of registry.terminals)
+  await retireRuntimeIdentity({
+    instanceId,
+    projectId: terminal.project_id,
+    sessionId: "terminal-" + terminal.id,
+  });
+await retireOwnedFileHelpers();
+process.stdout.write(
+  JSON.stringify({
+    retired: true,
+    terminals: registry.terminals.length,
+    fileSlots: "empty",
+  }),
+);
