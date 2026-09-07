@@ -1,9 +1,10 @@
 import type { DB } from "./index.ts";
 import { HarborError } from "../../policy/src/index.ts";
-export async function deploymentState(db: DB) {
+export async function deploymentState(db: DB, lock = false) {
   return (
     await db.query(
-      "SELECT maintenance,activation_required,epoch FROM deployment_state WHERE id=true",
+      "SELECT maintenance,activation_required,epoch FROM deployment_state WHERE id=true" +
+        (lock ? " FOR SHARE" : ""),
     )
   ).rows[0] as {
     maintenance: boolean;

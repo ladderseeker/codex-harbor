@@ -63,6 +63,9 @@ def environment(c, release, role):
         "HARBOR_PORT": str(c["apiPort"]),
         "HARBOR_HOST": "127.0.0.1",
         "HARBOR_STORAGE_SOCKET": p["run"] + "/storage.sock",
+        "HARBOR_FILE_SOCKET": p["run"] + "/storage.sock",
+        "HARBOR_GIT_AUTHOR_NAME": c.get("gitAuthor", {}).get("name", "Harbor owner"),
+        "HARBOR_GIT_AUTHOR_EMAIL": c.get("gitAuthor", {}).get("email", "harbor@localhost"),
         "HARBOR_CONTROL_SOCKET": p["run"] + "/credentials.sock",
     }
     if c.get("oidcSecretFile"):

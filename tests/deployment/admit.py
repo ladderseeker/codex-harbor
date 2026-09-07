@@ -4,7 +4,8 @@ import os, json, subprocess, sys, urllib.parse
 
 source = os.path.realpath(os.path.join(os.path.dirname(__file__), "../.."))
 os.chdir(source)
-manifest = json.load(open("/var/lib/harbor-p009-tools/admission.json"))
+tools = os.environ.get("HARBOR_DEPLOY_TEST_TOOLS", "/var/lib/harbor-p009-tools")
+manifest = json.load(open(tools + "/admission.json"))
 c = json.load(open(manifest["config"]))
 control = manifest["control"]
 unit = "harbor-p009-oidc-" + manifest["id"]
@@ -48,9 +49,9 @@ result = subprocess.run(
         "--node",
         "/opt/harbor-node/bin/node",
         "--restic",
-        "/var/lib/harbor-p009-tools/restic",
+        tools + "/restic",
         "--output",
-        "/var/lib/harbor-p009-tools/releases",
+        tools + "/releases",
     ],
     check=True,
     capture_output=True,

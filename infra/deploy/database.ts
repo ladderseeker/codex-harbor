@@ -1,3 +1,8 @@
+import {
+  installedModules,
+  installedModuleStatus,
+  restoreInstalledModules,
+} from "../../packages/storage/src/deployment-modules.ts";
 /** Fixed administrator database bridge. JSON stdin is never evaluated as SQL or code. */
 import { readFile } from "node:fs/promises";
 import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
@@ -25,7 +30,8 @@ const pool = createPool(process.env.DATABASE_URL!);
 const exists = async (name: string) =>
   !!(await pool.query("SELECT to_regclass($1) AS object", [name])).rows[0]
     .object;
-const modules: Record<string, string[]> = {
+const modules: Record<string, readonly string[]> = {
+  ...installedModules,
   P001: [
     "harbor_meta",
     "browser_sessions",
@@ -57,7 +63,7 @@ async function registry() {
     for (const table of tables)
       if (!(await exists(table)))
         throw Error("Required database module object missing");
-    present[module] = tables;
+    present[module] = [...tables];
   }
   const actual = (
     await pool.query(
@@ -81,12 +87,26 @@ async function registry() {
     ).rows;
   if (projects.length > 20 || workspaces.length > 320 || sessions.length > 200)
     throw Error("Registry count limit");
+  const terminalRows = (
+    await pool.query(
+      "SELECT id,project_id,workspace_id,generation,state,retired,restored_from FROM terminals ORDER BY id LIMIT 257",
+    )
+  ).rows;
+  const fileEffects = (
+    await pool.query(
+      "SELECT id,state,acknowledged_at FROM file_operations ORDER BY id LIMIT 4097",
+    )
+  ).rows;
+  if (terminalRows.length > 256 || fileEffects.length > 4096)
+    throw Error("Installed module registry bound");
   return {
     format: 1,
+    fileEffects,
     modules: present,
     projects,
     workspaces,
     sessions,
+    terminals: terminalRows,
     bootstrap: (await pool.query("SELECT runtime_id FROM runtime_bootstrap"))
       .rows[0]?.runtime_id,
     attachments: (await exists("session_attachment_storage"))
@@ -135,6 +155,7 @@ try {
   } else if (input.action === "status") {
     result = {
       deployment: (await pool.query("SELECT * FROM deployment_state")).rows[0],
+      ...(await installedModuleStatus(pool)),
       active: Number(
         (
           await pool.query(
@@ -177,6 +198,13 @@ try {
   else if (input.action === "interrupt") {
     await transaction(pool, async (db) => {
       await db.query("UPDATE harbor_meta SET emergency=true");
+      await db.query(
+        "INSERT INTO deployment_restored_operations(kind,id,source_instance,historical) SELECT 'terminal-interruption',id,$1,to_jsonb(terminals) FROM terminals WHERE NOT retired AND state='uncertain' AND termination_attempts<3 ON CONFLICT DO NOTHING",
+        [process.env.HARBOR_INSTANCE_ID],
+      );
+      await db.query(
+        "UPDATE terminals SET termination_attempts=termination_attempts+CASE WHEN state='uncertain' THEN 1 ELSE 0 END,state='retiring',failure_code='ADMINISTRATOR_INTERRUPTED',controller_until=NULL WHERE NOT retired AND state<>'queued' AND (state<>'uncertain' OR termination_attempts<3)",
+      );
       await db.query(
         "UPDATE operations SET state='uncertain',updated_at=now() WHERE kind='turn' AND state IN ('dispatching','running','waiting_input','waiting_approval')",
       );
@@ -307,6 +335,7 @@ try {
         await db.query(
           "UPDATE session_recoveries SET state='failed',report='{\"status\":\"unavailable\",\"reason\":\"Restored host requires a fresh fence\"}',updated_at=now() WHERE state IN ('queued','fencing','ready')",
         );
+      await restoreInstalledModules(db, input.sourceInstance);
       await db.query(
         "UPDATE intents SET actor='restored:' || $1 || ':' || actor",
         [input.sourceInstance],

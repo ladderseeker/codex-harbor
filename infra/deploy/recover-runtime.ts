@@ -1,3 +1,4 @@
+import { selectedWorkspace } from "../../packages/workspaces/src/service.ts";
 /** Exact stopped-service runner lock recovery; never a project-facing capability. */
 import {
   readFile,
@@ -9,7 +10,7 @@ import {
 } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { createPool } from "../../packages/storage/src/index.ts";
+import { createPool, transaction } from "../../packages/storage/src/index.ts";
 import { revokeEgress } from "../egress/network.mjs";
 const exec = promisify(execFile);
 let body = "";
@@ -27,7 +28,12 @@ if (
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 if (
   !uuid.test(input.projectId) ||
-  !uuid.test(input.sessionId) ||
+  !(
+    uuid.test(input.sessionId) ||
+    (typeof input.sessionId === "string" &&
+      input.sessionId.startsWith("terminal-") &&
+      uuid.test(input.sessionId.slice(9)))
+  ) ||
   !Number.isSafeInteger(input.generation) ||
   input.generation < 0 ||
   !/^\d+$/.test(input.lockInode)
@@ -57,11 +63,16 @@ try {
       .rowCount
   )
     throw Error("Unknown project identity");
+  const isTerminal = input.sessionId.startsWith("terminal-");
   if (
     !(
       await pool.query(
-        "SELECT 1 FROM sessions WHERE id=$1 AND project_id=$2 UNION ALL SELECT 1 FROM runtime_bootstrap WHERE runtime_id=$1",
-        [input.sessionId, input.projectId],
+        isTerminal
+          ? "SELECT 1 FROM terminals WHERE id=$1 AND project_id=$2 AND generation=$3"
+          : "SELECT 1 FROM sessions WHERE id=$1 AND project_id=$2 UNION ALL SELECT 1 FROM runtime_bootstrap WHERE runtime_id=$1",
+        isTerminal
+          ? [input.sessionId.slice(9), input.projectId, input.generation]
+          : [input.sessionId, input.projectId],
       )
     ).rowCount
   )
@@ -128,6 +139,49 @@ try {
       projectId: input.projectId,
       sessionId: input.sessionId,
       generation: input.generation,
+    });
+  }
+  if (isTerminal) {
+    await transaction(pool, async (db) => {
+      const before = (
+        await db.query("SELECT * FROM terminals WHERE id=$1", [
+          input.sessionId.slice(9),
+        ])
+      ).rows[0];
+      const w = await selectedWorkspace(db, before.workspace_id, true);
+      const row = (
+        await db.query("SELECT * FROM terminals WHERE id=$1 FOR UPDATE", [
+          before.id,
+        ])
+      ).rows[0];
+      if (
+        row.project_id !== input.projectId ||
+        Number(row.generation) !== input.generation
+      )
+        throw Error("Terminal recovery identity changed");
+      if (row.retired) return;
+      if (
+        w.writer_kind !== "terminal" ||
+        w.writer_owner_id !== row.id ||
+        Number(w.writer_epoch) !== Number(row.writer_epoch)
+      )
+        throw Error("Terminal recovery reservation changed");
+      await db.query(
+        "INSERT INTO deployment_restored_operations(kind,id,source_instance,historical) VALUES('terminal-recovery',$1,$2,$3) ON CONFLICT DO NOTHING",
+        [row.id, instanceId, JSON.stringify(row)],
+      );
+      await db.query(
+        "UPDATE workspaces SET writer_kind=NULL,writer_owner_id=NULL,writer_generation=NULL WHERE id=$1 AND writer_kind='terminal' AND writer_owner_id=$2 AND writer_epoch=$3",
+        [w.id, row.id, row.writer_epoch],
+      );
+      await db.query(
+        "UPDATE terminal_input SET state=CASE WHEN state='dispatching' THEN 'uncertain' ELSE 'denied' END,bytes=NULL,settled_at=clock_timestamp(),failure_code='ADMINISTRATOR_RECOVERED' WHERE terminal_id=$1 AND state IN ('accepted','dispatching')",
+        [row.id],
+      );
+      await db.query(
+        "UPDATE terminals SET state='interrupted',retired=true,writer_epoch=NULL,controller_until=NULL,controller_actor=NULL,controller_id=NULL,input_uncertain=true,output_lost=true,failure_code='ADMINISTRATOR_RECOVERED' WHERE id=$1",
+        [row.id],
+      );
     });
   }
   const children = await readdir(lock);

@@ -1,8 +1,8 @@
 """Trusted fixed workspace directory operations, extending quota.py admission."""
 import os,sys,json,stat,uuid,fcntl,shutil,ctypes
-# Load definitions without executing quota.py's stdin command dispatcher.
-namespace={};source=open(os.path.join(os.path.dirname(__file__),'quota.py')).read().split('try:main()')[0];exec(compile(source,'quota.py','exec'),namespace)
-trusted=namespace['trusted'];verify=namespace['verify'];attributes=namespace['attributes']
+# quota.py has an explicit main guard; import its trusted primitives without
+# executing the stdin dispatcher or truncating Python source at a text marker.
+from quota import trusted,verify,attributes
 def identity(path):
  info=os.stat(path,follow_symlinks=False)
  return {'canonical':path,'device':str(info.st_dev),'inode':str(info.st_ino)}
@@ -48,9 +48,13 @@ def main():
    if os.path.lexists(candidate)and(os.path.realpath(candidate)!=candidate or not stat.S_ISDIR(os.lstat(candidate).st_mode)or os.stat(candidate).st_uid!=10001):raise ValueError()
    if any(actual[k]!=expected[k]for k in ['device','inode']):raise ValueError()
    if expected.get('canonical')and actual['canonical']!=expected['canonical']:raise ValueError()
-   if expected.get('common'):
-    current=identity(common)
-    if any(current[k]!=expected['common'][k]for k in ['canonical','device','inode']):raise ValueError()
+  # Checkout source and selected identity are separate fields. Validate every
+  # supplied common identity even when source takes precedence for the checkout.
+  common_identities=[value['common']for value in [request.get('source'),request.get('identity')]if value and value.get('common')]
+  for expected_common in common_identities:
+   current=identity(common);info=os.lstat(common)
+   if os.path.realpath(common)!=common or not stat.S_ISDIR(info.st_mode)or info.st_uid!=10001:raise ValueError()
+   if any(current[k]!=expected_common[k]for k in ['canonical','device','inode']):raise ValueError()
   if request['action']=='fingerprint':
    # Reuse only the trusted bounded dirfd snapshot routine; no host Git command.
    helper_namespace={};helper_file=os.path.join(os.path.dirname(__file__),'..','git','helper.py')

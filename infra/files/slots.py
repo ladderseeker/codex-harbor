@@ -9,7 +9,7 @@ import sys
 import time
 
 base, action, operation_id, owner_pid = sys.argv[1:]
-if action not in ["claim", "release"] or not re.fullmatch(
+if action not in ["claim", "release", "inspect"] or not re.fullmatch(
     r"[a-f0-9-]{36}", operation_id
 ):
     raise ValueError("Invalid slot request")
@@ -65,7 +65,9 @@ try:
         ):
             raise ValueError("Invalid slot owner")
     changed = False
-    if action == "release":
+    if action == "inspect":
+        result = {"owners": [row["id"] for row in rows]}
+    elif action == "release":
         kept = [row for row in rows if row["id"] != operation_id]
         changed = len(kept) != len(rows)
         rows = kept

@@ -1,3 +1,4 @@
+import { releaseImage } from "../deploy/images.mjs";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
@@ -16,7 +17,10 @@ function slotBase() {
   if (!base) throw Error("File helper slot authority unavailable");
   return base;
 }
-async function slotCommand(action: "claim" | "release", operationId: string) {
+async function slotCommand(
+  action: "claim" | "release" | "inspect",
+  operationId: string,
+) {
   const base = slotBase(),
     info = await lstat(base);
   if (
@@ -36,7 +40,11 @@ async function slotCommand(action: "claim" | "release", operationId: string) {
     ],
     { timeout: 5000, maxBuffer: 8192 },
   );
-  return JSON.parse(result.stdout) as { claimed?: boolean; stale?: string[] };
+  return JSON.parse(result.stdout) as {
+    claimed?: boolean;
+    stale?: string[];
+    owners?: string[];
+  };
 }
 async function permit(operationId: string) {
   const deadline = Date.now() + 5000;
@@ -63,6 +71,14 @@ async function releaseOwnedSlots(operationId: string) {
   await slotCommand("release", operationId);
 }
 
+/** Caller stops all instance brokers first; only this private ledger owns these IDs. */
+export async function retireOwnedFileHelpers() {
+  const result = await slotCommand("inspect", randomUUID());
+  for (const operationId of result.owners ?? [])
+    await retireFileHelper(operationId);
+  if ((await slotCommand("inspect", randomUUID())).owners?.length)
+    throw Error("File helper retirement remains pending");
+}
 export async function retireFileHelper(operationId: string) {
   if (!id.test(operationId)) throw Error("Invalid file helper identity");
   const name = "harbor-file-" + operationId;
@@ -90,7 +106,9 @@ export async function retireFileHelper(operationId: string) {
   );
   if (
     labels["org.codex-harbor.owner"] !== "file-helper" ||
-    labels["org.codex-harbor.operation"] !== operationId
+    labels["org.codex-harbor.operation"] !== operationId ||
+    labels["org.codex-harbor.instance"] !==
+      (process.env.HARBOR_INSTANCE_ID ?? "local")
   )
     throw Error("File helper ownership mismatch");
   await exec("docker", ["rm", "--force", found], {
@@ -161,6 +179,9 @@ export async function fixedFileHelper(
       "org.codex-harbor.owner=file-helper",
       "--label",
       "org.codex-harbor.operation=" + operationId,
+      "--label",
+      "org.codex-harbor.instance=" +
+        (process.env.HARBOR_INSTANCE_ID ?? "local"),
       "--network=none",
       "--user=10001:10001",
       "--read-only",
@@ -184,7 +205,7 @@ export async function fixedFileHelper(
         "--mount",
         `type=bind,source=${command.identity.common.canonical},target=/git-common${writable ? "" : ",readonly"}`,
       );
-    args.push(FILE_IMAGE);
+    args.push(releaseImage("files", FILE_IMAGE));
     containerId = (
       await exec("docker", args, {
         env: dockerEnv(),

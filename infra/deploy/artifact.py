@@ -37,6 +37,8 @@ def verify(root, expected=None):
         raise ValueError("Unsupported release compatibility")
     if len(m["files"]) > MAX_FILES:
         raise ValueError("Release inventory limit")
+    if "apps/web/dist/index.html" not in m["files"]:
+        raise ValueError("Release omits the served browser document")
     seen = set()
     for base, dirs, names in os.walk(root, followlinks=False):
         for name in dirs + names:

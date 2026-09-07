@@ -1,3 +1,4 @@
+import { terminalModules } from "./modules.ts";
 import { terminalGitFence } from "./git-fence.ts";
 import { terminalReviewFixes } from "./review-fixes.ts";
 import { terminalFaults } from "./faults.ts";
@@ -236,7 +237,9 @@ try {
       fullPage: true,
     });
     const t = (await db.query("SELECT * FROM terminals LIMIT 1")).rows[0];
-    if (process.argv.includes("--terminal-git-fence")) {
+    if (process.argv.includes("--terminal-modules")) {
+      await terminalModules({ db, t, command, supervisor });
+    } else if (process.argv.includes("--terminal-git-fence")) {
       await terminalGitFence({ db, command, t });
     } else if (process.argv.includes("--terminal-review-fixes")) {
       await command(`/terminals/${t.id}/terminate`, {
@@ -549,13 +552,15 @@ try {
         node: process.version,
         sourceAtStart,
         sourceAtEnd: sourceDigest(),
-        scope: process.argv.includes("--terminal-git-fence")
-          ? "P004/P006 focused shared-Git reservation admission with real UI/API/supervisor; synthetic file lifecycle checkpoints, external OIDC/Codex PTY fixture; Linux separate"
-          : process.argv.includes("--terminal-stream-check")
-            ? "P006 focused real terminal stream/authority/slow-reader acceptance; external OIDC/Codex PTY fixture; Linux separate"
-            : process.argv.includes("--terminal-review-fixes")
-              ? "P006 corrective browser/API/DB/process/stream acceptance with initial UI smoke; external OIDC/Codex PTY fixture; Linux separate"
-              : "P006 complete terminal application acceptance; external OIDC/Codex PTY fixture; Linux separate",
+        scope: process.argv.includes("--terminal-modules")
+          ? "P004/P006/P009 real application maintenance/queued-drain/module rebind acceptance; synthetic historical states, external OIDC/Codex PTY; installed/Linux and protected restore separate"
+          : process.argv.includes("--terminal-git-fence")
+            ? "P004/P006 focused shared-Git reservation admission with real UI/API/supervisor; synthetic file lifecycle checkpoints, external OIDC/Codex PTY fixture; Linux separate"
+            : process.argv.includes("--terminal-stream-check")
+              ? "P006 focused real terminal stream/authority/slow-reader acceptance; external OIDC/Codex PTY fixture; Linux separate"
+              : process.argv.includes("--terminal-review-fixes")
+                ? "P006 corrective browser/API/DB/process/stream acceptance with initial UI smoke; external OIDC/Codex PTY fixture; Linux separate"
+                : "P006 complete terminal application acceptance; external OIDC/Codex PTY fixture; Linux separate",
       },
       null,
       2,
