@@ -8,7 +8,7 @@ The archive contains resolved source-review findings, installed web/workspace co
 
 | Issue | Severity | Status | Owner | Next action |
 | --- | --- | --- | --- | --- |
-| [P010 expired worker start](2026-09-08-065900-p010-expired-worker-start.md) | Medium | In progress | P010 | Bound preparation by remaining lifetime and reject new create/start after expiry; complete review, committed integration and Linux lifecycle evidence. |
+| [P010 expired worker start](2026-09-08-065900-p010-expired-worker-start.md) | Medium | In progress | P010 | Correction passed 28 exact-source Python contracts and bounded independent review; complete root integration and actual Linux lifecycle evidence. |
 | [P010 relay deadline](2026-09-08-061531-p010-relay-deadline.md) | Medium | In progress | P010 | Corrected lifetime guard passed focused local checks and bounded independent review; finish committed integration and actual Linux channel cleanup evidence. |
 | [P010 artifact link boundary](2026-09-08-045236-p010-artifact-link-boundary.md) | Medium | In progress | P010 | Exact-parent containment correction and independent hostile-archive checks passed; record committed P010 integration before archiving. |
 | [P005 attachment draft regression](2026-09-08-044009-p005-selection-regression.md) | Medium | Open | Regression maintainer | Reviewed bounded diagnostics integrated in e1b754a; inspect them on recurrence to establish the unexplained failing phase and cause. |

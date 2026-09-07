@@ -10,7 +10,7 @@
 
 ## Source issues
 
-- [Worker start after preparation expiry](../../issues/2026-09-08-065900-p010-expired-worker-start.md): Medium, In progress. The inherited build deadline is correct, but expiry during seed preparation does not prevent selecting new container creation/start. Bound and verify the complete preparation/start transition under P010-05.
+- [Worker start after preparation expiry](../../issues/2026-09-08-065900-p010-expired-worker-start.md): Medium, In progress. The corrected preparation/start transition passed 28 exact-source Python contracts and bounded independent review in isolated checkpoint `a51a4bc`. Root integration and actual Linux lifecycle evidence remain required under P010-05.
 - [Candidate relay deadline](../../issues/2026-09-08-061531-p010-relay-deadline.md): Medium, In progress. The early channel omitted its durable worker deadline. The correction passed focused local checks and bounded independent review; committed integration and actual Linux lifecycle evidence remain required under P010-05.
 - [Artifact link boundary](../../issues/2026-09-08-045236-p010-artifact-link-boundary.md): Medium, In progress. The exact-parent containment correction and independent hostile-archive checks passed in the isolated worktree. Committed P010 integration remains required; static binding does not establish complete candidate acceptance.
 - [P009 backup-transfer authorization](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, blocked. P010-06's real promotion/rollback depends on the P009 protected checkpoint; candidate builds cannot bypass the rejected payload/destination transfer. Continue self-development implementation and independent checks before requesting the concrete required approval.

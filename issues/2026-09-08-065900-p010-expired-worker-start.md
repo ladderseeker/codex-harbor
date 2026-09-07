@@ -16,4 +16,10 @@ The exact source-only driver/result are retained in `.test-runs/p010-start-deadl
 
 ## Impact and next steps
 
-Preparation can consume the remaining job lifetime before the next worker starts, weakening the fixed two-hour resource limit. Bound preparation by the remaining lifetime and check expiry before new creation/start effects, while retaining uncertain resources until exact retirement is confirmed. Cover this transition and independently review the correction, then record committed integration and the relevant actual Linux lifecycle evidence. Keep the separately corrected [relay deadline](2026-09-08-061531-p010-relay-deadline.md) finding distinct.
+Preparation can consume the remaining job lifetime before the next worker starts, weakening the fixed two-hour resource limit. The correction below bounds preparation and rejects later start effects while retaining uncertain resources. Complete root integration and the relevant actual Linux lifecycle evidence before archiving. Keep the separately corrected [relay deadline](2026-09-08-061531-p010-relay-deadline.md) finding distinct.
+
+## Correction and bounded review — 8 September 2026
+
+Isolated checkpoint `a51a4bc53568b645a22ded694dcdd6992f3f2c78` refreshes remaining lifetime after waits and before seed/main creation or start. Key generation, seed polling and Docker create/inspect/start receive bounded remaining time. Expiry or an ambiguous effect preserves its durable journal for exact retirement; it does not replay or release ownership.
+
+Main independently ran `python3 -B -m unittest discover -s tests/self -p '*_test.py'` against a separate exact-source copy on macOS ARM64/Python 3.9: all 28 tests passed. The new transition test covers expiry during seed (no create or start) and during creation (no later start), retaining uncertainty. A separate reviewer inspected the exact correction and closed this bounded source/test review with no actionable finding. Source hashes and results are retained in `.test-runs/p010-start-deadline-fix-20260908.json`. These tests intercept control/storage/process boundaries; they do not establish actual Linux worker retirement or complete P010 acceptance. The issue remains In progress pending those gates and root integration.
