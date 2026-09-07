@@ -255,8 +255,12 @@ export function previewRoutes(app: FastifyInstance, h: TerminalApi) {
           await revokePreviewAccess(db, p.id);
           const next = (
             await db.query(
-              "UPDATE previews SET state='queued',actor_hash=$2,generation=nextval('runtime_generation_seq'),revision=revision+1,stop_attempts=0,failure_code=NULL,exit_code=NULL,deadline=NULL,runner_id=NULL,relay_id=NULL,updated_at=clock_timestamp() WHERE id=$1 RETURNING *",
-              [p.id, h.actor(req)],
+              "UPDATE previews SET state='queued',actor_hash=$2,hostname=$3,generation=nextval('runtime_generation_seq'),revision=revision+1,stop_attempts=0,retirement_ack=NULL,failure_code=NULL,exit_code=NULL,deadline=NULL,runner_id=NULL,relay_id=NULL,restored_from=NULL,updated_at=clock_timestamp() WHERE id=$1 RETURNING *",
+              [
+                p.id,
+                h.actor(req),
+                randomBytes(16).toString("hex") + "." + c.HARBOR_PREVIEW_DOMAIN,
+              ],
             )
           ).rows[0];
           return { preview: previewView(next) };
@@ -365,6 +369,7 @@ export function previewRoutes(app: FastifyInstance, h: TerminalApi) {
         const before = await previewRow(db, req.params.id);
         await requirePreviewAuthority(db, before, h.actor(req), c, "read");
         const { p } = await lockedPreview(db, req.params.id);
+        await requirePreviewAuthority(db, p, h.actor(req), c, "read");
         const rows = (
           await db.query(
             "SELECT sequence,generation,bytes FROM preview_logs WHERE preview_id=$1 AND sequence>$2 AND created_at>clock_timestamp()-interval '24 hours' ORDER BY sequence LIMIT 64",

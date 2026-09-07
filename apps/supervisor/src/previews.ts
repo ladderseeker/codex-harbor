@@ -498,6 +498,24 @@ export class PreviewSupervisor {
       const r = this.owned.get(p.id);
       if (r) await this.flush(r);
       if (p.state === "uncertain") continue;
+      // A committed claim whose acknowledgement was lost must retire its exact
+      // identity. It never authorizes repeating the command in this process.
+      if (!r && !p.retired && ["starting", "ready"].includes(p.state)) {
+        await transaction(this.pool, async (db) => {
+          const { p: fresh } = await lockedPreview(db, p.id);
+          if (
+            Number(fresh.generation) !== Number(p.generation) ||
+            fresh.retired
+          )
+            return;
+          await revokePreviewAccess(db, p.id);
+          await db.query(
+            "UPDATE previews SET state='stopping',failure_code='ADMISSION_UNCONFIRMED',output_lost=true WHERE id=$1",
+            [p.id],
+          );
+        });
+        p.state = "stopping";
+      }
       if (
         emergency ||
         r?.reason ||

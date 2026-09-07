@@ -8,6 +8,14 @@ export const installedModules = {
     "file_events",
   ],
   P006: ["terminals", "terminal_input", "terminal_output"],
+  P011: [
+    "previews",
+    "preview_readers",
+    "preview_stops",
+    "preview_openings",
+    "preview_grants",
+    "preview_logs",
+  ],
   P008: [
     "schedules",
     "schedule_versions",
@@ -26,6 +34,8 @@ export async function installedModuleStatus(db: DB) {
     (SELECT count(*) FROM file_inspections WHERE state IN ('queued','inspecting')) AS "pendingFileInspections",
     (SELECT count(*) FROM terminals WHERE state='queued' AND NOT retired) AS "queuedTerminals",
     (SELECT count(*) FROM terminals WHERE state<>'queued' AND NOT retired) AS "activeTerminals",
+    (SELECT count(*) FROM previews WHERE state='queued') AS "queuedPreviews",
+    (SELECT count(*) FROM previews WHERE NOT retired) AS "activePreviews",
     (SELECT count(*) FROM schedules WHERE state='enabled') AS "enabledSchedules",
     (SELECT count(*) FROM schedule_occurrences WHERE state IN ('accepted','preparing_workspace','queued_turn')) AS "queuedScheduleOccurrences",
     (SELECT count(*) FROM schedule_occurrences o WHERE EXISTS(SELECT 1 FROM operations t WHERE t.id=o.turn_id AND t.state IN ('dispatching','running','waiting_approval','waiting_input')) OR EXISTS(SELECT 1 FROM workspace_storage_operations w WHERE w.id=o.storage_operation_id AND w.state IN ('queued','dispatching'))) AS "activeScheduleEffects"
@@ -42,6 +52,7 @@ export async function restoreInstalledModules(db: DB, source: string) {
     ["file", "file_operations"],
     ["file-inspection", "file_inspections"],
     ["terminal", "terminals"],
+    ["preview", "previews"],
   ] as const)
     await db.query(
       `INSERT INTO deployment_restored_operations(kind,id,source_instance,historical) SELECT $2,id,$1,to_jsonb(${table}) FROM ${table} ON CONFLICT DO NOTHING`,
@@ -64,6 +75,22 @@ export async function restoreInstalledModules(db: DB, source: string) {
     [source],
   );
   await db.query("DELETE FROM schedule_test_clock");
+  // Source preview identities are history only. No source runner/relay is
+  // contacted, and no restored viewing ticket or control can resume a process.
+  await db.query("UPDATE preview_grants SET revoked=true");
+  await db.query("UPDATE preview_openings SET revoked=true");
+  await db.query(
+    "UPDATE preview_stops SET state='failed',failure_code='RESTORED_AUTHORITY_REVOKED',actor_hash='restored:'||$1||':'||actor_hash WHERE state IN ('queued','retiring')",
+    [source],
+  );
+  await db.query("DELETE FROM preview_readers");
+  await db.query(
+    "UPDATE workspaces SET writer_kind=NULL,writer_owner_id=NULL,writer_generation=NULL WHERE writer_kind='preview'",
+  );
+  await db.query(
+    "UPDATE previews SET restored_from=$1,generation=nextval('runtime_generation_seq'),revision=revision+1,state='stopped',retired=true,lease_epoch=NULL,runner_id=NULL,relay_id=NULL,deadline=NULL,retirement_ack=NULL,stop_attempts=0,actor_hash='restored:'||$1||':'||actor_hash,output_lost=output_lost OR NOT retired,failure_code='RESTORED_AUTHORITY_REVOKED'",
+    [source],
+  );
   await db.query(
     "UPDATE file_operations SET restored_from=$1,state=CASE WHEN state='queued' THEN 'failed' WHEN state='dispatching' THEN 'uncertain' ELSE state END,failure_code=CASE WHEN state IN ('queued','dispatching','uncertain') THEN 'RESTORED_AUTHORITY_REVOKED' ELSE failure_code END,payload=CASE WHEN state='queued' THEN NULL ELSE payload END,payload_bytes=CASE WHEN state='queued' THEN 0 ELSE payload_bytes END",
     [source],

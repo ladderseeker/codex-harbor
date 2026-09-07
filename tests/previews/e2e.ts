@@ -1,6 +1,25 @@
+import { previewFaults } from "./faults-e2e.ts";
+import { inspectManagedStorage } from "../../infra/storage/client.ts";
+import { previewDerivedLinux } from "./derived-linux.ts";
+import { previewLinuxBoundary } from "./linux-boundary.ts";
+import { xfsFixture } from "../isolation/xfs-fixture.ts";
+import { retireRelay } from "../../infra/previews/launcher.ts";
+import { retireRuntimeIdentity } from "../../infra/runner/authority.ts";
+import { previewAccess } from "./access-e2e.ts";
+import { previewLifecycle } from "./lifecycle-e2e.ts";
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  writeFile,
+  readFile,
+  rm,
+  stat,
+  statfs,
+  cp,
+  realpath,
+} from "node:fs/promises";
 import { createServer } from "node:net";
 import path from "node:path";
 import os from "node:os";
@@ -8,6 +27,9 @@ import { chromium, expect } from "@playwright/test";
 import pg from "pg";
 import { sourceDigest } from "../../scripts/source-digest.ts";
 import { localComposeFiles } from "../../infra/compose.ts";
+const managed = process.env.HARBOR_TEST_XFS_MOUNT
+  ? await xfsFixture({ blockHardLimitBytes: 134217728, inodeHardLimit: 1024 })
+  : undefined;
 const sourceAtStart = sourceDigest(),
   instance = "harbor-previews-" + randomBytes(5).toString("hex"),
   children: ChildProcess[] = [],
@@ -29,9 +51,10 @@ const [dbPort, apiPort, previewPort, httpsPort, oidcPort, appPort] =
     await Promise.all(Array.from({ length: 6 }, free)),
   origin = `https://localhost:${httpsPort}`,
   password = randomBytes(24).toString("hex"),
-  rootId = randomUUID();
+  rootId = managed?.rootId ?? randomUUID();
 const env = {
   ...process.env,
+  ...(managed?.env ?? {}),
   NODE_ENV: "test",
   HARBOR_FIXTURE_MODE: "private-test",
   HARBOR_INSTANCE_ID: instance,
@@ -47,9 +70,15 @@ const env = {
   HARBOR_OIDC_ISSUER: `http://127.0.0.1:${oidcPort}`,
   HARBOR_OIDC_CLIENT_ID: instance,
   HARBOR_OWNER_SUBJECT: "owner",
-  HARBOR_PROJECT_ROOTS: JSON.stringify([
-    { id: rootId, name: "Preview test root", path: path.join(dir, "projects") },
-  ]),
+  HARBOR_PROJECT_ROOTS:
+    managed?.env.HARBOR_PROJECT_ROOTS ??
+    JSON.stringify([
+      {
+        id: rootId,
+        name: "Preview test root",
+        path: path.join(dir, "projects"),
+      },
+    ]),
   HARBOR_MODELS: "fixture",
   HARBOR_CONTROL_SOCKET: path.join(dir, "control", "credentials.sock"),
   HARBOR_CREDENTIAL_KEY_FILE: path.join(dir, "control", "key"),
@@ -61,10 +90,13 @@ const env = {
   HARBOR_PREVIEW_PORT: String(previewPort),
   HARBOR_PREVIEW_SOCKET: path.join(dir, "control", "preview.sock"),
 };
+Object.assign(process.env, env);
+let passed = false;
 let diagnostics = "",
   browser: Awaited<ReturnType<typeof chromium.launch>> | undefined,
   db: pg.Pool | undefined,
   composed = false;
+let ticketBody = "";
 const exchangeTraffic: unknown[] = [];
 const previewCookieChecks: Promise<boolean>[] = [];
 const override = path.join(dir, "compose.yaml");
@@ -96,20 +128,38 @@ try {
   const caddy = path.join(dir, "Caddyfile");
   await writeFile(
     caddy,
-    `{\nadmin off\nauto_https disable_redirects\n}\nhttps://localhost:3443 {\ntls internal\nreverse_proxy host.docker.internal:${apiPort}\n}\nhttps://*.preview.localhost:3443 {\ntls internal\nreverse_proxy host.docker.internal:${previewPort}\n}\n`,
+    `{\nadmin off\nauto_https disable_redirects\n}\nhttps://localhost:${process.platform === "linux" ? httpsPort : 3443} {\ntls internal\nreverse_proxy ${process.platform === "linux" ? "127.0.0.1" : "host.docker.internal"}:${apiPort}\n}\nhttps://*.preview.localhost:${process.platform === "linux" ? httpsPort : 3443} {\ntls internal\nreverse_proxy ${process.platform === "linux" ? "127.0.0.1" : "host.docker.internal"}:${previewPort}\n}\n`,
   );
   await writeFile(
     override,
     JSON.stringify({
-      services: { caddy: { volumes: [caddy + ":/etc/caddy/Caddyfile:ro"] } },
+      services: {
+        postgres: { pull_policy: "never" },
+        caddy: {
+          pull_policy: "never",
+          volumes: [caddy + ":/etc/caddy/Caddyfile:ro"],
+        },
+      },
     }),
   );
   compose(["up", "-d", "--wait"]);
   composed = true;
+  if (managed) {
+    start("infra/storage/server.ts");
+    await expect
+      .poll(
+        async () =>
+          stat(managed.env.HARBOR_STORAGE_SOCKET)
+            .then((s) => s.isSocket())
+            .catch(() => false),
+        { timeout: 15000 },
+      )
+      .toBe(true);
+  }
   start("tests/fixtures/oidc/server.ts");
   await new Promise((r) => setTimeout(r, 300));
   start("apps/api/src/main.ts");
-  start("apps/supervisor/src/main.ts");
+  const supervisor = start("apps/supervisor/src/main.ts");
   await expect
     .poll(
       async () => {
@@ -141,6 +191,7 @@ try {
       );
     if (new URL(req.url()).pathname === "/__harbor/exchange") {
       const headers = req.headers();
+      ticketBody = req.postData() ?? "";
       exchangeTraffic.push({
         method: req.method(),
         origin: headers.origin,
@@ -201,9 +252,17 @@ try {
       scripts: { dev: "node server.mjs" },
     }),
   );
+  await mkdir(path.join(row.canonical_path, "node_modules"), {
+    recursive: true,
+  });
+  await cp(
+    await realpath(path.resolve("node_modules/ws")),
+    path.join(row.canonical_path, "node_modules/ws"),
+    { recursive: true },
+  );
   await writeFile(
     path.join(row.canonical_path, "server.mjs"),
-    `import http from 'node:http';\nconst server=http.createServer((req,res)=>{if(req.url==='/events'){res.writeHead(200,{'content-type':'text/event-stream'});res.write('data: preview event\\n\\n');return;}res.writeHead(200,{'content-type':'text/html'});res.end('<!doctype html><h1>Private application</h1><p id="event">waiting</p><script>new EventSource("/events").onmessage=e=>document.querySelector("#event").textContent=e.data</script>');});server.listen(Number(process.env.PORT),'127.0.0.1',()=>console.log('PREVIEW_READY'));\n`,
+    `import http from 'node:http';import {WebSocketServer} from 'ws';\nconst server=http.createServer((req,res)=>{if(req.url==='/headers'){res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({cookie:req.headers.cookie,names:Object.keys(req.headers)}));return;}if(req.url==='/events'){res.writeHead(200,{'content-type':'text/event-stream'});res.write('data: preview event\\n\\n');return;}res.writeHead(200,{'content-type':'text/html'});res.end('<!doctype html><h1>Private application</h1><p id="event">waiting</p><p id="socket">waiting</p><script>const socket=new WebSocket(location.origin.replace("https:","wss:")+"/socket");socket.onopen=()=>socket.send("preview websocket");socket.onmessage=e=>document.querySelector("#socket").textContent=e.data;new EventSource("/events").onmessage=e=>document.querySelector("#event").textContent=e.data</script>');});new WebSocketServer({server,perMessageDeflate:false}).on('connection',client=>client.on('message',(data,binary)=>client.send(data,{binary})));server.listen(Number(process.env.PORT),'127.0.0.1',()=>console.log('PREVIEW_READY'));\n`,
   );
   await page.reload();
   await page
@@ -239,6 +298,7 @@ try {
       )
     ).rows[0].n,
   ).toBe(1);
+  if (managed) await previewLinuxBoundary(db, p.id, artifacts);
   await page
     .getByRole("button", { name: "Prepare private access", exact: true })
     .click();
@@ -251,6 +311,7 @@ try {
     popup.getByRole("heading", { name: "Private application" }),
   ).toBeVisible({ timeout: 15000 });
   await expect(popup.locator("#event")).toHaveText("preview event");
+  await expect(popup.locator("#socket")).toHaveText("preview websocket");
   expect(new URL(popup.url()).hostname).toMatch(
     /^[a-f0-9]{32}\.preview\.localhost$/,
   );
@@ -277,6 +338,13 @@ try {
     path: path.join(artifacts, "preview-application.png"),
     fullPage: true,
   });
+  await previewAccess({
+    db,
+    url: popup.url(),
+    cookie: previewCookie!.value,
+    ownerOrigin: origin,
+    ticketBody,
+  });
   await page.getByRole("button", { name: "Stop preview", exact: true }).click();
   await expect
     .poll(
@@ -298,24 +366,66 @@ try {
   await expect(
     popup.getByText("Preview unavailable.", { exact: false }),
   ).toBeVisible();
-  await writeFile(
-    path.join(artifacts, "result.json"),
-    JSON.stringify(
-      {
-        status: "passed",
-        instance,
-        sourceAtStart,
-        sourceAtEnd: sourceDigest(),
-        node: process.version,
-        scope:
-          "Initial P011 real UI/API/PG/supervisor/relay lifecycle and separate-origin SSE; external OIDC/Codex fixtures. Full security/fault/Linux acceptance remains pending.",
-      },
-      null,
-      2,
-    ),
-  );
-  console.log("P011 initial real-stack result: " + artifacts);
+  await previewLifecycle({
+    db,
+    context,
+    origin,
+    csrf: me.csrfToken,
+    supervisor,
+    previewId: p.id,
+  });
+  if (managed)
+    await previewDerivedLinux({
+      db,
+      context,
+      origin,
+      csrf: me.csrfToken,
+      workspace,
+      port: appPort,
+      artifacts,
+    });
+  await previewFaults({
+    db,
+    context,
+    origin,
+    csrf: me.csrfToken,
+    previewId: p.id,
+    supervisor,
+    restartSupervisor: () => start("apps/supervisor/src/main.ts"),
+    artifacts,
+  });
+  passed = true;
 } catch (error) {
+  const quotaUsage =
+    managed && db
+      ? await db
+          .query(
+            "SELECT id,root_id,relative_path FROM projects ORDER BY id LIMIT 20",
+          )
+          .then(async (result) =>
+            Promise.all(
+              result.rows.map(async (project) => ({
+                projectId: project.id,
+                storage: await inspectManagedStorage(
+                  project.root_id,
+                  project.relative_path,
+                ).catch(() => ({ status: "unavailable" })),
+              })),
+            ),
+          )
+          .catch(() => [])
+      : [];
+  const freeSpace = managed
+    ? await Promise.all(
+        [managed.base, managed.control].map(async (target) => {
+          const s = await statfs(target);
+          return {
+            availableBytes: s.bavail * s.bsize,
+            availableInodes: s.ffree,
+          };
+        }),
+      ).catch(() => [])
+    : [];
   const state = db
     ? await db
         .query("SELECT id,state,retired,failure_code,generation FROM previews")
@@ -352,6 +462,14 @@ try {
         sourceAtEnd: sourceDigest(),
         error: String(error),
         state,
+        quotaProfile: managed
+          ? {
+              bytes: managed.profile.blockHardLimitBytes,
+              inodes: managed.profile.inodeHardLimit,
+            }
+          : null,
+        quotaUsage,
+        freeSpace,
         logs,
         exchangeTraffic,
         diagnostics: diagnostics.replaceAll(password, "[redacted]"),
@@ -376,7 +494,54 @@ try {
           resolve();
         });
       });
+  if (managed && db) {
+    for (const p of (
+      await db.query("SELECT id,project_id,generation,port FROM previews")
+    ).rows) {
+      if (Number(p.generation) > 0)
+        await retireRelay({
+          id: p.id,
+          generation: Number(p.generation),
+          port: p.port,
+          instanceId: instance,
+        });
+      await retireRuntimeIdentity({
+        projectId: p.project_id,
+        sessionId: "preview-" + p.id,
+        instanceId: instance,
+      });
+    }
+  }
   await db?.end();
   if (composed) compose(["down", "-v", "--remove-orphans"]);
   await rm(dir, { recursive: true, force: true });
+  if (managed) await managed.cleanup();
+}
+if (passed) {
+  await writeFile(
+    path.join(artifacts, "result.json"),
+    JSON.stringify(
+      {
+        status: "passed",
+        instance,
+        sourceAtStart,
+        sourceAtEnd: sourceDigest(),
+        node: process.version,
+        cleanupConfirmed: true,
+        managedLinux: !!managed,
+        quotaProfile: managed
+          ? {
+              bytes: managed.profile.blockHardLimitBytes,
+              inodes: managed.profile.inodeHardLimit,
+            }
+          : null,
+        scope: managed
+          ? "Actual Linux UI/API/PG/supervisor/native Codex preview and fixed relay on XFS; external OIDC only; broader hostile-isolation/installed acceptance pending"
+          : "Real UI/API/PG/supervisor/relay lifecycle, maintenance, rollback-only metadata rebind, framing/credential/idle-stream authority checks; external OIDC/Codex fixtures; full fault/Linux acceptance pending",
+      },
+      null,
+      2,
+    ),
+  );
+  console.log("P011 real-stack result: " + artifacts);
 }

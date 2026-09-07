@@ -185,6 +185,14 @@ async function exchange(
         ],
       )
     ).rows[0];
+    await requireAuthority(db, initial.actor_hash, c);
+    const now = (await db.query("SELECT clock_timestamp() AS now")).rows[0].now;
+    if (
+      res.destroyed ||
+      new Date(row.expires_at).getTime() <= new Date(now).getTime() ||
+      new Date(opening.expires_at).getTime() <= new Date(now).getTime()
+    )
+      throw Error("Preview exchange authority expired during persistence");
     return { grant: secrets.grant, expires: new Date(row.expires_at) };
   });
   if (res.destroyed) return;
@@ -314,7 +322,7 @@ export async function startPreviewGateway(pool: Pool, c: Config) {
         const id = randomUUID();
         let count = 0,
           headed = false;
-        const timer = setTimeout(fail, 30000);
+        let timer = setTimeout(fail, 30000);
         broker = new BrokerConnection(
           c,
           hostname,
@@ -347,7 +355,8 @@ export async function startPreviewGateway(pool: Pool, c: Config) {
               }
               if (frame.streaming) {
                 clearTimeout(timer);
-                setTimeout(fail, 15 * 60000).unref();
+                timer = setTimeout(fail, 15 * 60000);
+                timer.unref();
               }
               res.writeHead(frame.status, out);
             } else if (frame.type === "data") {

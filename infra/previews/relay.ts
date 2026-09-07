@@ -174,11 +174,7 @@ function dispatch(f: RelayInput) {
   if (f.type === "websocket") {
     const path = requestPath(f.path),
       headers = requestHeaders(f.headers, port);
-    if (
-      f.headers.some(([k]) =>
-          /^sec-websocket-protocol$/i.test(k),
-      )
-    )
+    if (f.headers.some(([k]) => /^sec-websocket-protocol$/i.test(k)))
       throw Error("Unsupported WebSocket extension");
     const c = open(f.id);
     stream(f.id, c);

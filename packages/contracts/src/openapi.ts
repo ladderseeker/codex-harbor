@@ -87,7 +87,7 @@ export const publicSchemas = {
     writerGeneration: { type: ["integer", "null"] },
     writerKind: {
       type: ["string", "null"],
-      enum: ["conversation", "file", "terminal", null],
+      enum: ["conversation", "file", "terminal", "preview", "extension", null],
     },
     writerOwnerId: { type: ["string", "null"] },
     writerEpoch: { type: "integer", minimum: 0 },

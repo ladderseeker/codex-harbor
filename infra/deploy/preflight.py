@@ -1,6 +1,6 @@
 """Admission checks use fixed Linux tools and administrator-owned manifests."""
 
-import os, sys, json, platform, shutil, importlib.util, stat
+import os, sys, json, platform, shutil, importlib.util, stat, secrets
 from common import run
 from config import trusted, layout
 from artifact import verify
@@ -15,7 +15,7 @@ def preflight(c, release):
     ):
         raise ValueError("Fixture configuration forbidden in installed services")
     m = verify(release)
-    if set(m["images"]) != {"postgres", "caddy", "runner", "gateway", "git", "files"}:
+    if set(m["images"]) != {"postgres", "caddy", "runner", "gateway", "git", "files", "previewRelay"}:
         raise ValueError("Complete installed image registry required")
     if m.get("terminalSeccomp") != m["files"]["infra/runner/seccomp-terminal.json"]["sha256"]:
         raise ValueError("Terminal confinement manifest missing")
@@ -48,6 +48,21 @@ def preflight(c, release):
             or installed["Architecture"] != image["architecture"]
         ):
             raise ValueError("Exact release image unavailable: " + role)
+    if c.get("previews"):
+        preview = c["previews"]
+        hostname = secrets.token_hex(16) + "." + preview["domain"]
+        # Fixed administrator-only tools, bounded externally; no project DNS or
+        # private key bytes enter logs or command arguments.
+        if not run(["getent", "ahosts", hostname], timeout=10).strip():
+            raise ValueError("Wildcard preview DNS is unavailable")
+        run(["openssl", "x509", "-in", preview["certificate"], "-noout", "-checkend", "86400"], timeout=5)
+        result = run(["openssl", "x509", "-in", preview["certificate"], "-noout", "-checkhost", hostname], timeout=5)
+        if "does match certificate" not in result:
+            raise ValueError("Preview wildcard certificate does not match")
+        public = run(["openssl", "x509", "-in", preview["certificate"], "-pubkey", "-noout"], timeout=5)
+        paired = run(["openssl", "pkey", "-in", preview["key"], "-pubout", "-passin", "pass:"], timeout=5)
+        if public != paired:
+            raise ValueError("Preview certificate key mismatch")
     sys.dont_write_bytecode = True
     spec = importlib.util.spec_from_file_location(
         "harbor_quota", release + "/infra/storage/quota.py"

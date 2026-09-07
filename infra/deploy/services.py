@@ -72,6 +72,13 @@ def environment(c, release, role):
         values["HARBOR_OIDC_CLIENT_SECRET"] = open(c["oidcSecretFile"]).read().strip()
     if c.get("extraCaFile"):
         values["NODE_EXTRA_CA_CERTS"] = p["etc"] + "/issuer-ca.pem"
+    if c.get("previews"):
+        values.update({
+            "HARBOR_PREVIEW_DOMAIN": c["previews"]["domain"],
+            "HARBOR_PREVIEW_PORT": str(c["previews"]["port"]),
+            "HARBOR_PREVIEW_HTTPS_PORT": "443",
+            "HARBOR_PREVIEW_SOCKET": p["run"] + "/previews.sock",
+        })
     if role != "api":
         values.update(
             {
@@ -237,6 +244,12 @@ def write(c, release):
         + str(c["apiPort"])
         + "\n}\n"
     )
+    if c.get("previews"):
+        preview = c["previews"]
+        for field, filename in [("certificate", "preview-certificate.pem"), ("key", "preview-private.key")]:
+            text(p["etc"] + "/" + filename, open(preview[field]).read(), 0o400, 10005, 10005)
+            compose["services"]["caddy"]["volumes"].append(p["etc"] + "/" + filename + ":/etc/caddy/" + filename + ":ro")
+        caddy += "https://*." + preview["domain"] + " {\n  tls /etc/caddy/preview-certificate.pem /etc/caddy/preview-private.key\n  reverse_proxy 127.0.0.1:" + str(preview["port"]) + "\n}\n"
     text(p["etc"] + "/Caddyfile", caddy, 0o444)
     atomic(p["etc"] + "/compose.json", compose)
     for role in ["api", "supervisor", "storage"]:

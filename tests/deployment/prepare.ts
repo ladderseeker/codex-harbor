@@ -4,7 +4,10 @@ import { writeFile, chmod } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:net";
-const fixture = await xfsFixture();
+const previews = process.env.HARBOR_DEPLOY_TEST_PREVIEWS === "1";
+const fixture = await xfsFixture(
+  previews ? { blockHardLimitBytes: 134217728, inodeHardLimit: 1024 } : {},
+);
 const freePort = async () => {
   const server = createServer();
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -52,7 +55,42 @@ await writeFile(control + "/known-hosts", "", { mode: 0o600 });
 await writeFile(control + "/restic-password", randomUUID() + randomUUID(), {
   mode: 0o600,
 });
+if (previews) {
+  execFileSync(
+    "openssl",
+    [
+      "req",
+      "-x509",
+      "-newkey",
+      "rsa:2048",
+      "-nodes",
+      "-keyout",
+      control + "/preview.key",
+      "-out",
+      control + "/preview.crt",
+      "-days",
+      "2",
+      "-subj",
+      "/CN=*.preview.localhost",
+      "-addext",
+      "subjectAltName=DNS:*.preview.localhost",
+    ],
+    { stdio: "ignore" },
+  );
+  for (const file of ["preview.key", "preview.crt"])
+    await chmod(control + "/" + file, 0o600);
+}
 const c = {
+  ...(previews
+    ? {
+        previews: {
+          domain: "preview.localhost",
+          port: await freePort(),
+          certificate: control + "/preview.crt",
+          key: control + "/preview.key",
+        },
+      }
+    : {}),
   instance: id,
   origin: `https://localhost:${httpsPort}`,
   oidcIssuer: `https://127.0.0.1:${oidcPort}`,
@@ -98,6 +136,16 @@ await writeFile(
 );
 console.log(
   JSON.stringify({
+    ...(previews
+      ? {
+          previews: {
+            domain: "preview.localhost",
+            port: await freePort(),
+            certificate: control + "/preview.crt",
+            key: control + "/preview.key",
+          },
+        }
+      : {}),
     instance: id,
     config: control + "/deployment.json",
     control,

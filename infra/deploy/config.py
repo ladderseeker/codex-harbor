@@ -59,6 +59,7 @@ def load(path):
         "dnsProfile",
         "extraCaFile",
         "gitAuthor",
+        "previews",
     }
     if set(c) - required - optional or required - set(c):
         raise ValueError("Invalid deployment configuration fields")
@@ -90,6 +91,20 @@ def load(path):
             raise ValueError("Invalid private service port")
     if c["apiPort"] == c["databasePort"]:
         raise ValueError("Private service ports conflict")
+    if "previews" in c:
+        preview = c["previews"]
+        if not isinstance(preview, dict) or set(preview) != {"domain", "port", "certificate", "key"}:
+            raise ValueError("Fixed private preview profile required")
+        domain = preview["domain"]
+        if not isinstance(domain, str) or len(domain) > 220 or not re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}", domain):
+            raise ValueError("Canonical preview DNS suffix required")
+        origin_host = urllib.parse.urlsplit(c["origin"]).hostname
+        if origin_host == domain or origin_host.endswith("." + domain):
+            raise ValueError("Preview origin must be separate from Harbor")
+        if type(preview["port"]) is not int or not 1024 <= preview["port"] <= 65535 or preview["port"] in {c["apiPort"], c["databasePort"]}:
+            raise ValueError("Distinct private preview listener required")
+        trusted(preview["certificate"], file=True)
+        trusted(preview["key"], private=True, file=True)
     if "gitAuthor" in c:
         author = c["gitAuthor"]
         if not isinstance(author, dict) or set(author) != {"name", "email"} or not re.fullmatch(r"[^<>\r\n\x00]{1,120}", author.get("name", "")) or not re.fullmatch(r"[^<>\s\x00]{1,200}@[^<>\s\x00]{1,200}", author.get("email", "")):

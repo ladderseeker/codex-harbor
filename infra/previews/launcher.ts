@@ -208,8 +208,13 @@ export async function launchRelay(c: RelayIdentity, fixture = false) {
         });
       },
     );
-    await relay.ready;
-    return relay;
+    try {
+      await relay.ready;
+      return relay;
+    } catch (error) {
+      await relay.close();
+      throw error;
+    }
   }
   const runnerName = `harbor-${c.instanceId}-preview-${c.id}-${c.generation}`;
   const runner = JSON.parse(
@@ -269,16 +274,24 @@ export async function launchRelay(c: RelayIdentity, fixture = false) {
   const id = (
     await exec("docker", args, { env: env(), timeout: 15000, maxBuffer: 4096 })
   ).stdout.trim();
-  if (!/^[a-f0-9]{64}$/.test(id)) throw Error("Relay identity unavailable");
-  const created = await inspectExact(c);
-  if (
-    created?.Id !== id ||
-    created.HostConfig.NetworkMode !== "container:" + runner.Id ||
-    created.Mounts.length ||
-    created.HostConfig.PidMode ||
-    created.HostConfig.Privileged
-  )
-    throw Error("Relay confinement mismatch");
+  if (!/^[a-f0-9]{64}$/.test(id)) {
+    await retireRelay(c);
+    throw Error("Relay identity unavailable");
+  }
+  try {
+    const created = await inspectExact(c);
+    if (
+      created?.Id !== id ||
+      created.HostConfig.NetworkMode !== "container:" + runner.Id ||
+      created.Mounts.length ||
+      created.HostConfig.PidMode ||
+      created.HostConfig.Privileged
+    )
+      throw Error("Relay confinement mismatch");
+  } catch (error) {
+    await retireRelay(c);
+    throw error;
+  }
   const child = spawn("docker", ["start", "--attach", "--interactive", id], {
     env: env(),
     stdio: "pipe",
