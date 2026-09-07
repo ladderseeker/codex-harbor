@@ -46,7 +46,7 @@ The implemented workflow and commands are documented in [Managed project workspa
 
 ## Source issues
 
-[Created workspace validation identity](../../issues/2026-09-08-035221-workspace-validation-identity.md) remains High and In progress for the P008 worker root handoff. The shared caller/common correction has passed independent review, actual managed Linux creation/use and installed file/terminal acceptance. Direct helper evidence was not substituted for that application-level handoff.
+[Created workspace validation identity](../../issues/archive/2026-09-08-035221-workspace-validation-identity.md) is High and Resolved. Root `e1b754a` includes both the shared caller/common correction and P008 worker handoff. Independent review, actual managed Linux creation/use, installed file/terminal acceptance and subsequent scheduling integration passed on their recorded sources. Direct helper evidence was not substituted for that application-level handoff.
 
 [Workspace quota import](../../issues/archive/2026-09-08-031857-workspace-quota-import.md) is Resolved. The guarded import passed independently reviewed actual Linux workspace/full file and installed acceptance on production `f13afc57…ad1d27`. Earlier failures remain historical evidence; live and the separately tracked worker integration gate remain open.
 

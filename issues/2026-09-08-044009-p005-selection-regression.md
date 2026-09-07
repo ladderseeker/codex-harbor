@@ -1,8 +1,8 @@
 # Attachment draft sequence intermittently fails to reach its expected state
 
 - Severity: Medium
-- Status: In progress
-- Owner: Regression maintainer; P008 implementer investigating the observed run
+- Status: Open
+- Owner: Regression maintainer
 - Affected files: `tests/e2e/p005.ts`, `apps/web/src/Attachments.tsx`, draft-loading and attachment request boundaries; production cause unestablished
 - Acceptance: [P005-01/05](../design/proposals/005-attachments-and-rich-input.md#independent-acceptance), critical regression gate
 
@@ -25,3 +25,5 @@ Retain each original result and inspect the diagnostic if the symptom recurs; do
 Integrated run `8405f19db0` failed before selection because the visible Attach control remained disabled during the unchanged five-second wait. Run `250f0fb20a` passed readiness and selection but failed the subsequent unchanged draft-saved wait before reload. Neither prior diagnostic catch covered its full failing phase; both original results remain retained. The diagnostic now covers the complete load/readiness/selection/draft-save/reload sequence, preserves the first failure and records its phase without changing assertions, timeouts or mutations.
 
 Critical `177ce1a3c3` passed on Node 24.11.1 at exact source `ad4517f57745bb18accd7c870767acbc22335794d02fb49a1f346e3609df7c09` /998 files; production bytes match the integrated P008 feature checkpoint. Independent review accepted the bounded diagnostic and result. Later phase-label-only refinement is separately type-checked. The passing run does not establish the earlier causes; keep this observation Open after the final diagnostic integrates rather than repeating broad suites solely for an uncaptured failure.
+
+The reviewed diagnostic is committed in `9f3b414` and integrated in root `e1b754a`; merged-source Node 24 checks passed. Diagnosis remains open. Inspect the bounded first-phase evidence if the symptom recurs during required work; no production correction or historical cause is claimed.

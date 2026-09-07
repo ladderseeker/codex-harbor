@@ -7,7 +7,7 @@
 
 ## Source issues
 
-- [Created workspace validation identity](../../issues/2026-09-08-035221-workspace-validation-identity.md): High, In progress across P003/P008/P009. The shared caller/common correction and actual managed file/Git acceptance passed; the remaining action is the corresponding P008 worker root integration.
+- [Created workspace validation identity](../../issues/archive/2026-09-08-035221-workspace-validation-identity.md): High, Resolved across P003/P008/P009. Shared caller/common validation and the corresponding P008 worker correction are integrated in `e1b754a`; actual managed file/Git, installed module and scheduling evidence passed with independent review.
 - [P004 implementation review](../../issues/2026-09-08-012652-p004-implementation-review.md): High, Blocked for required fresh-host protected restore/authority evidence under P009-04. Two feature rounds and module source/evidence review closed the code corrections and installed writer/inventory/drain/local rebind scope.
 
 ## Scope and user/API flow

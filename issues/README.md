@@ -4,14 +4,12 @@ Use this index and the [issue archive](archive/README.md) to find existing findi
 
 ## Active issues
 
-The archive contains resolved P001/P003/P005/P007/P009 review findings, authority and retention corrections, allocation detection/reconciliation, and the P002/P005 harness corrections. Current feature/integration reviews, installed deployment/workspace defects, P005/P007 regression observations, live-account and backup-transfer blockers, and gateway availability remain active. The earlier runtime finding remains Transferred with partial local evidence below.
+The archive contains resolved source-review findings, installed web/workspace corrections, authority and retention corrections, allocation detection/reconciliation, and the P002/P005 harness corrections. Current P010 integration, P004/P006 restore obligations, P005/P007 regression observations, live-account and backup-transfer blockers, and gateway availability remain active. The earlier runtime finding remains Transferred with partial local evidence below.
 
 | Issue | Severity | Status | Owner | Next action |
 | --- | --- | --- | --- | --- |
 | [P010 artifact link boundary](2026-09-08-045236-p010-artifact-link-boundary.md) | Medium | In progress | P010 | Exact-parent containment correction and independent hostile-archive checks passed; record committed P010 integration before archiving. |
-| [P008 implementation review](2026-09-08-044007-p008-implementation-review.md) | High | In progress | P008 | Two corrective source/feature rounds closed; record committed correction and independent regression-evidence review. |
-| [P005 attachment draft regression](2026-09-08-044009-p005-selection-regression.md) | Medium | In progress | Regression maintainer | Bounded diagnostics and critical evidence independently reviewed; integrate the diagnostic and retain the unexplained failures for investigation on recurrence. |
-| [Created workspace identity](2026-09-08-035221-workspace-validation-identity.md) | High | In progress | P003/P009; P008 worker | Shared caller/common correction and managed/installed acceptance passed; finish the reviewed P008 worker integration and metadata bridge evidence. |
+| [P005 attachment draft regression](2026-09-08-044009-p005-selection-regression.md) | Medium | Open | Regression maintainer | Reviewed bounded diagnostics integrated in e1b754a; inspect them on recurrence to establish the unexplained failing phase and cause. |
 | [P007 regression evidence](2026-09-08-020429-p007-regression-evidence.md) | Medium | Open | Regression maintainer | Original-error/cleanup diagnostics are reviewed and a full critical run passed; inspect them on recurrence to establish the earlier409 cause. |
 | [P004 implementation review](2026-09-08-012652-p004-implementation-review.md) | High | Blocked | P004/P009 | Feature and installed module scope passed; obtain required protected fresh-host restore/authority evidence under P009-04. |
 | [P006 implementation review](2026-09-08-005028-p006-implementation-review.md) | High | Blocked | P006/P009 | Terminal and installed module scope passed; obtain required protected fresh-host restore/authority evidence under P009-04. |
