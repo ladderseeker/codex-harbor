@@ -19,6 +19,7 @@ This directory describes available behavior, developer workflows, and completed 
 - [Issue index](../issues/README.md): active findings, work transferred to proposals, and archived records.
 - [Expanded design review](reports/2026-09-07-design-review.md): completed independent review rounds, documentation checks, and remaining runtime validation.
 - [Proposal and issue lifecycle review](reports/2026-09-07-proposal-issue-lifecycle.md): lifecycle rules, archive migration, and documentation verification.
+- [Integration stash reconciliation](reports/2026-09-08-stash-reconciliation.md): accounting for temporary P004/P009 snapshots and their recoverable cleanup.
 - [P001 foundation verification](reports/2026-09-07-p001-foundation.md): delivered behavior, source/artifact identity, four review rounds, passing checks, and remaining gates.
 - [P005 workspace/history integration](reports/2026-09-07-p005-integration.md): combined Node 24 application/workspace acceptance and inherited actual Linux publication evidence.
 - [P005 attachment checkpoint](reports/2026-09-07-p005-attachments.md): rich drafts/uploads, real Linux publication evidence, review fixes and the blocked live-account gate.
