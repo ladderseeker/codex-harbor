@@ -13,6 +13,8 @@ Cover all delivered module state through a backup registry: PostgreSQL, native C
 
 ## Source issues
 
+- [Workspace quota import](../../issues/2026-09-08-031857-workspace-quota-import.md): High, In progress with P003. The cumulative installed validator cannot load quota definitions after the guarded-dispatcher change. P009-01 requires the corrected Linux workspace/file path and matching independent review.
+- [Installed web assets](../../issues/2026-09-08-031032-p009-installed-web-assets.md): High, In progress. Fresh installed browser acceptance exposed omitted `apps/web/dist/` content despite passing backend readiness. P009-01 requires corrected immutable packaging, actual installed browser/assets and independent review; the earlier administrator evidence does not close this new finding.
 - [P009 implementation review](../../issues/archive/2026-09-08-005028-p009-implementation-review.md): High, Resolved on 2026-09-08. Two baseline rounds and the separate enrollment/SSH correction review closed with available local/Linux evidence. Installed administrator recovery and inventory checks passed; later-module integration and blocked protected transfer/live gates remain separate obligations.
 
 - [Codex runtime compatibility finding](../../issues/archive/2026-09-07-073831-codex-runtime-compatibility.md): Medium severity; transferred on 2026-09-07, not resolved. P009 owns target-host kernel/container prerequisites, deployed account/runtime capabilities, real isolation, and release/restore readiness. These map to **P009-01/02/04/06/07**, the [Release and recovery contract](#release-and-recovery-contract), and [Delivery and verification](#delivery-and-verification).
