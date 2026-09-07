@@ -2,10 +2,10 @@
 
 - Severity: High
 - Status: In progress
-- Owner: [P002](../design/proposals/002-programmatic-api-access.md); [P007](../design/proposals/007-session-history-and-recovery.md) owns its recovery-path integration
+- Owner: [P002](../design/proposals/002-programmatic-api-access.md); [P003](../design/proposals/003-parallel-project-workspaces.md) and [P007](../design/proposals/007-session-history-and-recovery.md) own their resource/recovery-path integrations
 - Recorded: 2026-09-07
 - Affected files: packages/policy/src/authority.ts; browser/recovery authority queries using the same locking pattern
-- Acceptance: P002-03/05; P007-04/06 and inherited browser expiry/dispatch guarantees
+- Acceptance: P002-03/05; P003-05; P007-04/06 and inherited browser expiry/dispatch guarantees
 
 ## Evidence and reproduction
 

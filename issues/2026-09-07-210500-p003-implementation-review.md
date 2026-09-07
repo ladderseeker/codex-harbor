@@ -22,3 +22,11 @@ The reviewer found no additional actionable defect in the reviewed Git import, m
 ## Disposition
 
 The implementer accepted this batch and is adding focused interruption and bounded-retry regressions before repeating the affected application and actual Linux checks. A separate reviewer will evaluate the corrected source and evidence. P003 remains In progress; record the final source identity, commands, environment, outcomes, and review rounds before resolution and archival. The [dedicated live-account gate](2026-09-07-171225-live-runtime-credentials.md) remains independently open.
+
+## Round 2 — 7 September 2026
+
+The reviewer confirmed the three original corrections at source digest `3bf651d8899e101852c457ed40a27133caf58e575322006163e8e0270c461449` (822 files). Node 24 checks, 28 contract/integration tests, real P003 E2E `harbor-workspaces-f648acc433`, and the actual Linux artifact `p003-review1-linux-result.json` passed with matching source identities. Transport tests rejected a truncated reply in 17 ms and a slow response at the configured 100 ms total deadline in 104 ms. Actual partial-removal/SIGKILL recovery retained pending metadata ownership and completed the same recorded operation without removing neighboring files.
+
+One related High durability finding remains. Creation/removal can publish and fsync a completed receipt on the separate control filesystem before flushing the corresponding project-filesystem changes. Host or power loss may therefore recover the receipt ahead of those files, after which retry skips cleanup. This is a source-only ordering finding; the process-SIGKILL results above do not establish host-crash durability.
+
+Add a trusted filesystem durability barrier before completion publication, covering creation, Git metadata, removal and abandoned-stage cleanup. Failed or incomplete flush must retain reconciliation state. Verify the actual Linux path and error handling, then independently review the bounded correction. The shared authority integration and live-account gates remain separate.

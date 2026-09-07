@@ -7,6 +7,7 @@ The architecture is the implementation baseline; P001/P002 are Accepted and Impl
 - [D002 — Registered mount authority](decisions/002-registered-mount-authority.md): trusted ancestry, disjoint projects, and descriptor-relative operations; local/Linux checks passed.
 - [D003 — Quota-backed project storage](decisions/003-quota-backed-project-storage.md): trusted XFS allocation, runner access, and persistent hard limits; actual Linux checks passed.
 - [D004 — Protected runtime credentials](decisions/004-protected-runtime-credentials.md): supervisor-owned discovery and encrypted onboarding; fixture/cleanup checks passed, live-account gate pending.
+- [D006 — Portable releases and a fenced host restore](decisions/006-portable-release-and-restore.md): accepted deployment/backup/restore design in progress; packaging commands and fresh-host evidence remain pending in P009.
 - [Active proposals](proposals/README.md): complete user outcomes, dependencies, acceptance criteria, and implementation status.
 - [Proposal archive](proposals/archive/README.md): completed, superseded, or withdrawn proposals; currently empty.
 - [Proposal template](proposal-template.md): the required structure for a new or revised feature proposal.
