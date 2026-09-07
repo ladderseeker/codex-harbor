@@ -54,7 +54,7 @@ export type Intent = {
   body: unknown;
   key: string;
   label: string;
-  method?: "POST" | "DELETE";
+  method?: "POST" | "DELETE" | "PATCH";
 };
 export const newIntent = (
   path: string,

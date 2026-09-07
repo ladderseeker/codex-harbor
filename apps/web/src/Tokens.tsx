@@ -160,6 +160,8 @@ export function Tokens({
               "terminal:read",
               "terminal:control",
               "terminal:terminate",
+              "previews:read",
+              "previews:manage",
             ].map((scope) => (
               <label key={scope}>
                 <input

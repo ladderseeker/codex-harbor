@@ -1,4 +1,5 @@
 import { filePaths, fileSchemas } from "./files-openapi.ts";
+import { previewPaths, previewSchemas } from "./previews-openapi.ts";
 import {
   terminalCreate,
   terminalControl,
@@ -20,6 +21,7 @@ const object = (
 const array = (items: unknown) => ({ type: "array", items });
 export const publicSchemas = {
   ...fileSchemas,
+  ...previewSchemas,
   Error: object({
     error: object({
       code: string,
@@ -358,6 +360,7 @@ const paths: Record<string, any> = {
     ),
   },
   ...filePaths,
+  ...previewPaths,
   "/history": {
     get: {
       ...read(

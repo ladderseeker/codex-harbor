@@ -7,6 +7,7 @@ import { Files } from "./Files.tsx";
 import { History, ConversationDetails } from "./History.tsx";
 import { Recovery } from "./Recovery.tsx";
 import { Terminals } from "./Terminals.tsx";
+import { Previews } from "./Previews.tsx";
 import { Tokens } from "./Tokens.tsx";
 import {
   useCallback,
@@ -167,6 +168,7 @@ export function App() {
     };
   }, [projectId, snapshot?.session.state]);
   const [filesOpen, setFilesOpen] = useState(false);
+  const [previewWorkspace, setPreviewWorkspace] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expired, setExpired] = useState(false);
@@ -775,6 +777,13 @@ export function App() {
               onClick={() => setTerminalWorkspace(newWorkspaceId)}
             >
               Open terminals
+            </button>
+            <button
+              className="quiet-button"
+              disabled={!newWorkspaceId}
+              onClick={() => setPreviewWorkspace(newWorkspaceId)}
+            >
+              Project previews
             </button>
             {workspaceData.error && (
               <p className="inline-error">{workspaceData.error}</p>
@@ -1467,6 +1476,29 @@ export function App() {
                 )!
               }
               csrf={identity.csrfToken}
+              execute={execute}
+              disabled={blocked}
+            />
+          </Modal>
+        )}
+      {previewWorkspace &&
+        identity &&
+        workspaceData.workspaces.find((w) => w.id === previewWorkspace) && (
+          <Modal
+            title="Private project previews"
+            failure={error}
+            retry={
+              pending
+                ? () => void execute(pending.intent, pending.complete)
+                : undefined
+            }
+            close={() => setPreviewWorkspace("")}
+          >
+            <Previews
+              key={previewWorkspace}
+              workspace={
+                workspaceData.workspaces.find((w) => w.id === previewWorkspace)!
+              }
               execute={execute}
               disabled={blocked}
             />

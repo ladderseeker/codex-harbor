@@ -1,3 +1,7 @@
+if (process.argv.includes("--previews")) {
+  await import("../previews/e2e.ts");
+  process.exit(process.exitCode ?? 0);
+}
 if (process.argv.includes("--terminals")) {
   await import("../terminals/e2e.ts");
   process.exit(process.exitCode ?? 0);

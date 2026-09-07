@@ -8,7 +8,7 @@ import {
 } from "./index.js";
 import { launchRunner } from "../../../infra/runner/launcher.js";
 export type RuntimeConfig = RuntimeCallbacks & {
-  purpose?: "conversation" | "terminal";
+  purpose?: "conversation" | "terminal" | "preview";
   attachmentProject?: import("../../../infra/storage/admission.ts").NativeStorage;
   attachmentDirectory?: import("../../../infra/storage/admission.ts").NativeStorage;
   onTransport?: (adapter: CodexAdapter) => void;
@@ -44,7 +44,7 @@ export async function createRuntime(
         ]
       : ["/workspace"],
     config.purpose,
-    !config.fixture && config.purpose === "terminal",
+    !config.fixture && ["terminal", "preview"].includes(config.purpose ?? ""),
   );
   try {
     config.onTransport?.(adapter);
@@ -64,22 +64,26 @@ function fixtureProcess(config: RuntimeConfig) {
   if (!/^[a-zA-Z0-9_-]{1,64}$/.test(config.sessionId))
     throw Error("Invalid fixture identity");
   const terminal = config.purpose === "terminal";
+  const preview = config.purpose === "preview";
   const child = spawn(
-    terminal ? "python3" : process.execPath,
+    terminal || preview ? "python3" : process.execPath,
     [
       fileURLToPath(
         new URL(
-          terminal
-            ? "../../../tests/fixtures/codex/terminal.py"
-            : "../../../tests/fixtures/codex/server.mjs",
+          preview
+            ? "../../../tests/fixtures/codex/preview.py"
+            : terminal
+              ? "../../../tests/fixtures/codex/terminal.py"
+              : "../../../tests/fixtures/codex/server.mjs",
           import.meta.url,
         ),
       ),
     ],
     {
-      stdio: terminal
-        ? ["pipe", "pipe", "pipe"]
-        : ["pipe", "pipe", "pipe", "ipc"],
+      stdio:
+        terminal || preview
+          ? ["pipe", "pipe", "pipe"]
+          : ["pipe", "pipe", "pipe", "ipc"],
       env: {
         PATH: process.env.PATH,
         NODE_ENV: "test",

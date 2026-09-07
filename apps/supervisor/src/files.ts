@@ -264,7 +264,7 @@ export async function processFiles(
           row.kind !== "save" &&
           (
             await db.query(
-              "SELECT 1 FROM workspaces WHERE project_id=$1 AND writer_owner_id IS NOT NULL LIMIT 1",
+              "SELECT 1 FROM workspaces WHERE project_id=$1 AND writer_owner_id IS NOT NULL UNION ALL SELECT 1 FROM preview_readers r JOIN workspaces w ON w.id=r.workspace_id WHERE w.project_id=$1 LIMIT 1",
               [w.project_id],
             )
           ).rowCount

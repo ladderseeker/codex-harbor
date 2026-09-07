@@ -1,7 +1,7 @@
 # P011 — Private project previews
 
 - Decision: Accepted
-- Delivery: Planned
+- Delivery: In progress
 - Dependencies: [P003](003-parallel-project-workspaces.md)
 - Outcome: The owner starts a project's application and views it through an authenticated preview without exposing an arbitrary VPS port.
 
@@ -13,7 +13,7 @@ The initial feature supports ordinary project HTTP applications and explicitly t
 
 ## Contracts and security
 
-[D007 — Separate project-preview origins and a confined runner connection](../decisions/007-confined-project-preview-origins.md) is the accepted implementation boundary after independent design review. It owns unique origins, the body-only browser grant exchange, a fixed loopback relay over the exact no-egress runner namespace, and reader/exclusive-writer lifetime rules. It does not weaken D001, the stable Harbor CSP, or the public workspace-management gate. Delivery remains Planned until implementation begins.
+[D007 — Separate project-preview origins and a confined runner connection](../decisions/007-confined-project-preview-origins.md) is the accepted implementation boundary after independent design review. It owns unique origins, the body-only browser grant exchange, a fixed loopback relay over the exact no-egress runner namespace, and reader/exclusive-writer lifetime rules. It does not weaken D001, the stable Harbor CSP, or the public workspace-management gate. Implementation began on 8 September 2026 in an isolated worktree; acceptance remains pending.
 
 Store preview ID, workspace/runtime generation, permitted internal destination, lifecycle, process ownership, access grant, and expiry. Creation is an authenticated durable operation; stopping a preview confirms process/proxy termination and does not cancel an unrelated conversation implicitly.
 
@@ -55,7 +55,7 @@ Use delivered P003 with a small real HTTP fixture application, hostile-script va
 
 ## Delivery and verification
 
-The [account-free headless-command spike](../../docs/reports/2026-09-08-p011-protocol-spike.md) passed on Codex 0.153.4/Node 24.11.1/macOS. A zero-byte `command/exec/write` acknowledges the exact connection-scoped command identity and rejects unstarted/wrong/exited IDs. This supplies a candidate native identity check for the existing startup contract; it does not replace exact runner/relay checks, completed-generation denial or HTTP readiness. Delivery remains Planned until the complete feature implementation begins.
+The [account-free headless-command spike](../../docs/reports/2026-09-08-p011-protocol-spike.md) passed on Codex 0.153.4/Node 24.11.1/macOS. A zero-byte `command/exec/write` acknowledges the exact connection-scoped command identity and rejects unstarted/wrong/exited IDs. This supplies a candidate native identity check for the existing startup contract; it does not replace exact runner/relay checks, completed-generation denial or HTTP readiness. Implementation began on 8 September 2026; the complete feature acceptance remains pending.
 
 Use planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, and `pnpm test:isolation`; add live/contract lanes only if Codex integration changes. Follow [shared setup/evidence rules](README.md#shared-verification-contract). Configure separate test origins explicitly; a screenshot of a local page is not authentication/isolation evidence.
 
