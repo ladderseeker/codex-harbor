@@ -1,7 +1,7 @@
 # D006 — Portable releases and a fenced host restore
 
 - Decision: Accepted
-- Delivery: In progress (design amendment; deployment tooling is not implemented)
+- Delivery: In progress (administrator tooling and partial installed checks exist; module integration and required restore/live gates remain open)
 - Recorded: 2026-09-07
 - Scope: [P009](../proposals/009-portable-deployment-and-restore.md)
 - Supersedes: None; concretizes the [architecture release contract](../architecture.md#release-retention-and-rollback-rules)

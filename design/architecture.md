@@ -227,7 +227,7 @@ Promotion is a distinct trusted operation referencing an immutable artifact dige
 
 ## Release, retention, and rollback rules
 
-[D006](decisions/006-portable-release-and-restore.md) specifies P009's immutable installed layout, actual trusted supervisor/storage privilege, encrypted backup checkpoint and module registry, fresh-host authority/filesystem rebinding, and SSH recovery. It is an accepted design under development; its administrator commands and A-to-B restore gate are not yet implemented or verified.
+[D006](decisions/006-portable-release-and-restore.md) specifies P009's immutable installed layout, actual trusted supervisor/storage privilege, encrypted backup checkpoint and module registry, fresh-host authority/filesystem rebinding, and SSH recovery. Its administrator tooling is implemented in part, with installed-profile evidence in the [deployment report](../docs/reports/2026-09-08-p009-development.md). Delivered-module integration and the protected A-to-B restore gate remain incomplete; the design is not a deployment-readiness claim.
 
 Use additive, backward-compatible database migrations before swapping traffic. Back up and validate restore prerequisites before migrations that could lose data. A single migration owner acquires a deployment lock; candidates never migrate the stable database. Record application, schema, runner, Codex, and native-history format versions together in the release manifest. Compatibility across all of them is a release gate.
 

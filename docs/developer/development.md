@@ -10,6 +10,8 @@ P003 adds managed parallel workspaces; see the [workspace guide](workspaces.md) 
 
 P004's reviewed file editor and Git actions are being integrated with terminal and deployment behavior. The [file guide](files.md) explains the available read/edit/review flows and Linux write prerequisite; the [feature report](../reports/2026-09-08-p004-files.md) records two review rounds and matching critical/Linux acceptance without claiming completed cumulative integration.
 
+P006 adds persistent terminals with bounded output, explicit control ownership and retirement. The [terminal guide](../user/terminals.md) describes current behavior. The [combined file/terminal report](../reports/2026-09-08-p004-p006-integration.md) records the reviewed shared Git fence and passing cumulative critical/terminal application suites; installed maintenance and restore integration is still in progress.
+
 P005 adds bounded image/text attachments and saved drafts. See [attachment verification](attachments.md) for API/storage boundaries, real Linux publication checks, and the separate live-account command. Three feature review rounds and a separate cumulative integration review passed. The [integration report](../reports/2026-09-07-p005-integration.md) records Node 24 application/workspace acceptance and the unchanged Linux boundary; the mandatory real-account gate remains open.
 
 P007 adds bounded history search, visibility-only conversation archival and explicit uncertainty fencing/continuation. Its [integration report](../reports/2026-09-07-p007-history-integration.md) records two feature reviews, separate integration review, Node 24 combined acceptance, and the unchanged Linux boundary. Review, authority-expiry and replay/control-bound findings are resolved; dedicated live-account evidence remains open.
@@ -100,7 +102,7 @@ Assign each run a unique identity and clean up only its own processes, container
 
 Development starts locally on macOS/Linux and later uses the same entry points on compatible Linux VPS hosts. The [local environment design](../../design/architecture.md#local-first-development-and-portable-environments) owns the planned topology and Linux VM requirements. [P010](../../design/proposals/010-self-development.md) owns developing Harbor through its stable instance; [P009](../../design/proposals/009-portable-deployment-and-restore.md) owns deployment, restore, and external recovery.
 
-Those capabilities are planned, not operational today. As they are implemented, add tested setup and recovery instructions here or in linked operational guides. Keep future broker, candidate, and promotion specifications in their canonical design/proposals rather than copying them into this handbook. Existing authorization still governs work; self-development does not create a separate standing permission gate.
+Deployment tooling has partial installed-profile evidence and a [current command guide](deployment.md); complete checkpoint/restore and release readiness remain unverified. The self-development broker and candidate workflow are in implementation. Add tested usage as those outcomes become available, keeping their evolving specifications in the canonical design/proposals. Existing authorization still governs work; self-development does not create a separate standing permission gate.
 
 ## History and recovery API
 
