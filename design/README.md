@@ -1,6 +1,6 @@
 # Harbor design
 
-The architecture is the implementation baseline; P001–P003/P005/P007 are Accepted and Implemented, with verification/follow-ups still open. P004/P006/P009 are Accepted and In progress. P008/P010/P011/P012 are Accepted and Planned after independent design review. No proposal is finished. Decision (`Draft`, `Accepted`, `Superseded`) and delivery (`Planned`, `In progress`, `Implemented`, `Verified`) are separate states, tracked in the proposal index. Existing session authorization governs work; metadata does not create a universal approval gate.
+The architecture is the implementation baseline; P001–P003/P005/P007 are Accepted and Implemented, with verification/follow-ups still open. P004/P006/P008/P009/P010 are Accepted and In progress. P011/P012 are Accepted and Planned after independent design review. No proposal is finished. Decision (`Draft`, `Accepted`, `Superseded`) and delivery (`Planned`, `In progress`, `Implemented`, `Verified`) are separate states, tracked in the proposal index. Existing session authorization governs work; metadata does not create a universal approval gate.
 
 - [Architecture](architecture.md): system boundaries, identity, runtime/data contracts, local development, verification, self-development, and releases.
 - [D001 — Confined runtime egress](decisions/001-confined-runtime-egress.md): fixed gateway and isolated networks; Linux denials/connectivity passed, intermittent availability tracked.

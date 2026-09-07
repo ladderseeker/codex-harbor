@@ -3,6 +3,8 @@
 This directory describes available behavior, developer workflows, and completed reports. P001–P003, P005 and P007 are Implemented with required verification/follow-ups still open; the proposal index distinguishes current evidence from finished delivery.
 
 - [Developer workflow](developer/development.md): working on the repository now, command availability, and verification requirements.
+- [Files and changes](developer/files.md): reviewed editor, file and Git behavior, Linux requirements and integration limits.
+- [P004 feature evidence](reports/2026-09-08-p004-files.md): two review rounds, exact-source browser/API/Linux results and pending terminal/deployment integration.
 - [Deployment development commands](developer/deployment.md): current P009 administrator tooling, partial Linux evidence and blocked restore/transfer gates.
 - [P009 development checkpoint](reports/2026-09-08-p009-development.md): partial implementation and installed-profile results; not a release-readiness report.
 - [Linux execution verification](developer/linux-verification.md): dedicated XFS storage, real runner checks, and scoped cleanup.

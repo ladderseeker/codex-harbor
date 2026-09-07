@@ -8,6 +8,8 @@ P002 adds scoped credentials for external clients; use the [programmatic API gui
 
 P003 adds managed parallel workspaces; see the [workspace guide](workspaces.md) and [implementation evidence](../reports/2026-09-07-p003-workspaces.md). Its combined P001/P002/P003 application and actual Linux checks passed on Node 24; the real-account parallel-turn gate remains open.
 
+P004's reviewed file editor and Git actions are being integrated with terminal and deployment behavior. The [file guide](files.md) explains the available read/edit/review flows and Linux write prerequisite; the [feature report](../reports/2026-09-08-p004-files.md) records two review rounds and matching critical/Linux acceptance without claiming completed cumulative integration.
+
 P005 adds bounded image/text attachments and saved drafts. See [attachment verification](attachments.md) for API/storage boundaries, real Linux publication checks, and the separate live-account command. Three feature review rounds and a separate cumulative integration review passed. The [integration report](../reports/2026-09-07-p005-integration.md) records Node 24 application/workspace acceptance and the unchanged Linux boundary; the mandatory real-account gate remains open.
 
 P007 adds bounded history search, visibility-only conversation archival and explicit uncertainty fencing/continuation. Its [integration report](../reports/2026-09-07-p007-history-integration.md) records two feature reviews, separate integration review, Node 24 combined acceptance, and the unchanged Linux boundary. Review, authority-expiry and replay/control-bound findings are resolved; dedicated live-account evidence remains open.

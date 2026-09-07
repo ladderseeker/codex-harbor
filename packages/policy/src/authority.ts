@@ -2,7 +2,16 @@ import { transaction } from "../../storage/src/index.ts";
 import type { Pool, PoolClient } from "pg";
 import { digest, HarborError, authorizePermission } from "./index.ts";
 
-export const tokenScopes = ["read", "execute", "approve", "cancel"] as const;
+export const tokenScopes = [
+  "read",
+  "execute",
+  "approve",
+  "cancel",
+  "files:read",
+  "files:write",
+  "git:read",
+  "git:write",
+] as const;
 export type Scope = (typeof tokenScopes)[number];
 export interface Authority {
   kind: "browser" | "token";

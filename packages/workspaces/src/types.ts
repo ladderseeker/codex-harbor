@@ -44,6 +44,9 @@ export interface WorkspaceView {
   sourceDirty: boolean;
   release?: { id: string; state: string; failureCode: string | null } | null;
   writerSessionId: string | null;
+  writerKind?: "conversation" | "file" | "terminal" | null;
+  writerOwnerId?: string | null;
+  writerEpoch?: number;
   writerGeneration: number | null;
   failureCode: string | null;
 }

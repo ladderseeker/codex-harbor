@@ -24,3 +24,17 @@ The implementer's new real-process retirement assertion exposed an additional de
 ## Impact and next steps
 
 Input inspection and emergency stop can violate their core user-visible contracts; missing output continuity can misrepresent the terminal record. The implementer accepted one focused fix/acceptance batch, followed by independent round 2 and changed-boundary verification. Keep P006 active and unverified until these findings and its required gates are satisfied. Record exact fixes, source identities, commands/environment/results and review closure before archiving this same issue.
+
+## Output retention lock inversion — 8 September 2026
+
+Expanded real-stream acceptance reproduced PostgreSQL `40P01` in runs `harbor-e2e-03f210564c`, `db811f460c` and `2cee072467`. Sanitized wait graphs identify a project/workspace/terminal cycle without recording SQL values or terminal bytes. Output flush held the terminal row, updated its sequence, then updated the retention floor; that second update could acquire foreign-key parent locks. A viewer already held the parent rows while waiting for the terminal. Passing intermediate runs that did not reject a deadlock on the slow viewer do not close this finding.
+
+The correction makes output flush and retention maintenance acquire project → workspace → terminal locks before updating the terminal. The transaction wrapper already awaited its callback and COMMIT; no early-release fix or generic deadlock retry was substituted. The implementer audited admission, retirement and single-statement startup/close/failure writers for the same inversion.
+
+On Node 24.11.1, focused `pnpm test:e2e --terminals --terminal-review-fixes --terminal-stream-check` passed as `harbor-e2e-c50554982c`, exact source `4ea7ddc8327af98343b8103977ee2a7e72096d80017003f3c1bab2fdcc22f7e6` over 876 files. With actual output retention active, the test holds the project row, observes the supervisor waiting at that parent, and still acquires the terminal with NOWAIT. Releasing the parent permits complete fast-viewer output; a real nonreading peer detaches independently. A global assertion rejects every `40P01`.
+
+## Corrective review checkpoint — 8 September 2026
+
+The separate reviewer closed round 2 with no actionable finding in frozen source `89f4f59db58c259ed80e46e63e4eaefa87b861acb5c1dfd8a666c7582d28e688`, 876 files. The source delta from the focused stream result is an expiry-test correction, preserving the production resource-lock fix. Complete terminal acceptance `harbor-e2e-2ecaf4ca80` passed on that exact source. It includes the original three fixes, bounded explicit retirement retry, and expanded stream, authority, retention and outage cases. Node 24 check/build, 11 integration tests and 18 contracts passed on the same production bytes. The native Linux launcher, adapter, mount and seccomp bytes remain unchanged from the separately identified Linux checkpoint; this is not a new aggregate-source Linux pass.
+
+Critical and workspace regressions, main-branch integration, and P004/P009 shared writer, module inventory, drain and restored-authority handling remain pending at this checkpoint. Preserve this active record until those owned obligations are implemented, verified and independently reviewed.

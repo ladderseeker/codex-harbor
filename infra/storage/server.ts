@@ -1,4 +1,5 @@
 import { recoverManagedSocket } from "../deploy/socket.ts";
+import { executeFile } from "../files/service.ts";
 import { executeWorkspace } from "./workspace-service.ts";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
@@ -66,7 +67,10 @@ try {
 }
 const server = createServer((req, res) => {
   let body = "";
-  if (req.method !== "POST" || !["/", "/workspace"].includes(req.url ?? "")) {
+  if (
+    req.method !== "POST" ||
+    !["/", "/workspace", "/files"].includes(req.url ?? "")
+  ) {
     res.writeHead(404).end();
     return;
   }
@@ -75,6 +79,37 @@ const server = createServer((req, res) => {
     if (body.length > 8192) req.destroy();
   });
   req.on("end", () => {
+    if (req.url === "/files") {
+      let command;
+      try {
+        command = JSON.parse(body);
+        if (
+          !["tree", "search", "content", "download", "status", "diff"].includes(
+            command.action,
+          )
+        )
+          throw Error("Read only file endpoint");
+      } catch {
+        res.writeHead(400).end();
+        return;
+      }
+      void executeFile(command)
+        .then((result) =>
+          res
+            .writeHead(200, { "content-type": "application/json" })
+            .end(JSON.stringify(result)),
+        )
+        .catch((error) =>
+          res.writeHead(409, { "content-type": "application/json" }).end(
+            JSON.stringify({
+              code: /^[A-Z_]{1,40}$/.test(error?.code ?? "")
+                ? error.code
+                : "FILE_UNAVAILABLE",
+            }),
+          ),
+        );
+      return;
+    }
     if (req.url === "/workspace") {
       let command;
       try {

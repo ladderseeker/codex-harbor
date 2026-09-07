@@ -1,3 +1,4 @@
+import { filePaths, fileSchemas } from "./files-openapi.ts";
 import { tokenSchema } from "./tokens.ts";
 import { z } from "zod";
 import { projectSchema, sessionSchema, turnSchema } from "./index.ts";
@@ -10,6 +11,7 @@ const object = (
 ) => ({ type: "object", properties, required, additionalProperties: true });
 const array = (items: unknown) => ({ type: "array", items });
 export const publicSchemas = {
+  ...fileSchemas,
   Error: object({
     error: object({
       code: string,
@@ -39,6 +41,12 @@ export const publicSchemas = {
     sourceDirty: { type: "boolean" },
     writerSessionId: { type: ["string", "null"] },
     writerGeneration: { type: ["integer", "null"] },
+    writerKind: {
+      type: ["string", "null"],
+      enum: ["conversation", "file", "terminal", null],
+    },
+    writerOwnerId: { type: ["string", "null"] },
+    writerEpoch: { type: "integer", minimum: 0 },
     failureCode: { type: ["string", "null"] },
   }),
   Project: object({ id: uuid, name: string, createdAt: timestamp }),
@@ -103,6 +111,11 @@ export const publicSchemas = {
     available: { type: "boolean" },
   }),
   Capabilities: object({
+    files: object({
+      read: { type: "boolean" },
+      write: { type: "boolean" },
+      reason: { type: ["string", "null"] },
+    }),
     models: array(object({ id: string, name: string, efforts: array(string) })),
     permissionProfiles: array({ enum: ["read-only", "workspace-write"] }),
     limits: object({
@@ -180,7 +193,18 @@ const tokenRecord = object({
   id: uuid,
   name: string,
   prefix: string,
-  scopes: array({ enum: ["read", "execute", "approve", "cancel"] }),
+  scopes: array({
+    enum: [
+      "read",
+      "execute",
+      "approve",
+      "cancel",
+      "files:read",
+      "files:write",
+      "git:read",
+      "git:write",
+    ],
+  }),
   project_ids: array(uuid),
   permission_profile: { enum: ["read-only", "workspace-write"] },
   expires_at: timestamp,
@@ -289,6 +313,7 @@ const paths: Record<string, any> = {
       object({ draft: draftRecord }),
     ),
   },
+  ...filePaths,
   "/history": {
     get: {
       ...read(
@@ -568,7 +593,11 @@ Object.assign(paths, {
   },
 });
 for (const [name, item] of Object.entries(paths))
-  if (name.includes("{id}")) item.parameters = [idParameter];
+  if (name.includes("{id}"))
+    item.parameters = [...name.matchAll(/\{([^}]+)\}/g)].map((m) => ({
+      ...idParameter,
+      name: m[1],
+    }));
 const tokenRoutes: Record<string, string> = {
   "GET /openapi.json": "read",
   "GET /capabilities": "read",

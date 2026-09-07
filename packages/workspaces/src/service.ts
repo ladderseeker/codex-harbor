@@ -20,6 +20,9 @@ export function workspaceView(w: any): WorkspaceView {
     baseRevision: w.base_revision,
     sourceDirty: w.source_dirty,
     writerSessionId: w.writer_session_id,
+    writerKind: w.writer_kind,
+    writerOwnerId: w.writer_owner_id,
+    writerEpoch: Number(w.writer_epoch ?? 0),
     writerGeneration:
       w.writer_generation == null ? null : Number(w.writer_generation),
     failureCode: w.failure_code,
@@ -190,14 +193,18 @@ export async function requireWorkspaceIdle(
       "Project storage operation pending",
     );
   const busy = await db.query(
-    `SELECT 1 FROM workspaces WHERE ${wholeProject ? "project_id" : "id"}=$1 AND writer_session_id IS NOT NULL LIMIT 1`,
+    `SELECT 1 FROM workspaces WHERE ${wholeProject ? "project_id" : "id"}=$1 AND writer_owner_id IS NOT NULL LIMIT 1`,
     [wholeProject ? w.project_id : w.id],
   );
   const queued = await db.query(
     `SELECT 1 FROM operations o JOIN sessions s ON s.id=o.session_id WHERE s.${wholeProject ? "project_id" : "workspace_id"}=$1 AND o.state IN ('queued','dispatching','running','waiting_approval','waiting_input') LIMIT 1`,
     [wholeProject ? w.project_id : w.id],
   );
-  if (busy.rowCount || queued.rowCount)
+  const filePending = await db.query(
+    `SELECT 1 FROM file_operations WHERE ${wholeProject ? "project_id" : "workspace_id"}=$1 AND state IN ('queued','dispatching') LIMIT 1`,
+    [wholeProject ? w.project_id : w.id],
+  );
+  if (busy.rowCount || queued.rowCount || filePending.rowCount)
     throw new HarborError(
       409,
       "WORKSPACE_BUSY",

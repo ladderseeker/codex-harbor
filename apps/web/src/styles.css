@@ -1501,3 +1501,240 @@ body,
     font-size: 11px;
   }
 }
+.files-dialog {
+  padding: 0;
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  width: min(1440px, 96vw);
+  height: min(920px, 94dvh);
+  background: #f8fafb;
+  border: 1px solid #cbd7e0;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  color: #142536;
+}
+.files-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px 12px;
+  border-bottom: 1px solid #d7e1e9;
+}
+.files-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.files-header p {
+  margin: 5px 0 0;
+  color: #526575;
+}
+.file-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 10px 24px;
+}
+.file-tabs button[aria-pressed="true"] {
+  background: #233c53;
+  color: white;
+}
+.file-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+  border-top: 1px solid #d7e1e9;
+}
+.file-tree {
+  overflow: auto;
+  background: #e9eff3;
+  padding: 16px;
+  border-right: 1px solid #cbd7e0;
+  min-width: 0;
+}
+.file-tree form {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 20px;
+}
+.file-tree label {
+  display: grid;
+  gap: 6px;
+}
+.file-tree input {
+  width: 100%;
+  min-width: 0;
+}
+.file-entry {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 9px 8px;
+  color: #142536;
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+}
+.file-entry:hover {
+  background: #d8e5ee;
+}
+.file-entry small {
+  display: block;
+  color: #526575;
+  margin-top: 4px;
+}
+.file-content {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.file-content header,
+.file-content footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.file-content h3 {
+  font-size: 16px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.file-editor {
+  min-height: 320px;
+  flex: 1 0 320px;
+  width: 100%;
+  border: 1px solid #d7e1e9;
+  background: white;
+}
+.file-empty {
+  padding: 40px 20px;
+  color: #526575;
+}
+.file-operation {
+  padding: 10px 24px;
+  border-top: 1px solid #d7e1e9;
+  max-height: 220px;
+  overflow: auto;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.file-operation pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  width: 100%;
+}
+.file-notice {
+  margin: 0;
+  padding: 8px 24px;
+  background: #f5e9c8;
+}
+.file-confirm {
+  position: absolute;
+  inset: auto 24px 24px;
+  padding: 18px;
+  background: white;
+  border: 1px solid #829aaa;
+  box-shadow: 0 8px 24px #14253622;
+}
+.file-confirm button {
+  margin-right: 10px;
+}
+.change-entry {
+  padding: 10px 0;
+  border-bottom: 1px solid #cbd7e0;
+  overflow-wrap: anywhere;
+}
+.change-entry > span {
+  display: block;
+}
+.hunk-selection {
+  flex: 0 0 auto;
+  min-height: 48px;
+  max-height: 240px;
+  overflow: auto;
+}
+.hunk-selection label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.hunk-selection input {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+.hunk-selection pre {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+.commit-form {
+  border-top: 1px solid #cbd7e0;
+  padding-top: 16px;
+  display: grid;
+  gap: 10px;
+}
+.commit-form label {
+  display: grid;
+  gap: 6px;
+}
+.commit-form textarea {
+  min-height: 70px;
+}
+@media (max-width: 700px) {
+  .files-dialog {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+  }
+  .files-header,
+  .file-tabs {
+    padding: 12px;
+  }
+  .file-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .file-tree {
+    max-height: 210px;
+    flex-shrink: 0;
+    border-right: 0;
+    border-bottom: 1px solid #cbd7e0;
+  }
+  .file-content {
+    flex: 1;
+    padding: 10px;
+  }
+  .file-editor {
+    min-height: 260px;
+  }
+  .file-operation {
+    padding: 8px 12px;
+    max-height: 150px;
+  }
+}
+
+.files-dialog::backdrop {
+  background: #1c354b66;
+}
+
+.file-identities {
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: #526575;
+}

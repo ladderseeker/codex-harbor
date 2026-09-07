@@ -148,7 +148,16 @@ export function Tokens({
           </fieldset>
           <fieldset>
             <legend>Capabilities</legend>
-            {["read", "execute", "approve", "cancel"].map((scope) => (
+            {[
+              "read",
+              "execute",
+              "approve",
+              "cancel",
+              "files:read",
+              "files:write",
+              "git:read",
+              "git:write",
+            ].map((scope) => (
               <label key={scope}>
                 <input
                   type="checkbox"

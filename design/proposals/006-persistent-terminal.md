@@ -7,7 +7,7 @@
 
 ## Source issues
 
-- [P006 implementation review](../../issues/2026-09-08-005028-p006-implementation-review.md): High, In progress. Round1 identified outcome lookup admitting input, an emergency-stop dispatch race and unmarked restart output loss, plus distinct stream/retirement denial coverage. P006-02–06 and independent round2 own correction/verification; the proposal remains unverified.
+- [P006 implementation review](../../issues/2026-09-08-005028-p006-implementation-review.md): High, In progress. Two corrective feature rounds and complete terminal acceptance closed input lookup, emergency-stop, output-loss, explicit retirement and output-retention lock-order findings. Final critical regression and P004/P009 integration remain pending; the proposal is unverified.
 
 ## Scope and user/API flow
 

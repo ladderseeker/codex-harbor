@@ -1,6 +1,10 @@
 import { p005 } from "./p005.ts";
 import { p007 } from "./p007.ts";
 import { createPool } from "../../packages/storage/src/index.ts";
+if (process.argv.includes("--files")) {
+  await import("../files/e2e.ts");
+  process.exit(process.exitCode ?? 0);
+}
 if (process.argv.includes("--workspaces")) {
   await import("../workspaces/e2e.ts");
   process.exit(process.exitCode ?? 0);

@@ -1,3 +1,8 @@
+if (process.argv.includes("--files")) {
+  process.argv.push("--managed");
+  await import("../files/e2e.ts");
+  process.exit(process.exitCode ?? 0);
+}
 if (process.argv.includes("--attachments")) {
   await import("./attachments.js");
   process.exit(0);

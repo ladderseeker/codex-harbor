@@ -29,3 +29,11 @@ The reviewer inspected frozen `f5998b40…ff079` without editing it or rerunning
 4. **Medium — the first receipt directory lacks a parent durability barrier.** `infra/files/service.ts:96–98` creates `file-receipts` without fsync of its authority parent. Flushing a receipt and its child directory does not establish persistence of the new parent entry before the file effect. Add that barrier and inject its failure to prove publication is denied before effects.
 
 The implementer accepted all four in one correction batch. The bounded Git/object/authority/retirement/CSP review reported no further actionable finding. Verify the corrections and complete independent round 2 and integration before resolving and archiving this record.
+
+## Corrective feature closure — 8 September 2026
+
+Author commit `9a82f072c3b77740cbbbfb923f400b868eed88ab`, based on `fee16e75ff75ed063fcea84749563553ac1e421a`, records the corrected candidate. Managed-XFS `harbor-files-a475c452df` and critical `harbor-e2e-76c87b1fa9` passed on Node 24.11.1, both with exact start/end source `324022da4ddc36128348a01427cba6028a2bd44bb176848f9b47a34d56d37fa2`, 882 files. Check/build also passed.
+
+The held-response browser case preserves a draft edited during file opening; a real browser edit/save retains exact UTF-8 BOM/CRLF bytes and mode 0775. A targeted native helper assertion preserves mode 0666. Injecting rejection into the actual parent-directory `FileHandle.sync` proves zero receipt and zero file effect; this is a method-failure assertion, not a power-loss experiment. The separate reviewer matched the corrected source and both full results and closed round 2 with no actionable finding in the feature correction scope.
+
+The [feature report](../docs/reports/2026-09-08-p004-files.md) preserves historical checkpoints and their limitations. Main-branch P006/P009 integration remains owned and pending: shared style nonce, typed reservation epoch, module inventory, checkpoint drain and fresh-host restored authority without effect replay. Keep this issue and P004 active until those obligations are closed.

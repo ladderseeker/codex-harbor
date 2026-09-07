@@ -1,5 +1,10 @@
 import { prepareAttachments } from "../../../packages/attachments/src/materialize.ts";
 import { maintainAttachments } from "../../../packages/attachments/src/store.ts";
+import {
+  processFiles,
+  recoverFileStartup,
+  retireActiveFiles,
+} from "./files.ts";
 import { processRecovery } from "./recovery.ts";
 import {
   deploymentAdmission,
@@ -90,9 +95,10 @@ fence.on("error", () => {
   if (discoveryTransport) owned.push(discoveryTransport);
   for (const adapter of owned) adapter.close();
   const deadline = setTimeout(() => process.exit(1), 25000);
-  void Promise.allSettled(
-    owned.map((adapter) => adapter.closeAndWait()),
-  ).finally(() => {
+  void Promise.allSettled([
+    ...owned.map((adapter) => adapter.closeAndWait()),
+    retireActiveFiles(),
+  ]).finally(() => {
     clearTimeout(deadline);
     process.exit(1);
   });
@@ -128,6 +134,7 @@ const generation = await transaction(pool, async (db) => {
   }
   return g;
 });
+await recoverFileStartup(pool);
 if (c.HARBOR_FIXTURE_MODE) {
   const probe = await createRuntime({
     sessionId: randomUUID(),
@@ -520,6 +527,7 @@ async function onRequest(
     await event(db, sessionId, "approval.pending", { operationId });
   });
 }
+let filesTick: Promise<void> | undefined;
 let lastMaintenance = 0;
 async function tick() {
   if (!alive) return;
@@ -542,6 +550,14 @@ async function tick() {
   }
   if (credentials.mutating) return;
   if ((await deploymentState(pool)).activation_required) return;
+  if (!filesTick)
+    filesTick = processFiles(pool, c, () => alive, { generation, ownerPin })
+      .catch(() => {
+        console.error("File effect settlement remains pending");
+      })
+      .finally(() => {
+        filesTick = undefined;
+      });
   await processWorkspaceStorage(pool, !!c.HARBOR_FIXTURE_MODE, c.roots);
   await processWorkspaceReleases(pool, {
     config: c,
@@ -588,7 +604,8 @@ async function tick() {
         const w = await sessionWorkspace(db, id, true);
         if (
           w.state !== "ready" ||
-          (w.writer_session_id && w.writer_session_id !== id)
+          (w.writer_owner_id &&
+            (w.writer_kind !== "conversation" || w.writer_owner_id !== id))
         )
           throw Error("Workspace owned by another operation or unavailable");
         if (
@@ -604,7 +621,7 @@ async function tick() {
       releaseWorkspace: async (db, input) => {
         const w = await selectedWorkspace(db, input.workspaceId, true);
         if (input.generation === null) {
-          if (w.writer_session_id !== null) throw Error("Reservation changed");
+          if (w.writer_owner_id !== null) throw Error("Reservation changed");
           return;
         }
         await releaseRecoveredWorkspace(db, {
@@ -881,7 +898,7 @@ async function tick() {
   }
   if ((await deploymentState(pool)).maintenance) return;
   const candidates = await pool.query(
-    "SELECT o.*,s.native_thread_id,s.project_id,s.workspace_id,p.root_id,w.relative_path,w.device,w.inode,w.canonical_path,w.common_path,w.common_device,w.common_inode FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id WHERE w.state='ready' AND p.archived_at IS NULL AND w.writer_session_id IS NULL AND o.kind='turn' AND o.state='queued' AND s.state<>'uncertain' AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.session_id=o.session_id AND active.kind='turn' AND (active.state IN ('dispatching','running','waiting_approval','waiting_input') OR (active.state='uncertain' AND active.uncertainty_acknowledged_at IS NULL))) ORDER BY o.created_at LIMIT 4",
+    "SELECT o.*,s.native_thread_id,s.project_id,s.workspace_id,p.root_id,w.relative_path,w.device,w.inode,w.canonical_path,w.common_path,w.common_device,w.common_inode FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id WHERE w.state='ready' AND p.archived_at IS NULL AND w.writer_owner_id IS NULL AND o.kind='turn' AND o.state='queued' AND s.state<>'uncertain' AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.session_id=o.session_id AND active.kind='turn' AND (active.state IN ('dispatching','running','waiting_approval','waiting_input') OR (active.state='uncertain' AND active.uncertainty_acknowledged_at IS NULL))) ORDER BY o.created_at LIMIT 4",
   );
   for (const o of candidates.rows) {
     if ([...runtimes.values()].filter((r) => r.operation).length >= 4) break;
@@ -1220,6 +1237,8 @@ async function stop() {
   clearInterval(timer);
   discoveryTransport?.close();
   for (const r of runtimes.values()) r.adapter.close();
+  await retireActiveFiles();
+  await filesTick;
   await closeCredentials?.();
   await boss.stop();
   fence.release();
