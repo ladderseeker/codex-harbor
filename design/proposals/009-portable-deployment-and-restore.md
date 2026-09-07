@@ -13,7 +13,7 @@ Cover all delivered module state through a backup registry: PostgreSQL, native C
 
 ## Source issues
 
-- [Resume readiness](../../issues/2026-09-08-044008-p009-resume-readiness.md): Medium, In progress. An installed resume returned failure after maintenance was released. Preserve maintenance through bounded readiness and independently verify the corrected administrator command on Linux; later healthy status does not retroactively pass the failed command.
+- [Resume readiness](../../issues/archive/2026-09-08-044008-p009-resume-readiness.md): Medium, Resolved. Root `b387b46` holds maintenance through bounded readiness. One independent source/evidence review, 26 Python contracts and four Linux component cases passed; the historical installed-artifact qualification and preserved uncertainty remain explicit.
 - [Created workspace validation identity](../../issues/2026-09-08-035221-workspace-validation-identity.md): High, In progress with P003/P008. The installed post-create verifier discards identity required by the private storage service, blocking derived/copy readiness. P009-01 requires actual corrected application acceptance and independent review.
 - [Workspace quota import](../../issues/2026-09-08-031857-workspace-quota-import.md): High, In progress with P003. The cumulative installed validator cannot load quota definitions after the guarded-dispatcher change. P009-01 requires the corrected Linux workspace/file path and matching independent review.
 - [Installed web assets](../../issues/2026-09-08-031032-p009-installed-web-assets.md): High, In progress. Fresh installed browser acceptance exposed omitted `apps/web/dist/` content despite passing backend readiness. P009-01 requires corrected immutable packaging, actual installed browser/assets and independent review; the earlier administrator evidence does not close this new finding.
@@ -52,7 +52,7 @@ Add usable installation, operations, update, backup, and recovery guides under `
 
 ## Implementation record
 
-- 2026-09-08 cumulative module checkpoint: root `2bdb5ef` includes reviewed `77b2ad5` with file/terminal registry coverage, bounded maintenance, exact retirement and local restored-authority reconciliation. The [module report](../../docs/reports/2026-09-08-installed-module-integration.md) records matching application and Linux evidence plus the fresh installed UI failures and subsequent corrections. Final installed browser evidence, the separate resume correction, protected restore/promotion and live gates remain open.
+- 2026-09-08 cumulative module checkpoint: root `2bdb5ef` includes reviewed `77b2ad5` with file/terminal registry coverage, bounded maintenance, exact retirement and local restored-authority reconciliation. The [module report](../../docs/reports/2026-09-08-installed-module-integration.md) records matching application and Linux evidence plus the fresh installed UI failures and subsequent corrections. The bounded resume correction is subsequently integrated and resolved above; final installed browser evidence, protected restore/promotion and live gates remain open.
 
 - 2026-09-07: Started isolated implementation from the integrated P001–P003 baseline `d4f9e96`, under the owner's roadmap authorization. Incorporate the reviewed P007 integration and delivered attachment module before final registry/restore checks. Disposable Linux A/B prerequisite setup and the pinned Restic download are preparation, not completed P009 acceptance. Migration 009 is reserved for this feature.
 
