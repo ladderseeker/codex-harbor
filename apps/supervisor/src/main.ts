@@ -1,3 +1,7 @@
+import {
+  requireAuthority,
+  type Scope,
+} from "../../../packages/policy/src/authority.ts";
 import { RetirementRegistry } from "./retirement.ts";
 import { retireRuntimeIdentity } from "../../../infra/runner/authority.ts";
 import { clearManagedCredentials } from "../../../infra/storage/client.ts";
@@ -47,6 +51,7 @@ type RuntimeState = {
   generation: number;
   permissionProfile: string;
   authorityActor: string | null;
+  authorityScope: Scope;
   credentialVersion: string;
   operation: string;
   thread: string;
@@ -525,6 +530,7 @@ async function tick() {
     try {
       const expired = a.state === "pending";
       runtime.authorityActor = expired ? null : a.answer_actor_hash;
+      runtime.authorityScope = "approve";
       if (
         (expired || a.answer?.decision === "decline") &&
         a.kind === "item/tool/requestUserInput"
@@ -550,9 +556,28 @@ async function tick() {
           { approvalId: a.id },
         );
       });
-    } catch {
-      await update(a.operation_id, "uncertain");
-      runtime.adapter.close();
+    } catch (error) {
+      if (
+        error instanceof HarborError &&
+        [401, 403].includes(error.statusCode)
+      ) {
+        await transaction(pool, async (db) => {
+          await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
+            a.session_id,
+          ]);
+          await db.query(
+            "UPDATE approvals SET state='pending',answer=NULL,answer_actor_hash=NULL WHERE id=$1 AND state='answering'",
+            [a.id],
+          );
+          await event(db, a.session_id, "approval.rejected", {
+            approvalId: a.id,
+            reason: "Answer authorization expired or revoked before send",
+          });
+        });
+      } else {
+        await update(a.operation_id, "uncertain");
+        runtime.adapter.close();
+      }
     }
   }
   const cancels = await pool.query(
@@ -564,11 +589,59 @@ async function tick() {
     ]);
     const t = target.rows[0],
       r = runtimes.get(cancel.session_id);
-    if (t.state === "queued") {
-      await update(t.id, "interrupted");
-      await pool.query("UPDATE operations SET state='succeeded' WHERE id=$1", [
+    const projectId = (
+      await pool.query("SELECT project_id FROM sessions WHERE id=$1", [
+        cancel.session_id,
+      ])
+    ).rows[0].project_id;
+    try {
+      await requireAuthority(pool, cancel.actor_hash, c, {
+        scope: "cancel",
+        projectId,
+      });
+    } catch {
+      await pool.query("UPDATE operations SET state='failed' WHERE id=$1", [
         cancel.id,
       ]);
+      continue;
+    }
+    if (r) {
+      r.authorityActor = cancel.actor_hash;
+      r.authorityScope = "cancel";
+    }
+    if (t.state === "queued") {
+      try {
+        await transaction(pool, async (db) => {
+          await requireAuthority(db, cancel.actor_hash, c, {
+            scope: "cancel",
+            projectId,
+          });
+          await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
+            cancel.session_id,
+          ]);
+          await db.query(
+            "UPDATE operations SET state='interrupted',updated_at=now() WHERE id=$1 AND state='queued'",
+            [t.id],
+          );
+          await db.query(
+            "UPDATE operations SET state='succeeded' WHERE id=$1",
+            [cancel.id],
+          );
+          await deriveSessionState(db, cancel.session_id);
+          await event(db, cancel.session_id, "operation.interrupted", {
+            operationId: t.id,
+          });
+        });
+      } catch (error) {
+        if (
+          error instanceof HarborError &&
+          [401, 403].includes(error.statusCode)
+        )
+          await pool.query("UPDATE operations SET state='failed' WHERE id=$1", [
+            cancel.id,
+          ]);
+        else throw error;
+      }
     } else if (r && r.operation === t.id && r.turn) {
       try {
         await pool.query(
@@ -583,8 +656,10 @@ async function tick() {
       } catch (error) {
         const completed =
           (error as { code?: string }).code === "TURN_ALREADY_COMPLETED";
+        const denied =
+          error instanceof HarborError && [401, 403].includes(error.statusCode);
         cancellationRepairs.set(cancel.id, completed ? "succeeded" : "failed");
-        if (!completed)
+        if (!completed && !denied)
           r.mailbox.poison("Turn interruption could not be confirmed");
         const uncertain = await transaction(pool, async (db) => {
           await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
@@ -604,7 +679,7 @@ async function tick() {
               "waiting_approval",
               "waiting_input",
             ].includes(target.state);
-          if (!completed && active) {
+          if (!completed && !denied && active) {
             await db.query(
               "UPDATE operations SET state='uncertain',updated_at=now() WHERE id=$1",
               [t.id],
@@ -629,7 +704,7 @@ async function tick() {
             completed ? "cancel.noop" : "cancel.failed",
             { operationId: t.id, cancelId: cancel.id },
           );
-          return !completed && active;
+          return !completed && !denied && active;
         });
         cancellationRepairs.delete(cancel.id);
         if (uncertain)
@@ -645,13 +720,15 @@ async function tick() {
   );
   for (const o of candidates.rows) {
     if (runtimes.get(o.session_id)?.operation) continue;
-    const actor = await pool.query(
-      "SELECT 1 FROM browser_sessions WHERE hash=$1 AND NOT revoked AND expires_at>now() AND last_seen>now()-($2*interval '1 second') AND identity_pin=$3 AND (SELECT identity_pin FROM harbor_meta)=$3",
-      [o.actor_hash, c.HARBOR_IDLE_SECONDS, ownerPin],
-    );
-    if (!actor.rowCount) {
+    try {
+      await requireAuthority(pool, o.actor_hash, c, {
+        scope: "execute",
+        projectId: o.project_id,
+        permissionProfile: o.payload.permissionProfile,
+      });
+    } catch {
       await update(o.id, "failed", {
-        reason: "Queued execution grant revoked",
+        reason: "Queued execution grant revoked or restricted",
       });
       continue;
     }
@@ -737,6 +814,7 @@ async function tick() {
               generation: runtimeGeneration,
               permissionProfile: o.payload.permissionProfile,
               authorityActor: o.actor_hash,
+              authorityScope: "execute",
               credentialVersion,
               operation: o.id,
               thread: "",
@@ -769,12 +847,14 @@ async function tick() {
               )
                 throw Error("Dispatch fenced or stopped");
               if (captured.authorityActor) {
-                const actor = await fence.query(
-                  "SELECT 1 FROM browser_sessions WHERE hash=$1 AND NOT revoked AND expires_at>now() AND last_seen>now()-($2*interval '1 second') AND identity_pin=$3 AND (SELECT identity_pin FROM harbor_meta)=$3 FOR UPDATE",
-                  [captured.authorityActor, c.HARBOR_IDLE_SECONDS, ownerPin],
-                );
-                if (!actor.rowCount)
-                  throw Error("Dispatch authorization revoked");
+                await requireAuthority(fence, captured.authorityActor, c, {
+                  scope: captured.authorityScope,
+                  projectId: o.project_id,
+                  permissionProfile:
+                    captured.authorityScope === "cancel"
+                      ? undefined
+                      : captured.permissionProfile,
+                });
               }
               const session = await fence.query(
                 "SELECT generation FROM sessions WHERE id=$1 FOR UPDATE",
@@ -864,6 +944,7 @@ async function tick() {
       ]);
       r.operation = o.id;
       r.authorityActor = o.actor_hash;
+      r.authorityScope = "execute";
       const turn = await r.adapter.startTurn(
         r.thread,
         o.payload.text,

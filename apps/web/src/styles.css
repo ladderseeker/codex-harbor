@@ -1141,3 +1141,73 @@ body,
 .composer-region {
   flex-shrink: 0;
 }
+
+/* Scoped credential controls share the conversation interface's quiet form style. */
+.token-settings {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.token-settings fieldset {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  margin: 14px 0;
+}
+.token-settings legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+.token-settings form > fieldset > label,
+.token-settings > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+}
+.token-settings fieldset fieldset {
+  display: grid;
+  gap: 8px;
+}
+.token-settings fieldset fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.token-settings input:not([type="checkbox"]),
+.token-settings select {
+  width: 100%;
+  min-width: 0;
+}
+.token-settings input[type="checkbox"] {
+  margin: 0;
+}
+.token-settings ul {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  gap: 12px;
+}
+.token-settings li {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  overflow-wrap: anywhere;
+}
+.token-settings li p {
+  color: var(--muted);
+  margin: 6px 0;
+}
+.token-settings li button {
+  margin: 6px 0;
+}
+.token-settings [role="alert"] {
+  color: var(--danger);
+}
+.dialog:has(.token-settings) .dialog-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fcfdfe;
+  padding: 8px 0;
+}

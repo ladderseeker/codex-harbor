@@ -1,7 +1,7 @@
 # P002 — Programmatic API access
 
 - Decision: Accepted
-- Delivery: In progress
+- Delivery: Implemented
 - Dependencies: [P001](001-secure-persistent-conversations.md)
 - Outcome: The owner can create a limited access token and use an external script to operate Harbor without a browser session.
 
@@ -37,3 +37,17 @@ Add token tables/indexes with an additive migration; revocation must work across
 ## Implementation record
 
 - 2026-09-07: Started isolated implementation on the committed P001 foundation under the owner's roadmap authorization. The first slice delivers scoped token management, current-authority enforcement, the supported external contract, and browser/API acceptance together. P001's remaining gates stay visible; this record is not implementation evidence.
+
+## Implementation decisions
+
+P002 uses four explicit scopes: `read`, `execute`, `approve`, and `cancel`, with project UUID grants and a read-only or workspace-write ceiling. Tokens expire in 1–90 days. Token management remains browser-only. Up to 100 token records are retained per instance; revocation records remain durable. Creation retries return metadata with `secretUnavailable: true`; the raw secret is returned only on the first successful response and never enters the idempotency record. A lost first response requires revoke/recreate. Unknown routes remain browser-only until an explicit scope/resource policy is added.
+
+P001's live-account and medium bounds obligations remain open; this implementation does not establish dependent verification.
+
+## Current implementation evidence
+
+On 7 September 2026, `pnpm check`, `pnpm build`, nine integration tests, 13 adapter contracts (including pinned-runtime non-model smoke), and the combined real P002/P001 browser/API suite passed on source digest `2a14f17585b36d28ef9883e4e4f4c879db7175b90c97f75fd0dbe4ac5665f84e` (807 source/config files). The stable E2E artifact is `harbor-e2e-e8ae73cdcc`, with matching start/end digest, Node 26.7.0, Chromium 1194, and Codex 0.153.4. Only the external OIDC and Codex boundaries used fixtures.
+
+Independent review round 1 identified pre-send control revocation handling, conditional OpenAPI headers, and editable UI rejection handling. Those fixes passed focused contracts and the complete stable regression, including paused approval/cancel send guards. Round 2 independently checked the fixes and matching source/evidence and closed with no remaining actionable findings. Integration on Node 24.11.1 also passed check/build, nine integration tests, 13 contracts, and the full P002/P001 E2E run `harbor-e2e-f45757ee74`, with matching source digest at start and end. `pnpm test:live` returned exit 2 because dedicated credentials are unavailable; no model request was made. P002 remains unverified pending applicable upstream and live-account gates.
+
+Available behavior is documented in the [token settings guide](../../docs/user/api-tokens.md) and [programmatic API guide](../../docs/developer/programmatic-api.md). The [implementation report](../../docs/reports/2026-09-07-p002-api-tokens.md) records the source identity, review closure, integration baseline, and remaining gates.

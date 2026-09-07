@@ -1,8 +1,8 @@
 # Align replay retention and cancellation storage bounds
 
 - Severity: Medium
-- Status: Open
-- Owner: [P001](../design/proposals/001-secure-persistent-conversations.md#contracts-and-security)
+- Status: In progress
+- Owner: [P007](../design/proposals/007-session-history-and-recovery.md) corrective implementation; [P001](../design/proposals/001-secure-persistent-conversations.md#contracts-and-security) acceptance
 - Recorded: 2026-09-07
 - Affected files: packages/storage/src/maintenance.ts; apps/api/src/server.ts
 - Acceptance: P001-03 replay resynchronization and P001-07 bounded storage; inherited by subsequent API clients
@@ -18,6 +18,8 @@ Independent review round 3 identified these remaining bounds at source digest 05
 The implemented replay and cancellation workflows remain available, but their exact storage limits do not fully match the canonical P001 contract. This record carries the noncritical follow-up from the [implementation review](archive/2026-09-07-174757-p001-review-findings.md); it is not a claim that these bounds were fixed.
 
 ## Next steps
+
+On 7 September 2026, P007 took corrective implementation ownership for both replay age/count and reserved cancellation/recovery capacity, mapping to P007-02/05/06 and inherited P001-03/07. Its canonical proposal records the concrete design while implementation proceeds. This issue remains active until the complete correction, independent review, boundary tests, and documentation pass; ownership is not resolution or archival transfer.
 
 Enforce a documented event count/age bound without expiring durable messages, unresolved operations, approvals, or required idempotency records. Reserve bounded cancellation/recovery capacity before admitting ordinary work, and prevent failed/no-op control retries from accumulating indefinitely.
 
