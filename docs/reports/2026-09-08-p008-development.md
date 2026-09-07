@@ -1,6 +1,6 @@
 # P008 scheduling development checkpoint — 8 September 2026
 
-[P008](../../design/proposals/008-scheduled-tasks.md) is **Accepted / Implemented**, not Verified. Two feature review rounds and bounded module integration review have closed at integration commit `9f3b414`. The dated checkpoints below retain their original scope. Dedicated DST end-to-end, live-account and protected full restore/promotion evidence remain pending; the current acceptance mapping below qualifies the historical results.
+[P008](../../design/proposals/008-scheduled-tasks.md) is **Accepted / Implemented**, not Verified. Two feature review rounds and bounded module integration review have closed at integration commit `9f3b414`. The dated checkpoints below retain their original scope. The targeted DST follow-up below has passed; dedicated live-account and protected full restore/promotion evidence remain pending. The acceptance mapping preserves the historical evidence boundary.
 
 ## Implemented checkpoint
 
@@ -72,3 +72,19 @@ Run `9cefdbb8f5` executed the expanded real-stack suite, despite its stale inter
 | P008-07 | Missing dedicated credentials: remains unverified; no fixture or metadata bridge result substitutes for it. |
 
 The separate actual Linux metadata bridge checks fresh-instance paused/revoked authority and stale-job denial, with the exact predecessor/migration checks described above. They do not establish protected full filesystem restoration or promotion. No broad suite was rerun solely for this label and documentation correction.
+
+
+## Targeted P008-02 DST follow-up — 8 September 2026
+
+`pnpm test:e2e --schedules-dst` passed on Node24.11.1 in run `caa98775a7`, exact start/end source `18682c08061e1617f5a2d6cc9d2e54b359e29fd7473a959c446c99c11fcef0a3` (999 files). The real authenticated browser/API/PostgreSQL/supervisor lane rejects nonexistent one-time minutes through the UI, shows the exact timezone/local/offset/UTC cron preview, admits the schedule through the API and checks its single successful persisted occurrence and ordinary turn identity. Only external OIDC/Codex boundaries and the guarded scheduler clock are fixtures; authentication, grants and lease clocks remain real.
+
+| Case | Expected first persisted local minute | UTC instant |
+| --- | --- | --- |
+| New York spring gap | 2026-03-09 02:30 | 2026-03-09 06:30Z |
+| New York autumn fold | 2026-11-01 01:30 | 2026-11-01 05:30Z |
+| Lord Howe half-hour gap | 2026-10-05 02:15 | 2026-10-04 15:15Z |
+| Apia skipped day | 2011-12-31 12:00 | 2011-12-30 22:00Z |
+
+During the second New York 01:30 instant, the test restarts the supervisor, waits for its actual planner pass, checks the persisted next due time is the following day and requires unchanged original occurrence/turn IDs. This closes the missing real-stack DST scope in the mapping above; earlier UTC clock-jump coverage remains separate. Evidence is `.test-runs/harbor-e2e-caa98775a7/{result.json,dst-cases.json,dst-preview.png}`. `pnpm check` passed at the same code; the owned fresh stack was cleaned by the normal harness.
+
+Three preliminary runs failed test assumptions: project/session creation returns200, the cron label includes help text, and an idle planner updates `last_planned_at` rather than its due-work `last_observed_at`. Their logs remain retained. Corrections changed only test contract/locator/observation logic. No production code, runtime adapter or isolation boundary changed; no broad regression rerun is claimed for this test-only addition. Independent bounded source and matching-artifact review closed with no actionable finding. Live-account and protected full restore/promotion gates remain unverified.

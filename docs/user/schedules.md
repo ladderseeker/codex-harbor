@@ -1,6 +1,6 @@
 # Scheduled work
 
-P008 is Implemented, not Verified. Two feature review rounds and bounded module integration review have closed. Dedicated DST end-to-end, live-account and protected full restore/promotion evidence remain pending. The [proposal](../../design/proposals/008-scheduled-tasks.md) owns the full contract and delivery gates.
+P008 is Implemented, not Verified. Two feature review rounds and bounded module integration review have closed. Targeted DST end-to-end acceptance has passed; dedicated live-account and protected full restore/promotion evidence remain pending. The [proposal](../../design/proposals/008-scheduled-tasks.md) owns the full contract and delivery gates.
 
 Open **Schedules** in the sidebar, choose a project, and create a schedule. Enter the prompt, model, effort and permission profile, then preview the next occurrences before activating it. The preview shows the requested local minute, timezone, UTC offset and actual UTC instant.
 

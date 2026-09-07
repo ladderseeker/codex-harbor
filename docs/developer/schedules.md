@@ -1,6 +1,6 @@
 # Schedule API and verification
 
-P008 is Implemented, not Verified. Feature and bounded module integration reviews have closed; DST-specific end-to-end, dedicated live-account and protected full restore/promotion evidence remain pending. The [user guide](../user/schedules.md) describes the implemented interface, while [P008](../../design/proposals/008-scheduled-tasks.md) retains full acceptance, dependency and live-account obligations. The real Linux metadata rebind check establishes the fixed administrator bridge, not a full filesystem restore or installed release.
+P008 is Implemented, not Verified. Feature and bounded module integration reviews have closed; Targeted DST end-to-end acceptance has passed; dedicated live-account and protected full restore/promotion evidence remain pending. The [user guide](../user/schedules.md) describes the implemented interface, while [P008](../../design/proposals/008-scheduled-tasks.md) retains full acceptance, dependency and live-account obligations. The real Linux metadata rebind check establishes the fixed administrator bridge, not a full filesystem restore or installed release.
 
 The versioned `/api/v1/openapi.json` document declares request/response schemas, path parameters and token scopes. Cookie mutations require exact Origin and X-CSRF-Token. Cookie-free bearer calls use explicit project grants and the following scopes:
 
@@ -23,6 +23,7 @@ Available specialist entry points are:
 
 - `pnpm test:schedules`: calendar boundaries and actual isolated PostgreSQL/pg-boss admission, including COMMIT rejection and post-lock authority checks.
 - `pnpm test:e2e --schedules`: fresh Caddy/PostgreSQL/browser/API/supervisor with external OIDC and Codex fixtures. It includes actual persisted quota prefill for boundary tests, clearly distinguished from physically running work.
+- `pnpm test:e2e --schedules-dst`: targeted real UI/API/PG/supervisor timezone preview and persisted occurrence checks for New York gap/fold, Lord Howe half-hour gap and Apia skipped day, including restart during the repeated hour. This uses only the guarded scheduler clock, not a changed authentication clock.
 - `pnpm test:isolation --schedules`: the supported Linux XFS profile, using real managed allocation/copy and API/supervisor scheduling. The Codex boundary remains a fixture; this command does not establish model behavior or replace native runner isolation evidence. Actual managed-XFS copy scheduling passed on Node24.11.1; see the [development evidence](../reports/2026-09-08-p008-development.md).
 - `pnpm test:live --schedules`: the managed Linux stack plus one real pinned Codex scheduled occurrence, with the browser closed. It requires a dedicated `HARBOR_TEST_OPENAI_API_KEY`; `HARBOR_TEST_CODEX_MODEL` selects an explicitly discovered configured model. The observed missing-key path exits 2 before resources or model requests. The real-account branch remains unverified.
 
