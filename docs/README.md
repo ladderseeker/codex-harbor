@@ -8,6 +8,7 @@ This directory describes available behavior, developer workflows, and completed 
 - [Terminal user guide](user/terminals.md): shell control, detach versus termination, replay limits and current isolation restrictions.
 - [P006 feature evidence](reports/2026-09-08-p006-development.md): two review rounds, complete terminal/critical/workspace acceptance and separately qualified native Linux checks.
 - [File/terminal/deployment integration](reports/2026-09-08-p004-p006-integration.md): reviewed combined source, shared Git correction and pending installed-module acceptance.
+- [Installed module integration](reports/2026-09-08-installed-module-integration.md): file/terminal registry, maintenance and restored-authority implementation, with exact intermediate and current Linux evidence and remaining gates.
 - [Deployment development commands](developer/deployment.md): current P009 administrator tooling, partial Linux evidence and blocked restore/transfer gates.
 - [P009 development checkpoint](reports/2026-09-08-p009-development.md): partial implementation and installed-profile results; not a release-readiness report.
 - [Linux execution verification](developer/linux-verification.md): dedicated XFS storage, real runner checks, and scoped cleanup.

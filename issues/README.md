@@ -8,6 +8,7 @@ The archive contains resolved P001/P003/P005/P007/P009 review findings, authorit
 
 | Issue | Severity | Status | Owner | Next action |
 | --- | --- | --- | --- | --- |
+| [P010 artifact link boundary](2026-09-08-045236-p010-artifact-link-boundary.md) | Medium | In progress | P010 | Reject exact parent-directory link targets and independently verify hostile-archive containment. |
 | [P008 implementation review](2026-09-08-044007-p008-implementation-review.md) | High | In progress | P008 | Two corrective source/feature rounds closed; record committed correction and independent regression-evidence review. |
 | [Resume readiness](2026-09-08-044008-p009-resume-readiness.md) | Medium | In progress | P009 | Preserve maintenance until bounded readiness, independently review the correction and verify the actual Linux command outcome. |
 | [P005 selection regression](2026-09-08-044009-p005-selection-regression.md) | Medium | In progress | Regression maintainer | Review bounded diagnostics and preserve unexplained failures separately from the passing critical run; establish cause on recurrence. |

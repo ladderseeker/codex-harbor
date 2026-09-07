@@ -98,3 +98,5 @@ Design review: an independent agent checked runtime separation, authority, typed
 ## Implementation record
 
 - 2026-09-07: Started isolated implementation on the reviewed attachment/workspace/history integration `cb6be0d`, under the accepted contract. Migration 011 is reserved. Coordinate the generic typed writer interface with P004 migration 010; terminal semantics remain independently owned by P006.
+
+- 2026-09-08: Two feature review rounds and complete terminal acceptance closed on their recorded sources. Root `2bdb5ef` adds reviewed installed module checkpoint `77b2ad5`, source `f13afc57f3956a7b457e567da02f1bb00ad214405c52c7a3d28f2d5c94ad1d27` /961 files. It includes bounded drain, exact retirement/recovery and revoked restored controller/input authority; matching critical/workspace/full-terminal application suites passed. The [module report](../../docs/reports/2026-09-08-installed-module-integration.md) preserves distinct Linux/installed evidence and pending final installed/release gates. Delivery remains In progress.

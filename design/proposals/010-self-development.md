@@ -10,6 +10,7 @@
 
 ## Source issues
 
+- [Artifact link boundary](../../issues/2026-09-08-045236-p010-artifact-link-boundary.md): Medium, In progress. The early outside-worker static verifier accepts an exact parent-directory symlink target; the separate installer rejects it. Correct and independently verify archive containment without claiming that a static binding establishes complete candidate acceptance.
 - [P009 backup-transfer authorization](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, blocked. P010-06's real promotion/rollback depends on the P009 protected checkpoint; candidate builds cannot bypass the rejected payload/destination transfer. Continue self-development implementation and independent checks before requesting the concrete required approval.
 - [Dedicated live credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md): High, blocked. P010-07's real coding conversation remains unverified without its dedicated account; fixture-scripted source edits establish a separate end-to-end outcome.
 - [P009 runtime/release evidence](../../issues/archive/2026-09-07-073831-codex-runtime-compatibility.md): Transferred, not resolved. P010 inherits the relevant installed runtime and compatibility gates; local build success cannot establish deployment readiness.
