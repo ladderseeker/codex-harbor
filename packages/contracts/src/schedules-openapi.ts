@@ -380,7 +380,10 @@ export const schedulePaths: Record<string, any> = {
         required: ["occurrence"],
         properties: {
           occurrence: object({ id: uuid, state: text }),
-          operation: ref("Operation"),
+          operation: object(
+            { id: uuid, state: text, control_attempts: positive },
+            ["id", "state"],
+          ),
           message: text,
         },
         additionalProperties: true,

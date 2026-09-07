@@ -10,7 +10,11 @@ export interface WorkspaceProvision extends WorkspaceIdentity {
   sourceDirty: boolean;
 }
 export interface WorkspaceCommand {
-  action: "workspaceCreate" | "workspaceInspect" | "workspaceRemove";
+  action:
+    | "workspaceCreate"
+    | "workspaceInspect"
+    | "workspaceValidate"
+    | "workspaceRemove";
   operationId?: string;
   retryFailed?: boolean;
   sourceSnapshot?: string;
@@ -40,6 +44,9 @@ export interface WorkspaceView {
   sourceDirty: boolean;
   release?: { id: string; state: string; failureCode: string | null } | null;
   writerSessionId: string | null;
+  writerKind?: "conversation" | "file" | "terminal" | null;
+  writerOwnerId?: string | null;
+  writerEpoch?: number;
   writerGeneration: number | null;
   failureCode: string | null;
 }

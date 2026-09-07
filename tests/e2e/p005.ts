@@ -262,6 +262,22 @@ export async function p005({
   ).toHaveLength(1);
   await page.goto(origin + "/?conversation=" + other.id);
   const text = Buffer.from("<script>window.attachmentExecuted=true</script>");
+  await writeFile(
+    path.join(artifacts, "p005-text-selection-readiness.json"),
+    JSON.stringify({
+      visibleAttachEnabled: await page
+        .getByRole("button", { name: "Attach file", exact: true })
+        .isEnabled(),
+      hiddenInputEnabled: await page
+        .getByLabel("Choose attachment")
+        .isEnabled(),
+    }),
+  );
+  // setInputFiles bypasses the hidden input's visible button. Observe the same
+  // readiness gate a real file-picker interaction must pass; never retry a mutation.
+  await expect(
+    page.getByRole("button", { name: "Attach file", exact: true }),
+  ).toBeEnabled();
   await page
     .getByLabel("Choose attachment")
     .setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: text });
@@ -563,6 +579,9 @@ export async function p005({
     },
     { times: 1 },
   );
+  await expect(
+    page.getByRole("button", { name: "Attach file", exact: true }),
+  ).toBeEnabled();
   await page.getByLabel("Choose attachment").setInputFiles({
     name: "retry.txt",
     mimeType: "text/plain",
@@ -604,6 +623,9 @@ export async function p005({
     },
     { times: 1 },
   );
+  await expect(
+    page.getByRole("button", { name: "Attach file", exact: true }),
+  ).toBeEnabled();
   await page.getByLabel("Choose attachment").setInputFiles({
     name: "lost.txt",
     mimeType: "text/plain",
@@ -694,6 +716,9 @@ export async function p005({
     },
     { times: 1 },
   );
+  await expect(
+    page.getByRole("button", { name: "Attach file", exact: true }),
+  ).toBeEnabled();
   await page.getByLabel("Choose attachment").setInputFiles({
     name: "preflight.txt",
     mimeType: "text/plain",
@@ -764,6 +789,9 @@ export async function p005({
   } finally {
     page.off("response", observeReload);
   }
+  await expect(
+    page.getByRole("button", { name: "Attach file", exact: true }),
+  ).toBeEnabled();
   await page.getByLabel("Choose attachment").setInputFiles({
     name: "preflight.txt",
     mimeType: "text/plain",

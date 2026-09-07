@@ -1,8 +1,10 @@
 # Detect and reconcile allocated project slots without database registration
 
 - Severity: Medium
-- Status: In progress
-- Owner: [P009](../design/proposals/009-portable-deployment-and-restore.md), deployment readiness and backup consistency
+- Status: Resolved
+- Archive disposition: Resolved
+- Archived: 2026-09-08
+- Owner: [P009](../../design/proposals/009-portable-deployment-and-restore.md), deployment readiness and backup consistency
 - Recorded: 2026-09-07
 - Affected files: apps/api/src/server.ts; packages/storage/src/index.ts; infra/storage/quota.py
 - Acceptance: P009-01/04/05; trusted storage preflight and complete backup registry
@@ -25,4 +27,14 @@ Provide an explicit trusted recovery path that validates identity, quota, owners
 
 `tests/deployment/allocation-loss.ts` in the P009 worktree exercised immutable artifact `f7490e28eec65a338e920aff83f944a45af986643dfa544991a528cff5d17ecd` in the fresh installed `deploy-c97498fe` instance on the owned Ubuntu 24.04 arm64 VM. It used the actual Harbor API, PostgreSQL and trusted XFS allocator; only external OIDC identity was a fixture. A deferred PostgreSQL COMMIT failure occurred after quota-slot publication. The directory remained without a project row, and the same create-key retry failed explicitly rather than replacing it. A fresh owner request through the supported existing-project registration path recovered project `0eb7c1e9-af22-4108-bcb9-768931e59d44` with the original device/inode identity unchanged.
 
-The executed result was printed in the tool transcript; no standalone result JSON was written by that test. The P009 worktree report `docs/reports/2026-09-08-p009-development.md`, installed package and recovered project retain the supporting evidence. Checkpoint inventory now refuses unregistered managed directories before transfer. Independent review of the complete correction and its related unknown-slot preservation remains pending; no protected backup was transferred. This is intermediate correction evidence, not issue resolution or complete P009 acceptance.
+The executed result was printed in the tool transcript; no standalone result JSON was written by that test. The [deployment report](../../docs/reports/2026-09-08-p009-development.md), installed package and recovered project retain the supporting evidence. Checkpoint inventory now refuses unregistered managed directories before transfer. Independent review of this issue's complete correction and inventory obligations remained pending at that checkpoint even though two related implementation review rounds had closed; no protected backup was transferred. This is intermediate correction evidence, not complete P009 acceptance.
+
+## Resolution — 8 September 2026
+
+The final inventory/reconciliation test ran against immutable installed artifact `6dd02dba8efa54179667afef6e48c2623986d32a76e1bed68ea8cae4355b9dc8` in disposable `deploy-29946354`, on Ubuntu 24.04 arm64, Node 24.11.1, PostgreSQL 17.6 and quota-backed XFS. `tests/deployment/allocation-loss.ts` uses the real owner-authenticated API, a deferred PostgreSQL COMMIT fault, the trusted allocator and the **installed** `harborctl inventory` command. Only external OIDC identity is a fixture.
+
+The orphan remains on disk and is reported with its explicit registration path. Repeating the original create request fails without replacing the directory. A new, deliberate existing-project registration recovers project `8765cc85-2c64-4acf-900c-97f763d36414` with its original device/inode, and that registered entry disappears from the unregistered inventory. The retained result is `.test-runs/p009-allocation-inventory-linux.json` in the P009 worktree, copied from the installed fixture's `allocation-loss-result.json`; unlike the earlier checkpoint, this run wrote its result directly.
+
+The complementary actual Linux publication lane on source `2ae952b318729bbb08525635a0ae4a04e21d2fe91cd38fdbf2cb33b045285c1f` preserved an unknown pool-slot sentinel and another untouched slot through owned publication failure/recovery. The separate reviewer inspected the final inventory test and retained result together with that preservation evidence, and closed this issue's bounded detection/reconciliation obligations in one focused closure review following the two P009 baseline rounds. The reviewed inventory assertions are retained in the repository test.
+
+Initial project allocation remains non-atomic across SQL and the filesystem; resolution provides detection, blocked completeness claims and deliberate identity-checked recovery, not automatic adoption or rollback. Complete protected backup/restore, later module inventories and release/live gates remain separately owned by P009. No protected transfer, source-host fencing or fresh-host restore is inferred from this issue's closure.

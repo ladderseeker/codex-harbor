@@ -1,7 +1,15 @@
 import { scheduleE2e } from "../schedules/e2e.ts";
+if (process.argv.includes("--terminals")) {
+  await import("../terminals/e2e.ts");
+  process.exit(process.exitCode ?? 0);
+}
 import { p005 } from "./p005.ts";
 import { p007 } from "./p007.ts";
 import { createPool } from "../../packages/storage/src/index.ts";
+if (process.argv.includes("--files")) {
+  await import("../files/e2e.ts");
+  process.exit(process.exitCode ?? 0);
+}
 if (process.argv.includes("--workspaces")) {
   await import("../workspaces/e2e.ts");
   process.exit(process.exitCode ?? 0);
@@ -164,6 +172,7 @@ try {
     const db = new pg.Pool({ connectionString: env.DATABASE_URL });
     try {
       await scheduleE2e({
+        fixtureState: env.HARBOR_FIXTURE_STATE_DIR,
         browser,
         db,
         origin,

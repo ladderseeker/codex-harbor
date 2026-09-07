@@ -6,6 +6,13 @@ const tokenScopes = [
   "cancel",
   "schedules:read",
   "schedules:manage",
+  "files:read",
+  "files:write",
+  "git:read",
+  "git:write",
+  "terminal:read",
+  "terminal:control",
+  "terminal:terminate",
 ] as const;
 export const tokenSchema = z
   .object({

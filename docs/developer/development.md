@@ -8,9 +8,15 @@ P002 adds scoped credentials for external clients; use the [programmatic API gui
 
 P003 adds managed parallel workspaces; see the [workspace guide](workspaces.md) and [implementation evidence](../reports/2026-09-07-p003-workspaces.md). Its combined P001/P002/P003 application and actual Linux checks passed on Node 24; the real-account parallel-turn gate remains open.
 
+P004's reviewed file editor and Git actions are being integrated with terminal and deployment behavior. The [file guide](files.md) explains the available read/edit/review flows and Linux write prerequisite; the [feature report](../reports/2026-09-08-p004-files.md) records two review rounds and matching critical/Linux acceptance without claiming completed cumulative integration.
+
+P006 adds persistent terminals with bounded output, explicit control ownership and retirement. The [terminal guide](../user/terminals.md) describes current behavior. The [combined file/terminal report](../reports/2026-09-08-p004-p006-integration.md) records the reviewed shared Git fence and passing cumulative critical/terminal application suites; installed maintenance and restore integration is still in progress.
+
 P005 adds bounded image/text attachments and saved drafts. See [attachment verification](attachments.md) for API/storage boundaries, real Linux publication checks, and the separate live-account command. Three feature review rounds and a separate cumulative integration review passed. The [integration report](../reports/2026-09-07-p005-integration.md) records Node 24 application/workspace acceptance and the unchanged Linux boundary; the mandatory real-account gate remains open.
 
 P007 adds bounded history search, visibility-only conversation archival and explicit uncertainty fencing/continuation. Its [integration report](../reports/2026-09-07-p007-history-integration.md) records two feature reviews, separate integration review, Node 24 combined acceptance, and the unchanged Linux boundary. Review, authority-expiry and replay/control-bound findings are resolved; dedicated live-account evidence remains open.
+
+P009 deployment work is In progress. Its [development command guide](deployment.md) documents the implemented administrator interface, tested subset and explicit transfer/live blockers; it is not a production-readiness claim.
 
 ## Run the deterministic application locally
 
@@ -96,7 +102,7 @@ Assign each run a unique identity and clean up only its own processes, container
 
 Development starts locally on macOS/Linux and later uses the same entry points on compatible Linux VPS hosts. The [local environment design](../../design/architecture.md#local-first-development-and-portable-environments) owns the planned topology and Linux VM requirements. [P010](../../design/proposals/010-self-development.md) owns developing Harbor through its stable instance; [P009](../../design/proposals/009-portable-deployment-and-restore.md) owns deployment, restore, and external recovery.
 
-Those capabilities are planned, not operational today. As they are implemented, add tested setup and recovery instructions here or in linked operational guides. Keep future broker, candidate, and promotion specifications in their canonical design/proposals rather than copying them into this handbook. Existing authorization still governs work; self-development does not create a separate standing permission gate.
+Deployment tooling has partial installed-profile evidence and a [current command guide](deployment.md); complete checkpoint/restore and release readiness remain unverified. The self-development broker and candidate workflow are in implementation. Add tested usage as those outcomes become available, keeping their evolving specifications in the canonical design/proposals. Existing authorization still governs work; self-development does not create a separate standing permission gate.
 
 ## History and recovery API
 
@@ -107,3 +113,15 @@ History pagination uses a filter-bound cursor and a maximum page size of 50. Met
 Migration 007 adds history metadata, replay watermarks, recovery attempts and bounded control reservations. New conversations have a 500-record ceiling with ordinary turn admission stopped at 400 retained records. Existing histories receive a one-time ceiling sufficient to preserve all records and reserve missing cancellation/fencing slots. This does not permit further ordinary work above the admission limit. Recovery reports and audit slots have separate fixed bounds. Restore a matching database backup when rolling back across this migration; older binaries do not understand acknowledged uncertainty and must not be pointed at the upgraded database.
 
 `tests/e2e/p007.ts` runs inside the same real-stack harness as the P001 regressions. It exercises UI search/rename/archive, API and supervisor restart, a dropped accepted continuation response, native projection repair/conflict, actual PostgreSQL stop/start, deferred-commit recovery failures, replay age/count and saturated control reservations. `tests/contract/history.test.ts` checks pinned native non-model behavior on a fresh CODEX_HOME and persisted fixture history. A dedicated live native turn remains an explicit unavailable gate; the fixture does not establish Linux isolation or live-account recovery.
+
+## Terminal development
+
+`pnpm test:e2e --terminals` runs the terminal browser/API/database/supervisor lane. Its external Codex fixture wraps a real run-owned shell/PTy, but supplies no Linux confinement evidence. `tests/contract/terminal.test.ts` separately starts the pinned real Codex runtime with an empty private home and no account, and checks PTY readiness, resize, delayed exit and exact terminal seccomp policy. `pnpm test:isolation --terminals` uses the supported [Linux verification environment](linux-verification.md), including the P003 Git helper image, to verify actual terminal mounts, quota/namespace denials, no network, background retirement and crash behavior.
+
+Migration 011 adds terminal metadata, input outcomes and byte output, plus the shared typed workspace writer reservation. Its persistent reservation epoch is independent of the native conversation generation. Older binaries do not understand terminal ownership; do not run them on this upgraded database. Backups cannot resume a native PTY, and portable drain/restore integration remains a P009 integration gate.
+
+The API exposes explicit terminal routes and a restricted WebSocket protocol; input is sequenced by terminal generation and controller epoch rather than an ordinary command idempotency key. Creation/control/termination retain timestamped Idempotency-Key handling. The trusted factory selects the fixed external-sandbox policy only after confined Linux runner admission. No API request can choose a sandbox, argv, environment or host path. The authenticated application document supplies a style-only nonce to the pinned xterm build adapter; script policy stays self-only.
+
+## Scheduled work development
+
+P008 is in progress. The [schedule API and verification guide](schedules.md) describes its current isolated UI/API and specialist test entry points, including the unverified managed/live and deployment integration gates.

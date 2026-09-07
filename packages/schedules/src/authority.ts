@@ -1,3 +1,5 @@
+import { lockScheduleOwner } from "./locking.ts";
+import { deploymentAdmission } from "../../storage/src/deployment.ts";
 import { timeFingerprint } from "./time.ts";
 import type { PoolClient } from "pg";
 import type {
@@ -42,6 +44,7 @@ export async function requireScheduleAuthority(
   if (!grant) return deny();
   // The owner identity gate is already held. Source PAT precedes schedule/grant,
   // project/workspace/session locks; subsequent checks reuse that lock order.
+  await lockScheduleOwner(db);
   const source = grant.source_pat_id
     ? await sourceAuthority("pat:" + grant.source_pat_id, {
         scope: "execute",
@@ -53,6 +56,7 @@ export async function requireScheduleAuthority(
       })
     : undefined;
   if (source && !source.scopes?.includes("schedules:manage")) return deny();
+  await deploymentAdmission(db);
   await db.query("SELECT id FROM schedules WHERE id=$1 FOR SHARE", [
     grant.schedule_id,
   ]);

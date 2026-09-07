@@ -3,9 +3,20 @@ import {
   initializeScheduleQueue,
   SCHEDULE_QUEUE,
 } from "../../../packages/schedules/src/queue.ts";
+import { TerminalSupervisor } from "./terminals.ts";
 import { prepareAttachments } from "../../../packages/attachments/src/materialize.ts";
 import { maintainAttachments } from "../../../packages/attachments/src/store.ts";
+import {
+  processFiles,
+  recoverFileStartup,
+  retireActiveFiles,
+} from "./files.ts";
 import { processRecovery } from "./recovery.ts";
+import {
+  deploymentAdmission,
+  deploymentState,
+  verifyInstalledSchema,
+} from "../../../packages/storage/src/deployment.ts";
 import { processWorkspaceStorage } from "./workspace-storage.ts";
 import {
   processWorkspaceReleases,
@@ -53,7 +64,8 @@ import type {
 } from "../../../packages/codex-adapter/src/index.ts";
 const c = config(),
   pool = createPool(c.DATABASE_URL);
-await migrate(pool);
+if (process.env.HARBOR_MANAGED_RELEASE) await verifyInstalledSchema(pool);
+else await migrate(pool);
 const ownerPin = digest(c.HARBOR_OIDC_ISSUER + "\0" + c.HARBOR_OWNER_SUBJECT);
 await bindIdentity(pool, ownerPin);
 let discovering = false;
@@ -66,6 +78,7 @@ if (
 )
   throw Error("Another supervisor owns this instance");
 let alive = true;
+let terminals: TerminalSupervisor | undefined;
 type RuntimeState = {
   adapter: CodexAdapter;
   generation: number;
@@ -85,13 +98,15 @@ const retirement = new RetirementRegistry<CodexAdapter>();
 const retire = (adapter: CodexAdapter) => retirement.retire(adapter);
 fence.on("error", () => {
   alive = false;
+  void terminals?.stop();
   const owned = [...runtimes.values()].map((runtime) => runtime.adapter);
   if (discoveryTransport) owned.push(discoveryTransport);
   for (const adapter of owned) adapter.close();
   const deadline = setTimeout(() => process.exit(1), 25000);
-  void Promise.allSettled(
-    owned.map((adapter) => adapter.closeAndWait()),
-  ).finally(() => {
+  void Promise.allSettled([
+    ...owned.map((adapter) => adapter.closeAndWait()),
+    retireActiveFiles(),
+  ]).finally(() => {
     clearTimeout(deadline);
     process.exit(1);
   });
@@ -127,6 +142,9 @@ const generation = await transaction(pool, async (db) => {
   }
   return g;
 });
+await recoverFileStartup(pool);
+terminals = new TerminalSupervisor(pool, c, () => alive);
+terminals.start();
 if (c.HARBOR_FIXTURE_MODE) {
   const probe = await createRuntime({
     sessionId: randomUUID(),
@@ -216,7 +234,13 @@ async function clearNativeCredentials() {
 const closeCredentials = await serveCredentials(credentials, c);
 let lastDiscovery = 0;
 async function discover() {
-  if (discovering || credentials.mutating) return;
+  if (
+    discovering ||
+    credentials.mutating ||
+    (await deploymentState(pool)).maintenance ||
+    (await deploymentState(pool)).activation_required
+  )
+    return;
   discovering = true;
   try {
     if (
@@ -310,10 +334,11 @@ await boss.work(SCHEDULE_QUEUE, { pollingIntervalSeconds: 0.5 }, async () => {
 });
 let scheduleTick: Promise<void> | undefined;
 const scheduleFence = async (db: import("pg").PoolClient) => {
+  const deployment = await deploymentState(db);
+  if (deployment.maintenance || deployment.activation_required)
+    throw Error("Schedule deployment admission closed");
   const meta = (
-    await db.query(
-      "SELECT generation,identity_pin,emergency FROM harbor_meta FOR SHARE",
-    )
+    await db.query("SELECT generation,identity_pin,emergency FROM harbor_meta")
   ).rows[0];
   if (
     !alive ||
@@ -539,6 +564,7 @@ async function onRequest(
     await event(db, sessionId, "approval.pending", { operationId });
   });
 }
+let filesTick: Promise<void> | undefined;
 let lastMaintenance = 0;
 async function tick() {
   if (!alive) return;
@@ -560,6 +586,7 @@ async function tick() {
     lastMaintenance = Date.now();
   }
   if (credentials.mutating) return;
+  if ((await deploymentState(pool)).activation_required) return;
   if (!scheduleTick)
     scheduleTick = processSchedules(pool, boss, c, scheduleFence)
       .catch(() => {
@@ -584,6 +611,14 @@ async function tick() {
       await requireAuthority(db, row.actor_hash, c, need);
     },
   );
+  if (!filesTick)
+    filesTick = processFiles(pool, c, () => alive, { generation, ownerPin })
+      .catch(() => {
+        console.error("File effect settlement remains pending");
+      })
+      .finally(() => {
+        filesTick = undefined;
+      });
   await processWorkspaceReleases(pool, {
     config: c,
     current: () => alive && !credentials.mutating,
@@ -629,7 +664,8 @@ async function tick() {
         const w = await sessionWorkspace(db, id, true);
         if (
           w.state !== "ready" ||
-          (w.writer_session_id && w.writer_session_id !== id)
+          (w.writer_owner_id &&
+            (w.writer_kind !== "conversation" || w.writer_owner_id !== id))
         )
           throw Error("Workspace owned by another operation or unavailable");
         if (
@@ -645,7 +681,7 @@ async function tick() {
       releaseWorkspace: async (db, input) => {
         const w = await selectedWorkspace(db, input.workspaceId, true);
         if (input.generation === null) {
-          if (w.writer_session_id !== null) throw Error("Reservation changed");
+          if (w.writer_owner_id !== null) throw Error("Reservation changed");
           return;
         }
         await releaseRecoveredWorkspace(db, {
@@ -920,8 +956,9 @@ async function tick() {
         cancel.id,
       ]);
   }
+  if ((await deploymentState(pool)).maintenance) return;
   const candidates = await pool.query(
-    "SELECT o.*,s.native_thread_id,s.project_id,s.workspace_id,p.root_id,w.relative_path,w.device,w.inode,w.canonical_path,w.common_path,w.common_device,w.common_inode FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id WHERE w.state='ready' AND p.archived_at IS NULL AND w.writer_session_id IS NULL AND o.kind='turn' AND o.state='queued' AND s.state<>'uncertain' AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.session_id=o.session_id AND active.kind='turn' AND (active.state IN ('dispatching','running','waiting_approval','waiting_input') OR (active.state='uncertain' AND active.uncertainty_acknowledged_at IS NULL))) ORDER BY o.created_at LIMIT 4",
+    "SELECT o.*,s.native_thread_id,s.project_id,s.workspace_id,p.root_id,w.relative_path,w.device,w.inode,w.canonical_path,w.common_path,w.common_device,w.common_inode FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id WHERE w.state='ready' AND p.archived_at IS NULL AND w.writer_owner_id IS NULL AND o.kind='turn' AND o.state='queued' AND s.state<>'uncertain' AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.session_id=o.session_id AND active.kind='turn' AND (active.state IN ('dispatching','running','waiting_approval','waiting_input') OR (active.state='uncertain' AND active.uncertainty_acknowledged_at IS NULL))) ORDER BY o.created_at LIMIT 4",
   );
   for (const o of candidates.rows) {
     if ([...runtimes.values()].filter((r) => r.operation).length >= 4) break;
@@ -1128,6 +1165,10 @@ async function tick() {
                       ? undefined
                       : captured.permissionProfile,
                 });
+              await deploymentAdmission(
+                fence,
+                captured.authorityScope !== "execute",
+              );
               const result = send();
               await fence.query("COMMIT");
               return result;
@@ -1258,9 +1299,12 @@ const timer = setInterval(() => {
 }, 250);
 async function stop() {
   alive = false;
+  await terminals?.stop();
   clearInterval(timer);
   discoveryTransport?.close();
   for (const r of runtimes.values()) r.adapter.close();
+  await retireActiveFiles();
+  await filesTick;
   await closeCredentials?.();
   await boss.stop();
   await scheduleTick;

@@ -7,7 +7,7 @@ import {
   type Scope,
 } from "../../../packages/policy/src/authority.ts";
 export type TokenRoutePolicy = {
-  scope: Scope;
+  scope: Scope | ((db: Pool | PoolClient, req: any) => Promise<Scope>);
   resource: (
     db: Pool | PoolClient,
     req: any,
@@ -38,7 +38,10 @@ export async function authorizeTokenRoute(
   if (extension) {
     const resource = await extension.resource(db, req);
     await requireAuthority(db, authority.hash, c, {
-      scope: extension.scope,
+      scope:
+        typeof extension.scope === "function"
+          ? await extension.scope(db, req)
+          : extension.scope,
       ...resource,
     });
     return;

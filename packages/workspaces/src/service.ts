@@ -20,6 +20,9 @@ export function workspaceView(w: any): WorkspaceView {
     baseRevision: w.base_revision,
     sourceDirty: w.source_dirty,
     writerSessionId: w.writer_session_id,
+    writerKind: w.writer_kind,
+    writerOwnerId: w.writer_owner_id,
+    writerEpoch: Number(w.writer_epoch ?? 0),
     writerGeneration:
       w.writer_generation == null ? null : Number(w.writer_generation),
     failureCode: w.failure_code,
@@ -59,6 +62,43 @@ export async function selectedWorkspace(db: DB, id: string, lock = false) {
 }
 export async function verifyWorkspace(w: any) {
   try {
+    if (process.env.HARBOR_STORAGE_SOCKET) {
+      const roots = JSON.parse(process.env.HARBOR_PROJECT_ROOTS ?? "[]");
+      const root = roots.find(
+        (r: any) =>
+          w.canonical_path?.startsWith(r.path + "/") &&
+          (!w.root_id || r.id === w.root_id),
+      );
+      if (!root) throw Error("Workspace authority unavailable");
+      const relativePath = w.canonical_path.slice(root.path.length + 1);
+      await workspaceCommand({
+        action: "workspaceValidate",
+        rootId: root.id,
+        relativePath,
+        workspaceId: w.workspace_id ?? w.id,
+        kind: ["local", "copy", "worktree"].includes(w.kind)
+          ? w.kind
+          : w.common_path
+            ? "worktree"
+            : "local",
+        source: { relativePath, device: w.device, inode: w.inode },
+        identity: {
+          canonical: w.canonical_path,
+          device: w.device,
+          inode: w.inode,
+          ...(w.common_path
+            ? {
+                common: {
+                  canonical: w.common_path,
+                  device: w.common_device,
+                  inode: w.common_inode,
+                },
+              }
+            : {}),
+        },
+      });
+      return w.canonical_path as string;
+    }
     if (
       !w.canonical_path ||
       (await realpath(w.canonical_path)) !== w.canonical_path
@@ -153,14 +193,27 @@ export async function requireWorkspaceIdle(
       "Project storage operation pending",
     );
   const busy = await db.query(
-    `SELECT 1 FROM workspaces WHERE ${wholeProject ? "project_id" : "id"}=$1 AND writer_session_id IS NOT NULL LIMIT 1`,
+    `SELECT 1 FROM workspaces WHERE ${wholeProject ? "project_id" : "id"}=$1 AND writer_owner_id IS NOT NULL LIMIT 1`,
     [wholeProject ? w.project_id : w.id],
   );
   const queued = await db.query(
     `SELECT 1 FROM operations o JOIN sessions s ON s.id=o.session_id WHERE s.${wholeProject ? "project_id" : "workspace_id"}=$1 AND o.state IN ('queued','dispatching','running','waiting_approval','waiting_input') LIMIT 1`,
     [wholeProject ? w.project_id : w.id],
   );
-  if (busy.rowCount || queued.rowCount)
+  const filePending = await db.query(
+    `SELECT 1 FROM file_operations WHERE ${wholeProject ? "project_id" : "workspace_id"}=$1 AND state IN ('queued','dispatching') LIMIT 1`,
+    [wholeProject ? w.project_id : w.id],
+  );
+  const terminals = await db.query(
+    `SELECT 1 FROM terminals WHERE ${wholeProject ? "project_id" : "workspace_id"}=$1 AND state='queued' LIMIT 1`,
+    [wholeProject ? w.project_id : w.id],
+  );
+  if (
+    busy.rowCount ||
+    queued.rowCount ||
+    filePending.rowCount ||
+    terminals.rowCount
+  )
     throw new HarborError(
       409,
       "WORKSPACE_BUSY",

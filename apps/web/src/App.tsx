@@ -4,8 +4,10 @@ import {
   AttachmentPicker,
   AttachmentPreview,
 } from "./Attachments.tsx";
+import { Files } from "./Files.tsx";
 import { History, ConversationDetails } from "./History.tsx";
 import { Recovery } from "./Recovery.tsx";
+import { Terminals } from "./Terminals.tsx";
 import { Tokens } from "./Tokens.tsx";
 import {
   useCallback,
@@ -45,6 +47,7 @@ interface Root {
   label?: string;
 }
 interface Capabilities {
+  files?: { read: boolean; write: boolean; reason: string | null };
   models: {
     id: string;
     name: string;
@@ -124,6 +127,7 @@ export function App() {
   const [newWorkspaceId, setNewWorkspaceId] = useState("");
   const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false);
   const [schedulesOpen, setSchedulesOpen] = useState(false);
+  const [terminalWorkspace, setTerminalWorkspace] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   useEffect(() => {
     setNewWorkspaceId("");
@@ -164,6 +168,7 @@ export function App() {
       active = false;
     };
   }, [projectId, snapshot?.session.state]);
+  const [filesOpen, setFilesOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expired, setExpired] = useState(false);
@@ -760,6 +765,21 @@ export function App() {
               onClick={() => setWorkspaceManagerOpen(true)}
             >
               Manage workspaces
+            </button>
+            <button
+              className="quiet-button"
+              disabled={!newWorkspaceId || !capabilities?.files?.read}
+              title={capabilities?.files?.reason ?? undefined}
+              onClick={() => setFilesOpen(true)}
+            >
+              Files and changes
+            </button>
+            <button
+              className="quiet-button"
+              disabled={!newWorkspaceId}
+              onClick={() => setTerminalWorkspace(newWorkspaceId)}
+            >
+              Open terminals
             </button>
             {workspaceData.error && (
               <p className="inline-error">{workspaceData.error}</p>
@@ -1391,6 +1411,21 @@ export function App() {
           </>
         )}
       </main>
+      {filesOpen && identity && newWorkspaceId && (
+        <Files
+          key={newWorkspaceId}
+          workspace={{
+            id: newWorkspaceId,
+            name:
+              workspaceData.workspaces.find((w) => w.id === newWorkspaceId)
+                ?.name ?? "Workspace",
+          }}
+          csrf={identity.csrfToken}
+          writeAvailable={!!capabilities?.files?.write}
+          unavailableReason={capabilities?.files?.reason ?? undefined}
+          onClose={() => setFilesOpen(false)}
+        />
+      )}
       {workspaceManagerOpen && project && (
         <Modal
           title={`Workspaces in ${project.name}`}
@@ -1432,6 +1467,32 @@ export function App() {
           />
         </Modal>
       )}
+      {terminalWorkspace &&
+        identity &&
+        workspaceData.workspaces.find((w) => w.id === terminalWorkspace) && (
+          <Modal
+            title="Workspace terminals"
+            failure={error}
+            retry={
+              pending
+                ? () => void execute(pending.intent, pending.complete)
+                : undefined
+            }
+            close={() => setTerminalWorkspace("")}
+          >
+            <Terminals
+              key={terminalWorkspace}
+              workspace={
+                workspaceData.workspaces.find(
+                  (w) => w.id === terminalWorkspace,
+                )!
+              }
+              csrf={identity.csrfToken}
+              execute={execute}
+              disabled={blocked}
+            />
+          </Modal>
+        )}
       {tokensOpen && identity && (
         <Modal title="API tokens" close={() => setTokensOpen(false)}>
           <Tokens csrf={identity.csrfToken} projects={projects} />

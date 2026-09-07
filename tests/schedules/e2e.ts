@@ -1,3 +1,8 @@
+import { scheduleWorkspacesE2e } from "./workspaces-e2e.ts";
+import { scheduleBoundsE2e } from "./bounds-e2e.ts";
+import { scheduleFaultsE2e } from "./faults-e2e.ts";
+import { scheduleLifecycleE2e } from "./lifecycle-e2e.ts";
+import { scheduleAuthorityE2e } from "./authority-e2e.ts";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { openapi } from "../../packages/contracts/src/openapi.ts";
 import path from "node:path";
@@ -9,6 +14,7 @@ export async function scheduleE2e(options: {
   db: Pool;
   origin: string;
   artifacts: string;
+  fixtureState: string;
   pauseSupervisor: () => void;
   resumeSupervisor: () => void;
   restartSupervisor: () => Promise<void>;
@@ -204,6 +210,9 @@ export async function scheduleE2e(options: {
     .click();
   await expect(page.locator(".schedule-preview li")).toHaveCount(1);
   await page.setViewportSize({ width: 1280, height: 1000 });
+  await page
+    .getByLabel("Schedule title", { exact: true })
+    .scrollIntoViewIfNeeded();
   await page.screenshot({
     path: path.join(options.artifacts, "schedule-editor-desktop.png"),
     fullPage: true,
@@ -212,6 +221,7 @@ export async function scheduleE2e(options: {
   expect(
     await page.evaluate(() => document.body.scrollWidth <= innerWidth),
   ).toBe(true);
+  await page.locator(".schedule-preview").scrollIntoViewIfNeeded();
   await page.screenshot({
     path: path.join(options.artifacts, "schedule-editor-mobile.png"),
     fullPage: true,
@@ -256,6 +266,66 @@ export async function scheduleE2e(options: {
   expect(completed.session_id).not.toBe(session.id);
   expect(completed.kind).toBe("copy");
   expect(completed.state).toBe("ready");
+  context = await browser.newContext({ ignoreHTTPSErrors: true });
+  me = await login();
+  await scheduleAuthorityE2e({
+    context,
+    db,
+    origin,
+    projectId: project.id,
+    sessionId: session.id,
+    post,
+    pauseSupervisor: options.pauseSupervisor,
+    resumeSupervisor: options.resumeSupervisor,
+  });
+  await scheduleFaultsE2e({
+    db,
+    context,
+    origin,
+    projectId: project.id,
+    sessionId: session.id,
+    csrf: me.csrfToken,
+    fixtureState: options.fixtureState,
+    post,
+    pauseSupervisor: options.pauseSupervisor,
+    resumeSupervisor: options.resumeSupervisor,
+    restartSupervisor: options.restartSupervisor,
+  });
+  await scheduleLifecycleE2e({
+    db,
+    context,
+    origin,
+    projectId: project.id,
+    post,
+    restartSupervisor: options.restartSupervisor,
+    closeViewer: async () => {
+      await context.close();
+    },
+    openViewer: async () => {
+      context = await browser.newContext({ ignoreHTTPSErrors: true });
+      me = await login();
+    },
+  });
+  // Give the preceding intentional negative/control burst its own rate window.
+  await new Promise((resolve) => setTimeout(resolve, 10050));
+  await scheduleBoundsE2e({
+    db,
+    context,
+    origin,
+    projectId: project.id,
+    sessionId: session.id,
+    csrf: me.csrfToken,
+    post,
+  });
+  await new Promise((resolve) => setTimeout(resolve, 10050));
+  await scheduleWorkspacesE2e({
+    db,
+    context,
+    origin,
+    csrf: me.csrfToken,
+    post,
+  });
+  await context.close();
   await expect
     .poll(
       async () =>

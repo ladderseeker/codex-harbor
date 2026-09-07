@@ -1017,6 +1017,7 @@ export async function p007(h: Context) {
     "INSERT INTO intents(actor,route,key,request_hash,result) SELECT 'owner','/test/p007-quota',$1||':'||gen_random_uuid()::text,'fixture','{}' FROM generate_series(1,$2::int)",
     [String(Date.now()), 10000 - count],
   );
+  let quotaFailure = false;
   try {
     const details = (await snapshot(capacitySession)).session;
     expect(
@@ -1139,15 +1140,73 @@ export async function p007(h: Context) {
         )
       ).rows[0],
     ).toEqual(removalCounts);
+  } catch (error) {
+    quotaFailure = true;
+    const e = error as any;
+    const primitive = (value: unknown) =>
+      typeof value === "number" || typeof value === "boolean"
+        ? value
+        : typeof value;
+    await writeFile(
+      path.join(h.artifacts, "p007-quota-failure.json"),
+      JSON.stringify(
+        {
+          matcher: e.matcherResult?.name ?? "unknown",
+          expected: primitive(e.matcherResult?.expected),
+          actual: primitive(e.matcherResult?.actual),
+          location: String(e.stack)
+            .split("\n")
+            .filter((line) => /at .*tests\/e2e\/p007\.ts:\d+/.test(line))
+            .slice(0, 2),
+        },
+        null,
+        2,
+      ),
+    ).catch(() => {});
+    throw error;
   } finally {
-    await db.query("DELETE FROM intents WHERE route='/test/p007-quota'");
-    expect(
-      (
-        await command("/security/runtime-credentials", {
-          apiKey: "p007-restored-fixture-" + randomUUID(),
-        })
-      ).status(),
-    ).toBe(200);
+    try {
+      await db.query("DELETE FROM intents WHERE route='/test/p007-quota'");
+      const restored = await command("/security/runtime-credentials", {
+        apiKey: "p007-restored-fixture-" + randomUUID(),
+      });
+      const result = await restored.json();
+      const code =
+        typeof result.error?.code === "string" &&
+        /^[A-Z_]{1,64}$/.test(result.error.code)
+          ? result.error.code
+          : null;
+      const active = (
+        await db.query(
+          "SELECT state,count(*) AS n FROM operations WHERE state IN ('queued','dispatching','running','waiting_approval','waiting_input') GROUP BY state ORDER BY state",
+        )
+      ).rows;
+      const recoveries = (
+        await db.query(
+          "SELECT state,count(*) AS n FROM session_recoveries GROUP BY state ORDER BY state",
+        )
+      ).rows;
+      const evidence = {
+        status: restored.status(),
+        code,
+        active,
+        recoveries,
+        originalFailure: quotaFailure,
+      };
+      await writeFile(
+        path.join(h.artifacts, "p007-credential-cleanup.json"),
+        JSON.stringify(evidence, null, 2),
+      );
+      // Preserve a prior assertion instead of replacing it with cleanup's result.
+      if (!quotaFailure)
+        expect(restored.status(), JSON.stringify(evidence)).toBe(200);
+    } catch (error) {
+      if (!quotaFailure) throw error;
+      await writeFile(
+        path.join(h.artifacts, "p007-cleanup-exception.json"),
+        JSON.stringify({ category: "CLEANUP_FAILED_AFTER_ORIGINAL_ASSERTION" }),
+      ).catch(() => {});
+    }
   }
   // A connection can disappear while a transaction callback is between queries.
   // Use the real shared pool and an exact owned backend, without adding a test

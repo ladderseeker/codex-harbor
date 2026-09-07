@@ -1,3 +1,5 @@
+import { lockScheduleOwner } from "./locking.ts";
+import { deploymentAdmission } from "../../storage/src/deployment.ts";
 import { scheduleTarget } from "./targets.ts";
 import { effectiveSettings } from "../../policy/src/models.ts";
 import { occurrenceCapacity } from "./capacity.ts";
@@ -38,7 +40,9 @@ export async function createActivatedSchedule(
         ? "workspace-write"
         : b.config.permissionProfile,
   };
+  await lockScheduleOwner(db);
   const authority = await requireAuthority(db, actor, c, need);
+  await deploymentAdmission(db);
   await requireAuthority(db, actor, c, { ...need, scope: "execute" });
   if (authority.kind === "schedule")
     throw new HarborError(
@@ -154,11 +158,12 @@ export async function admitRecurringOccurrence(
       hint.active_grant_id,
     ])
   ).rows[0];
+  await lockScheduleOwner(db);
   if (grant.source_pat_id)
     await requireAuthority(db, "pat:" + grant.source_pat_id, c, {
       scope: "schedules:manage",
     });
-  else await db.query("SELECT pg_advisory_xact_lock_shared(740016)");
+  await deploymentAdmission(db);
   await db.query("SELECT pg_advisory_xact_lock(740028)");
   const row = (
     await db.query(

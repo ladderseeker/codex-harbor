@@ -108,3 +108,9 @@ Add schedule/occurrence migrations and backup registration; exercise restore int
 - Standalone configuration pins `sourcePolicy` to `committed` Git content or an explicit non-Git `snapshot`; preparation rejects a later source-kind change instead of silently changing that authorized policy. Run-now grants expire within one day (and never beyond their source PAT), independently of recurring activation's configured 1–90 days.
 
 - Intermediate, unreviewed checkpoint (8 September 2026): shared cron/DST evaluation, PG/pg-boss occurrence admission, source-bound grants, UI/API management and existing/standalone execution are implemented for continued testing. Node 24.11.1 intermediate run `78f703000d` passed offline UI/API/PG/supervisor execution and a new non-Git copy/conversation at source `06ca11d6562b40daf171bea83f67939ed19d75e1bcf6218883c352cf42d78728` (879 files). Subsequent focused checks pass six calendar tests, actual PG admission including a blocked stale-planner transaction, and OpenAPI schema compilation. This checkpoint is not feature completion or independent review: full fault/authority/quota acceptance, cumulative file/terminal/deployment integration, and the dedicated live-account gate remain outstanding.
+
+- The pause route uses the existing bounded control rate class alongside cancellation, so an exhausted ordinary request window does not consume the separate pause/cancel admission window. This does not remove either rate limit or the server-side per-target intent bounds.
+
+### Expanded implementation evidence — 8 September 2026
+
+The [development checkpoint](../../docs/reports/2026-09-08-p008-development.md) records current real application, managed-XFS, authority/fault/capacity evidence and preserved failures. Delivery remains In progress: independent feature review, installed-module/restore and migration013-after016 integration, final cumulative evidence and the dedicated live-account gate are not waived.

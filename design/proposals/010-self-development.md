@@ -6,6 +6,7 @@
 - Outcome: A conversation in stable Harbor edits Harbor source, builds and tests a separate candidate, and produces a reviewable release while stable Harbor remains usable.
 - Design updated: 2026-09-08; [D008](../decisions/008-isolated-self-development-workers.md) and the concrete contracts below completed one independent design review and focused correction check.
 - Implementation started: 2026-09-08; fixed worker and broker work is isolated from stable/deployment instances. A separate supported Linux VM has enforced project/worker XFS quotas and pinned tool images; this preparation does not establish worker isolation or candidate acceptance. P009 checkpoint and dedicated live-account gates remain blocked below.
+- Initial Linux boot canary: the owned Ubuntu 24.04.4 guest booted under TCG inside the fixed nonroot, network-disabled, resource-bounded outer container, printed the expected marker and powered off. Its exact container and XFS job disk were retired and quota cleared. This establishes an initial boot result only; source transport, broker, independent verifier, candidate and full isolation acceptance remain in implementation.
 
 ## Source issues
 

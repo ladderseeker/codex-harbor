@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Trusted, bounded XFS pool assignment and read-only admission. No runner code is executed."""
 import os, sys, json, re, stat, fcntl, struct, subprocess
+sys.dont_write_bytecode=True
 SAFE=re.compile(r'^[a-zA-Z0-9/_-]+$')
 FSGETXATTR=0x801c581f
 PROJINHERIT=0x200
@@ -134,8 +135,9 @@ def main():
             finally:os.close(parent)
         s=os.stat(workspace,follow_symlinks=False)
         print(json.dumps({'canonical':workspace,'device':str(s.st_dev),'inode':str(s.st_ino)}))
-try:main()
-except ValueError as error:
-    reason=str(error)
-    sys.stderr.write(('Managed XFS storage unavailable: '+reason if re.fullmatch('[a-zA-Z -]{1,80}',reason) else 'Managed XFS storage unavailable')+'\n');sys.exit(2)
-except Exception:sys.stderr.write('Managed XFS storage unavailable\n');sys.exit(2)
+if __name__=='__main__':
+    try:main()
+    except ValueError as error:
+        reason=str(error)
+        sys.stderr.write(('Managed XFS storage unavailable: '+reason if re.fullmatch('[a-zA-Z -]{1,80}',reason) else 'Managed XFS storage unavailable')+'\n');sys.exit(2)
+    except Exception:sys.stderr.write('Managed XFS storage unavailable\n');sys.exit(2)

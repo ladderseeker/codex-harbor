@@ -10,6 +10,13 @@ export const tokenScopes = [
   "cancel",
   "schedules:read",
   "schedules:manage",
+  "files:read",
+  "files:write",
+  "git:read",
+  "git:write",
+  "terminal:read",
+  "terminal:control",
+  "terminal:terminate",
 ] as const;
 export type Scope = (typeof tokenScopes)[number];
 export interface Authority {

@@ -5,6 +5,10 @@
 - Dependencies: [P003](003-parallel-project-workspaces.md)
 - Outcome: The owner inspects workspace files and changes, edits a file safely, and deliberately applies a reviewed Git action.
 
+## Source issues
+
+- [P004 implementation review](../../issues/2026-09-08-012652-p004-implementation-review.md): High, In progress. Two feature review rounds closed the draft, byte/mode and receipt-parent durability findings with exact-source managed-XFS and critical regression evidence. Shared P006/P009 writer, module inventory, drain and restore behavior still require integration and verification.
+
 ## Scope and user/API flow
 
 Add a workspace file tree, bounded filename/text search, text editor, authenticated downloads, Git status, and code/diff views. Show unsaved edits, stale revisions, unavailable/binary/oversized files, and external changes. Provide explicit stage/unstage and commit actions, with exact selected changes visible before mutation. Each action has an authenticated API equivalent and an observable result.
@@ -38,7 +42,7 @@ Persist only necessary revision/audit metadata; never duplicate all repository c
 
 ## Recorded implementation design — 7 September 2026
 
-This amendment concretizes the authorized outcome. Delivery remains Planned until the integrated dependency baseline is available; no file/Git endpoint or editor is claimed implemented here. P003’s [D005 decision](../decisions/005-managed-project-workspaces.md) remains the authority for trusted checkout/common mounts, the managed Git profile and workspace writer ownership. The following contracts extend its fixed helper and durable receipt mechanisms rather than granting the API host filesystem or command execution access.
+This amendment concretizes the authorized outcome. Implementation starts against the independently reviewed P003/P002/P007 baseline; endpoint and editor completion still require the acceptance evidence below. P003’s [D005 decision](../decisions/005-managed-project-workspaces.md) remains the authority for trusted checkout/common mounts, the managed Git profile and workspace writer ownership. The following contracts extend its fixed helper and durable receipt mechanisms rather than granting the API host filesystem or command execution access.
 
 ### Workspace view and editor
 
@@ -52,28 +56,27 @@ Drafts remain in browser memory by default, never operational logs or persistent
 
 All routes are under `/api/v1/workspaces/{id}` and resolve the registered workspace and its project before any content or receipt is disclosed. Versioned OpenAPI declares exact route descriptors rather than a permissive prefix. Browser mutations retain Origin/CSRF and current pinned owner checks. P002 extends its explicit scope vocabulary with `files:read`, `files:write`, `git:read`, `git:write`; tokens also require the selected project grant. Both write scopes require the effective workspace-write ceiling. Existing tokens gain no new scopes automatically. File/Git scopes never imply credentials, raw runtime or host administration access. Cookie-free authenticated downloads use an Authorization header through fetch; no token appears in a URL.
 
-| Route | Result or accepted intent |
+| Route                                         | Result or accepted intent                                                                                                  |
 | --- | --- |
-| `GET /files/tree?path=&cursor=&limit=` | One directory page, entry kind/opaque reference, bounded display path, directory revision and explicit truncation |
-| `GET /files/search?q=&mode=filename|text&cursor=` | Literal query results, relative path, bounded line/snippet for text mode, scan/truncation budget and filter-bound cursor |
-| `GET /files/content?ref=` | UTF-8 text or an explicit binary/oversized/unavailable reason, exact byte revision and file metadata |
-| `GET /files/download?ref=&revision=` | Authorized attachment download of the exact inspected revision; changed content returns conflict |
-| `POST /files/save` | `{ref, expectedRevision, text}` with Idempotency-Key; durable operation ID/result |
-| `GET /git/status?cursor=` | HEAD/ref identity, staged/unstaged/untracked/conflict entries, index revision and bounded page |
-| `GET /git/diff?ref=&side=staged|unstaged` | Exact old/new blob identities and modes, bounded diff and selectable server-derived hunk IDs |
-| `POST /git/stage`, `POST /git/unstage` | Exact reviewed selection, expected HEAD/index/file revisions and Idempotency-Key |
-| `POST /git/commit` | Reviewed staged-tree identity, exact selected entries/hunks, expected HEAD/ref/index, explicit message and Idempotency-Key |
-| `GET /file-operations/{operationId}` | Scoped queued/running/succeeded/failed/uncertain result, identities and safe reason; no raw helper log |
-| `POST /file-operations/{operationId}/inspect` | Explicit bounded exact-helper retirement and read-only effect inspection, expected reservation epoch and Idempotency-Key |
-| `POST /file-operations/{operationId}/release` | Consume a confirmed inspection with explicit unknown-effects acknowledgement; release only its typed ownership CAS |
-| `GET /files/events?cursor=` | Authorized bounded invalidation stream with workspace revision and resync marker |
+| `GET /files/tree?ref=&cursor=&limit=`        | One directory page, entry kind/opaque reference, bounded display path, directory revision and explicit truncation          |
+| `GET /files/search?q=&mode=filename%7Ctext&cursor=` | Literal query results, relative path, bounded line/snippet for text mode, scan/truncation budget and filter-bound cursor |
+| `GET /files/content?ref=`                     | UTF-8 text or an explicit binary/oversized/unavailable reason, exact byte revision and file metadata                       |
+| `GET /files/download?ref=&revision=`          | Authorized attachment download of the exact inspected revision; changed content returns conflict                           |
+| `POST /files/save`                            | `{ref, expectedRevision, text}` with Idempotency-Key; durable operation ID/result                                          |
+| `GET /git/status?cursor=`                     | HEAD/ref identity, staged/unstaged/untracked/conflict entries, index revision and bounded page                             |
+| `GET /git/diff?ref=&side=staged%7Cunstaged` | Exact old/new blob identities and modes, bounded diff and selectable server-derived hunk IDs |
+| `POST /git/stage`, `POST /git/unstage`        | Exact reviewed selection, expected HEAD/index/file revisions and Idempotency-Key                                           |
+| `POST /git/commit`                            | Reviewed staged-tree identity, exact selected entries/hunks, expected HEAD/ref/index, explicit message and Idempotency-Key |
+| `GET /file-operations/{operationId}`          | Scoped queued/running/succeeded/failed/uncertain result, identities and safe reason; no raw helper log                     |
+| `POST /file-operations/{operationId}/inspect` | Explicit bounded exact-helper retirement and read-only effect inspection, expected reservation epoch and Idempotency-Key   |
+| `POST /file-operations/{operationId}/release` | Consume a confirmed inspection with explicit unknown-effects acknowledgement; release only its typed ownership CAS         |
+| `GET /files/events?cursor=`                   | Authorized bounded invalidation stream with workspace revision and resync marker                                           |
 
 Opaque references encode or map exact relative filename bytes and are bound to workspace identity; they are not filesystem authority. Unicode and hostile names remain navigable without treating display strings as shell syntax. Reject NUL, absolute paths, parent traversal, ambiguous separators, excessive depth and paths into Git administrative/control locations. Symlinks appear as non-traversable entries; neither reads nor writes follow them. Invalid-UTF-8 names receive an escaped display label and opaque reference, not lossy round-tripping. Missing/renamed identity returns a bounded not-found/conflict response without an outside-path diagnostic.
 
 Initial limits are 1 MiB UTF-8 per editor model/save, 4 open models, 16 MiB per download, 200 directory/status entries per page, path depth 32 and 4 KiB encoded path. Search is literal, 1–120 characters, at most 10,000 visited entries/32 MiB inspected text/2 seconds and 200 matches per response; files above 1 MiB are reported as skipped. A signed cursor carries scope/query/directory revision and remaining finite scan budget, expires after five minutes, and cannot turn a bounded query into an unlimited recursive scan. Hidden ordinary files remain discoverable; `.git`, native homes, Harbor staging and other control metadata are always excluded. Git status scans at most 10,000 paths, with an explicit incomplete result; incomplete selection cannot authorize a commit. Diffs are capped at 1 MiB/2,000 hunks/20,000 lines per file and 100 selected paths/2 MiB total selection per mutation. Binary/oversized entries show status and exact identity, support a bounded download where eligible and whole-file selection where the complete byte/object identity is available; they never masquerade as an empty text diff. An exceeded complete-review budget rejects mutation with a named limit.
 
 Watch only the selected workspace's expanded directories/open files, at most 32 directories and four file content revisions per client, with a two-second coalescing interval and no repository-wide recursive watcher. Polling is an acceptable portable backend under those bounds. Notifications invalidate views; they do not replace drafts or claim a lossless audit of external shell writes. At most four streams per actor and 1,000 retained invalidations per workspace for one hour; a missing cursor/gap requires rereading the bounded view. Resync also follows API restart. Every stream and download rechecks current authority; downloads stop on disconnect/revocation, have a 30-second deadline, `attachment` disposition, safe encoded filename, `application/octet-stream`, `nosniff` and `no-store`. HTML/SVG never render on the application origin.
-
 ### File revision, admission and durable saves
 
 A file revision binds the workspace identity epoch, exact relative reference, regular-file device/inode, mode and SHA-256 of its exact bytes, with an explicit absent-file marker where creation is supported. Reads use descriptor-relative no-follow opens, require a regular single-link file, and compare metadata before/after hashing. Deny hard-linked editable files rather than allowing an unseen alias to be changed. Preserve UTF-8 bytes, BOM and line endings unless the user explicitly edits them; a no-op save is not a newline conversion. Git administrative files cannot be edited through this route.
@@ -125,3 +128,25 @@ Design review: the main agent required the explicit uncertain-operation inspecti
 ## Implementation record
 
 - 2026-09-07: Started isolated implementation from reviewed P001/P002/P003/P007 integration `ca1a2cf` under the accepted design and roadmap authorization. Migration 010 is reserved. Application acceptance and independent review remain in progress.
+
+### P004 implementation refinement: Monaco CSP
+
+The authenticated application document carries a fresh `harbor-style-nonce` meta value. Its CSP permits that nonce for styles and retains the existing `script-src 'self'` policy. Monaco 0.56.0 has no public style nonce option: a narrow build adapter stamps only its two pinned, trusted `createElement('style')` factories. The adapter rejects an unexpected factory shape; no global DOM monkey patch or project-controlled HTML receives a nonce. Actual browser CSP/style/worker evidence is required before delivery. This shares the P006 document nonce seam.
+
+File-operation reload reconciliation also exposes bounded `GET /workspaces/:id/files/operations` and `/git/operations` lists (at most 128 each, their corresponding read scopes). The UI recovers a retained unresolved operation after reload and permits reviewing recent outcomes without relying on a browser-stored intent or secret.
+
+Native filesystem admission: writes use the supported Linux boundary. The macOS private fixture may inspect/render files, but it advertises writes unavailable and rejects new write intents before effects. Development observed a replacement file receive different reported inode values across Docker Desktop helper containers despite unchanged bytes and timestamps; native Linux preserved identity in the focused helper/receipt test. This observation does not establish Docker Desktop internals or relax the revision contract. Complete file acceptance runs on native Linux, and production isolation still requires the managed XFS profile.
+
+Monaco's pinned markup renderers also emit style attributes. The build adapter routes only those reviewed, already-escaped renderer fragments through an attribute lexer: layout attributes become inert before parsing, then are applied through CSSOM before insertion. It neither changes text content nor handles arbitrary repository HTML. Strict style-attribute policy remains in force. Hostile text, diff rendering and CSP assertions are required coverage.
+
+Required-object verification is bounded to 10,000 distinct tree/blob/commit objects, depth 32 and 32 MiB decoded object bytes, with an individual object bound of 16 MiB. The fixed helper verifies exact Git object hashes before index/ref publication, then rechecks the same recorded result after publication and before the filesystem barrier. An exceeded budget is an explicit incomplete review, not permission to omit validation. Prepared index/ref identities are fsynced by the trusted broker through a fixed acknowledgement before publication; dropped acknowledgements never cause original-effect replay.
+
+Helper capacity is a private four-entry ledger updated under a process-released OS lock, with atomic fsynced replacement. A broker crash retains its reservation. Only a recorded dead broker older than the bounded 120-second launch/cleanup grace can be reclaimed, after exact labeled container retirement; PID reuse or unconfirmed retirement fails closed. Cleanup compares the operation identity under the same lock, so an old cleanup cannot remove a successor's reservation. The ledger and its lock are included in the module's control-state inventory.
+
+Uncertainty blocks admission as well as dispatch. When a file effect becomes uncertain, queued successors for its workspace (and related project Git mutations for a Git effect) fail with a visible predecessor-uncertain reason; releasing the reservation never silently starts those old queued intents. A later edit requires a newly accepted operation with current revisions. Conversation/terminal uncertainty likewise cannot be bypassed by requesting a file write. Inspection and acknowledgement remain separately available.
+
+Archived registered workspaces remain available for authorized bounded inspection and downloads; new file/Git mutations require the ready, unarchived state. Removing, failed or unavailable workspaces are not file-access aliases.
+
+Candidate verification and pending independent review are recorded in the [8 September report](../../docs/reports/2026-09-08-p004-files.md).
+
+- 8 September 2026: The complete managed-XFS file outcome and critical Node 24 regressions pass at `324022da4ddc36128348a01427cba6028a2bd44bb176848f9b47a34d56d37fa2` (882 files). Two independent implementation review rounds closed after draft, byte/mode and receipt-parent durability corrections. P006/P009 integration and inherited verification gates remain explicit in the report; this is not Verified or archived.

@@ -1,3 +1,4 @@
+import { deploymentAdmission } from "../../../packages/storage/src/deployment.ts";
 import { requireAuthority } from "../../../packages/policy/src/authority.ts";
 import {
   admitOrdinaryIntent,
@@ -15,6 +16,8 @@ import {
   realpath,
   stat,
   chmod,
+  chown,
+  lstat,
   unlink,
   writeFile,
 } from "node:fs/promises";
@@ -160,6 +163,7 @@ export class CredentialStore {
               : null,
           };
         }
+        await deploymentAdmission(db);
         const encryptionKey = await this.key();
         const route = "/security/runtime-credentials/" + request.action;
         const hash = createHmac("sha256", encryptionKey)
@@ -293,10 +297,45 @@ export async function serveCredentials(store: CredentialStore, c: Config) {
   if (!c.HARBOR_CONTROL_SOCKET) return undefined;
   const directory = await realpath(path.dirname(c.HARBOR_CONTROL_SOCKET)),
     metadata = await stat(directory);
-  if ((metadata.mode & 0o077) !== 0 || metadata.uid !== process.getuid?.())
+  const clientUid = Number(
+      process.env.HARBOR_CONTROL_CLIENT_UID ?? process.getuid?.(),
+    ),
+    clientGid = Number(process.env.HARBOR_CONTROL_CLIENT_GID ?? clientUid);
+  if (
+    !Number.isSafeInteger(clientUid) ||
+    clientUid < 0 ||
+    [10001, 10002].includes(clientUid) ||
+    !Number.isSafeInteger(clientGid) ||
+    clientGid < 0
+  )
+    throw Error("Invalid private control client identity");
+  if (
+    (metadata.mode & (clientUid === process.getuid?.() ? 0o077 : 0o027)) !==
+      0 ||
+    metadata.uid !== process.getuid?.() ||
+    (clientUid !== process.getuid?.() &&
+      (process.getuid?.() !== 0 ||
+        metadata.gid !== clientGid ||
+        !(metadata.mode & 0o010)))
+  )
     throw Error(
       "Control socket directory must be private and supervisor-owned",
     );
+  if (
+    (await realpath(path.dirname(c.HARBOR_CONTROL_SOCKET))) !==
+    path.dirname(c.HARBOR_CONTROL_SOCKET)
+  )
+    throw Error("Canonical private control directory required");
+  for (let ancestor = directory; ; ancestor = path.dirname(ancestor)) {
+    const info = await lstat(ancestor);
+    if (
+      (info.uid !== 0 && info.uid !== process.getuid?.()) ||
+      info.isSymbolicLink() ||
+      ((info.mode & 0o022) !== 0 && (info.mode & 0o1000) === 0)
+    )
+      throw Error("Untrusted control ancestry");
+    if (ancestor === path.dirname(ancestor)) break;
+  }
   for (const root of c.roots) {
     const canonical = await realpath(root.path);
     if (directory === canonical || directory.startsWith(canonical + path.sep))
@@ -308,7 +347,7 @@ export async function serveCredentials(store: CredentialStore, c: Config) {
     const owner = JSON.parse(await readFile(marker, "utf8"));
     if (
       !existing.isSocket() ||
-      existing.uid !== process.getuid?.() ||
+      existing.uid !== clientUid ||
       owner.instance !== (process.env.HARBOR_INSTANCE_ID ?? "harbor") ||
       owner.inode !== existing.ino ||
       owner.device !== existing.dev
@@ -369,6 +408,8 @@ export async function serveCredentials(store: CredentialStore, c: Config) {
     server.listen(c.HARBOR_CONTROL_SOCKET, resolve);
   });
   await chmod(c.HARBOR_CONTROL_SOCKET, 0o600);
+  if (clientUid !== process.getuid?.())
+    await chown(c.HARBOR_CONTROL_SOCKET, clientUid, clientGid);
   const owned = await stat(c.HARBOR_CONTROL_SOCKET);
   await writeFile(
     marker,

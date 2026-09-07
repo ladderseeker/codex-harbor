@@ -1,0 +1,201 @@
+#!/usr/bin/python3
+"""Administrator-only fixed commands. Never execute this through a coding runner."""
+import sys
+
+sys.dont_write_bytecode = True
+import os, json, argparse, uuid
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from config import load
+from common import lock, record
+from control import (
+    initialize,
+    selected,
+    readiness,
+    maintenance,
+    db,
+    service,
+    status,
+    inspect_allocations,
+    recover_runtime,
+)
+from preflight import preflight
+from backup import checkpoint, restic
+from promotion import promote
+from restore import restore, activate
+from destination import (
+    enroll,
+    for_backup,
+    verify_repository,
+    state as destination_state,
+    status as destination_status,
+)
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="harborctl")
+    parser.add_argument("--config", required=True)
+    sub = parser.add_subparsers(dest="action", required=True)
+    setup = sub.add_parser("install")
+    setup.add_argument("--archive", required=True)
+    setup.add_argument("--sha256", required=True)
+    setup.add_argument("--resume", action="store_true")
+    recover = sub.add_parser("restore")
+    recover.add_argument("--archive", required=True)
+    recover.add_argument("--sha256", required=True)
+    recover.add_argument("--snapshot", required=True)
+    recover.add_argument("--registry-sha256", required=True)
+    recover.add_argument("--resume", action="store_true")
+    recover.add_argument("--acknowledge-owner-rebind", action="store_true")
+    sub.add_parser("status")
+    sub.add_parser("preflight")
+    sub.add_parser("inventory")
+    drain = sub.add_parser("drain")
+    drain.add_argument("--interrupt", action="store_true")
+    sub.add_parser("resume")
+    recovery = sub.add_parser("recover-runtime")
+    recovery.add_argument("--project-id", required=True)
+    recovery.add_argument("--session-id", required=True)
+    recovery.add_argument("--generation", type=int, required=True)
+    recovery.add_argument("--lock-inode", required=True)
+    recovery.add_argument("--acknowledge-unknown-effects", action="store_true")
+    activation = sub.add_parser("activate")
+    activation.add_argument("--restore-id", required=True)
+    repository = sub.add_parser("repository-init")
+    repository.add_argument("--expected-destination", required=True)
+    repository_check = sub.add_parser("backup-destination-verify")
+    repository_check.add_argument("--expected-destination", required=True)
+    destination = sub.add_parser("backup-destination-enroll")
+    destination.add_argument("--profile", required=True)
+    destination.add_argument("--expected-current", required=True)
+    sub.add_parser("backup-destination-status")
+    backup = sub.add_parser("backup")
+    backup.add_argument("--interrupt", action="store_true")
+    for action in ["promote", "rollback"]:
+        candidate = sub.add_parser(action)
+        candidate.add_argument("--archive", required=True)
+        candidate.add_argument("--sha256", required=True)
+        candidate.add_argument("--interrupt", action="store_true")
+        candidate.add_argument("--resume", action="store_true")
+    args = parser.parse_args()
+    if sys.platform != "linux" or os.geteuid() != 0:
+        raise ValueError("Linux administrator required")
+    c = load(args.config)
+    with lock(c) as paths:
+        operation = str(uuid.uuid4())
+        readonly = args.action in [
+            "status",
+            "preflight",
+            "inventory",
+            "backup-destination-status",
+        ]
+        if not readonly:
+            record(paths, args.action, operation, state="running")
+        try:
+            if args.action == "status":
+                result = status(c)
+            elif args.action == "backup-destination-status":
+                result = destination_status(c)
+            elif args.action == "backup-destination-enroll":
+                result = enroll(c, args.profile, args.expected_current)
+            elif args.action == "backup-destination-verify":
+                result = verify_repository(c, selected(c)[0], args.expected_destination)
+            elif args.action == "recover-runtime":
+                result = recover_runtime(
+                    c,
+                    args.project_id,
+                    args.session_id,
+                    args.generation,
+                    args.lock_inode,
+                    args.acknowledge_unknown_effects,
+                )
+            elif args.action == "inventory":
+                result = inspect_allocations(c)
+            elif args.action == "install":
+                result = initialize(
+                    c, os.path.realpath(args.archive), args.sha256, args.resume
+                )
+            elif args.action == "restore":
+                result = restore(
+                    c,
+                    os.path.realpath(args.archive),
+                    args.sha256,
+                    args.snapshot,
+                    args.registry_sha256,
+                    args.resume,
+                    args.acknowledge_owner_rebind,
+                )
+            elif args.action in ["promote", "rollback"]:
+                result = promote(
+                    c,
+                    os.path.realpath(args.archive),
+                    args.sha256,
+                    args.action == "rollback",
+                    args.interrupt,
+                    args.resume,
+                )
+            elif args.action == "activate":
+                result = activate(c, args.restore_id)
+            elif args.action == "backup":
+                result = checkpoint(c, args.interrupt)
+            elif args.action == "drain":
+                release, registry = maintenance(c, args.interrupt)
+                result = {"drained": True, "sessions": len(registry["sessions"])}
+            else:
+                release, state = selected(c)
+                if args.action == "repository-init":
+                    if destination_state(c)["current"] != args.expected_destination:
+                        raise ValueError(
+                            "Exact destination initialization acknowledgement required"
+                        )
+                    restic(for_backup(c, allow_unverified=True), release, ["init"])
+                    result = verify_repository(c, release, args.expected_destination)
+                elif args.action == "status":
+                    result = {"installation": state, "readiness": readiness(c, release)}
+                elif args.action == "preflight":
+                    result = preflight(c, release)
+                elif args.action == "resume":
+                    deployment_status = db(c, release, "status")
+                    if deployment_status["deployment"]["activation_required"]:
+                        raise ValueError(
+                            "Restored instance requires explicit validated activation"
+                        )
+                    preflight(c, release)
+                    db(c, release, "maintenance", enabled=False)
+                    service(c, "start")
+                    result = readiness(c, release)
+                else:
+                    raise ValueError("Unsupported administrator action")
+            if not readonly:
+                record(paths, args.action, operation, state="completed", result=result)
+            print(json.dumps({"operation": operation, **result}))
+        except Exception:
+            if not readonly:
+                record(
+                    paths,
+                    args.action,
+                    operation,
+                    state="failed",
+                    reason="Administrator action failed; admission state remains explicit",
+                )
+            raise
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as error:
+        # Never expose subprocess arguments, stderr, credentials or decoded registry.
+        print(
+            json.dumps(
+                {
+                    "error": (
+                        str(error)
+                        if isinstance(error, (ValueError, RuntimeError))
+                        else "Administrator operation failed"
+                    )
+                }
+            ),
+            file=sys.stderr,
+        )
+        sys.exit(1)

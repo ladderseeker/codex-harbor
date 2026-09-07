@@ -5,6 +5,15 @@ import { requestTurnCancellation } from "../../../packages/storage/src/cancellat
 import { attachmentRoutes } from "./attachments.ts";
 import { acceptConversationTurn } from "../../../packages/storage/src/turns.ts";
 import { effectiveSettings as requireEffectiveSettings } from "../../../packages/policy/src/models.ts";
+import { terminalStreams } from "./terminal-stream.ts";
+import { terminalRoutes } from "./terminals.ts";
+import {
+  deploymentAdmission,
+  deploymentState,
+  verifyInstalledSchema,
+} from "../../../packages/storage/src/deployment.ts";
+import type { FastifyRequest, FastifyReply } from "fastify";
+import { fileRoutes } from "./files.ts";
 import { registerWorkspaceRoutes } from "./workspace-routes.ts";
 import {
   selectedWorkspace,
@@ -39,9 +48,9 @@ import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import staticFiles from "@fastify/static";
 import * as oidc from "openid-client";
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
 import path from "node:path";
-import { stat, chmod } from "node:fs/promises";
+import { stat, chmod, readFile } from "node:fs/promises";
 import { z } from "zod";
 import {
   createPool,
@@ -70,7 +79,8 @@ import type { Config } from "./config.ts";
 import type { PoolClient } from "pg";
 export async function buildServer(c: Config) {
   const pool = createPool(c.DATABASE_URL);
-  await migrate(pool);
+  if (process.env.HARBOR_MANAGED_RELEASE) await verifyInstalledSchema(pool);
+  else await migrate(pool);
   const ownerPin = digest(c.HARBOR_OIDC_ISSUER + "\0" + c.HARBOR_OWNER_SUBJECT);
   await bindIdentity(pool, ownerPin);
   const client = await oidc.discovery(
@@ -137,7 +147,12 @@ export async function buildServer(c: Config) {
       window = login ? 60000 : 10000,
       limit = login ? 30 : 200;
     const reserved =
-      req.url.includes("/security/") || req.url.endsWith("/cancel");
+      req.url.includes("/security/") ||
+      req.url.endsWith("/cancel") ||
+      /^\/api\/v1\/schedules\/[a-f0-9-]{36}\/pause$/.test(
+        req.url.split("?")[0],
+      ) ||
+      req.url.endsWith("/terminate");
     const bucketKey =
       req.ip + ":" + (login ? "login" : reserved ? "control" : "ordinary");
     const bucket = rateBuckets.get(bucketKey);
@@ -172,7 +187,11 @@ export async function buildServer(c: Config) {
       "referrer-policy": "no-referrer",
       "x-frame-options": "DENY",
     });
-    if (["/auth/login", "/auth/callback"].includes(req.url.split("?")[0]!))
+    if (
+      ["/auth/login", "/auth/callback", "/health"].includes(
+        req.url.split("?")[0]!,
+      )
+    )
       return;
     if (req.headers.authorization !== undefined) {
       auth.set(
@@ -198,6 +217,10 @@ export async function buildServer(c: Config) {
   });
   app.addHook("preHandler", async (req) => {
     if (auth.has(req)) await authorizeTokenRoute(pool, c, auth.get(req)!, req);
+  });
+  app.get("/health", async () => {
+    await pool.query("SELECT 1");
+    return { status: "ready" };
   });
   app.get("/auth/login", async (_req, reply) => {
     const state = oidc.randomState(),
@@ -337,14 +360,23 @@ export async function buildServer(c: Config) {
       }
       const reserved =
         route.endsWith("/cancel") ||
+        route.endsWith("/terminate") ||
         route.endsWith("/answer") ||
         route.endsWith("/recovery") ||
         route.endsWith("/recovery/continue") ||
         route === "/api/v1/security/emergency-stop" ||
-        route === "/api/v1/security/logout";
+        route === "/api/v1/security/logout" ||
+        (route.includes("/file-operations/") &&
+          (route.endsWith("/inspect") || route.endsWith("/release")));
       if (!reserved) await admitOrdinaryIntent(db, actor);
-      if (auth.get(req)!.kind === "token") {
-        const reserve = route.endsWith("/cancel") || route.endsWith("/answer");
+      const reservedFileControl =
+        route.includes("/file-operations/") &&
+        (route.endsWith("/inspect") || route.endsWith("/release"));
+      if (auth.get(req)!.kind === "token" && !reservedFileControl) {
+        const reserve =
+          route.endsWith("/cancel") ||
+          route.endsWith("/answer") ||
+          route.endsWith("/terminate");
         if (
           Number(
             (
@@ -361,25 +393,41 @@ export async function buildServer(c: Config) {
           );
       }
       await requireAuthority(db, auth.get(req)!.hash, c);
+      await deploymentAdmission(
+        db,
+        route.endsWith("/cancel") ||
+          route.endsWith("/answer") ||
+          [
+            "/api/v1/security/emergency-stop",
+            "/api/v1/security/logout",
+          ].includes(route),
+      );
       const result = await fn(db);
       if (!externalEffectsGranted.has(req) && !selfRevocations.has(req))
         await requireAuthority(db, auth.get(req)!.hash, c);
       if (route === "/api/v1/security/emergency-stop") return result;
       const controlTarget =
-        route === "/api/v1/security/logout"
-          ? "logout:" + auth.get(req)!.hash
-          : route.endsWith("/cancel")
-            ? "cancel:" + req.params.id
-            : route.endsWith("/answer")
-              ? "approval:" + req.params.id
-              : route.endsWith("/recovery/continue")
-                ? "continue:" + req.body.recoveryId
-                : route.endsWith("/recovery")
-                  ? "recovery:" + (result as any).recovery.id
-                  : null;
+        route.includes("/file-operations/") && route.endsWith("/inspect")
+          ? "file-inspect:" + req.params.operationId
+          : route.includes("/file-operations/") && route.endsWith("/release")
+            ? "file-release:" + req.params.operationId
+            : route === "/api/v1/security/logout"
+              ? "logout:" + auth.get(req)!.hash
+              : route.endsWith("/terminate")
+                ? "terminal:" + req.params.id
+                : route.endsWith("/cancel")
+                  ? "cancel:" + req.params.id
+                  : route.endsWith("/answer")
+                    ? "approval:" + req.params.id
+                    : route.endsWith("/recovery/continue")
+                      ? "continue:" + req.body.recoveryId
+                      : route.endsWith("/recovery")
+                        ? "recovery:" + (result as any).recovery.id
+                        : null;
       const limit = controlTarget
         ? controlTarget.startsWith("continue:") ||
-          controlTarget.startsWith("logout:")
+          controlTarget.startsWith("logout:") ||
+          controlTarget.startsWith("file-release:")
           ? 1
           : 3
         : 10000;
@@ -423,6 +471,7 @@ export async function buildServer(c: Config) {
   const lockWorkspace = async (db: PoolClient, id: string) => {
     await sessionWorkspace(db, id, true);
   };
+  fileRoutes(app, { pool, c, command, actor: (req) => auth.get(req)!.hash });
   historyRoutes(app, { pool, command, lockWorkspace });
   recoveryRoutes(app, {
     pool,
@@ -489,6 +538,26 @@ export async function buildServer(c: Config) {
     roots: c.roots.map(({ id, name }) => ({ id, name })),
   }));
   app.get("/api/v1/capabilities", async (req) => ({
+    files: {
+      read: !!(
+        process.env.HARBOR_FILE_SOCKET ?? process.env.HARBOR_STORAGE_SOCKET
+      ),
+      write:
+        process.platform === "linux" &&
+        !!(
+          process.env.HARBOR_FILE_SOCKET ?? process.env.HARBOR_STORAGE_SOCKET
+        ) &&
+        c.HARBOR_PERMISSION_CEILING === "workspace-write",
+      reason:
+        process.platform !== "linux"
+          ? "Writes require the supported Linux filesystem boundary"
+          : !(
+                process.env.HARBOR_FILE_SOCKET ??
+                process.env.HARBOR_STORAGE_SOCKET
+              )
+            ? "Configure the trusted file service"
+            : null,
+    },
     emergencyStopped: (await pool.query("SELECT emergency FROM harbor_meta"))
       .rows[0].emergency,
     models: (
@@ -751,6 +820,18 @@ export async function buildServer(c: Config) {
     },
   );
   attachmentRoutes(app, pool, command);
+  terminalRoutes(app, {
+    pool,
+    c,
+    command,
+    actor: (req) => auth.get(req)!.hash,
+  });
+  terminalStreams(app, {
+    pool,
+    c,
+    command,
+    actor: (req) => auth.get(req)!.hash,
+  });
   app.get<{ Params: { id: string } }>("/api/v1/operations/:id", async (req) => {
     const r = await pool.query("SELECT * FROM operations WHERE id=$1", [
       req.params.id,
@@ -976,14 +1057,38 @@ export async function buildServer(c: Config) {
       });
     },
   );
+  async function applicationDocument(
+    _req: FastifyRequest,
+    reply: FastifyReply,
+  ) {
+    const nonce = randomBytes(24).toString("base64"),
+      html = await readFile(path.resolve("apps/web/dist/index.html"), "utf8");
+    const policy = String(reply.getHeader("Content-Security-Policy"));
+    reply.header(
+      "Content-Security-Policy",
+      policy.replace("style-src 'self'", `style-src 'self' 'nonce-${nonce}'`),
+    );
+    return reply
+      .type("text/html; charset=utf-8")
+      .send(
+        html.replace(
+          "<head>",
+          `<head><meta name="harbor-style-nonce" content="${nonce}">`,
+        ),
+      );
+  }
+  app.get("/", applicationDocument);
+  app.get("/index.html", applicationDocument);
   await app.register(staticFiles, {
     root: path.resolve("apps/web/dist"),
     wildcard: false,
+    index: false,
+    globIgnore: ["index.html"],
   });
   app.setNotFoundHandler(async (req, reply) => {
     if (req.url.startsWith("/api/"))
       throw new HarborError(404, "NOT_FOUND", "Route not found");
-    return reply.sendFile("index.html");
+    return applicationDocument(req, reply);
   });
   app.addHook("onClose", async () => pool.end());
   return app;

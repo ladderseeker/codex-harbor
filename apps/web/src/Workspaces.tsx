@@ -154,14 +154,15 @@ export function WorkspaceSummary({
               The conversation stays bound to this workspace.
             </p>
           )}
-          {workspace.writerSessionId &&
+          {workspace.writerOwnerId &&
             workspace.writerSessionId !== sessionId && (
               <p className="writer-notice" role="status">
                 {queued
                   ? "Queued for this workspace."
                   : "This workspace is in use."}{" "}
-                Another conversation holds its writer reservation. Work starts
-                after its processes are confirmed stopped.
+                A {workspace.writerKind ?? "conversation"} holds its writer
+                reservation. Work starts after its processes are confirmed
+                stopped.
               </p>
             )}
           {workspace.writerSessionId === sessionId && (
@@ -351,10 +352,10 @@ export function WorkspaceManager({
                   : ""}
               </p>
             )}
-            {workspace.writerSessionId && (
+            {workspace.writerOwnerId && (
               <p className="field-help">
-                Writer reservation held by conversation{" "}
-                {workspace.writerSessionId}.
+                Writer reservation held by {workspace.writerKind}{" "}
+                {workspace.writerOwnerId}.
               </p>
             )}
             <div className="workspace-actions">
@@ -379,7 +380,7 @@ export function WorkspaceManager({
               {workspace.state !== "archived" &&
                 workspace.state !== "removed" && (
                   <button
-                    disabled={disabled || !!workspace.writerSessionId}
+                    disabled={disabled || !!workspace.writerOwnerId}
                     onClick={() =>
                       setConfirmation({ action: "archive", workspace })
                     }
@@ -390,7 +391,7 @@ export function WorkspaceManager({
               {workspace.kind !== "local" && workspace.state !== "removed" && (
                 <button
                   className="quiet-button danger-text"
-                  disabled={disabled || !!workspace.writerSessionId}
+                  disabled={disabled || !!workspace.writerOwnerId}
                   onClick={() =>
                     setConfirmation({ action: "remove", workspace })
                   }

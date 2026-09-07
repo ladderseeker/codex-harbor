@@ -65,7 +65,9 @@ export function Schedules(props: Props) {
     detailRequest = useRef(0),
     historyRequest = useRef(0),
     selectedRef = useRef(selected),
-    editorRef = useRef(editor);
+    editorRef = useRef(editor),
+    listPaged = useRef(false),
+    historyPaged = useRef(false);
   selectedRef.current = selected;
   editorRef.current = editor;
   const filter = () =>
@@ -75,6 +77,7 @@ export function Schedules(props: Props) {
       limit: "20",
     }).toString();
   const load = async (more = false) => {
+    listPaged.current = more;
     const requestId = ++listRequest.current;
     const epoch = view.current,
       values = await request<{
@@ -100,6 +103,7 @@ export function Schedules(props: Props) {
       setDetail(value.schedule);
   };
   const loadHistory = async (more = false) => {
+    historyPaged.current = more;
     const requestId = ++historyRequest.current;
     const epoch = view.current,
       id = selectedRef.current;
@@ -152,7 +156,11 @@ export function Schedules(props: Props) {
     const timer = setInterval(() => {
       if (!active || loading || editorRef.current || pending.current) return;
       loading = true;
-      void Promise.all([load(), loadHistory()])
+      void Promise.all([
+        ...(!listPaged.current ? [load()] : []),
+        ...(!historyPaged.current ? [loadHistory()] : []),
+        ...(selectedRef.current ? [loadDetail(selectedRef.current)] : []),
+      ])
         .catch((e) => {
           if (active) setError(e.message);
         })
@@ -215,6 +223,18 @@ export function Schedules(props: Props) {
           Retry schedule request
         </button>
       )}
+      <button
+        disabled={!!editor || blocked}
+        onClick={() =>
+          void Promise.all([
+            load(),
+            loadHistory(),
+            ...(selectedRef.current ? [loadDetail(selectedRef.current)] : []),
+          ]).catch((e) => setError(e.message))
+        }
+      >
+        Refresh schedules and occurrences
+      </button>
       <div className="schedule-toolbar">
         <label>
           Project

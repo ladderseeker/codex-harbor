@@ -1,8 +1,8 @@
 """Trusted fixed workspace directory operations, extending quota.py admission."""
 import os,sys,json,stat,uuid,fcntl,shutil,ctypes
-# Load definitions without executing quota.py's stdin command dispatcher.
-namespace={};source=open(os.path.join(os.path.dirname(__file__),'quota.py')).read().split('try:main()')[0];exec(compile(source,'quota.py','exec'),namespace)
-trusted=namespace['trusted'];verify=namespace['verify'];attributes=namespace['attributes']
+# quota.py has an explicit main guard; import its trusted primitives without
+# executing the stdin dispatcher or truncating Python source at a text marker.
+from quota import trusted,verify,attributes
 def identity(path):
  info=os.stat(path,follow_symlinks=False)
  return {'canonical':path,'device':str(info.st_dev),'inode':str(info.st_ino)}

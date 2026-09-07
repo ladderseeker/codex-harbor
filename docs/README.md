@@ -3,6 +3,13 @@
 This directory describes available behavior, developer workflows, and completed reports. P001–P003, P005 and P007 are Implemented with required verification/follow-ups still open; the proposal index distinguishes current evidence from finished delivery.
 
 - [Developer workflow](developer/development.md): working on the repository now, command availability, and verification requirements.
+- [Files and changes](developer/files.md): reviewed editor, file and Git behavior, Linux requirements and integration limits.
+- [P004 feature evidence](reports/2026-09-08-p004-files.md): two review rounds, exact-source browser/API/Linux results and pending terminal/deployment integration.
+- [Terminal user guide](user/terminals.md): shell control, detach versus termination, replay limits and current isolation restrictions.
+- [P006 feature evidence](reports/2026-09-08-p006-development.md): two review rounds, complete terminal/critical/workspace acceptance and separately qualified native Linux checks.
+- [File/terminal/deployment integration](reports/2026-09-08-p004-p006-integration.md): reviewed combined source, shared Git correction and pending installed-module acceptance.
+- [Deployment development commands](developer/deployment.md): current P009 administrator tooling, partial Linux evidence and blocked restore/transfer gates.
+- [P009 development checkpoint](reports/2026-09-08-p009-development.md): partial implementation and installed-profile results; not a release-readiness report.
 - [Linux execution verification](developer/linux-verification.md): dedicated XFS storage, real runner checks, and scoped cleanup.
 - [Attachment verification](developer/attachments.md): upload/draft persistence, Linux publication checks and the separate live gate.
 - [Programmatic API](developer/programmatic-api.md): bearer authentication, current scopes, streaming, and safe retries.

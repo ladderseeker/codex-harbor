@@ -1,4 +1,5 @@
-import { lockOwnerIdentity } from "../../policy/src/authority.ts";
+import { lockScheduleOwner } from "./locking.ts";
+import { deploymentAdmission } from "../../storage/src/deployment.ts";
 import type { Pool } from "pg";
 import { transaction } from "../../storage/src/index.ts";
 /** Native turn state remains authoritative; attention never fabricates a terminal result. */
@@ -10,7 +11,8 @@ export async function settleOccurrences(pool: Pool) {
   ).rows;
   for (const hint of rows)
     await transaction(pool, async (db) => {
-      await lockOwnerIdentity(db);
+      await lockScheduleOwner(db);
+      await deploymentAdmission(db, true);
       await db.query("SELECT pg_advisory_xact_lock(740028)");
       await db.query("SELECT id FROM schedules WHERE id=$1 FOR UPDATE", [
         hint.schedule_id,

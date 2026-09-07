@@ -1,3 +1,4 @@
+import { releaseImage } from "../deploy/images.mjs";
 import {
   type ChildProcessWithoutNullStreams,
   execFile,
@@ -19,6 +20,7 @@ const exec = promisify(execFile);
 const idPattern = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 export const RUNNER_IMAGE = "codex-harbor-runner:0.153.4";
 export type RunnerConfig = {
+  purpose?: "conversation" | "terminal";
   attachmentDirectory?: NativeStorage;
   attachmentProject?: NativeStorage;
   workspaceId?: string;
@@ -37,6 +39,10 @@ export async function runnerArguments(
   config: RunnerConfig,
   native?: NativeStorage,
 ) {
+  if (config.purpose && !["conversation", "terminal"].includes(config.purpose))
+    throw Error("Unsupported runner purpose");
+  if (config.purpose === "terminal" && config.attachmentDirectory)
+    throw Error("Terminal runners cannot mount conversation attachments");
   for (const id of [
     config.sessionId,
     config.projectId,
@@ -163,6 +169,8 @@ export async function runnerArguments(
     "--label",
     "org.codex-harbor.owner=runner",
     "--label",
+    `org.codex-harbor.purpose=${config.purpose ?? "conversation"}`,
+    "--label",
     `org.codex-harbor.instance=${config.instanceId ?? "local"}`,
     "--log-driver",
     "local",
@@ -185,7 +193,7 @@ export async function runnerArguments(
     "--security-opt",
     "no-new-privileges:true",
     "--security-opt",
-    `seccomp=${fileURLToPath(new URL("./seccomp.json", import.meta.url))}`,
+    `seccomp=${fileURLToPath(new URL(config.purpose === "terminal" ? "./seccomp-terminal.json" : "./seccomp.json", import.meta.url))}`,
     "--pids-limit",
     "128",
     "--memory",
@@ -218,7 +226,7 @@ export async function runnerArguments(
     "HOME=/home/runner",
     "--workdir",
     "/workspace",
-    RUNNER_IMAGE,
+    releaseImage("runner", RUNNER_IMAGE),
     "codex",
     "app-server",
     "--listen",
@@ -273,27 +281,31 @@ export async function startConfinedRunner(
       )
         throw Error("Native history volume ownership mismatch");
     }
-    const egress = await provisionEgress(config);
+    const egress =
+      config.purpose === "terminal" ? null : await provisionEgress(config);
     try {
       // Revalidate after provisioning and before Docker resolves the administrator-controlled mount.
       const args = await runnerArguments(config, native);
-      args[args.indexOf("--network") + 1] = egress.networkName;
-      const imageIndex = args.indexOf(RUNNER_IMAGE);
-      args.splice(
-        imageIndex,
-        0,
-        "--env",
-        `HARBOR_MODEL_BASE_URL=${egress.modelBaseUrl}`,
-      );
-      args.push(
-        "--strict-config",
-        "-c",
-        'cli_auth_credentials_store="file"',
-        "-c",
-        'model_provider="harbor"',
-        "-c",
-        `model_providers.harbor={name="Harbor model gateway",base_url="${egress.modelBaseUrl}",wire_api="responses",requires_openai_auth=true,supports_websockets=false}`,
-      );
+      if (egress) {
+        args[args.indexOf("--network") + 1] = egress.networkName;
+        const imageIndex = args.indexOf(releaseImage("runner", RUNNER_IMAGE));
+        if (imageIndex < 0)
+          throw Error("Fixed runner image boundary unavailable");
+        args.splice(
+          imageIndex,
+          0,
+          "--env",
+          `HARBOR_MODEL_BASE_URL=${egress.modelBaseUrl}`,
+        );
+      }
+      args.push("--strict-config", "-c", 'cli_auth_credentials_store="file"');
+      if (egress)
+        args.push(
+          "-c",
+          'model_provider="harbor"',
+          "-c",
+          `model_providers.harbor={name="Harbor model gateway",base_url="${egress.modelBaseUrl}",wire_api="responses",requires_openai_auth=true,supports_websockets=false}`,
+        );
       const child: OwnedRuntimeProcess = spawn("docker", args, {
         stdio: "pipe",
         env: {
@@ -321,7 +333,7 @@ export async function startConfinedRunner(
             if (found.stdout.trim())
               throw Error("Owned runner termination unconfirmed");
           }
-          await egress.cleanup();
+          await egress?.cleanup();
         })());
       child.closeOwned = cleanup;
       child.inspectOwned = () => inspectRunnerProcesses(config);
@@ -341,7 +353,7 @@ export async function startConfinedRunner(
       });
       return child;
     } catch (error) {
-      await egress.cleanup();
+      await egress?.cleanup();
       throw error;
     }
   });

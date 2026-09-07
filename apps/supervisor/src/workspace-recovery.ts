@@ -17,6 +17,7 @@ export async function releaseRecoveredWorkspace(
 ) {
   const w = await selectedWorkspace(db, expected.workspaceId, true);
   if (
+    w.writer_kind !== "conversation" ||
     w.writer_session_id !== expected.sessionId ||
     Number(w.writer_generation) !== expected.generation
   )
@@ -64,6 +65,7 @@ export async function processWorkspaceReleases(
         await authority();
         const w = await selectedWorkspace(db, row.workspace_id, true);
         if (
+          w.writer_kind !== "conversation" ||
           w.writer_session_id !== row.session_id ||
           Number(w.writer_generation) !== Number(row.expected_generation)
         )

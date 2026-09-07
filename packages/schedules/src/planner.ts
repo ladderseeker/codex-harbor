@@ -3,7 +3,8 @@ import type { Pool, PoolClient } from "pg";
 import type { PgBoss } from "pg-boss";
 import { randomUUID } from "node:crypto";
 import { transaction } from "../../storage/src/index.ts";
-import { lockOwnerIdentity } from "../../policy/src/authority.ts";
+import { lockScheduleOwner } from "./locking.ts";
+import { deploymentAdmission } from "../../storage/src/deployment.ts";
 import { HarborError } from "../../policy/src/index.ts";
 import {
   admitRecurringOccurrence,
@@ -44,7 +45,8 @@ export async function planSchedule(
     new Date(now) < (hint.last_observed_at ?? hint.cursor_at)
   ) {
     await transaction(pool, async (db) => {
-      await lockOwnerIdentity(db);
+      await lockScheduleOwner(db);
+      await deploymentAdmission(db, true);
       await db.query(
         "UPDATE schedules SET state='attention',reason=$2,updated_at=clock_timestamp() WHERE id=$1 AND state='enabled' AND config_revision=$3 AND grant_epoch=$4",
         [
@@ -88,7 +90,8 @@ export async function planSchedule(
       ...(late ? { rangeFrom: hint.cursor_at.toISOString() } : {}),
     };
     const saved = await transaction(pool, async (db) => {
-      await lockOwnerIdentity(db);
+      await lockScheduleOwner(db);
+      await deploymentAdmission(db, true);
       const r = await db.query(
         "UPDATE schedules SET catch_up=$2,last_observed_at=$3 WHERE id=$1 AND state='enabled' AND config_revision=$4 AND grant_epoch=$5 AND cursor_at=$6 AND catch_up IS NULL RETURNING id",
         [
@@ -142,7 +145,8 @@ export async function planSchedule(
         !batch.rangeFrom
       ) {
         await transaction(pool, async (db) => {
-          await lockOwnerIdentity(db);
+          await lockScheduleOwner(db);
+          await deploymentAdmission(db, true);
           await db.query("SELECT pg_advisory_xact_lock(740028)");
           const current = (
             await db.query(
@@ -201,7 +205,8 @@ export async function planSchedule(
         )
       )
         await transaction(pool, async (db) => {
-          await lockOwnerIdentity(db);
+          await lockScheduleOwner(db);
+          await deploymentAdmission(db, true);
           await db.query(
             "UPDATE schedules SET state='attention',reason=$2 WHERE id=$1 AND state='enabled' AND config_revision=$3 AND grant_epoch=$4",
             [id, error.code, hint.config_revision, hint.grant_epoch],
@@ -213,7 +218,8 @@ export async function planSchedule(
     return;
   }
   await transaction(pool, async (db) => {
-    await lockOwnerIdentity(db);
+    await lockScheduleOwner(db);
+    await deploymentAdmission(db, true);
     await db.query("SELECT pg_advisory_xact_lock(740028)");
     const current = (
       await db.query(

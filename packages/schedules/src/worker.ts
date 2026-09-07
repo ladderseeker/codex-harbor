@@ -1,7 +1,8 @@
 import type { Pool, PoolClient } from "pg";
 import type { PgBoss } from "pg-boss";
 import { transaction } from "../../storage/src/index.ts";
-import { lockOwnerIdentity } from "../../policy/src/authority.ts";
+import { lockScheduleOwner } from "./locking.ts";
+import { deploymentAdmission } from "../../storage/src/deployment.ts";
 import { HarborError } from "../../policy/src/index.ts";
 import { planSchedule } from "./planner.ts";
 import { advanceOccurrence, type ScheduleExecutionConfig } from "./phases.ts";
@@ -26,7 +27,8 @@ export async function processSchedules(
   ).rows;
   for (const schedule of schedules) {
     await transaction(pool, async (db) => {
-      await lockOwnerIdentity(db);
+      await lockScheduleOwner(db);
+      await deploymentAdmission(db, true);
       await fence(db);
     });
     try {
@@ -34,7 +36,8 @@ export async function processSchedules(
     } catch (error) {
       if (!(error instanceof HarborError)) throw error;
       await transaction(pool, async (db) => {
-        await lockOwnerIdentity(db);
+        await lockScheduleOwner(db);
+        await deploymentAdmission(db, true);
         await db.query(
           "UPDATE schedules SET state='attention',reason=$2 WHERE id=$1 AND state='enabled' AND config_revision=$3 AND grant_epoch=$4",
           [
@@ -63,7 +66,8 @@ export async function processSchedules(
     } catch (error) {
       if (!(error instanceof HarborError)) throw error;
       await transaction(pool, async (db) => {
-        await lockOwnerIdentity(db);
+        await lockScheduleOwner(db);
+        await deploymentAdmission(db, true);
         await db.query("SELECT pg_advisory_xact_lock(740028)");
         await fence(db);
         await db.query("SELECT id FROM schedules WHERE id=$1 FOR UPDATE", [

@@ -1,3 +1,5 @@
+import { lockScheduleOwner } from "./locking.ts";
+import { deploymentAdmission } from "../../storage/src/deployment.ts";
 import type { Pool, PoolClient } from "pg";
 import { randomUUID } from "node:crypto";
 import { transaction } from "../../storage/src/index.ts";
@@ -27,7 +29,9 @@ export async function scheduleCommand(
     JSON.stringify({ route: input.route, body: input.body }),
   );
   return transaction(pool, async (db) => {
+    await lockScheduleOwner(db);
     const caller = await requireAuthority(db, input.actor, c, input.need);
+    await deploymentAdmission(db, !!input.control);
     if (caller.kind === "schedule")
       throw new HarborError(
         403,

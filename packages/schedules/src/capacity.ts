@@ -1,3 +1,5 @@
+import { lockScheduleOwner } from "./locking.ts";
+import { deploymentAdmission } from "../../storage/src/deployment.ts";
 import type { PoolClient } from "pg";
 import { HarborError } from "../../policy/src/index.ts";
 const settled =
@@ -57,6 +59,8 @@ export async function occurrenceCapacity(db: PoolClient, scheduleId: string) {
     );
 }
 export async function pruneScheduleHistory(db: PoolClient) {
+  await lockScheduleOwner(db);
+  await deploymentAdmission(db, true);
   await db.query("SELECT pg_advisory_xact_lock(740028)");
   const rows = (
     await db.query(

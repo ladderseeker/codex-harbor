@@ -39,9 +39,15 @@ export async function processWorkspaceStorage(
       if (row.action === "create")
         try {
           await verifyWorkspace({
+            id: row.workspace_id,
+            root_id: row.command.rootId,
+            kind: row.command.kind,
             canonical_path: result.canonical,
             device: result.device,
             inode: result.inode,
+            common_path: result.common?.canonical ?? null,
+            common_device: result.common?.device ?? null,
+            common_inode: result.common?.inode ?? null,
           });
         } catch {
           available = false;
