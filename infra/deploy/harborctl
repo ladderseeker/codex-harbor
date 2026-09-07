@@ -12,6 +12,7 @@ from control import (
     initialize,
     selected,
     readiness,
+    await_readiness,
     maintenance,
     db,
     service,
@@ -30,6 +31,31 @@ from destination import (
     state as destination_state,
     status as destination_status,
 )
+
+
+def resume_services(c, release):
+    deployment_status = db(c, release, "status")
+    if deployment_status["deployment"]["activation_required"]:
+        raise ValueError("Restored instance requires explicit validated activation")
+    # Keep durable admission closed while Type=simple processes acquire sockets.
+    # Repeating resume is safe for running services and does not replay work.
+    db(c, release, "maintenance", enabled=True)
+    try:
+        preflight(c, release)
+        service(c, "start")
+        result = await_readiness(c, release)
+        db(c, release, "maintenance", enabled=False)
+        result["deployment"] = db(c, release, "status")["deployment"]
+        if result["deployment"]["maintenance"]:
+            raise ValueError("Resume admission release unconfirmed")
+        return result
+    except Exception:
+        try:
+            db(c, release, "maintenance", enabled=True)
+        except Exception:
+            # A lost database acknowledgement must not leave reachable writers.
+            service(c, "stop", ["api", "supervisor"])
+        raise
 
 
 def main():
@@ -155,15 +181,7 @@ def main():
                 elif args.action == "preflight":
                     result = preflight(c, release)
                 elif args.action == "resume":
-                    deployment_status = db(c, release, "status")
-                    if deployment_status["deployment"]["activation_required"]:
-                        raise ValueError(
-                            "Restored instance requires explicit validated activation"
-                        )
-                    preflight(c, release)
-                    db(c, release, "maintenance", enabled=False)
-                    service(c, "start")
-                    result = readiness(c, release)
+                    result = resume_services(c, release)
                 else:
                     raise ValueError("Unsupported administrator action")
             if not readonly:
