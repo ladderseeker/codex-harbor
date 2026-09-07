@@ -12,6 +12,7 @@ This directory describes available behavior, developer workflows, and completed 
 - [Deployment development commands](developer/deployment.md): current P009 administrator tooling, partial Linux evidence and blocked restore/transfer gates.
 - [P009 development checkpoint](reports/2026-09-08-p009-development.md): partial implementation and installed-profile results; not a release-readiness report.
 - [Linux execution verification](developer/linux-verification.md): dedicated XFS storage, real runner checks, and scoped cleanup.
+- [Feature verification host preparation](reports/2026-09-08-feature-verification-host.md): fresh quota storage, pinned public tools and actual forwarding canary; feature acceptance remains separate.
 - [Attachment verification](developer/attachments.md): upload/draft persistence, Linux publication checks and the separate live gate.
 - [Schedule user guide](user/schedules.md): recurrence, offline execution, attention and pause/cancel behavior.
 - [Schedule developer guide](developer/schedules.md): API authority, test commands and recovery boundaries.

@@ -4,6 +4,17 @@ The full `pnpm test:isolation` lane exercises the supported local Linux launcher
 
 Use a disposable Linux VM with no personal project mounts, account state, or production services. The current verification environment uses Ubuntu 24.04, Linux 6.8, Node 24.11.1, pnpm 12.3.4, Docker Engine 29.1.3, Compose 2.40.3, and xfsprogs 6.6.0. The lane also requires Python 3, a C compiler, `iproute2`, and the repository's installed dependencies and frontend build. The launcher and Docker daemon must run on the same Linux host.
 
+Disable automatic application port forwarding in the VM manager and verify the effective behavior. For Lima 2.2.0, the [tested preparation](../reports/2026-09-08-feature-verification-host.md#forwarding-and-scoped-cleanup) uses the following rule in addition to `mounts: []` and `ssh.forwardAgent: false`. An omitted `guestIP` does not suppress every wildcard listener. Explicit SSH administration and any test-owned forwarding must be tracked separately.
+
+```yaml
+portForwards:
+  - guestIP: 0.0.0.0
+    guestIPMustBeZero: false
+    guestPortRange: [1, 65535]
+    ignore: true
+    proto: any
+```
+
 ## Prepare isolated storage
 
 Provision a dedicated XFS filesystem with project accounting and enforcement enabled by the `prjquota` mount option. Keep its control directory outside the mounted project storage and inaccessible to other users. [D003](../../design/decisions/003-quota-backed-project-storage.md) explains the enforced boundary.
@@ -16,14 +27,14 @@ set -eu
 HARBOR_VERIFY_ROOT=/var/lib/harbor-verification
 mkdir -m 0700 "$HARBOR_VERIFY_ROOT"
 mkdir -m 0700 "$HARBOR_VERIFY_ROOT/control" "$HARBOR_VERIFY_ROOT/mount"
-truncate -s 2G "$HARBOR_VERIFY_ROOT/quota.img"
-mkfs.xfs -q "$HARBOR_VERIFY_ROOT/quota.img"
+fallocate -l 2G "$HARBOR_VERIFY_ROOT/quota.img"
+mkfs.xfs -q -K "$HARBOR_VERIFY_ROOT/quota.img"
 mount -o loop,prjquota,nosuid,nodev "$HARBOR_VERIFY_ROOT/quota.img" "$HARBOR_VERIFY_ROOT/mount"
 xfs_quota -x -c state "$HARBOR_VERIFY_ROOT/mount"
 )
 ```
 
-Check that project accounting and enforcement are both on. Do not substitute a personal filesystem or disable a failed admission check. The harness allocates fresh project IDs and two bounded storage slots beneath this dedicated mount; it does not configure quotas for existing projects.
+Check that project accounting and enforcement are both on, the backing image is physically allocated, and enough free host disk remains for the run. Do not substitute a personal filesystem or disable a failed admission check. The harness allocates fresh project IDs and two bounded storage slots beneath this dedicated mount; it does not configure quotas for existing projects.
 
 ## Run the lane
 
