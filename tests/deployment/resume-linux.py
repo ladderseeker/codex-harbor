@@ -1,6 +1,6 @@
 """Explicit disposable installed-instance test. No backup, migration or model work."""
 
-import argparse, hashlib, json, os, pathlib, subprocess, sys, time
+import argparse, hashlib, json, os, pathlib, signal, subprocess, sys, time
 
 sys.dont_write_bytecode = True
 parser = argparse.ArgumentParser()
@@ -72,8 +72,10 @@ result = {
 
 
 def disabled():
-    db(c, release, "maintenance", enabled=True)
-    service(c, "stop", ["api", "supervisor", "storage"])
+    try:
+        db(c, release, "maintenance", enabled=True)
+    finally:
+        service(c, "stop", ["api", "supervisor", "storage"])
 
 
 def delay(seconds):
@@ -100,15 +102,28 @@ def execute(name, expected, inspect_disabled=False):
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        start_new_session=True,
     )
     observations = []
-    # Observe real DB admission while the delayed API cannot yet listen.
-    if inspect_disabled:
-        time.sleep(1)
-        while process.poll() is None and time.monotonic() - started < 5:
-            observations.append(db(c, release, "status")["deployment"]["maintenance"])
-            time.sleep(0.2)
-    out, err = process.communicate(timeout=150)
+    try:
+        # Observe real DB admission while the delayed API cannot yet listen.
+        if inspect_disabled:
+            time.sleep(1)
+            while process.poll() is None and time.monotonic() - started < 5:
+                observations.append(
+                    db(c, release, "status")["deployment"]["maintenance"]
+                )
+                time.sleep(0.2)
+        out, err = process.communicate(timeout=150)
+    finally:
+        # Kill the exact test-created session before admission teardown, including
+        # a child database client whose parent timed out. Never leave a late resume.
+        if process.poll() is None or sys.exc_info()[1] is not None:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=10)
     assert process.returncode == expected, (
         name,
         process.returncode,
@@ -133,6 +148,13 @@ def execute(name, expected, inspect_disabled=False):
     )
 
 
+def remove_override():
+    if dropdir.exists():
+        (dropdir / "resume-test.conf").unlink()
+        dropdir.rmdir()
+        run(["systemctl", "daemon-reload"])
+
+
 try:
     disabled()
     delay(8)
@@ -147,27 +169,41 @@ try:
     run(["systemctl", "daemon-reload"])
     execute("retry-after-failure", 0)
 finally:
-    disabled()
-    if dropdir.exists():
-        (dropdir / "resume-test.conf").unlink()
-        dropdir.rmdir()
-        run(["systemctl", "daemon-reload"])
-    assert hashlib.sha256(unit_file.read_bytes()).hexdigest() == unit_hash
-    assert (
-        hashlib.sha256(pathlib.Path(a.config).read_bytes()).hexdigest() == config_hash
-    )
-    result["drainedAfter"] = db(c, release, "status")["deployment"]["maintenance"]
-    result["originalConfigAndUnitPreserved"] = True
-    assert preserved_state() == original_history
-    result["originalSessionStatesAndWriterReservationsPreserved"] = True
-    result["applicationUnitsStopped"] = all(
-        subprocess.run(
-            ["systemctl", "is-active", p["unit"] + "-" + r + ".service"],
-            stdout=subprocess.DEVNULL,
-        ).returncode
-        != 0
-        for r in ["api", "supervisor", "storage"]
-    )
-    pathlib.Path(a.output).write_text(json.dumps(result, indent=2) + "\n")
-assert result["drainedAfter"] and result["applicationUnitsStopped"]
+    primary_error = sys.exc_info()[1]
+    cleanup_errors = []
+    for cleanup in [disabled, lambda: remove_override()]:
+        try:
+            cleanup()
+        except Exception as error:
+            cleanup_errors.append(type(error).__name__)
+    try:
+        assert hashlib.sha256(unit_file.read_bytes()).hexdigest() == unit_hash
+        assert (
+            hashlib.sha256(pathlib.Path(a.config).read_bytes()).hexdigest()
+            == config_hash
+        )
+        result["drainedAfter"] = db(c, release, "status")["deployment"]["maintenance"]
+        result["originalConfigAndUnitPreserved"] = True
+        assert preserved_state() == original_history
+        result["originalSessionStatesAndWriterReservationsPreserved"] = True
+        result["applicationUnitsStopped"] = all(
+            subprocess.run(
+                ["systemctl", "is-active", p["unit"] + "-" + r + ".service"],
+                stdout=subprocess.DEVNULL,
+                timeout=15,
+            ).returncode
+            != 0
+            for r in ["api", "supervisor", "storage"]
+        )
+        assert result["drainedAfter"] and result["applicationUnitsStopped"]
+    except Exception as error:
+        cleanup_errors.append(type(error).__name__)
+    result["cleanupErrors"] = cleanup_errors
+    try:
+        pathlib.Path(a.output).write_text(json.dumps(result, indent=2) + "\n")
+    except Exception:
+        if primary_error is None:
+            raise
+    if cleanup_errors and primary_error is None:
+        raise RuntimeError("Owned resume fixture cleanup unconfirmed")
 print(json.dumps(result))
