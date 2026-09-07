@@ -1,3 +1,4 @@
+import { scheduleModulesE2e } from "./modules-e2e.ts";
 import { scheduleReviewControlsE2e } from "./review-controls-e2e.ts";
 import { scheduleWorkspacesE2e } from "./workspaces-e2e.ts";
 import { scheduleBoundsE2e } from "./bounds-e2e.ts";
@@ -339,6 +340,16 @@ export async function scheduleE2e(options: {
         ).rows[0].state,
     )
     .toBe("completed");
+  await scheduleModulesE2e({
+    db,
+    context,
+    origin,
+    csrf: me.csrfToken,
+    projectId: project.id,
+    sessionId: session.id,
+    post,
+    restartSupervisor: options.restartSupervisor,
+  });
   await scheduleReviewControlsE2e({
     db,
     projectId: project.id,

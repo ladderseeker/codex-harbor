@@ -1,3 +1,4 @@
+import { workspaceCommand } from "../../infra/storage/workspace-client.js";
 import { sourceDigest } from "../../scripts/source-digest.js";
 import {
   spawn,
@@ -17,6 +18,7 @@ import {
   rename,
   rmdir,
   unlink,
+  symlink,
 } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID, randomBytes } from "node:crypto";
@@ -286,6 +288,56 @@ try {
     w2 = rows.find((w) => w.id === two.id),
     s1 = randomUUID(),
     s2 = randomUUID();
+  const validateCommand = {
+    action: "workspaceValidate" as const,
+    rootId: fixture.env.HARBOR_PROJECT_ROOTS
+      ? JSON.parse(fixture.env.HARBOR_PROJECT_ROOTS)[0].id
+      : "",
+    workspaceId: w1.id,
+    relativePath: w1.relative_path,
+    kind: "worktree" as const,
+    source: {
+      relativePath: w1.relative_path,
+      device: w1.device,
+      inode: w1.inode,
+    },
+    identity: {
+      canonical: w1.canonical_path,
+      device: w1.device,
+      inode: w1.inode,
+      common: {
+        canonical: w1.common_path,
+        device: w1.common_device,
+        inode: w1.common_inode,
+      },
+    },
+  };
+  await workspaceCommand(validateCommand);
+  await assert.rejects(
+    workspaceCommand({
+      ...validateCommand,
+      identity: {
+        ...validateCommand.identity,
+        common: {
+          ...validateCommand.identity.common,
+          inode: String(BigInt(w1.common_inode) + 1n),
+        },
+      },
+    }),
+  );
+  const retainedCommon = w1.common_path + ".owned-validation-canary";
+  await rename(w1.common_path, retainedCommon);
+  try {
+    await symlink(retainedCommon, w1.common_path);
+    await assert.rejects(workspaceCommand(validateCommand));
+  } finally {
+    await unlink(w1.common_path);
+    await rename(retainedCommon, w1.common_path);
+  }
+  await workspaceCommand(validateCommand);
+  console.log(
+    "PASS managed validation rejects wrong common inode and symlink, original identity restored",
+  );
   const terminals = new Map<string, string>();
   adapter = new CodexAdapter(await launchRunner(config(w1, s1, 1)), {
     onEvent: (m, p) => {

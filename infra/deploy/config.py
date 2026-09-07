@@ -58,6 +58,7 @@ def load(path):
         "permissionCeiling",
         "dnsProfile",
         "extraCaFile",
+        "gitAuthor",
     }
     if set(c) - required - optional or required - set(c):
         raise ValueError("Invalid deployment configuration fields")
@@ -89,6 +90,10 @@ def load(path):
             raise ValueError("Invalid private service port")
     if c["apiPort"] == c["databasePort"]:
         raise ValueError("Private service ports conflict")
+    if "gitAuthor" in c:
+        author = c["gitAuthor"]
+        if not isinstance(author, dict) or set(author) != {"name", "email"} or not re.fullmatch(r"[^<>\r\n\x00]{1,120}", author.get("name", "")) or not re.fullmatch(r"[^<>\s\x00]{1,200}@[^<>\s\x00]{1,200}", author.get("email", "")):
+            raise ValueError("Invalid managed Git author")
     if c.get("permissionCeiling", "read-only") not in ["read-only", "workspace-write"]:
         raise ValueError("Invalid permission ceiling")
     if c.get("dnsProfile", "system") not in ["system", "cloudflare-doh"]:

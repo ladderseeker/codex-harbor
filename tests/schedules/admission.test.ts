@@ -1,3 +1,9 @@
+import { writeFile } from "node:fs/promises";
+import {
+  installedModules,
+  installedModuleStatus,
+  restoreInstalledModules,
+} from "../../packages/storage/src/deployment-modules.ts";
 import { planSchedule } from "../../packages/schedules/src/planner.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -59,18 +65,30 @@ test(
         "org.codex-harbor.test=" + name,
         "-e",
         "POSTGRES_PASSWORD",
+        "--tmpfs",
+        "/var/lib/postgresql/data:rw,size=268435456",
         "-p",
         "127.0.0.1::5432",
         "postgres:17.6-bookworm",
       ]);
-      const port = JSON.parse(
-        docker([
-          "inspect",
-          "--format",
-          "{{json .NetworkSettings.Ports}}",
-          name,
-        ]),
-      )["5432/tcp"][0].HostPort;
+      let port: string | undefined;
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const published = JSON.parse(
+          docker([
+            "inspect",
+            "--format",
+            "{{json .NetworkSettings.Ports}}",
+            name,
+          ]),
+        );
+        port = published["5432/tcp"]?.[0]?.HostPort;
+        if (port) break;
+        await sleep(100);
+      }
+      assert.ok(
+        port,
+        "Owned PostgreSQL loopback port was not published within five seconds",
+      );
       const url = `postgres://postgres:${password}@127.0.0.1:${port}/postgres`;
       pool = createPool(url);
       let ready = false;
@@ -402,6 +420,158 @@ test(
         ).rows[0].catch_up,
         null,
       );
+      // Fixed installed-module restore uses real persisted schedule/grant/job state.
+      // This is local metadata rebind, not a protected backup or runner restore.
+      const originalOccurrence = (
+        await pool.query("SELECT * FROM schedule_occurrences WHERE id=$1", [
+          occurrence.id,
+        ])
+      ).rows[0];
+      assert.equal(installedModules.P008.length, 6);
+      assert.ok((await installedModuleStatus(pool)).enabledSchedules > 0);
+      if (process.env.HARBOR_TEST_ADMIN_BRIDGE === "1") {
+        assert.equal(process.platform, "linux");
+        assert.equal(process.getuid?.(), 0);
+        const destination = "restore-" + randomUUID();
+        const bridgeInput = {
+          action: "restore-rebind",
+          restoreId: randomUUID(),
+          sourceInstance: name,
+          sourceOwner: c.HARBOR_OWNER_SUBJECT,
+          projects: [],
+          workspaces: [],
+          attachments: [],
+          attachmentFiles: [],
+        };
+        const bridge = (input: unknown) =>
+          JSON.parse(
+            execFileSync(
+              process.execPath,
+              ["--import", "tsx", "infra/deploy/database.ts"],
+              {
+                input: JSON.stringify(input),
+                encoding: "utf8",
+                timeout: 60000,
+                env: {
+                  ...process.env,
+                  DATABASE_URL: url,
+                  HARBOR_INSTANCE_ID: destination,
+                  HARBOR_OWNER_SUBJECT: c.HARBOR_OWNER_SUBJECT,
+                  HARBOR_OIDC_ISSUER: c.HARBOR_OIDC_ISSUER,
+                },
+              },
+            ),
+          );
+        const inventory = bridge({ action: "registry" });
+        assert.deepEqual(inventory.modules.P008, [...installedModules.P008]);
+        assert.equal(JSON.stringify(inventory).includes(input.prompt), false);
+        assert.equal(bridge(bridgeInput).disabled, true);
+        const originalHistoryCount = (
+          await pool.query(
+            "SELECT count(*) FROM deployment_restored_operations",
+          )
+        ).rows[0].count;
+        assert.equal(bridge(bridgeInput).disabled, true);
+        assert.equal(
+          (
+            await pool.query(
+              "SELECT count(*) FROM deployment_restored_operations",
+            )
+          ).rows[0].count,
+          originalHistoryCount,
+        );
+        const deployment = bridge({ action: "status" }).deployment;
+        assert.equal(deployment.maintenance, true);
+        assert.equal(deployment.activation_required, true);
+        assert.equal(
+          (
+            await pool.query(
+              "SELECT revoked FROM browser_sessions WHERE hash=$1",
+              [actor],
+            )
+          ).rows[0].revoked,
+          true,
+        );
+      } else await transaction(pool, (db) => restoreInstalledModules(db, name));
+      assert.equal(
+        Number(
+          (
+            await pool.query(
+              "SELECT count(*) FROM schedules WHERE state<>'paused' OR active_grant_id IS NOT NULL OR catch_up IS NOT NULL",
+            )
+          ).rows[0].count,
+        ),
+        0,
+      );
+      assert.equal(
+        Number(
+          (
+            await pool.query(
+              "SELECT count(*) FROM schedule_grants WHERE NOT revoked",
+            )
+          ).rows[0].count,
+        ),
+        0,
+      );
+      assert.equal(
+        Number(
+          (await pool.query("SELECT count(*) FROM schedule_test_clock")).rows[0]
+            .count,
+        ),
+        0,
+      );
+      const historical = (
+        await pool.query(
+          "SELECT historical FROM deployment_restored_operations WHERE kind='schedule-occurrence' AND id=$1 AND source_instance=$2",
+          [occurrence.id, name],
+        )
+      ).rows[0].historical;
+      assert.equal(historical.prompt, originalOccurrence.prompt);
+      assert.equal(historical.state, originalOccurrence.state);
+      assert.equal(historical.turn_id, originalOccurrence.turn_id);
+      assert.equal(
+        (
+          await pool.query(
+            "SELECT state FROM schedule_occurrences WHERE id=$1",
+            [occurrence.id],
+          )
+        ).rows[0].state,
+        "cancelled",
+      );
+      assert.equal(
+        (
+          await pool.query("SELECT data FROM pgboss.job WHERE id=$1", [
+            occurrence.id,
+          ])
+        ).rows[0].data.occurrenceId,
+        occurrence.id,
+      );
+      await assert.rejects(requireAuthority(pool, internal, c, need));
+      assert.equal((await installedModuleStatus(pool)).enabledSchedules, 0);
+      if (
+        process.env.HARBOR_TEST_ADMIN_BRIDGE === "1" &&
+        process.env.HARBOR_SCHEDULE_BRIDGE_RESULT
+      )
+        await writeFile(
+          process.env.HARBOR_SCHEDULE_BRIDGE_RESULT,
+          JSON.stringify(
+            {
+              status: "passed",
+              node: process.version,
+              platform: process.platform,
+              actualAdministratorBridge: true,
+              registryIncludesSchedules: true,
+              originalQueueIdentityRetained: true,
+              restoreRetryStable: true,
+              destinationActivationRequired: true,
+              oldBrowserRevoked: true,
+              scope:
+                "fresh synthetic PostgreSQL state and actual source administrator bridge; no installed artifact, filesystem restore, native process, backup or transfer",
+            },
+            null,
+            2,
+          ) + "\n",
+        );
     } finally {
       await boss?.stop();
       await pool?.end();

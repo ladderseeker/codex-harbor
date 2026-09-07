@@ -9,6 +9,7 @@ IMAGES = {
     "runner": "codex-harbor-runner:0.153.4",
     "gateway": "codex-harbor-egress:1",
     "git": "codex-harbor-git:2.39.5-p003",
+    "files": "codex-harbor-files:2.39.5-p004",
 }
 
 
@@ -46,9 +47,7 @@ def build(source, node, restic, output, predecessor=None):
         [restic, "version"]
     ).startswith("restic 0.19.1 "):
         raise ValueError("Pinned Node/Restic binary required")
-    if not os.path.isfile(source + "/apps/web/dist/index.html") and not os.path.isfile(
-        source + "/dist/index.html"
-    ):
+    if not os.path.isfile(source + "/apps/web/dist/index.html"):
         raise ValueError("Build web assets before packaging")
     (
         run(
@@ -94,8 +93,9 @@ def build(source, node, restic, output, predecessor=None):
             symlinks=True,
             ignore=shutil.ignore_patterns("__pycache__", ".DS_Store"),
         )
-        if os.path.isdir(source + "/dist"):
-            shutil.copytree(source + "/dist", payload + "/dist")
+        # Vite output is ignored by Git, but the installed API serves this exact
+        # directory. Include it explicitly in the authenticated release inventory.
+        shutil.copytree(source + "/apps/web/dist", payload + "/apps/web/dist")
         os.makedirs(payload + "/bin")
         shutil.copyfile(node, payload + "/bin/node")
         shutil.copyfile(restic, payload + "/bin/restic")
@@ -159,6 +159,7 @@ def build(source, node, restic, output, predecessor=None):
                 and p.endswith(".sql")
             },
             "seccomp": content["infra/runner/seccomp.json"]["sha256"],
+            "terminalSeccomp": content["infra/runner/seccomp-terminal.json"]["sha256"],
             "files": content,
         }
         manifest["supportedPredecessors"] = []

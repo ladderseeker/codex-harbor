@@ -1140,6 +1140,10 @@ async function tick() {
                       : captured.permissionProfile,
                 });
               }
+              await deploymentAdmission(
+                fence,
+                captured.authorityScope !== "execute",
+              );
               const session = await fence.query(
                 "SELECT generation FROM sessions WHERE id=$1 FOR UPDATE",
                 [o.session_id],
@@ -1168,10 +1172,6 @@ async function tick() {
                       ? undefined
                       : captured.permissionProfile,
                 });
-              await deploymentAdmission(
-                fence,
-                captured.authorityScope !== "execute",
-              );
               const result = send();
               await fence.query("COMMIT");
               return result;

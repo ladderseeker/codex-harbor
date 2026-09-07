@@ -1,7 +1,7 @@
 # P008 — Scheduled tasks
 
 - Decision: Accepted
-- Delivery: In progress
+- Delivery: Implemented
 - Dependencies: [P003](003-parallel-project-workspaces.md), [P007](007-session-history-and-recovery.md)
 - Outcome: The owner schedules project work, leaves Harbor, and later reviews each occurrence's result or request for attention.
 
@@ -116,3 +116,17 @@ Add schedule/occurrence migrations and backup registration; exercise restore int
 The [development checkpoint](../../docs/reports/2026-09-08-p008-development.md) records current real application, managed-XFS, authority/fault/capacity evidence and preserved failures. Delivery remains In progress: independent feature review, installed-module/restore and migration013-after016 integration, final cumulative evidence and the dedicated live-account gate are not waived.
 
 - Round 1 correction decisions (8 September 2026): resolve and retain a standalone Git OID during the occurrence admission transaction, with the project/source row locks and idle-writer check held; preparation requires that OID and cannot replace it with a later HEAD. A manual run-now with an already busy source rejects before creating its occurrence/grant; recurring busy slots keep the overlap policy. Material edits require current manage and execute authority and the effective profile (including standalone write ceiling), even though edits pause rather than activate. Pause controls key the latest grant frontier, including one-shot grants; an exact older key still returns its original outcome. Periodic maintenance prunes expired control receipts before bounded age pruning, even for idle paused schedules. Emergency stop atomically pauses schedules and revokes all future grants while preserving original occurrence/native outcomes. These corrections await matching regression evidence and independent recheck.
+
+### Installed-module integration decisions (8 September 2026)
+
+The final module checkpoint `77b2ad50` is integrated without changing previously applied migration bytes. P008 extends the fixed code-owned P009 registry with its six tables; generated workspace and native content remain in the existing project inventory. Status distinguishes retained queued occurrences from active native or storage effects. Maintenance freezes new schedule admission and preparation; active effects must settle under their existing receipt and retirement rules before drain succeeds. Administrator interruption also pauses schedules and revokes all grants.
+
+Fresh-instance rebind preserves original schedule and occurrence records in the historical deployment inventory, pauses every schedule, revokes regular and one-shot grants, invalidates source command authority and removes the private fixture clock. Undispatched occurrences become cancelled; a linked turn already classified uncertain stays uncertain. Existing completed and uncertain outcomes remain historical. Only explicit destination activation under current authority can issue a fresh grant; stale queue notifications cannot renew one.
+
+Acceptance includes a fresh full schema and a real PostgreSQL upgrade from the exact predecessor migration map containing 016 to the unchanged map plus 013. Lower-ID compatibility remains conditional on the exact supported predecessor artifact and migration map; no migration renumbering or generic bypass is introduced. Local metadata rebind and compatibility evidence do not claim protected off-host restore or promotion.
+
+### Reviewed integrated implementation — 8 September 2026
+
+The complete scheduling implementation and fixed P009 registry/maintenance/rebind integration exist at final source `ce8ad2847e116ac6f6f059198bd9bbaf1564fc74edfc09bdf78113fe72858a9e` (998 files). Two feature review rounds and one bounded integration review closed with no remaining actionable scoped finding. Node24 checks/build,11 integration tests,18 pinned native contracts, full schedule feature and critical application regression passed at the qualified checkpoints in the [development report](../../docs/reports/2026-09-08-p008-development.md). Actual PostgreSQL fresh/lower-ID upgrade, exact predecessor compatibility and Linux source administrator metadata-rebind checks passed. The final test-only diagnostic/bridge deltas and earlier attachment observations remain explicitly qualified.
+
+Delivery is Implemented, not Verified: dedicated live-account P008-07 and protected full filesystem restore/promotion evidence remain unavailable. Local metadata rebind is not substituted for those gates; this proposal stays active. Parent integration owns the current reciprocal issue/index lifecycle and final baseline verification.

@@ -4,6 +4,7 @@ import os, stat, re, json, shutil, importlib.util, ctypes, multiprocessing, fcnt
 from config import layout, trusted
 from common import atomic
 
+NATIVE = re.compile(r"^(?:terminal-)?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
 UUID = re.compile(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
 
 
@@ -45,7 +46,7 @@ def owner(relative, item):
     if parts[0] == "native":
         if len(parts) == 1:
             return 0, 0o700
-        if not UUID.fullmatch(parts[1]):
+        if not NATIVE.fullmatch(parts[1]):
             raise ValueError("Invalid native-home identity")
         return 10001, (item.get("mode", 0o700) & 0o777)
     if parts[0] == "workspaces":
@@ -262,7 +263,7 @@ def _publish(
         atomic(journal_path, journal)
         if os.path.isdir(target + "/native"):
             for home in sorted(os.listdir(target + "/native")):
-                if not UUID.fullmatch(home):
+                if not NATIVE.fullmatch(home):
                     raise ValueError("Invalid native directory identity")
                 native.append(
                     {

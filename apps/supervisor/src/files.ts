@@ -1,3 +1,7 @@
+import {
+  deploymentAdmission,
+  deploymentState,
+} from "../../../packages/storage/src/deployment.ts";
 import type { Pool, PoolClient } from "pg";
 import type { Config } from "../../api/src/config.ts";
 import { transaction } from "../../../packages/storage/src/index.ts";
@@ -136,7 +140,7 @@ export async function processFiles(
   }
   const inspection = (
     await pool.query(
-      "SELECT i.*,o.workspace_id,o.project_id,o.kind,o.payload,o.id AS effect_id FROM file_inspections i JOIN file_operations o ON o.id=i.operation_id WHERE i.state='queued' ORDER BY i.created_at LIMIT 1",
+      "SELECT i.*,o.workspace_id,o.project_id,o.kind,o.payload,o.restored_from,o.id AS effect_id FROM file_inspections i JOIN file_operations o ON o.id=i.operation_id WHERE i.state='queued' ORDER BY i.created_at LIMIT 1",
     )
   ).rows[0];
   if (inspection) {
@@ -165,7 +169,8 @@ export async function processFiles(
           "UPDATE file_inspections SET state='inspecting',updated_at=now() WHERE id=$1 AND state='queued'",
           [inspection.id],
         );
-        await retireFileHelper(inspection.effect_id);
+        if (!inspection.restored_from)
+          await retireFileHelper(inspection.effect_id);
         const report = await inspectFileEffect(
           {
             ...workspaceFileCommand(w, inspection.kind, inspection.payload),
@@ -173,6 +178,7 @@ export async function processFiles(
             epoch: Number(w.writer_epoch),
           },
           !!c.HARBOR_FIXTURE_MODE && !process.env.HARBOR_STORAGE_SOCKET,
+          !!inspection.restored_from,
         );
         if (Buffer.byteLength(JSON.stringify(report)) > 16384)
           throw Error("File inspection result limit");
@@ -213,6 +219,7 @@ export async function processFiles(
     }
     return;
   }
+  if ((await deploymentState(pool)).maintenance) return;
   const candidates = (
     await pool.query(
       "SELECT o.* FROM file_operations o JOIN workspaces w ON w.id=o.workspace_id JOIN projects p ON p.id=o.project_id WHERE o.state='queued' AND w.writer_owner_id IS NULL AND w.state='ready' AND p.archived_at IS NULL ORDER BY o.created_at,o.id LIMIT 20",
@@ -231,6 +238,7 @@ export async function processFiles(
           projectId: row.project_id,
           permissionProfile: "workspace-write",
         });
+        await deploymentAdmission(db);
         w = await selectedWorkspace(db, row.workspace_id, true);
         if (w.writer_owner_id || w.state !== "ready" || w.project_archived)
           return false;
@@ -327,6 +335,7 @@ export async function processFiles(
                 projectId: row.project_id,
                 permissionProfile: "workspace-write",
               });
+              await deploymentAdmission(db);
               const locked = await selectedWorkspace(
                 db,
                 row.workspace_id,
@@ -359,6 +368,7 @@ export async function processFiles(
       await transaction(pool, (db) => settle(db, row, "succeeded", result));
       repairs.delete(row.id);
     } catch (error) {
+      if (!claimed && (error as any)?.code === "MAINTENANCE") return;
       if (activeFileHelpers.has(row.id)) {
         try {
           await retireFileHelper(row.id);

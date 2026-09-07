@@ -45,9 +45,9 @@ export async function processWorkspaceStorage(
             canonical_path: result.canonical,
             device: result.device,
             inode: result.inode,
-            common_path: result.common?.canonical ?? null,
-            common_device: result.common?.device ?? null,
-            common_inode: result.common?.inode ?? null,
+            common_path: result.common?.canonical,
+            common_device: result.common?.device,
+            common_inode: result.common?.inode,
           });
         } catch {
           available = false;

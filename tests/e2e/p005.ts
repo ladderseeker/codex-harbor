@@ -289,28 +289,42 @@ export async function p005({
   };
   page.on("response", selectionResponse);
   page.on("requestfailed", selectionFailed);
-  await page.goto(origin + "/?conversation=" + other.id);
   const text = Buffer.from("<script>window.attachmentExecuted=true</script>");
-  await writeFile(
-    path.join(artifacts, "p005-text-selection-readiness.json"),
-    JSON.stringify({
-      visibleAttachEnabled: await page
-        .getByRole("button", { name: "Attach file", exact: true })
-        .isEnabled(),
-      hiddenInputEnabled: await page
-        .getByLabel("Choose attachment")
-        .isEnabled(),
-    }),
-  );
-  // setInputFiles bypasses the hidden input's visible button. Observe the same
-  // readiness gate a real file-picker interaction must pass; never retry a mutation.
-  await expect(
-    page.getByRole("button", { name: "Attach file", exact: true }),
-  ).toBeEnabled();
-  await page
-    .getByLabel("Choose attachment")
-    .setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: text });
+  let textPhase = "load";
   try {
+    await page.goto(origin + "/?conversation=" + other.id);
+    await writeFile(
+      path.join(artifacts, "p005-text-selection-readiness.json"),
+      JSON.stringify({
+        visibleAttachEnabled: await page
+          .getByRole("button", { name: "Attach file", exact: true })
+          .isEnabled(),
+        hiddenInputEnabled: await page
+          .getByLabel("Choose attachment")
+          .isEnabled(),
+      }),
+    );
+    textPhase = "readiness";
+    // setInputFiles bypasses the hidden input's visible button. Observe the same
+    // readiness gate a real file-picker interaction must pass; never retry a mutation.
+    await expect(
+      page.getByRole("button", { name: "Attach file", exact: true }),
+    ).toBeEnabled();
+    textPhase = "selection";
+    await page.getByLabel("Choose attachment").setInputFiles({
+      name: "notes.txt",
+      mimeType: "text/plain",
+      buffer: text,
+    });
+    await expect(
+      page.getByText("Selected for this message", { exact: true }),
+    ).toBeVisible();
+    textPhase = "draft-save";
+    await expect(
+      page.getByText("Draft saved for 24 hours.", { exact: true }),
+    ).toBeVisible();
+    textPhase = "reload";
+    await page.reload();
     await expect(
       page.getByText("Selected for this message", { exact: true }),
     ).toBeVisible();
@@ -320,6 +334,7 @@ export async function p005({
         path.join(artifacts, "p005-text-selection-failure.json"),
         JSON.stringify(
           {
+            phase: textPhase,
             traffic: selectionTraffic,
             attachEnabled: await page
               .getByRole("button", { name: "Attach file", exact: true })
@@ -353,13 +368,6 @@ export async function p005({
     page.off("response", selectionResponse);
     page.off("requestfailed", selectionFailed);
   }
-  await expect(
-    page.getByText("Draft saved for 24 hours.", { exact: true }),
-  ).toBeVisible();
-  await page.reload();
-  await expect(
-    page.getByText("Selected for this message", { exact: true }),
-  ).toBeVisible();
   expect(
     await page.evaluate(() => Boolean((window as any).attachmentExecuted)),
   ).toBe(false);

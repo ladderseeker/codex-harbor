@@ -85,7 +85,8 @@ await writeFile(control + "/deployment.json", JSON.stringify(c), {
   mode: 0o600,
 });
 await writeFile(
-  "/var/lib/harbor-p009-tools/admission.json",
+  (process.env.HARBOR_DEPLOY_TEST_TOOLS ?? "/var/lib/harbor-p009-tools") +
+    "/admission.json",
   JSON.stringify({
     id,
     control,

@@ -382,6 +382,30 @@ try {
   await activePage
     ?.screenshot({ path: path.join(artifacts, "failure.png"), fullPage: true })
     .catch(() => {});
+  try {
+    if (faultDb)
+      await writeFile(
+        path.join(artifacts, "failure-state.json"),
+        JSON.stringify(
+          {
+            workspaces: (
+              await faultDb.query(
+                "SELECT id,kind,state,failure_code,relative_path,base_revision FROM workspaces ORDER BY created_at LIMIT 32",
+              )
+            ).rows,
+            storage: (
+              await faultDb.query(
+                "SELECT id,state,failure_code,action,result FROM workspace_storage_operations ORDER BY created_at DESC LIMIT 16",
+              )
+            ).rows,
+          },
+          null,
+          2,
+        ),
+      );
+  } catch {
+    /* Preserve the original assertion if diagnostics are unavailable. */
+  }
   console.error("P004 owned failure artifacts:", artifacts);
   throw error;
 } finally {

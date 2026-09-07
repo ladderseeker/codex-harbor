@@ -16,12 +16,15 @@ root = m["profile"]["roots"][0]
 os.mkdir(control + "/launcher", 0o700)
 c = {"instance": m["id"], "xfsProfile": m["profile"]}
 project, local, native = [str(uuid.uuid4()) for _ in range(3)]
+terminal_native = "terminal-" + str(uuid.uuid4())
 stage = control + "/stage"
 unit = "/synthetic/unit"
 location = stage + unit
 os.makedirs(location + "/workspace")
 os.mkdir(location + "/native")
 os.mkdir(location + "/native/" + native)
+os.mkdir(location + "/native/" + terminal_native)
+Path(location + "/native/" + terminal_native + "/history").write_text("terminal native retained")
 Path(location + "/workspace/marker").write_text("restored checkout")
 Path(location + "/native/" + native + "/canary").write_text("native retained")
 registry = {
@@ -93,6 +96,9 @@ assert (
     Path(root["path"] + "/unit/native/" + native + "/canary").read_text()
     == "native retained"
 )
+assert Path(root["path"] + "/unit/native/" + terminal_native + "/history").read_text() == "terminal native retained"
+assert os.stat(root["path"] + "/unit/native/" + terminal_native).st_uid == 10001
+assert {n["sessionId"] for n in result["nativeIdentities"]} == {native, terminal_native}
 assert not Path(root["path"] + "/unit/partial-owned").exists()
 assert other.read_text() == "other slot unchanged"
 assert result["projects"][0]["inode"] == str(
@@ -110,6 +116,7 @@ print(
                 "other slot untouched",
                 "actual XFS quota admission and syncfs",
                 "native bytes preserved",
+                "terminal native history identity and runner ownership preserved",
                 "removed checkout not recreated",
                 "exact published retry",
             ],

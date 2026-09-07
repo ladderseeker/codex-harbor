@@ -1,3 +1,7 @@
+import {
+  deploymentAdmission,
+  deploymentState,
+} from "../../../packages/storage/src/deployment.ts";
 import type { Pool, PoolClient } from "pg";
 import { transaction } from "../../../packages/storage/src/index.ts";
 import {
@@ -228,6 +232,10 @@ export class TerminalSupervisor {
       // Emergency UPDATE cannot commit between this locked read and synchronous send.
       await lockOwnerIdentity(db);
       await this.currentGrant(db, true);
+      await requireAuthority(db, g.actor, this.c, {
+        scope: "terminal:control",
+      });
+      await deploymentAdmission(db);
       const t = await lockedTerminal(
         db,
         r.id,
@@ -446,9 +454,10 @@ export class TerminalSupervisor {
       await maintainTerminalOutput(this.pool);
       this.lastMaintenance = Date.now();
     }
+    if ((await deploymentState(this.pool)).activation_required) return;
     if (this.starting) {
       await this.pool.query(
-        "UPDATE terminals SET state='retiring',failure_code='SUPERVISOR_RESTARTED',controller_until=NULL,output_lost=true WHERE NOT retired AND state<>'queued'",
+        "UPDATE terminals SET state='retiring',failure_code='SUPERVISOR_RESTARTED',controller_until=NULL,output_lost=true WHERE NOT retired AND state<>'queued' AND restored_from IS NULL",
       );
       this.starting = false;
     }
@@ -462,6 +471,11 @@ export class TerminalSupervisor {
     ).rows;
     for (const t of rows) {
       const r = this.owned.get(t.id);
+      if (
+        t.state === "queued" &&
+        (await deploymentState(this.pool)).maintenance
+      )
+        continue;
       if (t.state === "dispatching" && !r) {
         await this.pool.query(
           "UPDATE terminals SET state='retiring',failure_code='ADMISSION_UNCONFIRMED',controller_until=NULL WHERE id=$1 AND state='dispatching'",
@@ -491,7 +505,12 @@ export class TerminalSupervisor {
         await this.retire(t, r);
         continue;
       }
-      if (t.state !== "running" || !r?.adapter) continue;
+      if (
+        t.state !== "running" ||
+        !r?.adapter ||
+        (await deploymentState(this.pool)).maintenance
+      )
+        continue;
       for (const input of (
         await this.pool.query(
           "SELECT * FROM terminal_input WHERE terminal_id=$1 AND state='accepted' ORDER BY epoch,sequence LIMIT 8",
@@ -556,7 +575,8 @@ export class TerminalSupervisor {
         );
       }
     }
-    if (meta.emergency) return;
+    if (meta.emergency || (await deploymentState(this.pool)).maintenance)
+      return;
     const queued = (
       await this.pool.query(
         "SELECT * FROM terminals WHERE state='queued' ORDER BY created_at LIMIT 8",
@@ -571,6 +591,7 @@ export class TerminalSupervisor {
             projectId: t.project_id,
             permissionProfile: t.permission_profile,
           });
+          await deploymentAdmission(db);
           authorizePermission(
             t.permission_profile,
             this.c.HARBOR_PERMISSION_CEILING,
@@ -614,7 +635,7 @@ export class TerminalSupervisor {
             Number(
               (
                 await db.query(
-                  "SELECT count(*) AS n FROM terminals WHERE NOT retired AND state<>'queued'",
+                  "SELECT count(*) AS n FROM terminals WHERE NOT retired AND state<>'queued' AND restored_from IS NULL",
                 )
               ).rows[0].n,
             ) >= 4
@@ -640,6 +661,8 @@ export class TerminalSupervisor {
           return true;
         });
       } catch (error) {
+        if (error instanceof HarborError && error.code === "MAINTENANCE")
+          continue;
         if (error instanceof HarborError)
           await this.pool.query(
             "UPDATE terminals SET state='failed',retired=true,failure_code=$2 WHERE id=$1 AND state='queued'",

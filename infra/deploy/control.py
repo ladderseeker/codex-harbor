@@ -210,6 +210,9 @@ def maintenance(c, interrupt=False, deadlineSeconds=60):
         status = db(c, release, "status")
         if not (
             status["active"] or status["pendingStorage"] or status["pendingRecovery"]
+            or status["activeFiles"] or status["uncertainFiles"]
+            or status["pendingFileInspections"] or status["activeTerminals"]
+            or status["activeScheduleEffects"]
         ):
             break
         if time.monotonic() > deadline:
