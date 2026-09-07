@@ -1,11 +1,19 @@
+import { requireScheduleAuthority } from "../../schedules/src/authority.ts";
 import { transaction } from "../../storage/src/index.ts";
 import type { Pool, PoolClient } from "pg";
 import { digest, HarborError, authorizePermission } from "./index.ts";
 
-export const tokenScopes = ["read", "execute", "approve", "cancel"] as const;
+export const tokenScopes = [
+  "read",
+  "execute",
+  "approve",
+  "cancel",
+  "schedules:read",
+  "schedules:manage",
+] as const;
 export type Scope = (typeof tokenScopes)[number];
 export interface Authority {
-  kind: "browser" | "token";
+  kind: "browser" | "token" | "schedule";
   hash: string;
   csrf: string;
   projectIds?: string[];
@@ -17,19 +25,30 @@ export interface AuthorityConfig {
   HARBOR_OIDC_ISSUER: string;
   HARBOR_OWNER_SUBJECT: string;
   HARBOR_IDLE_SECONDS: number;
+  HARBOR_PERMISSION_CEILING?: "read-only" | "workspace-write";
+}
+export interface AuthorityNeed {
+  projectId?: string;
+  scope?: Scope;
+  permissionProfile?: string;
+  internalOperation?: { kind: "workspace" | "turn"; id: string };
 }
 type Config = AuthorityConfig;
 export async function requireAuthority(
   db: Pool | PoolClient,
   actor: string,
   c: Config,
-  need: { projectId?: string; scope?: Scope; permissionProfile?: string } = {},
+  need: AuthorityNeed = {},
 ): Promise<Authority> {
   if (!("release" in db))
     return transaction(db as Pool, (tx) =>
       requireAuthority(tx, actor, c, need),
     );
   await lockOwnerIdentity(db as PoolClient);
+  if (actor.startsWith("schedule:"))
+    return requireScheduleAuthority(db, actor, c, need, (source, sourceNeed) =>
+      requireAuthority(db, source, c, sourceNeed),
+    );
   const pin = digest(c.HARBOR_OIDC_ISSUER + "\0" + c.HARBOR_OWNER_SUBJECT);
   if (!actor.startsWith("pat:")) {
     await db.query(

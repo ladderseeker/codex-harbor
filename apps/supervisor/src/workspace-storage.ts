@@ -1,4 +1,5 @@
-import type { Pool } from "pg";
+import { HarborError } from "../../../packages/policy/src/index.ts";
+import type { Pool, PoolClient } from "pg";
 import { transaction } from "../../../packages/storage/src/index.ts";
 import {
   selectedWorkspace,
@@ -10,6 +11,7 @@ export async function processWorkspaceStorage(
   pool: Pool,
   fixture: boolean,
   roots: { id: string; path: string }[],
+  admission?: (db: PoolClient, row: any) => Promise<void>,
 ) {
   const rows = (
     await pool.query(
@@ -19,7 +21,13 @@ export async function processWorkspaceStorage(
   for (const row of rows) {
     try {
       await transaction(pool, async (db) => {
+        if (row.state === "queued") {
+          if (row.actor_hash.startsWith("schedule:") && !admission)
+            throw new Error("Schedule preparation admission unavailable");
+          await admission?.(db, row);
+        }
         await selectedWorkspace(db, row.workspace_id, true);
+        if (row.state === "queued") await admission?.(db, row);
         await db.query(
           "UPDATE workspace_storage_operations SET state='dispatching',updated_at=now() WHERE id=$1",
           [row.id],
@@ -69,6 +77,26 @@ export async function processWorkspaceStorage(
         );
       });
     } catch (error) {
+      if (
+        row.actor_hash.startsWith("schedule:") &&
+        row.state === "queued" &&
+        error instanceof HarborError &&
+        [401, 403].includes(error.statusCode)
+      ) {
+        await transaction(pool, async (db) => {
+          await selectedWorkspace(db, row.workspace_id, true);
+          const denied = await db.query(
+            "UPDATE workspace_storage_operations SET state='failed',failure_code='SCHEDULE_GRANT',updated_at=clock_timestamp() WHERE id=$1 AND state='queued' RETURNING id",
+            [row.id],
+          );
+          if (denied.rowCount)
+            await db.query(
+              "UPDATE workspaces SET state='failed',failure_code='SCHEDULE_GRANT' WHERE id=$1 AND state='creating'",
+              [row.workspace_id],
+            );
+        });
+        continue;
+      }
       // Ambiguous transport/COMMIT outcomes remain pending and read the same receipt next tick.
       if ((error as { code?: string }).code !== "WORKSPACE_STORAGE_FAILED")
         await pool.query(

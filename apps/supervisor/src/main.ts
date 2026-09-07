@@ -1,3 +1,8 @@
+import { processSchedules } from "../../../packages/schedules/src/worker.ts";
+import {
+  initializeScheduleQueue,
+  SCHEDULE_QUEUE,
+} from "../../../packages/schedules/src/queue.ts";
 import { prepareAttachments } from "../../../packages/attachments/src/materialize.ts";
 import { maintainAttachments } from "../../../packages/attachments/src/store.ts";
 import { processRecovery } from "./recovery.ts";
@@ -293,6 +298,32 @@ boss.on("error", () => {
 });
 await boss.start();
 await boss.createQueue("harbor-dispatch");
+await initializeScheduleQueue(boss);
+await boss.work(SCHEDULE_QUEUE, { pollingIntervalSeconds: 0.5 }, async () => {
+  // The opaque job wakes the ordinary durable poller; it never dispatches native work directly.
+  if (alive)
+    await boss.send(
+      "harbor-dispatch",
+      {},
+      { singletonKey: "dispatch", retryLimit: 0 },
+    );
+});
+let scheduleTick: Promise<void> | undefined;
+const scheduleFence = async (db: import("pg").PoolClient) => {
+  const meta = (
+    await db.query(
+      "SELECT generation,identity_pin,emergency FROM harbor_meta FOR SHARE",
+    )
+  ).rows[0];
+  if (
+    !alive ||
+    credentials.mutating ||
+    Number(meta.generation) !== generation ||
+    meta.identity_pin !== ownerPin ||
+    meta.emergency
+  )
+    throw Error("Schedule dispatcher fenced or stopped");
+};
 async function update(id: string, state: string, data: unknown = {}) {
   await transaction(pool, async (db) => {
     const found = await db.query(
@@ -529,7 +560,30 @@ async function tick() {
     lastMaintenance = Date.now();
   }
   if (credentials.mutating) return;
-  await processWorkspaceStorage(pool, !!c.HARBOR_FIXTURE_MODE, c.roots);
+  if (!scheduleTick)
+    scheduleTick = processSchedules(pool, boss, c, scheduleFence)
+      .catch(() => {
+        console.error("Schedule metadata reconciliation remains pending");
+      })
+      .finally(() => {
+        scheduleTick = undefined;
+      });
+  await processWorkspaceStorage(
+    pool,
+    !!c.HARBOR_FIXTURE_MODE,
+    c.roots,
+    async (db, row) => {
+      if (!row.actor_hash.startsWith("schedule:")) return;
+      const need = {
+        scope: "execute" as const,
+        projectId: row.project_id,
+        internalOperation: { kind: "workspace" as const, id: row.id },
+      };
+      await requireAuthority(db, row.actor_hash, c, need);
+      await scheduleFence(db);
+      await requireAuthority(db, row.actor_hash, c, need);
+    },
+  );
   await processWorkspaceReleases(pool, {
     config: c,
     current: () => alive && !credentials.mutating,
@@ -874,6 +928,7 @@ async function tick() {
     if (runtimes.get(o.session_id)?.operation) continue;
     try {
       await requireAuthority(pool, o.actor_hash, c, {
+        internalOperation: { kind: "turn", id: o.id },
         scope: "execute",
         projectId: o.project_id,
         permissionProfile: o.payload.permissionProfile,
@@ -892,6 +947,7 @@ async function tick() {
       const workspacePath = await verifyWorkspace(o);
       const admitted = await transaction(pool, async (db) => {
         await requireAuthority(db, o.actor_hash, c, {
+          internalOperation: { kind: "turn", id: o.id },
           scope: "execute",
           projectId: o.project_id,
           permissionProfile: o.payload.permissionProfile,
@@ -901,6 +957,7 @@ async function tick() {
         )
           return false;
         await requireAuthority(db, o.actor_hash, c, {
+          internalOperation: { kind: "turn", id: o.id },
           scope: "execute",
           projectId: o.project_id,
           permissionProfile: o.payload.permissionProfile,
@@ -1034,6 +1091,7 @@ async function tick() {
                 throw Error("Dispatch fenced or stopped");
               if (captured.authorityActor) {
                 await requireAuthority(fence, captured.authorityActor, c, {
+                  internalOperation: { kind: "turn", id: captured.operation },
                   scope: captured.authorityScope,
                   projectId: o.project_id,
                   permissionProfile:
@@ -1062,6 +1120,7 @@ async function tick() {
               // Re-evaluate authority after every lock, immediately before wire send.
               if (captured.authorityActor)
                 await requireAuthority(fence, captured.authorityActor, c, {
+                  internalOperation: { kind: "turn", id: captured.operation },
                   projectId: o.project_id,
                   scope: captured.authorityScope,
                   permissionProfile:
@@ -1204,6 +1263,7 @@ async function stop() {
   for (const r of runtimes.values()) r.adapter.close();
   await closeCredentials?.();
   await boss.stop();
+  await scheduleTick;
   fence.release();
   await pool.end();
 }

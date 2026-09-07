@@ -1,3 +1,4 @@
+import { scheduleSchemas, schedulePaths } from "./schedules-openapi.ts";
 import { tokenSchema } from "./tokens.ts";
 import { z } from "zod";
 import { projectSchema, sessionSchema, turnSchema } from "./index.ts";
@@ -180,7 +181,16 @@ const tokenRecord = object({
   id: uuid,
   name: string,
   prefix: string,
-  scopes: array({ enum: ["read", "execute", "approve", "cancel"] }),
+  scopes: array({
+    enum: [
+      "read",
+      "execute",
+      "approve",
+      "cancel",
+      "schedules:read",
+      "schedules:manage",
+    ],
+  }),
   project_ids: array(uuid),
   permission_profile: { enum: ["read-only", "workspace-write"] },
   expires_at: timestamp,
@@ -631,10 +641,11 @@ export const openapi = {
     },
     schemas: {
       ...publicSchemas,
+      ...scheduleSchemas,
       ProjectInput: z.toJSONSchema(projectSchema),
       SessionInput: z.toJSONSchema(sessionSchema),
       TurnInput: z.toJSONSchema(turnSchema),
     },
   },
-  paths,
+  paths: { ...paths, ...schedulePaths },
 };
