@@ -15,7 +15,8 @@
     "test:contract": "node --import tsx --test tests/contract/*.test.ts",
     "test:live": "node --import tsx tests/live/run.ts",
     "test:isolation": "node --import tsx tests/isolation/run.ts",
-    "test:egress": "node --test tests/egress/*.test.mjs"
+    "test:egress": "node --test tests/egress/*.test.mjs",
+    "test:workspaces": "node --import tsx --test tests/workspaces/*.test.ts"
   },
   "dependencies": {
     "@fastify/cookie": "11.0.2",

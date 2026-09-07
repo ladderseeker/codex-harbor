@@ -119,7 +119,7 @@ Treat model output, chat Markdown, filenames, diffs, and terminal links as untru
 
 Offer Local and Worktree modes. Prefer worktrees for concurrent Git work and explicit copies for non-Git folders. Worktrees share repository metadata and are not a security boundary. Show starting revisions and handle uncommitted files deliberately; review before applying changes elsewhere. [Official worktree explanation](https://learn.chatgpt.com/docs/environments/git-worktrees)
 
-Workspace admission coordinates managed runs, editor writes, and Git operations. Terminals retain writer reservations while shells or background jobs remain active; conflicting managed operations queue. This is cooperative coordination: arbitrary processes and external SSH can bypass it. Show Local conflicts and warn before simultaneous editing; never promise unconditional overwrite prevention.
+[D005](decisions/005-managed-project-workspaces.md) defines managed Local, Git Worktree and copy storage, stable common metadata mounts, and the confined Git helper. Workspace admission coordinates managed runs, editor writes, and Git operations. Terminals retain writer reservations while shells or background jobs remain active; conflicting managed operations queue. This is cooperative coordination: arbitrary processes and external SSH can bypass it. Show Local conflicts and warn before simultaneous editing; never promise unconditional overwrite prevention.
 
 The supervisor, not the browser, owns running work and subscriptions. Closing every page, changing networks, or restarting the HTTP service must leave execution intact. A turn may still complete, fail, hit a usage limit, or wait for approval. Waiting is visible and never interpreted as permission to continue.
 

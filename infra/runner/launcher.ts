@@ -19,6 +19,8 @@ const exec = promisify(execFile);
 const idPattern = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 export const RUNNER_IMAGE = "codex-harbor-runner:0.153.4";
 export type RunnerConfig = {
+  workspaceId?: string;
+  gitCommon?: { canonical: string; device: string; inode: string };
   sessionId: string;
   projectId: string;
   workspacePath: string;
@@ -73,6 +75,27 @@ export async function runnerArguments(
       throw Error("Untrusted workspace ancestor");
     if (ancestor === dirname(ancestor)) break;
   }
+  if (config.gitCommon) {
+    const common = config.gitCommon;
+    if (common.canonical.includes(",") || common.canonical.includes("\n"))
+      throw Error("Unsupported Git common path");
+    if (
+      !config.workspaceId ||
+      !idPattern.test(config.workspaceId) ||
+      dirname(workspace).split("/").at(-1) !== config.workspaceId ||
+      dirname(dirname(workspace)).split("/").at(-1) !== "workspaces" ||
+      common.canonical !== dirname(dirname(dirname(workspace))) + "/git-common"
+    )
+      throw Error("Git common mapping invalid");
+    const identity = await stat(common.canonical, { bigint: true });
+    if (
+      (await realpath(common.canonical)) !== common.canonical ||
+      identity.dev.toString() !== common.device ||
+      identity.ino.toString() !== common.inode ||
+      !identity.isDirectory()
+    )
+      throw Error("Git common identity changed");
+  }
   if (native) {
     const identity = await stat(native.canonical, { bigint: true });
     if (
@@ -102,6 +125,14 @@ export async function runnerArguments(
     "max-size=1m",
     "--log-opt",
     "max-file=2",
+    ...(config.gitCommon
+      ? [
+          "--mount",
+          `type=bind,source=${config.gitCommon.canonical},target=/git-common${config.permissionProfile === "workspace-write" ? "" : ",readonly"}`,
+          "--mount",
+          `type=bind,source=${workspace},target=/harbor/workspaces/${config.workspaceId}${config.permissionProfile === "workspace-write" ? "" : ",readonly"}`,
+        ]
+      : []),
     "--user",
     "10001:10001",
     "--read-only",

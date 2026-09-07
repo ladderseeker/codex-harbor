@@ -9,8 +9,11 @@ import {
   renameSync,
   mkdirSync,
   statSync,
+  openSync,
+  closeSync,
+  constants,
 } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 const stateFile = process.env.HARBOR_FIXTURE_STATE_FILE;
 let saved = [];
@@ -198,6 +201,8 @@ createInterface({ input: process.stdin }).on("line", (line) => {
         JSON.stringify({ method: "turn/start", threadId: p.threadId }) + "\n",
       );
     const text = p.input[0].text;
+    const marker=text.match(/\[workspace-marker:([a-zA-Z0-9_-]{1,64})\]/);
+    if(marker && process.env.HARBOR_FIXTURE_WORKSPACE){const fd=openSync(join(process.env.HARBOR_FIXTURE_WORKSPACE,'harbor-marker.txt'),constants.O_WRONLY|constants.O_CREAT|constants.O_TRUNC|constants.O_NOFOLLOW,0o644);try{writeFileSync(fd,marker[1])}finally{closeSync(fd)}}
     const turn = {
       id: randomUUID(),
       status: "inProgress",
@@ -268,6 +273,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
           delta: "x".repeat(4096),
         });
     event("turn/started", { threadId: p.threadId, turn });
+    if(text.includes("[retirement-unknown]")){process.send?.({retirementUnknown:true});return setTimeout(()=>process.exit(34),50)}
     if (text.includes("[crash]")) return setTimeout(() => process.exit(32), 50);
     if (text.includes("[approval]") || text.includes("[input]")) {
       const id = randomUUID();

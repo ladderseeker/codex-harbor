@@ -18,6 +18,29 @@ export const publicSchemas = {
       retryable: { type: "boolean" },
     }),
   }),
+  Workspace: object({
+    id: uuid,
+    projectId: uuid,
+    name: string,
+    kind: { enum: ["local", "worktree", "copy"] },
+    state: {
+      enum: [
+        "creating",
+        "removing",
+        "ready",
+        "unavailable",
+        "failed",
+        "archived",
+        "removed",
+      ],
+    },
+    relativePath: string,
+    baseRevision: { type: ["string", "null"] },
+    sourceDirty: { type: "boolean" },
+    writerSessionId: { type: ["string", "null"] },
+    writerGeneration: { type: ["integer", "null"] },
+    failureCode: { type: ["string", "null"] },
+  }),
   Project: object({ id: uuid, name: string, createdAt: timestamp }),
   Session: object({
     id: uuid,
@@ -293,6 +316,63 @@ const paths: Record<string, any> = {
   },
   "/openapi.json": { get: read({ type: "object" }) },
 };
+const workspaceResult = object({ workspace: ref("Workspace") });
+Object.assign(paths, {
+  "/projects/{id}/workspaces": {
+    get: read(object({ workspaces: array(ref("Workspace")) })),
+    post: mutation(
+      object(
+        {
+          name: string,
+          kind: { enum: ["worktree", "copy"] },
+          sourceWorkspaceId: uuid,
+          revision: {
+            type: "string",
+            pattern: "^(?:[a-f0-9]{40}|[a-f0-9]{64})$",
+          },
+          dirtyPolicy: { enum: ["exclude", "snapshot"] },
+        },
+        ["name", "kind", "sourceWorkspaceId", "dirtyPolicy"],
+      ),
+      workspaceResult,
+    ),
+  },
+  "/workspaces/{id}": {
+    get: read(
+      object({
+        workspace: ref("Workspace"),
+        inspection: object({
+          available: { type: "boolean" },
+          git: { type: "boolean" },
+          dirty: { type: "boolean" },
+        }),
+      }),
+    ),
+    delete: mutation(empty, workspaceResult),
+  },
+  "/workspaces/{id}/archive": { post: mutation(empty, workspaceResult) },
+  "/projects/{id}/archive": {
+    post: mutation(empty, object({ project: ref("Project") })),
+  },
+  "/sessions/{id}/archive": {
+    post: mutation(empty, object({ session: ref("Session") })),
+  },
+  "/workspaces/{id}/release": {
+    post: mutation(
+      object({
+        acknowledgeUnknownEffects: { const: true },
+        expectedSessionId: uuid,
+        expectedGeneration: { type: "integer", minimum: 1 },
+      }),
+      object({
+        release: object({
+          id: uuid,
+          state: { enum: ["queued", "dispatching", "completed", "failed"] },
+        }),
+      }),
+    ),
+  },
+});
 for (const [name, item] of Object.entries(paths))
   if (name.includes("{id}")) item.parameters = [idParameter];
 const tokenRoutes: Record<string, string> = {

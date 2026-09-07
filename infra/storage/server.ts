@@ -1,3 +1,4 @@
+import { executeWorkspace } from "./workspace-service.ts";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { chmod, lstat, chown, realpath } from "node:fs/promises";
@@ -66,15 +67,42 @@ try {
 }
 const server = createServer((req, res) => {
   let body = "";
-  if (req.method !== "POST" || req.url !== "/") {
+  if (req.method !== "POST" || !["/", "/workspace"].includes(req.url ?? "")) {
     res.writeHead(404).end();
     return;
   }
   req.on("data", (chunk) => {
     body += chunk;
-    if (body.length > 4096) req.destroy();
+    if (body.length > 8192) req.destroy();
   });
   req.on("end", () => {
+    if (req.url === "/workspace") {
+      let command;
+      try {
+        command = JSON.parse(body);
+      } catch {
+        res.writeHead(400).end();
+        return;
+      }
+      void executeWorkspace(command)
+        .then((result) =>
+          res
+            .writeHead(200, { "content-type": "application/json" })
+            .end(JSON.stringify(result)),
+        )
+        .catch((error) =>
+          res.writeHead(409, { "content-type": "application/json" }).end(
+            JSON.stringify({
+              error: "Managed workspace operation unavailable",
+              code:
+                error?.code === "WORKSPACE_STORAGE_FAILED"
+                  ? "WORKSPACE_STORAGE_FAILED"
+                  : "WORKSPACE_STORAGE_UNAVAILABLE",
+            }),
+          ),
+        );
+      return;
+    }
     const child = spawn(
       "python3",
       [fileURLToPath(new URL("./quota.py", import.meta.url))],

@@ -54,6 +54,52 @@ export async function p002({
   const root = (
     await (await context.request.get(origin + "/api/v1/project-roots")).json()
   ).roots[0];
+  // Independent P002 conversations receive distinct managed checkouts so its
+  // concurrent approval/cancel assertions do not contend on P003's Local lease.
+  const localWorkspace = (
+    await (
+      await context.request.get(
+        origin + `/api/v1/projects/${projectId}/workspaces`,
+      )
+    ).json()
+  ).workspaces.find((w: any) => w.kind === "local");
+  await expect
+    .poll(
+      async () =>
+        (
+          await (
+            await context.request.get(
+              origin + `/api/v1/projects/${projectId}/workspaces`,
+            )
+          ).json()
+        ).workspaces.find((w: any) => w.id === localWorkspace.id)
+          .writerSessionId,
+      { timeout: 30000 },
+    )
+    .toBe(null);
+  const isolatedWorkspaces: string[] = [];
+  for (const name of ["P002 broader profile", "P002 writable approval"]) {
+    const result = await owner(`/projects/${projectId}/workspaces`, {
+      name,
+      kind: "copy",
+      sourceWorkspaceId: localWorkspace.id,
+      dirtyPolicy: "snapshot",
+    });
+    expect(result.status()).toBe(200);
+    const w = (await result.json()).workspace;
+    await expect
+      .poll(
+        async () =>
+          (
+            await (
+              await context.request.get(origin + `/api/v1/workspaces/${w.id}`)
+            ).json()
+          ).workspace.state,
+        { timeout: 30000 },
+      )
+      .toBe("ready");
+    isolatedWorkspaces.push(w.id);
+  }
   const otherProject = (
     await (
       await owner("/projects", {
@@ -137,6 +183,14 @@ export async function p002({
     ).toBe(403);
     expect((await client.get(origin + "/")).status()).toBe(403);
     expect((await client.get(origin + "/api/v2/sessions")).status()).toBe(403);
+    expect(
+      (
+        await client.get(origin + `/api/v1/projects/${projectId}/workspaces`)
+      ).status(),
+    ).toBe(403);
+    expect(
+      (await send(`/workspaces/${localWorkspace.id}/release`, {})).status(),
+    ).toBe(403);
     expect((await client.get(origin + "/api/v1/openapi.json")).status()).toBe(
       200,
     );
@@ -177,6 +231,7 @@ export async function p002({
         await send("/sessions", {
           ...settings,
           projectId,
+          workspaceId: isolatedWorkspaces.shift(),
           permissionProfile: "workspace-write",
         })
       ).status(),
@@ -512,6 +567,7 @@ export async function p002({
         await owner("/sessions", {
           ...settings,
           projectId,
+          workspaceId: isolatedWorkspaces.shift(),
           permissionProfile: "workspace-write",
         })
       ).json()
@@ -908,6 +964,7 @@ export async function p002({
         await owner("/sessions", {
           ...settings,
           projectId,
+          workspaceId: isolatedWorkspaces.shift(),
           permissionProfile: "workspace-write",
         })
       ).json()

@@ -1,10 +1,10 @@
 # Codex Harbor
 
-A single-owner web interface and authenticated API for Codex, being built for compatible Linux VPS hosts. Persistent conversations and scoped API tokens run locally; workspaces, attachments, and history/recovery are being implemented.
+A single-owner web interface and authenticated API for Codex, being built for compatible Linux VPS hosts. Persistent conversations, scoped API tokens and managed parallel workspaces run locally; attachments and history/recovery are being integrated.
 
 ## Status
 
-P001 and P002 are Implemented. The foundation passed deterministic browser/API E2E and actual Linux/XFS isolation, with four independent review rounds. Scoped tokens passed their browser/API regressions, runtime contracts, and two review rounds, including integration on Node 24. Required live-account evidence and follow-ups remain open, so no proposal is marked finished. See the [foundation report](docs/reports/2026-09-07-p001-foundation.md), [API-token report](docs/reports/2026-09-07-p002-api-tokens.md), and [developer workflow](docs/developer/development.md) for tested commands and limits.
+P001–P003 are Implemented. The foundation, token controls and workspace lifecycle passed their recorded browser/API, contract and Linux checks, including combined Node 24 integration. Required live-account evidence and follow-ups remain open, so no proposal is marked finished. See the [foundation report](docs/reports/2026-09-07-p001-foundation.md), [API-token report](docs/reports/2026-09-07-p002-api-tokens.md), [workspace report](docs/reports/2026-09-07-p003-workspaces.md), and [developer workflow](docs/developer/development.md) for tested commands and limits.
 
 ## Start here
 

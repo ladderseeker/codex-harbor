@@ -28,6 +28,7 @@ export const projectSchema = z
 export const sessionSchema = z
   .object({
     projectId: z.string().uuid(),
+    workspaceId: z.uuid().optional(),
     title: z.string().trim().min(1).max(100).default("New conversation"),
     model: z.string().min(1).max(100),
     effort: z.enum(["low", "medium", "high"]).default("medium"),
@@ -56,6 +57,7 @@ export interface Session {
   permissionProfile: PermissionProfile;
   createdAt: string;
   updatedAt: string;
+  archivedAt?: string | null;
 }
 export interface Message {
   id: string;
