@@ -1,0 +1,17 @@
+# Codex Harbor
+
+A planned single-owner web interface and authenticated API for Codex, running on a compatible Linux VPS. The intended experience includes projects, parallel conversations that continue after the browser closes, scheduled tasks, terminals, files, and attachments.
+
+## Status
+
+Design stage. This repository contains the architecture, feature proposals, and development rules. It does not yet contain a runnable application or executable end-to-end tests.
+
+## Start here
+
+- [Design index](design/README.md): architecture, decisions, and feature proposals.
+- [Proposal index](design/proposals/README.md): complete feature outcomes, dependencies, and verification gates.
+- [Developer workflow](docs/developer/development.md): local development, future VPS self-development, and testing requirements.
+- [Documentation index](docs/README.md): documentation for available behavior and completed reports.
+- [Repository instructions](AGENTS.md): document ownership, implementation, and independent review rules.
+
+Designs and future feature proposals belong in `design/`. User/developer documentation and reports belong in `docs/`. Unresolved findings belong in `issues/`.
