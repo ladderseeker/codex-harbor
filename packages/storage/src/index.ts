@@ -1,16 +1,26 @@
+import { pruneReplay } from "./replay.ts";
 import { createHash } from "node:crypto";
 import pg from "pg";
 import { readFile, readdir } from "node:fs/promises";
 import type { HarborEvent } from "../../contracts/src/index.ts";
 export type DB = pg.Pool | pg.PoolClient;
 export function createPool(connectionString: string) {
-  return new pg.Pool({
+  const pool = new pg.Pool({
     connectionString,
     max: 10,
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 30000,
     query_timeout: 15000,
   });
+  // Idle connections can fail during a real database outage. The pool evicts
+  // them; request queries still reject, while the supervisor lease has its own
+  // fatal connection handler. Never log the pg client (it contains credentials).
+  pool.on("error", () => {});
+  // Checked-out clients can lose their connection between awaited queries too.
+  // pg still marks them non-queryable and rejects the next query; consuming the
+  // event prevents an unrelated HTTP process crash, not transaction recovery.
+  pool.on("connect", (client) => client.on("error", () => {}));
+  return pool;
 }
 export async function migrate(pool: pg.Pool) {
   const client = await pool.connect();
@@ -79,6 +89,7 @@ export async function event(db: DB, id: string, type: string, data: unknown) {
     "INSERT INTO events(session_id,sequence,type,data) VALUES($1,$2,$3,$4) RETURNING created_at",
     [id, seq, type, JSON.stringify(data)],
   );
+  await pruneReplay(db, id);
   return {
     schemaVersion: 1,
     conversationId: id,
@@ -111,7 +122,13 @@ export function publicRow(row: Record<string, unknown>) {
         k.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()),
         v instanceof Date
           ? v.toISOString()
-          : k === "generation" || k === "sequence"
+          : [
+                "generation",
+                "sequence",
+                "metadata_revision",
+                "replay_floor",
+                "history_ceiling",
+              ].includes(k)
             ? Number(v)
             : v,
       ]),
@@ -121,7 +138,7 @@ export function publicRow(row: Record<string, unknown>) {
 export async function deriveSessionState(db: DB, sessionId: string) {
   await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [sessionId]);
   const states = await db.query(
-    "SELECT state FROM operations WHERE session_id=$1 AND kind='turn' ORDER BY created_at DESC,id DESC",
+    "SELECT state FROM operations WHERE session_id=$1 AND kind='turn' AND NOT (state='uncertain' AND uncertainty_acknowledged_at IS NOT NULL) ORDER BY created_at DESC,id DESC",
     [sessionId],
   );
   const rows = states.rows.map((r) => r.state as string);

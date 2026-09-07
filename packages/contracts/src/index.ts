@@ -46,6 +46,8 @@ export type SessionState =
   | "interrupted"
   | "uncertain";
 export interface Session {
+  archived?: boolean;
+  metadataRevision?: number;
   id: string;
   projectId: string;
   workspaceId: string;

@@ -1141,3 +1141,66 @@ body,
 .composer-region {
   flex-shrink: 0;
 }
+.history {
+  padding: 12px 0;
+}
+.history .field {
+  font-size: 12px;
+  margin: 0 12px 10px;
+}
+.history input,
+.history select {
+  width: 100%;
+  min-width: 0;
+}
+.history-snippet {
+  display: block;
+  white-space: normal;
+  color: #526575;
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 4px;
+  max-height: 3em;
+  overflow: hidden;
+}
+.history-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 16px 0;
+  border-top: 1px solid #d7e0e6;
+}
+.history-details form,
+.history-details p {
+  flex-basis: 100%;
+}
+.history-details button {
+  font-size: 12px;
+}
+.recovery form {
+  display: grid;
+  gap: 16px;
+}
+.recovery-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.6;
+}
+.recovery-ack input {
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+.recovery textarea {
+  width: 100%;
+  resize: vertical;
+}
+.recovery-settings > textarea,
+.recovery-settings .send-button {
+  display: none;
+}
+.recovery-settings-label {
+  margin: 14px 12px 0;
+  font-size: 12px;
+  color: #526575;
+}

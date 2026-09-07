@@ -17,7 +17,7 @@ Review each approval or input request before answering. Another tab may already 
 
 **Stop turn** requests interruption. **Stopping** is not confirmation that execution has stopped; wait for the final state. After confirmed interruption, Harbor displays the observed process list when inspection succeeds. Some listed processes belong to the Codex runtime itself. An unavailable inspection is shown explicitly and must not be read as an empty process list.
 
-An **Uncertain** state means Harbor cannot establish whether work was delivered or completed. Completed filesystem changes may remain. The conversation stays paused instead of automatically replaying that work. Rich owner-directed reconciliation belongs to the still-planned history/recovery feature.
+An **Uncertain** state means Harbor cannot establish whether work was delivered or completed. Completed filesystem changes may remain. The conversation stays paused instead of automatically replaying that work. The recovery panel provides owner-directed fencing and a separate acknowledged new-operation path, described below.
 
 If a submission loses its connection, use its retained retry action to submit the identical intent. Changing the payload or creating a new request expresses different work. Requests outside the supported retry window require a deliberate new intent; an expired key is not silently reused.
 
@@ -31,4 +31,20 @@ If a submission loses its connection, use its retained retry action to submit th
 
 Open **Storage and limits** for persisted conversation usage and managed project quota information. Project usage is marked unavailable when the trusted storage service cannot inspect it. **Conversation limits** explains the server's current replay and retry bounds. Reaching an admission limit prevents new work; it does not grant permission to delete project files automatically.
 
-The application currently focuses on text conversations. Programmatic tokens, multiple workspace modes, file editing, attachments, terminals, richer history, schedules, deployment management, previews, and extension management remain tracked in the [active proposals](../../design/proposals/README.md).
+The application currently focuses on text conversations. Programmatic tokens, multiple workspace modes, file editing, attachments, terminals, schedules, deployment management, previews, and extension management remain tracked in the [active proposals](../../design/proposals/README.md).
+
+## Search and organize history
+
+Use **Search conversations** in the project rail to find a title or stored message text. **Show** switches between active, archived, and all conversations; **Load older conversations** fetches the next bounded page. **Rename conversation** checks the current revision so another tab's edit cannot be overwritten silently.
+
+**Archive conversation** changes list visibility only. It does not stop running work, delete messages, remove files, or change native history. Open a retained direct conversation link, or select archived history, then use **Restore conversation** to return it to the active list.
+
+## Recover an uncertain conversation
+
+Choose **Fence old runtime and inspect history**. Harbor first confirms that the old runtime and its processes have retired. It then attempts a bounded native-history read. The result distinguishes unavailable or truncated native content; already confirmed stored messages are preserved when the read conflicts. Old approval requests expire. An uncertain original operation remains visibly uncertain even when native text is recovered.
+
+A ready recovery offers a separate text field and a risk acknowledgement. Review files and retained history, acknowledge that unknown effects may remain, then use **Start new operation after recovery**. This is a new operation with new instructions, not a replay or an exactly-once continuation. Normal new-work quotas can still reject it. You can leave the conversation stopped.
+
+If the response is lost, **Retry same request** reconciles the same intent after reconnect or API restart. A failed fencing attempt requires **Retry fencing deliberately**, with at most three attempts. Exhausted or unconfirmed retirement remains blocked; use the administrator's SSH recovery path rather than trying to force another generation through the UI.
+
+Replay keeps at most 2,000 events and seven days, including uncertain conversations. Messages and unresolved operations are stored separately. A replay gap requests a fresh snapshot and stream; it never resubmits a turn. Reserved controls remain separate from ordinary history-request limits, while a database outage denies new requests until persistence returns.

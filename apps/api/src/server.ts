@@ -1,4 +1,17 @@
 import {
+  requireAuthority,
+  authenticateBrowser,
+  lockOwnerIdentity,
+} from "../../../packages/policy/src/authority.ts";
+import {
+  admitOrdinaryIntent,
+  lockIntentAdmission,
+} from "../../../packages/storage/src/admission.ts";
+import { recoveryRoutes } from "./recovery.ts";
+import { historyRoutes } from "./history.ts";
+import { pruneReplay } from "../../../packages/storage/src/replay.ts";
+import { capacity } from "../../../packages/storage/src/capacity.ts";
+import {
   createManagedProject,
   validateManagedProject,
   inspectManagedStorage,
@@ -66,6 +79,8 @@ export async function buildServer(c: Config) {
     for (const stream of openStreams) stream.end();
   });
   const auth = new WeakMap<object, { hash: string; csrf: string }>();
+  const externalEffectsGranted = new WeakSet<object>();
+  const selfRevocations = new WeakSet<object>();
   app.setErrorHandler((error, request, reply) => {
     const e =
       error instanceof HarborError
@@ -146,18 +161,13 @@ export async function buildServer(c: Config) {
     if (!token)
       throw new HarborError(401, "AUTH_REQUIRED", "Sign in to continue");
     const hash = digest(token);
-    const r = await pool.query(
-      "UPDATE browser_sessions SET last_seen=now() WHERE hash=$1 AND NOT revoked AND expires_at>now() AND last_seen>now()-($2*interval '1 second') AND identity_pin=$3 AND (SELECT identity_pin FROM harbor_meta)=$3 RETURNING csrf",
-      [hash, c.HARBOR_IDLE_SECONDS, ownerPin],
-    );
-    if (!r.rowCount)
-      throw new HarborError(401, "AUTH_EXPIRED", "Session expired or revoked");
-    auth.set(req, { hash, csrf: r.rows[0].csrf });
+    const authority = await authenticateBrowser(pool, c, hash);
+    auth.set(req, authority);
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
       requireOrigin(req.headers.origin, c.HARBOR_ORIGIN);
       if (
         typeof req.headers["x-csrf-token"] !== "string" ||
-        !equalSecret(req.headers["x-csrf-token"], r.rows[0].csrf)
+        !equalSecret(req.headers["x-csrf-token"], authority.csrf)
       )
         throw new HarborError(403, "CSRF_DENIED", "CSRF token required");
     }
@@ -255,6 +265,14 @@ export async function buildServer(c: Config) {
       JSON.stringify({ params: req.params, body: req.body ?? {} }),
     );
     return transaction(pool, async (db) => {
+      if (route === "/api/v1/security/logout") {
+        await lockOwnerIdentity(db);
+        await db.query(
+          "SELECT hash FROM browser_sessions WHERE hash=$1 FOR UPDATE",
+          [auth.get(req)!.hash],
+        );
+      }
+      await requireAuthority(db, auth.get(req)!.hash, c);
       await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
         actor + route + key,
       ]);
@@ -269,13 +287,75 @@ export async function buildServer(c: Config) {
             "IDEMPOTENCY_CONFLICT",
             "Key already identifies different input",
           );
+        await requireAuthority(db, auth.get(req)!.hash, c);
         return old.rows[0].result;
       }
       checkKey(key);
+      await lockIntentAdmission(db, actor);
+      if (
+        route === "/api/v1/security/emergency-stop" &&
+        (await db.query("SELECT emergency FROM harbor_meta FOR UPDATE")).rows[0]
+          .emergency
+      ) {
+        await requireAuthority(db, auth.get(req)!.hash, c);
+        return { stopped: true };
+      }
+      const reserved =
+        route.endsWith("/cancel") ||
+        route.endsWith("/answer") ||
+        route.endsWith("/recovery") ||
+        route.endsWith("/recovery/continue") ||
+        route === "/api/v1/security/emergency-stop" ||
+        route === "/api/v1/security/logout";
+      if (!reserved) await admitOrdinaryIntent(db, actor);
+      await requireAuthority(db, auth.get(req)!.hash, c);
       const result = await fn(db);
+      if (!externalEffectsGranted.has(req) && !selfRevocations.has(req))
+        await requireAuthority(db, auth.get(req)!.hash, c);
+      if (route === "/api/v1/security/emergency-stop") return result;
+      const controlTarget =
+        route === "/api/v1/security/logout"
+          ? "logout:" + auth.get(req)!.hash
+          : route.endsWith("/cancel")
+            ? "cancel:" + req.params.id
+            : route.endsWith("/answer")
+              ? "approval:" + req.params.id
+              : route.endsWith("/recovery/continue")
+                ? "continue:" + req.body.recoveryId
+                : route.endsWith("/recovery")
+                  ? "recovery:" + (result as any).recovery.id
+                  : null;
+      const limit = controlTarget
+        ? controlTarget.startsWith("continue:") ||
+          controlTarget.startsWith("logout:")
+          ? 1
+          : 3
+        : 10000;
+      const count = Number(
+        (
+          await db.query(
+            "SELECT count(*) FROM intents WHERE actor=$1 AND control_target IS NOT DISTINCT FROM $2",
+            [actor, controlTarget],
+          )
+        ).rows[0].count,
+      );
+      if (controlTarget && count >= limit)
+        throw new HarborError(
+          429,
+          "INTENT_QUOTA",
+          controlTarget
+            ? "This target's control attempts are exhausted; emergency stop remains available"
+            : "Ordinary request history capacity reached; reserved controls remain available",
+        );
+      if (controlTarget && Buffer.byteLength(JSON.stringify(result)) > 8192)
+        throw new HarborError(
+          500,
+          "CONTROL_RESULT_LIMIT",
+          "Control result exceeds its storage reservation",
+        );
       await db.query(
-        "INSERT INTO intents(actor,route,key,request_hash,result) VALUES($1,$2,$3,$4,$5)",
-        [actor, route, key, hash, JSON.stringify(result)],
+        "INSERT INTO intents(actor,route,key,request_hash,result,control_target) VALUES($1,$2,$3,$4,$5,$6)",
+        [actor, route, key, hash, JSON.stringify(result), controlTarget],
       );
       return result;
     });
@@ -317,6 +397,13 @@ export async function buildServer(c: Config) {
       throw new HarborError(404, "NOT_FOUND", "Conversation not found");
     return r.rows[0];
   }
+  historyRoutes(app, { pool, command });
+  recoveryRoutes(app, {
+    pool,
+    command,
+    actor: (req) => auth.get(req)!.hash,
+    acceptTurn,
+  });
   app.get("/api/v1/openapi.json", async () => openapi);
   app.get("/api/v1/security/runtime-credentials", async (req) =>
     credentialCommand(c.HARBOR_CONTROL_SOCKET, {
@@ -426,6 +513,8 @@ export async function buildServer(c: Config) {
           "ROOT_DENIED",
           "Project root is not allowed",
         );
+      await requireAuthority(db, auth.get(req)!.hash, c);
+      externalEffectsGranted.add(req);
       const provisioned =
         c.HARBOR_FIXTURE_MODE && !process.env.HARBOR_STORAGE_SOCKET
           ? null
@@ -475,7 +564,9 @@ export async function buildServer(c: Config) {
   );
   app.get("/api/v1/sessions", async () => ({
     sessions: (
-      await pool.query("SELECT * FROM sessions ORDER BY updated_at DESC")
+      await pool.query(
+        "SELECT * FROM sessions WHERE NOT archived ORDER BY updated_at DESC",
+      )
     ).rows.map(publicRow),
   }));
   app.post("/api/v1/sessions", async (req) =>
@@ -521,7 +612,7 @@ export async function buildServer(c: Config) {
     "/api/v1/sessions/:id/snapshot",
     async (req) =>
       transaction(pool, async (db) => {
-        await db.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ");
+        await pruneReplay(db, req.params.id);
         const s = await session(db, req.params.id);
         return {
           session: publicRow(s),
@@ -559,92 +650,77 @@ export async function buildServer(c: Config) {
         };
       }),
   );
+  async function acceptTurn(req: any, db: PoolClient, input: unknown) {
+    const b = turnSchema.parse(input);
+    authorizePermission(b.permissionProfile, c.HARBOR_PERMISSION_CEILING);
+    await effectiveSettings(db, b.model, b.effort);
+    if (!c.models.includes(b.model))
+      throw new HarborError(403, "MODEL_DENIED", "Model unavailable");
+    await db.query("SELECT * FROM sessions WHERE id=$1 FOR UPDATE", [
+      req.params.id,
+    ]);
+    const s = await session(db, req.params.id);
+    await capacity(db, s.id, "turn");
+    const total = await db.query(
+      "SELECT coalesce(sum(octet_length(text)),0) AS bytes,count(*) AS count FROM messages WHERE session_id=$1",
+      [s.id],
+    );
+    if (
+      Number(total.rows[0].bytes) + Buffer.byteLength(b.text) > 2097152 ||
+      Number(total.rows[0].count) >= 2000
+    )
+      throw new HarborError(
+        429,
+        "HISTORY_QUOTA",
+        "Conversation storage limit reached",
+      );
+    if (
+      (
+        await db.query(
+          "SELECT 1 FROM operations WHERE session_id=$1 AND state='uncertain' AND uncertainty_acknowledged_at IS NULL LIMIT 1",
+          [s.id],
+        )
+      ).rowCount
+    )
+      throw new HarborError(
+        409,
+        "UNCERTAIN",
+        "Resolve uncertain delivery before new work",
+      );
+    if ((await db.query("SELECT emergency FROM harbor_meta")).rows[0].emergency)
+      throw new HarborError(409, "EMERGENCY_STOP", "Dispatch is stopped");
+    await db.query("SELECT pg_advisory_xact_lock(740015)");
+    if (
+      Number(
+        (
+          await db.query(
+            "SELECT count(*) FROM operations WHERE state IN ('queued','dispatching','running','waiting_approval','waiting_input')",
+          )
+        ).rows[0].count,
+      ) >= c.HARBOR_MAX_QUEUED
+    )
+      throw new HarborError(429, "QUEUE_QUOTA", "Queue limit reached");
+    const id = randomUUID();
+    const r = await db.query(
+      "INSERT INTO operations(id,session_id,kind,state,payload,actor_hash) VALUES($1,$2,'turn','queued',$3,$4) RETURNING *",
+      [id, s.id, JSON.stringify(b), auth.get(req)!.hash],
+    );
+    await db.query(
+      "INSERT INTO messages(id,session_id,operation_id,role,text,status) VALUES($1,$2,$3,'user',$4,'complete')",
+      [randomUUID(), s.id, id, b.text],
+    );
+    await db.query(
+      "UPDATE sessions SET state=CASE WHEN state IN ('running','waiting_approval','waiting_input') THEN state ELSE 'queued' END WHERE id=$1",
+      [s.id],
+    );
+    await event(db, s.id, "operation.queued", { operationId: id });
+    return { operation: publicRow(r.rows[0]) };
+  }
   app.post<{ Params: { id: string } }>(
     "/api/v1/sessions/:id/turns",
     async (req, reply) => {
       const result = await command(req, async (db) => {
-        const b = turnSchema.parse(req.body);
-        authorizePermission(b.permissionProfile, c.HARBOR_PERMISSION_CEILING);
-        await effectiveSettings(db, b.model, b.effort);
-        if (!c.models.includes(b.model))
-          throw new HarborError(403, "MODEL_DENIED", "Model unavailable");
-        await db.query("SELECT * FROM sessions WHERE id=$1 FOR UPDATE", [
-          req.params.id,
-        ]);
-        const s = await session(db, req.params.id);
-        if (
-          Number(
-            (
-              await db.query(
-                "SELECT count(*) FROM operations WHERE session_id=$1",
-                [s.id],
-              )
-            ).rows[0].count,
-          ) >= 500
-        )
-          throw new HarborError(
-            429,
-            "HISTORY_QUOTA",
-            "Conversation operation limit reached",
-          );
-        const total = await db.query(
-          "SELECT coalesce(sum(octet_length(text)),0) AS bytes,count(*) AS count FROM messages WHERE session_id=$1",
-          [s.id],
-        );
-        if (
-          Number(total.rows[0].bytes) + Buffer.byteLength(b.text) > 2097152 ||
-          Number(total.rows[0].count) >= 2000
-        )
-          throw new HarborError(
-            429,
-            "HISTORY_QUOTA",
-            "Conversation storage limit reached",
-          );
-        if (
-          s.state === "uncertain" ||
-          (
-            await db.query(
-              "SELECT 1 FROM operations WHERE session_id=$1 AND state='uncertain' LIMIT 1",
-              [s.id],
-            )
-          ).rowCount
-        )
-          throw new HarborError(
-            409,
-            "UNCERTAIN",
-            "Resolve uncertain delivery before new work",
-          );
-        if (
-          (await db.query("SELECT emergency FROM harbor_meta")).rows[0]
-            .emergency
-        )
-          throw new HarborError(409, "EMERGENCY_STOP", "Dispatch is stopped");
-        await db.query("SELECT pg_advisory_xact_lock(740015)");
-        if (
-          Number(
-            (
-              await db.query(
-                "SELECT count(*) FROM operations WHERE state IN ('queued','dispatching','running','waiting_approval','waiting_input')",
-              )
-            ).rows[0].count,
-          ) >= c.HARBOR_MAX_QUEUED
-        )
-          throw new HarborError(429, "QUEUE_QUOTA", "Queue limit reached");
-        const id = randomUUID();
-        const r = await db.query(
-          "INSERT INTO operations(id,session_id,kind,state,payload,actor_hash) VALUES($1,$2,'turn','queued',$3,$4) RETURNING *",
-          [id, s.id, JSON.stringify(b), auth.get(req)!.hash],
-        );
-        await db.query(
-          "INSERT INTO messages(id,session_id,operation_id,role,text,status) VALUES($1,$2,$3,'user',$4,'complete')",
-          [randomUUID(), s.id, id, b.text],
-        );
-        await db.query(
-          "UPDATE sessions SET state=CASE WHEN state IN ('running','waiting_approval','waiting_input') THEN state ELSE 'queued' END WHERE id=$1",
-          [s.id],
-        );
-        await event(db, s.id, "operation.queued", { operationId: id });
-        return { operation: publicRow(r.rows[0]) };
+        return acceptTurn(req, db, req.body);
       });
       return reply.code(202).send(result);
     },
@@ -771,15 +847,32 @@ export async function buildServer(c: Config) {
               "This turn is no longer cancellable",
             );
           const pending = await db.query(
-            "SELECT id,state FROM operations WHERE session_id=$1 AND kind='cancel' AND payload->>'operationId'=$2 AND state IN ('queued','dispatching','running') LIMIT 1",
+            "SELECT id,state,control_attempts FROM operations WHERE session_id=$1 AND kind='cancel' AND payload->>'operationId'=$2 LIMIT 1",
             [o.session_id, o.id],
           );
-          if (pending.rows[0])
+          if (pending.rows[0] && pending.rows[0].state !== "failed")
             return {
               operation: pending.rows[0],
               message:
                 "Stop already requested; interruption is not yet confirmed",
             };
+          if (pending.rows[0]) {
+            if (pending.rows[0].control_attempts >= 3)
+              throw new HarborError(
+                429,
+                "CONTROL_ATTEMPTS",
+                "Cancellation attempts exhausted; use emergency stop",
+              );
+            await db.query(
+              "UPDATE operations SET state='queued',actor_hash=$2,control_attempts=control_attempts+1,updated_at=now() WHERE id=$1",
+              [pending.rows[0].id, auth.get(req)!.hash],
+            );
+            return {
+              operation: { id: pending.rows[0].id, state: "queued" },
+              message: "Stop requested again",
+            };
+          }
+          await capacity(db, o.session_id, "cancel");
           const id = randomUUID();
           await db.query(
             "INSERT INTO operations(id,session_id,kind,state,payload,actor_hash) VALUES($1,$2,'cancel','queued',$3,$4)",
@@ -809,6 +902,8 @@ export async function buildServer(c: Config) {
   );
   app.post("/api/v1/security/logout", async (req, reply) => {
     const result = await command(req, async (db) => {
+      await requireAuthority(db, auth.get(req)!.hash, c);
+      selfRevocations.add(req);
       await db.query("UPDATE browser_sessions SET revoked=true WHERE hash=$1", [
         auth.get(req)!.hash,
       ]);
@@ -830,7 +925,7 @@ export async function buildServer(c: Config) {
       const streamOwner = auth.get(req)!.hash;
       if ((streams.get(streamOwner) ?? 0) >= 4)
         throw new HarborError(429, "STREAM_QUOTA", "Too many event streams");
-      streams.set(streamOwner, (streams.get(streamOwner) ?? 0) + 1);
+      await pruneReplay(pool, req.params.id);
       const bounds = await pool.query(
         "SELECT s.sequence,(SELECT min(e.sequence) FROM events e WHERE e.session_id=s.id) AS oldest FROM sessions s WHERE s.id=$1",
         [req.params.id],
@@ -840,6 +935,7 @@ export async function buildServer(c: Config) {
         (cursor < Number(bounds.rows[0].sequence) &&
           (bounds.rows[0].oldest === null ||
             cursor < Number(bounds.rows[0].oldest) - 1));
+      streams.set(streamOwner, (streams.get(streamOwner) ?? 0) + 1);
       reply.hijack();
       openStreams.add(reply.raw);
       reply.raw.writeHead(200, {
@@ -863,19 +959,29 @@ export async function buildServer(c: Config) {
         if (busy) return;
         busy = true;
         try {
-          const a = await pool.query(
-            "SELECT 1 FROM browser_sessions WHERE hash=$1 AND NOT revoked AND expires_at>now() AND last_seen>now()-($2*interval '1 second') AND identity_pin=$3 AND (SELECT identity_pin FROM harbor_meta)=$3",
-            [auth.get(req)!.hash, c.HARBOR_IDLE_SECONDS, ownerPin],
-          );
-          if (!a.rowCount) {
-            reply.raw.end();
+          await requireAuthority(pool, auth.get(req)!.hash, c);
+          const current = await pruneReplay(pool, req.params.id);
+          if (
+            !current ||
+            cursor < Number(current.replay_floor) ||
+            cursor > Number(current.sequence)
+          ) {
+            reply.raw.end(
+              'event: resync\ndata: {"reason":"Replay retention gap; fetch snapshot"}\n\n',
+            );
             return;
           }
           const rows = await pool.query(
-            "SELECT * FROM events WHERE session_id=$1 AND sequence>$2 ORDER BY sequence LIMIT 100",
+            "SELECT * FROM events WHERE session_id=$1 AND sequence>$2 AND created_at>=now()-interval '7 days' ORDER BY sequence LIMIT 100",
             [req.params.id, cursor],
           );
           for (const row of rows.rows) {
+            if (Number(row.sequence) !== cursor + 1) {
+              reply.raw.end(
+                'event: resync\ndata: {"reason":"Replay retention gap; fetch snapshot"}\n\n',
+              );
+              return;
+            }
             cursor = Number(row.sequence);
             if (
               !reply.raw.write(
