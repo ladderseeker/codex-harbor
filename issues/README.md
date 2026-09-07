@@ -4,7 +4,7 @@ Use this index and the [issue archive](archive/README.md) to find existing findi
 
 ## Active issues
 
-The critical P001 implementation review is resolved in the archive. P003/P007 implementation findings, authority-correction integration, the live-account blocker, and medium bounds, gateway and storage-inventory follow-ups remain active. The earlier runtime finding remains Transferred with partial local evidence below.
+The critical P001 implementation review is resolved in the archive. P003/P005/P007 implementation findings, authority-correction integration, the live-account blocker, and medium bounds, gateway and storage-inventory follow-ups remain active. The earlier runtime finding remains Transferred with partial local evidence below.
 
 | Issue | Severity | Status | Owner | Next action |
 | --- | --- | --- | --- | --- |
@@ -12,6 +12,7 @@ The critical P001 implementation review is resolved in the archive. P003/P007 im
 | [Authority expiry after a lock wait](2026-09-07-202308-authority-expiry-after-lock-wait.md) | High | In progress | P002 policy; P003/P007 integration | P002 correction passed focused third review and Node 24 acceptance; integrate resource/recovery lock paths and verify combined behavior. |
 | [P003 implementation review](2026-09-07-210500-p003-implementation-review.md) | High | In progress | P003 | Original interruption/retry fixes passed; add the round-2 filesystem durability barrier before completed receipts, then verify and re-review. |
 | [P007 implementation review](2026-09-07-203000-p007-implementation-review.md) | High | In progress | P007 | Batch recovery/admission/pagination fixes and missing boundary assertions, then independently re-review and verify. |
+| [P005 implementation review](2026-09-07-213300-p005-implementation-review.md) | Medium | In progress | P005 | Correct draft expiry, early upload pause and exact PNG chunk validation; verify real boundary cases and independently review the frozen result. |
 | [Replay and control bounds](2026-09-07-185228-p001-retention-control-bounds.md) | Medium | In progress | P007 corrective implementation; P001 acceptance | Enforce replay age/count and bounded reserved cancellation/recovery storage; verify P007-02/05/06 and inherited P001-03/07 before closure. |
 | [Linux gateway availability](2026-09-07-185228-linux-gateway-availability.md) | Medium | Open | P001; P009 target-host lane | Second VM reproduced DNS/TLS transport failures in 5/20 probes; retain denial policy and compare target-host connectivity. |
 | [Unregistered project allocation](2026-09-07-205511-unregistered-project-allocation.md) | Medium | Open | P009 preflight and backup registry | Reproduce commit failure after slot allocation; detect and safely reconcile unregistered quota units without adopting or deleting unknown data. |

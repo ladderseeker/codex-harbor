@@ -30,3 +30,11 @@ The reviewer confirmed the three original corrections at source digest `3bf651d8
 One related High durability finding remains. Creation/removal can publish and fsync a completed receipt on the separate control filesystem before flushing the corresponding project-filesystem changes. Host or power loss may therefore recover the receipt ahead of those files, after which retry skips cleanup. This is a source-only ordering finding; the process-SIGKILL results above do not establish host-crash durability.
 
 Add a trusted filesystem durability barrier before completion publication, covering creation, Git metadata, removal and abandoned-stage cleanup. Failed or incomplete flush must retain reconciliation state. Verify the actual Linux path and error handling, then independently review the bounded correction. The shared authority integration and live-account gates remain separate.
+
+## Corrective review checkpoint — 7 September 2026
+
+The bounded durability correction closes round 2 on feature commit `c96755e`, source digest `aed1994e3fd222d28b178386e276b23bb0bddda573ef6251ab1eae300265df86` (822 files). The reviewer inspected the trusted `syncfs` and receipt-directory barriers, exact applied-creation identity/content validation, and idempotent applied-removal cleanup. Error, mismatch or timeout retains pending reconciliation without copying newer source content or reporting completion.
+
+Node 24.11.1 ran 28 combined workspace/contract/integration tests, types, formatting and documentation checks. Real P003 E2E `harbor-workspaces-55c9cedde7` and actual Linux `p003-review2-validated-linux-result.json` passed at matching source digests. The Linux fixture used kernel 6.8.0-134, Docker 29.1.3 and XFS tools 6.6.0; it injected `syncfs` EIO, changed an applied checkout, and verified restart/error/reconciliation ordering and exact inode preservation. This is kernel-error and process-loss evidence, not an actual power-cut test. The final E2E used the already-built unchanged UI; a separate build at this exact final source was not recorded. The combined integration will build fresh assets.
+
+No actionable critical finding remains in the reviewed P003 fix scope. Keep the issue active until the current P002 authority integration and combined application/Linux evidence are recorded. Dedicated live-account acceptance remains separately blocked.
