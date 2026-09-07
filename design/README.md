@@ -1,6 +1,6 @@
 # Harbor design
 
-The architecture is the implementation baseline; P001–P003/P005/P007 are Accepted and Implemented, with verification/follow-ups still open. P004/P006/P009 are Accepted and In progress. P008/P011/P012 are Accepted and Planned after independent design review. No proposal is finished. Decision (`Draft`, `Accepted`, `Superseded`) and delivery (`Planned`, `In progress`, `Implemented`, `Verified`) are separate states, tracked in the proposal index. Existing session authorization governs work; metadata does not create a universal approval gate.
+The architecture is the implementation baseline; P001–P003/P005/P007 are Accepted and Implemented, with verification/follow-ups still open. P004/P006/P009 are Accepted and In progress. P008/P010/P011/P012 are Accepted and Planned after independent design review. No proposal is finished. Decision (`Draft`, `Accepted`, `Superseded`) and delivery (`Planned`, `In progress`, `Implemented`, `Verified`) are separate states, tracked in the proposal index. Existing session authorization governs work; metadata does not create a universal approval gate.
 
 - [Architecture](architecture.md): system boundaries, identity, runtime/data contracts, local development, verification, self-development, and releases.
 - [D001 — Confined runtime egress](decisions/001-confined-runtime-egress.md): fixed gateway and isolated networks; Linux denials/connectivity passed, intermittent availability tracked.
@@ -10,6 +10,7 @@ The architecture is the implementation baseline; P001–P003/P005/P007 are Accep
 - [D005 — Managed parallel workspaces](decisions/005-managed-project-workspaces.md): trusted Git/copy storage, workspace ownership and durable metadata operations; combined application/Linux checks passed, live-account gate pending.
 - [D006 — Portable releases and a fenced host restore](decisions/006-portable-release-and-restore.md): accepted deployment/backup/restore design in progress; packaging commands and fresh-host evidence remain pending in P009.
 - [D007 — Separate project-preview origins and a confined runner connection](decisions/007-confined-project-preview-origins.md): accepted origin, browser-grant, fixed relay and reader-lease contract for P011; implementation and browser/Linux evidence remain pending.
+- [D008 — Confined self-development workers](decisions/008-isolated-self-development-workers.md): accepted broker, container/guest boundary, independent verifier and exact-artifact contract for P010; implementation and Linux/performance evidence remain pending.
 - [Active proposals](proposals/README.md): complete user outcomes, dependencies, acceptance criteria, and implementation status.
 - [Proposal archive](proposals/archive/README.md): completed, superseded, or withdrawn proposals; currently empty.
 - [Proposal template](proposal-template.md): the required structure for a new or revised feature proposal.
