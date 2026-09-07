@@ -20,7 +20,11 @@ export async function prepareNativeStorage(
   });
   if (!root) throw Error("Workspace lacks managed XFS storage");
   const relativePath = relative(root.path, workspacePath);
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}\/workspace$/.test(relativePath))
+  if (
+    !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}\/(?:workspace|workspaces\/[a-f0-9-]{36}\/checkout)$/.test(
+      relativePath,
+    )
+  )
     throw Error("Managed workspace mapping invalid");
   return new Promise((resolve, reject) => {
     const child = spawn(

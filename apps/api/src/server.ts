@@ -1,3 +1,8 @@
+import { registerWorkspaceRoutes } from "./workspace-routes.ts";
+import {
+  selectedWorkspace,
+  verifyWorkspace,
+} from "../../../packages/workspaces/src/service.ts";
 import {
   createManagedProject,
   validateManagedProject,
@@ -11,7 +16,7 @@ import staticFiles from "@fastify/static";
 import * as oidc from "openid-client";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { stat } from "node:fs/promises";
+import { stat, chmod } from "node:fs/promises";
 import { z } from "zod";
 import {
   createPool,
@@ -317,6 +322,12 @@ export async function buildServer(c: Config) {
       throw new HarborError(404, "NOT_FOUND", "Conversation not found");
     return r.rows[0];
   }
+  registerWorkspaceRoutes(app, {
+    pool,
+    c,
+    command,
+    actor: (req) => auth.get(req)!.hash,
+  });
   app.get("/api/v1/openapi.json", async () => openapi);
   app.get("/api/v1/security/runtime-credentials", async (req) =>
     credentialCommand(c.HARBOR_CONTROL_SOCKET, {
@@ -435,6 +446,8 @@ export async function buildServer(c: Config) {
       const canonical =
         provisioned?.canonical ??
         (await resolveProject(c.roots, b.rootId, b.path, b.create));
+      if (c.HARBOR_FIXTURE_MODE && !provisioned && b.create)
+        await chmod(canonical, 0o755);
       const storedRelative = path.relative(root.path, canonical);
       const identity = provisioned
         ? { dev: provisioned.device, ino: provisioned.inode }
@@ -466,10 +479,17 @@ export async function buildServer(c: Config) {
           canonical,
         ],
       );
-      await db.query("INSERT INTO workspaces(id,project_id) VALUES($1,$2)", [
-        randomUUID(),
-        id,
-      ]);
+      await db.query(
+        "INSERT INTO workspaces(id,project_id,relative_path,canonical_path,device,inode) VALUES($1,$2,$3,$4,$5,$6)",
+        [
+          randomUUID(),
+          id,
+          storedRelative,
+          canonical,
+          String(identity.dev),
+          String(identity.ino),
+        ],
+      );
       return { project: publicRow(row.rows[0]) };
     }),
   );
@@ -496,18 +516,30 @@ export async function buildServer(c: Config) {
           "SESSION_QUOTA",
           "Conversation limit reached",
         );
-      const w = await db.query(
-        "SELECT id FROM workspaces WHERE project_id=$1",
-        [b.projectId],
+      const choice = await db.query(
+        "SELECT id FROM workspaces WHERE project_id=$1 AND ($2::uuid IS NULL AND kind='local' OR id=$2)",
+        [b.projectId, b.workspaceId ?? null],
       );
-      if (!w.rowCount)
-        throw new HarborError(404, "NOT_FOUND", "Project not found");
+      if (!choice.rowCount)
+        throw new HarborError(
+          404,
+          "NOT_FOUND",
+          "Workspace not found in project",
+        );
+      const chosen = await selectedWorkspace(db, choice.rows[0].id, true);
+      if (chosen.project_archived || chosen.state !== "ready")
+        throw new HarborError(
+          409,
+          "WORKSPACE_UNAVAILABLE",
+          "Select an available workspace",
+        );
+      await verifyWorkspace(chosen);
       const r = await db.query(
         "INSERT INTO sessions(id,project_id,workspace_id,title,model,effort,permission_profile) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",
         [
           randomUUID(),
           b.projectId,
-          w.rows[0].id,
+          chosen.id,
           b.title,
           b.model,
           b.effort,
@@ -568,10 +600,27 @@ export async function buildServer(c: Config) {
         await effectiveSettings(db, b.model, b.effort);
         if (!c.models.includes(b.model))
           throw new HarborError(403, "MODEL_DENIED", "Model unavailable");
+        const existingSession = await session(db, req.params.id);
+        const selected = await selectedWorkspace(
+          db,
+          existingSession.workspace_id,
+          true,
+        );
         await db.query("SELECT * FROM sessions WHERE id=$1 FOR UPDATE", [
           req.params.id,
         ]);
         const s = await session(db, req.params.id);
+        if (
+          s.archived_at ||
+          selected.project_archived ||
+          selected.state !== "ready"
+        )
+          throw new HarborError(
+            409,
+            "WORKSPACE_UNAVAILABLE",
+            "Conversation workspace is unavailable or archived",
+          );
+        await verifyWorkspace(selected);
         if (
           Number(
             (

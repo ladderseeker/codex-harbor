@@ -52,6 +52,7 @@ export class CodexAdapter {
     private callbacks: RuntimeCallbacks = {},
     private timeoutMs = 15_000,
     private withDispatch?: <T>(send: () => T) => Promise<T>,
+    private workspaceRoots: string[] = ["/workspace"],
   ) {
     process.stdout.setEncoding("utf8");
     process.stdout.on("data", (chunk: string) => this.receive(chunk));
@@ -267,7 +268,7 @@ export class CodexAdapter {
           options.permissionProfile === "workspace-write"
             ? {
                 type: "workspaceWrite",
-                writableRoots: ["/workspace"],
+                writableRoots: this.workspaceRoots,
                 networkAccess: false,
                 excludeTmpdirEnvVar: true,
                 excludeSlashTmp: true,

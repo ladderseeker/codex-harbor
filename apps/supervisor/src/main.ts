@@ -1,3 +1,7 @@
+import { processWorkspaceStorage } from "./workspace-storage.ts";
+import { processWorkspaceReleases } from "./workspace-recovery.ts";
+import { claimWorkspace, releaseWorkspace } from "./workspace-admission.ts";
+import { verifyWorkspace } from "../../../packages/workspaces/src/service.ts";
 import { RetirementRegistry } from "./retirement.ts";
 import { retireRuntimeIdentity } from "../../../infra/runner/authority.ts";
 import { clearManagedCredentials } from "../../../infra/storage/client.ts";
@@ -404,6 +408,15 @@ async function onEvent(
         await event(db, sessionId, "processes.inspected", inspection);
     });
   }
+  if (
+    completed &&
+    !captured.mailbox.poisoned &&
+    runtimes.get(sessionId) === captured
+  ) {
+    runtimes.delete(sessionId);
+    if (await retire(captured.adapter))
+      await releaseWorkspace(pool, sessionId, captured.generation);
+  }
 }
 // Memory follows committed state only; failed COMMIT poisons the captured runtime.
 async function onRequest(
@@ -496,6 +509,28 @@ async function tick() {
     lastMaintenance = Date.now();
   }
   if (credentials.mutating) return;
+  await processWorkspaceStorage(pool, !!c.HARBOR_FIXTURE_MODE, c.roots);
+  await processWorkspaceReleases(pool, {
+    idleSeconds: c.HARBOR_IDLE_SECONDS,
+    ownerPin,
+    retire: async (sessionId, projectId) => {
+      const runtime = runtimes.get(sessionId);
+      if (runtime) {
+        runtimes.delete(sessionId);
+        if (!(await retire(runtime.adapter)))
+          throw Error("Runtime retirement unconfirmed");
+      }
+      if (!c.HARBOR_FIXTURE_MODE)
+        await retireRuntimeIdentity({
+          instanceId: process.env.HARBOR_INSTANCE_ID ?? "harbor",
+          projectId,
+          sessionId,
+        });
+      if (!(await retirement.confirmed()))
+        throw Error("Runtime retirement unconfirmed");
+    },
+  });
+
   await discover().catch(() => {});
   const emergency = (await pool.query("SELECT emergency FROM harbor_meta"))
     .rows[0].emergency;
@@ -641,9 +676,10 @@ async function tick() {
       ]);
   }
   const candidates = await pool.query(
-    "SELECT o.*,s.native_thread_id,s.project_id,p.root_id,p.relative_path,p.device,p.inode FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id WHERE o.kind='turn' AND o.state='queued' AND s.state<>'uncertain' AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.session_id=o.session_id AND active.kind='turn' AND active.state IN ('uncertain','dispatching','running','waiting_approval','waiting_input')) ORDER BY o.created_at LIMIT 4",
+    "SELECT o.*,s.native_thread_id,s.project_id,s.workspace_id,p.root_id,w.relative_path,w.device,w.inode,w.canonical_path,w.common_path,w.common_device,w.common_inode FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id WHERE w.state='ready' AND p.archived_at IS NULL AND s.archived_at IS NULL AND w.writer_session_id IS NULL AND o.kind='turn' AND o.state='queued' AND s.state<>'uncertain' AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.session_id=o.session_id AND active.kind='turn' AND active.state IN ('uncertain','dispatching','running','waiting_approval','waiting_input')) ORDER BY o.created_at LIMIT 4",
   );
   for (const o of candidates.rows) {
+    if ([...runtimes.values()].filter((r) => r.operation).length >= 4) break;
     if (runtimes.get(o.session_id)?.operation) continue;
     const actor = await pool.query(
       "SELECT 1 FROM browser_sessions WHERE hash=$1 AND NOT revoked AND expires_at>now() AND last_seen>now()-($2*interval '1 second') AND identity_pin=$3 AND (SELECT identity_pin FROM harbor_meta)=$3",
@@ -660,12 +696,12 @@ async function tick() {
         o.payload.permissionProfile,
         c.HARBOR_PERMISSION_CEILING,
       );
-      const workspacePath = await resolveProject(
-        c.roots,
-        o.root_id,
-        o.relative_path,
-      );
-      await transaction(pool, async (db) => {
+      const workspacePath = await verifyWorkspace(o);
+      const admitted = await transaction(pool, async (db) => {
+        if (
+          !(await claimWorkspace(db, o.workspace_id, o.session_id, generation))
+        )
+          return false;
         await db.query(
           "UPDATE operations SET state='dispatching',generation=$2 WHERE id=$1",
           [o.id, generation],
@@ -683,7 +719,9 @@ async function tick() {
         await event(db, o.session_id, "operation.dispatching", {
           operationId: o.id,
         });
+        return true;
       });
+      if (!admitted) continue;
       const credentialVersion = await credentials.version();
       let r = runtimes.get(o.session_id);
       if (
@@ -709,6 +747,10 @@ async function tick() {
           runtimeGeneration,
         ]);
 
+        await pool.query(
+          "UPDATE workspaces SET writer_generation=$2 WHERE id=$1 AND writer_session_id=$3",
+          [o.workspace_id, runtimeGeneration, o.session_id],
+        );
         let captured: RuntimeState;
         const mailbox = new RuntimeMailbox((reason) => {
           const current = captured && runtimes.get(o.session_id) === captured;
@@ -725,6 +767,14 @@ async function tick() {
           sessionId: o.session_id,
           projectId: o.project_id,
           workspacePath,
+          workspaceId: o.workspace_id,
+          gitCommon: o.common_path
+            ? {
+                canonical: o.common_path,
+                device: o.common_device,
+                inode: o.common_inode,
+              }
+            : undefined,
           workspaceDevice: o.device,
           workspaceInode: o.inode,
           generation: runtimeGeneration,
