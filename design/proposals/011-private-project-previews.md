@@ -55,6 +55,8 @@ Use delivered P003 with a small real HTTP fixture application, hostile-script va
 
 ## Delivery and verification
 
+The [account-free headless-command spike](../../docs/reports/2026-09-08-p011-protocol-spike.md) passed on Codex 0.153.4/Node 24.11.1/macOS. A zero-byte `command/exec/write` acknowledges the exact connection-scoped command identity and rejects unstarted/wrong/exited IDs. This supplies a candidate native identity check for the existing startup contract; it does not replace exact runner/relay checks, completed-generation denial or HTTP readiness. Delivery remains Planned until the complete feature implementation begins.
+
 Use planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, and `pnpm test:isolation`; add live/contract lanes only if Codex integration changes. Follow [shared setup/evidence rules](README.md#shared-verification-contract). Configure separate test origins explicitly; a screenshot of a local page is not authentication/isolation evidence.
 
 Add preview lifecycle migrations and expiry/cleanup registration. Restore metadata as inactive until a process is deliberately restarted; backup never implies a live process survives. Document supported protocols, private access, and limitations once implemented. Review proxy and cookie boundaries independently before verified delivery.
