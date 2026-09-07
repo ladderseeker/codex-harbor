@@ -4,11 +4,12 @@ Use this index and the [issue archive](archive/README.md) to find existing findi
 
 ## Active issues
 
-P001/P003/P005/P007 implementation reviews, authority-expiry integration and replay/control bounds are resolved in the archive. The live-account blocker, gateway availability, storage inventory and a Low unexplained browser-test timeout remain active. The earlier runtime finding remains Transferred with partial local evidence below.
+P001/P003/P005/P007 implementation reviews, authority-expiry integration and replay/control bounds are resolved in the archive. The live-account and P009 backup-transfer authorization blockers, gateway availability, storage inventory and a Low unexplained browser-test timeout remain active. The earlier runtime finding remains Transferred with partial local evidence below.
 
 | Issue | Severity | Status | Owner | Next action |
 | --- | --- | --- | --- | --- |
 | [Dedicated live-test credentials](2026-09-07-171225-live-runtime-credentials.md) | High | Blocked | P001; later live-test owners | Supply dedicated test credentials through the documented test configuration, then run bounded real-account acceptance. Continue other implementation and verification. |
+| [P009 backup transfer authorization](2026-09-07-231526-p009-backup-transfer-approval.md) | High | Blocked | P009; dependent checkpoint users | Automatic review rejected generated private-state/secret export to the owned B SFTP repository. Finish available implementation/review, then obtain exact payload/destination authorization before the transfer. |
 | [Linux gateway availability](2026-09-07-185228-linux-gateway-availability.md) | Medium | Open | P001; P009 target-host lane | Second VM reproduced DNS/TLS transport failures in 5/20 probes; retain denial policy and compare target-host connectivity. |
 | [Unregistered project allocation](2026-09-07-205511-unregistered-project-allocation.md) | Medium | Open | P009 preflight and backup registry | Reproduce commit failure after slot allocation; detect and safely reconcile unregistered quota units without adopting or deleting unknown data. |
 | [Upload-recovery visibility timeout](2026-09-07-224419-p005-reload-visibility.md) | Low | Open | P005/browser regression owners | Capture the HTTP/page diagnostics on recurrence and reproduce before changing behavior or the intended assertion. |
