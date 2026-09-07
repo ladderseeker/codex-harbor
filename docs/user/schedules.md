@@ -1,12 +1,12 @@
 # Scheduled work
 
-P008 is in progress. Its isolated feature build provides the flows below; cumulative deployment/restore integration, complete acceptance and independent implementation review remain pending. The [proposal](../../design/proposals/008-scheduled-tasks.md) owns the full contract and delivery gates.
+P008 is Implemented, not Verified. Two feature review rounds and bounded module integration review have closed. Dedicated DST end-to-end, live-account and protected full restore/promotion evidence remain pending. The [proposal](../../design/proposals/008-scheduled-tasks.md) owns the full contract and delivery gates.
 
 Open **Schedules** in the sidebar, choose a project, and create a schedule. Enter the prompt, model, effort and permission profile, then preview the next occurrences before activating it. The preview shows the requested local minute, timezone, UTC offset and actual UTC instant.
 
 A schedule can run once or use five numeric cron fields: minute, hour, day of month, month and day of week. Recurring minutes skipped by daylight-saving changes do not run. A repeated local minute runs only at its first instant. A one-time minute that does not exist is rejected.
 
-The default creates a new workspace and conversation for each occurrence. Choose committed Git content or explicitly authorize a snapshot of a non-Git folder. An optional Git revision fixes the source commit; otherwise preparation resolves the current committed source under the project lock. Creating a workspace requires workspace-write authority even if the resulting Codex turn is read-only. Existing-conversation schedules respect its workspace reservation and manual work; they do not bypass the ordinary queue or an unresolved effect.
+The default creates a new workspace and conversation for each occurrence. Choose committed Git content or explicitly authorize a snapshot of a non-Git folder. An optional Git revision fixes the source commit; otherwise occurrence admission captures the current committed source under the project lock. Creating a workspace requires workspace-write authority even if the resulting Codex turn is read-only. Existing-conversation schedules respect its workspace reservation and manual work; they do not bypass the ordinary queue or an unresolved effect.
 
 Activation records a grant lasting 1–90 days, with a 30-day default for browser-created schedules. Closing the browser or signing out does not revoke that grant. A grant created through an API token also depends on that token's current expiry, revocation, scopes, project access and permission ceiling. Already-running work retains its recorded authorization. Future preparation and dispatch must pass current checks.
 

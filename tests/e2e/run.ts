@@ -221,13 +221,13 @@ try {
           sourceAtEnd: sourceDigest(),
           node: process.version,
           scope:
-            "P008 intermediate real UI/API/PG/pg-boss/supervisor offline existing and standalone snapshot smoke; external OIDC/Codex fixtures; full fault/quota acceptance pending",
+            "P008 real UI/API/PG/pg-boss/supervisor offline scheduling, lifecycle, faults, authority, quotas and maintenance; external OIDC/Codex fixtures; DST-specific end-to-end, live-account and protected restore gates require separate evidence",
         },
         null,
         2,
       ),
     );
-    console.log("P008 intermediate real-stack result: " + artifacts);
+    console.log("P008 real-stack result: " + artifacts);
   } else {
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ ignoreHTTPSErrors: true });

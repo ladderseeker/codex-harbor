@@ -1,6 +1,6 @@
 # Schedule API and verification
 
-P008 remains in progress. The [user guide](../user/schedules.md) describes the implemented interface, while [P008](../../design/proposals/008-scheduled-tasks.md) retains full acceptance, dependency and live-account obligations. Do not treat the intermediate checkpoint as an installed release or completed restore integration.
+P008 is Implemented, not Verified. Feature and bounded module integration reviews have closed; DST-specific end-to-end, dedicated live-account and protected full restore/promotion evidence remain pending. The [user guide](../user/schedules.md) describes the implemented interface, while [P008](../../design/proposals/008-scheduled-tasks.md) retains full acceptance, dependency and live-account obligations. The real Linux metadata rebind check establishes the fixed administrator bridge, not a full filesystem restore or installed release.
 
 The versioned `/api/v1/openapi.json` document declares request/response schemas, path parameters and token scopes. Cookie mutations require exact Origin and X-CSRF-Token. Cookie-free bearer calls use explicit project grants and the following scopes:
 
