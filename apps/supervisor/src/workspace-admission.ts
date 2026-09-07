@@ -44,7 +44,7 @@ export async function releaseWorkspace(
     if (!s) return;
     await selectedWorkspace(db, s.workspace_id, true);
     const uncertain = await db.query(
-      "SELECT 1 FROM operations WHERE session_id=$1 AND kind='turn' AND state IN ('uncertain','dispatching','running','waiting_approval','waiting_input') LIMIT 1",
+      "SELECT 1 FROM operations WHERE session_id=$1 AND kind='turn' AND (state IN ('dispatching','running','waiting_approval','waiting_input') OR (state='uncertain' AND uncertainty_acknowledged_at IS NULL)) LIMIT 1",
       [sessionId],
     );
     if (!uncertain.rowCount)

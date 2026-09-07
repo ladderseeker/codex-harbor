@@ -44,7 +44,7 @@ export async function prepareAttachments(
         process.env.HARBOR_FIXTURE_MODE !== "private-test"
       )
         throw Error("Private fixture mode disabled");
-      return { inputs };
+      if (!process.env.HARBOR_STORAGE_SOCKET) return { inputs };
     }
     if (process.platform !== "linux" || process.getuid?.() !== 0)
       throw Error("Trusted Linux attachment authority required");

@@ -4,7 +4,7 @@ The attachment implementation uses authenticated browser-owner routes described 
 
 The initial profile accepts bounded PNG and UTF-8 text; the [user guide](../user/attachments.md) lists effective limits and recovery behavior. PostgreSQL is authoritative for metadata, blobs and revisioned drafts. Migration 008 creates `attachments`, `conversation_drafts` and `session_attachment_storage`. Stage admission reserves declared bytes. A PUT accepts only the declared complete size/hash and validates media before committing staged content. Turn admission atomically associates validated references with its operation and clears only the submitted draft revision.
 
-The trusted Linux supervisor publishes only committed operation content through the fixed quota helper. Files use opaque IDs, root ownership, read-only permissions and verified digests/inodes. They reside within the project's XFS quota unit in `attachments/<session-id>/`; the launcher binds only that session directory read-only at `/attachments`. Database commit failure after publication leaves the blob authoritative; an exact publication retry verifies and reuses the physical inode. Unsubmitted upload cleanup never deletes submitted native files.
+The trusted Linux supervisor publishes only committed operation content through the fixed quota helper. Files use opaque IDs, root ownership, read-only permissions and verified digests/inodes. Publication uses the registered project canonical identity independently of a selected P003 derived checkout; both the helper and launcher validate that identity. Files reside within the project's XFS quota unit in `attachments/<session-id>/`; the launcher binds only that session directory read-only at `/attachments`. Database commit failure after publication leaves the blob authoritative; an exact publication retry verifies and reuses the physical inode. Unsubmitted upload cleanup never deletes submitted native files.
 
 Run from the repository root:
 
@@ -16,7 +16,7 @@ pnpm test:contract
 pnpm test:e2e
 ```
 
-The browser suite includes real Harbor UI, Caddy, API, PostgreSQL and supervisor. Only OIDC and the external Codex protocol process are fixtures. It covers selection, drop, clipboard paste, safe preview/history reload, draft CAS/expiry, abort/retry and lost responses, count/byte/type/ownership denials, and exact fixture input references. The fixture profile does not publish host attachment files and cannot establish Linux confinement or model understanding.
+The browser suite includes real Harbor UI, Caddy, API, PostgreSQL and supervisor. Only OIDC and the external Codex protocol process are fixtures. It covers selection, drop, clipboard paste, safe preview/history reload, draft CAS/expiry, abort/retry and lost responses, count/byte/type/ownership denials, and exact fixture input references. The fixture profile skips filesystem publication only when no trusted storage socket is configured. With the Linux storage socket, the real supervisor still publishes through the quota helper; only its external Codex process is a fixture. Neither configuration establishes model understanding.
 
 On the dedicated supported host configured by the [Linux verification guide](linux-verification.md):
 

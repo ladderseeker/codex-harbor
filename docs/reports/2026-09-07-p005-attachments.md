@@ -37,3 +37,7 @@ The Linux failure test uses a real deferred PostgreSQL constraint trigger to rej
 [P005](../../design/proposals/005-attachments-and-rich-input.md) stays active. P005-06 requires the [dedicated live credential gate](../../issues/2026-09-07-171225-live-runtime-credentials.md); the runnable live variant requires a bounded completed response identifying the synthetic red image and exact text. Incoming P002 authority refinements and P003/P007 integration require their combined coordinator-owned validation; isolated branch evidence does not close those cross-feature gates.
 
 The [user guide](../user/attachments.md) describes supported files, limits, drafts and recovery. The [developer guide](../developer/attachments.md) documents the implemented API/storage and test commands. P009 must register attachment/draft blobs and materialized quota directories and revalidate their identities during restore. Permanent deletion of submitted content, automatic document conversion and public sharing remain outside P005's accepted scope.
+
+## Later integration record
+
+The subsequent [workspace/history integration report](2026-09-07-p005-integration.md) records the combined P002/P003/P007 checkpoint. The source digests and results above remain the original feature evidence.

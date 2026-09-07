@@ -14,6 +14,7 @@ import {
   writeFile,
   mkdir,
   chmod,
+  chown,
   rename,
   rmdir,
 } from "node:fs/promises";
@@ -74,6 +75,8 @@ const env = {
   HARBOR_OWNER_SUBJECT: "owner",
   HARBOR_PERMISSION_CEILING: "workspace-write",
   HARBOR_MODELS: "fixture",
+  HARBOR_FIXTURE_STATE_DIR: join(fixture.control, "fixture-state"),
+  HARBOR_FIXTURE_TRACE_FILE: join(fixture.control, "dispatch-trace.jsonl"),
 };
 Object.assign(process.env, env);
 const compose = (args: string[]) =>
@@ -205,9 +208,44 @@ try {
     effort: "medium",
     permissionProfile: "read-only",
   };
-  const uploaded = async (title: string) => {
+  const local = (
+    await pool.query(
+      "SELECT * FROM workspaces WHERE project_id=$1 AND kind='local'",
+      [project.id],
+    )
+  ).rows[0];
+  await writeFile(
+    join(stored.canonical_path, "source.txt"),
+    "project snapshot attachment fixture",
+  );
+  const supervisor = start("apps/supervisor/src/main.ts");
+  const { workspace: copy } = await command(
+    `/projects/${project.id}/workspaces`,
+    {
+      name: "Attachment derived copy",
+      kind: "copy",
+      sourceWorkspaceId: local.id,
+      dirtyPolicy: "snapshot",
+    },
+  );
+  let derived: any;
+  for (let i = 0; i < 400; i++) {
+    derived = (
+      await pool.query("SELECT * FROM workspaces WHERE id=$1", [copy.id])
+    ).rows[0];
+    if (derived.state === "ready") break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  assert.equal(
+    derived.state,
+    "ready",
+    "Actual supervisor must create the derived workspace",
+  );
+  supervisor.kill("SIGSTOP");
+  const uploaded = async (title: string, workspaceId = local.id) => {
     const { session } = await command("/sessions", {
       projectId: project.id,
+      workspaceId,
       title,
       ...settings,
     });
@@ -247,7 +285,7 @@ try {
     });
     return { session, operation, ids, files };
   };
-  const first = await uploaded("Selected attachment session"),
+  const first = await uploaded("Selected attachment session", copy.id),
     other = await uploaded("Other attachment session");
   await pool.query(
     "CREATE FUNCTION reject_attachment_publication() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.device IS NOT NULL THEN RAISE EXCEPTION 'owned publication COMMIT fault'; END IF; RETURN NEW; END $$; CREATE CONSTRAINT TRIGGER reject_attachment_publication AFTER UPDATE ON attachments DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION reject_attachment_publication()",
@@ -257,7 +295,7 @@ try {
       pool,
       first.session.id,
       first.operation.id,
-      stored.canonical_path,
+      derived.canonical_path,
       false,
     ),
     /owned publication COMMIT fault/,
@@ -294,7 +332,7 @@ try {
     pool,
     first.session.id,
     first.operation.id,
-    stored.canonical_path,
+    derived.canonical_path,
     false,
   );
   const otherPrepared = await prepareAttachments(
@@ -306,13 +344,48 @@ try {
   );
   assert.equal((await stat(physical, { bigint: true })).ino, before.ino);
   assert.ok(prepared.directory && otherPrepared.directory);
+  supervisor.kill("SIGCONT");
+  for (let i = 0; i < 300; i++) {
+    const rows = (
+      await pool.query(
+        "SELECT state FROM operations WHERE id=ANY($1::uuid[])",
+        [[first.operation.id, other.operation.id]],
+      )
+    ).rows;
+    if (rows.length === 2 && rows.every((r) => r.state === "succeeded")) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  assert.ok(
+    (
+      await pool.query(
+        "SELECT state FROM operations WHERE id=ANY($1::uuid[])",
+        [[first.operation.id, other.operation.id]],
+      )
+    ).rows.every((r) => r.state === "succeeded"),
+    "Real supervisor must dispatch both session-bound attachment turns",
+  );
+  const delivered = (await readFile(env.HARBOR_FIXTURE_TRACE_FILE, "utf8"))
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  for (const id of [first.ids[0], other.ids[0]])
+    assert.equal(
+      delivered.filter((event) =>
+        event.attachmentPaths?.includes("/attachments/" + id),
+      ).length,
+      1,
+    );
+  const stopped = new Promise((r) => supervisor.once("exit", r));
+  supervisor.kill("SIGTERM");
+  await stopped;
   const configuration = {
     sessionId: first.session.id,
     projectId: project.id,
-    workspacePath: stored.canonical_path,
-    workspaceDevice: stored.device,
-    workspaceInode: stored.inode,
-    generation: 1,
+    workspaceId: copy.id,
+    workspacePath: derived.canonical_path,
+    workspaceDevice: derived.device,
+    workspaceInode: derived.inode,
+    generation: 10001,
     instanceId: fixture.id,
     permissionProfile: "workspace-write" as const,
     attachmentDirectory: prepared.directory,
@@ -381,8 +454,8 @@ try {
     assert.match(response, /red/i);
     assert.match(response, /HARBOR_SYNTHETIC_TEXT/);
   }
-  const container = `harbor-${fixture.id}-${first.session.id}-1`;
-  const probe = `const fs=require('fs'),assert=require('assert'),crypto=require('crypto');const entries=${JSON.stringify(first.ids)};assert.deepEqual(fs.readdirSync('/attachments').sort(),entries.sort());for(const id of entries){const bytes=fs.readFileSync('/attachments/'+id);assert.ok(bytes.length);assert.throws(()=>fs.writeFileSync('/attachments/'+id,'tampered'));assert.throws(()=>fs.unlinkSync('/attachments/'+id));}assert.throws(()=>fs.writeFileSync('/attachments/new','x'));assert.equal(fs.existsSync('/attachments/${other.ids[0]}'),false);assert.equal(fs.existsSync('${otherPrepared.directory.canonical}'),false);assert.equal(fs.existsSync('/var/run/docker.sock'),false);console.log('PASS actual nonroot session-only read-only attachment mount');`;
+  const container = `harbor-${fixture.id}-${first.session.id}-10001`;
+  const probe = `const fs=require('fs'),assert=require('assert'),crypto=require('crypto');const entries=${JSON.stringify(first.ids)};assert.deepEqual(fs.readdirSync('/attachments').sort(),entries.sort());for(const id of entries){const bytes=fs.readFileSync('/attachments/'+id);assert.ok(bytes.length);assert.throws(()=>fs.writeFileSync('/attachments/'+id,'tampered'));assert.throws(()=>fs.unlinkSync('/attachments/'+id));}assert.throws(()=>fs.writeFileSync('/attachments/new','x'));assert.equal(fs.existsSync('/attachments/${other.ids[0]}'),false);assert.equal(fs.existsSync('${otherPrepared.directory.canonical}'),false);assert.equal(fs.existsSync('/var/run/docker.sock'),false);assert.equal(fs.readFileSync('/workspace/source.txt','utf8'),'project snapshot attachment fixture');console.log('PASS actual nonroot session-only read-only attachment mount');`;
   console.log(
     (
       await exec("docker", ["exec", container, "node", "-e", probe], {
@@ -390,8 +463,62 @@ try {
       })
     ).stdout.trim(),
   );
+  second = new CodexAdapter(
+    await launchRunner({
+      ...configuration,
+      sessionId: other.session.id,
+      workspaceId: local.id,
+      workspacePath: stored.canonical_path,
+      workspaceDevice: stored.device,
+      workspaceInode: stored.inode,
+      attachmentDirectory: otherPrepared.directory,
+      attachmentProject: otherPrepared.project,
+    }),
+  );
+  await second.initialize();
+  const otherProbe = `const fs=require('fs'),a=require('assert');a.deepEqual(fs.readdirSync('/attachments').sort(),${JSON.stringify(other.ids)}.sort());a.equal(fs.existsSync('/attachments/${first.ids[0]}'),false);a.equal(fs.existsSync('/harbor/workspaces/${copy.id}'),false);a.throws(()=>fs.writeFileSync('/attachments/${other.ids[0]}','changed'));console.log('PASS simultaneous Local/derived session attachment isolation');`;
+  console.log(
+    (
+      await exec(
+        "docker",
+        [
+          "exec",
+          `harbor-${fixture.id}-${other.session.id}-10001`,
+          "node",
+          "-e",
+          otherProbe,
+        ],
+        { timeout: 15000 },
+      )
+    ).stdout.trim(),
+  );
+  await second.closeAndWait();
+  second = undefined;
   await adapter.closeAndWait();
   adapter = undefined;
+  const movedProject = stored.canonical_path + ".owned-moved";
+  await rename(stored.canonical_path, movedProject);
+  await mkdir(stored.canonical_path, { mode: 0o700 });
+  await chown(stored.canonical_path, 10001, 10001);
+  try {
+    await assert.rejects(
+      launchRunner({ ...configuration, generation: 10002 }),
+      /identity|binding/i,
+    );
+    await assert.rejects(
+      prepareAttachments(
+        pool,
+        first.session.id,
+        first.operation.id,
+        derived.canonical_path,
+        false,
+      ),
+      /identity verification/,
+    );
+  } finally {
+    await rmdir(stored.canonical_path);
+    await rename(movedProject, stored.canonical_path);
+  }
   const original = await readFile(physical);
   await chmod(physical, 0o644);
   await writeFile(physical, Buffer.alloc(original.length));
@@ -401,7 +528,7 @@ try {
       pool,
       first.session.id,
       first.operation.id,
-      stored.canonical_path,
+      derived.canonical_path,
       false,
     ),
     /identity verification/,
@@ -413,7 +540,7 @@ try {
     pool,
     first.session.id,
     first.operation.id,
-    stored.canonical_path,
+    derived.canonical_path,
     false,
   );
   const canonical = prepared.directory.canonical,
@@ -426,7 +553,7 @@ try {
         pool,
         first.session.id,
         first.operation.id,
-        stored.canonical_path,
+        derived.canonical_path,
         false,
       ),
       /identity verification/,
@@ -446,6 +573,13 @@ try {
   );
 } finally {
   const failures: unknown[] = [];
+  if (second) {
+    try {
+      await second.closeAndWait();
+    } catch (error) {
+      failures.push(error);
+    }
+  }
   if (adapter) {
     try {
       await adapter.closeAndWait();
@@ -457,6 +591,7 @@ try {
   await api.dispose();
   for (const child of children) {
     if (child.exitCode !== null || child.signalCode !== null) continue;
+    child.kill("SIGCONT");
     child.kill("SIGTERM");
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => child.kill("SIGKILL"), 5000);
@@ -508,7 +643,7 @@ try {
             ).stdout.trim(),
           },
           scope:
-            "Real API/Postgres/trusted XFS publication and confined pinned Codex runner; external OIDC and capability catalog fixtures",
+            "Real API/Postgres/supervisor derived workspace publication and simultaneous Local/derived confined pinned Codex runners; external OIDC/Codex dispatch fixtures",
           liveAccount: process.env.HARBOR_TEST_LIVE_ATTACHMENTS
             ? "passed synthetic image color and exact text response"
             : "Separate mandatory gate",

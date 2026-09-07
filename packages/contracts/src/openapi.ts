@@ -47,6 +47,8 @@ export const publicSchemas = {
     projectId: uuid,
     workspaceId: uuid,
     title: string,
+    archived: { type: "boolean" },
+    metadataRevision: { type: "integer", minimum: 0 },
     state: {
       enum: [
         "idle",
@@ -209,6 +211,21 @@ const uploadMutation = mutation(
 uploadMutation.requestBody.content = {
   "application/octet-stream": { schema: { type: "string", format: "binary" } },
 } as any;
+const recovery = object({
+  id: uuid,
+  state: { enum: ["queued", "fencing", "ready", "failed", "consumed"] },
+  expectedGeneration: { type: "integer" },
+  generation: { type: ["integer", "null"] },
+  attempt: { type: "integer", minimum: 1, maximum: 3 },
+  attemptsRemaining: { type: "integer", minimum: 0, maximum: 2 },
+  report: object(
+    { status: { enum: ["available", "unavailable", "truncated"] } },
+    ["status"],
+  ),
+  continuedOperationId: { type: ["string", "null"] },
+  createdAt: timestamp,
+  updatedAt: timestamp,
+});
 const paths: Record<string, any> = {
   "/sessions/{id}/attachments": {
     get: read(object({ attachments: array(attachmentRecord) })),
@@ -270,6 +287,97 @@ const paths: Record<string, any> = {
         expectedRevision: { type: "integer", minimum: 0 },
       }),
       object({ draft: draftRecord }),
+    ),
+  },
+  "/history": {
+    get: {
+      ...read(
+        object({
+          sessions: array(ref("Session")),
+          nextCursor: { type: ["string", "null"] },
+        }),
+      ),
+      parameters: [
+        { in: "query", name: "q", schema: { type: "string", maxLength: 120 } },
+        {
+          in: "query",
+          name: "state",
+          schema: { enum: ["active", "archived", "all"], default: "active" },
+        },
+        { in: "query", name: "projectId", schema: uuid },
+        {
+          in: "query",
+          name: "limit",
+          schema: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+        },
+        {
+          in: "query",
+          name: "cursor",
+          schema: string,
+          description:
+            "Opaque immutable-order cursor bound to filters; changed filters require a new first page.",
+        },
+      ],
+    },
+  },
+  "/sessions/{id}/metadata": {
+    post: mutation(
+      {
+        type: "object",
+        properties: {
+          expectedRevision: { type: "integer", minimum: 0 },
+          title: { type: "string", minLength: 1, maxLength: 200 },
+          archived: { type: "boolean" },
+        },
+        required: ["expectedRevision"],
+        additionalProperties: false,
+        anyOf: [{ required: ["title"] }, { required: ["archived"] }],
+      },
+      object({ session: ref("Session") }),
+    ),
+  },
+  "/sessions/{id}/recovery": {
+    get: read(
+      object({
+        generation: { type: "integer" },
+        cursor: { type: "integer" },
+        state: string,
+        unresolvedOperations: array(ref("Operation")),
+        recovery: { anyOf: [recovery, { type: "null" }] },
+      }),
+    ),
+    post: mutation(
+      {
+        type: "object",
+        properties: {
+          expectedGeneration: { type: "integer", minimum: 0 },
+          recoveryId: uuid,
+          expectedAttempt: { type: "integer", minimum: 1, maximum: 2 },
+        },
+        required: ["expectedGeneration"],
+        additionalProperties: false,
+        dependentRequired: {
+          recoveryId: ["expectedAttempt"],
+          expectedAttempt: ["recoveryId"],
+        },
+      },
+      object({ recovery }),
+      202,
+    ),
+  },
+  "/sessions/{id}/recovery/continue": {
+    post: mutation(
+      z.toJSONSchema(
+        turnSchema
+          .extend({
+            recoveryId: z.uuid(),
+            expectedGeneration: z.number().int().nonnegative(),
+            acknowledgeUnknownEffects: z.literal(true),
+          })
+          .strict(),
+      ),
+      accepted,
+      202,
     ),
   },
   "/security/api-tokens": {

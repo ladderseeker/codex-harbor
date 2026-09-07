@@ -1,3 +1,4 @@
+import { attachmentWorkspaces } from "./p005-workspaces.ts";
 import { expect, type Page, type BrowserContext } from "@playwright/test";
 import type { Pool } from "pg";
 import { randomUUID, createHash } from "node:crypto";
@@ -539,8 +540,19 @@ export async function p005({
   );
 
   const uploadSession = await newSession("Upload response recovery");
-  await page.goto(origin + "/?conversation=" + uploadSession.id);
-  await expect(page.getByLabel("Message Codex")).toBeVisible();
+  const uploadNavigation = await page.goto(
+    origin + "/?conversation=" + uploadSession.id,
+  );
+  expect(uploadNavigation?.status()).toBe(200);
+  await expect(page.getByLabel("Message Codex"))
+    .toBeVisible()
+    .catch(async (error) => {
+      throw new Error(
+        "Upload recovery page failed to load: " +
+          (await page.locator("body").innerText()),
+        { cause: error },
+      );
+    });
   let releasePause!: () => void;
   const pause = new Promise<void>((r) => (releasePause = r));
   let uploadIntercepted!: () => void;
@@ -568,9 +580,14 @@ export async function p005({
   await expect(
     page.getByRole("button", { name: "Retry same upload", exact: true }),
   ).toBeVisible();
+  const retryResponse = page.waitForResponse(
+    (r) => r.request().method() === "PUT" && r.url().includes("/attachments/"),
+  );
   await page
     .getByRole("button", { name: "Retry same upload", exact: true })
     .click();
+  const retriedUpload = await retryResponse;
+  expect(retriedUpload.status(), await retriedUpload.text()).toBe(200);
   await expect(
     page.getByText("Selected for this message", { exact: true }),
   ).toHaveCount(1);
@@ -1019,6 +1036,7 @@ export async function p005({
       seedSessions,
     ]);
   }
+  await attachmentWorkspaces(context, page, origin, csrf, db, traceFile);
   console.log(
     "P005 attachment UI/API atomic association, cross-session denial, saved drafts, safe previews, paste and staged GC passed. Native image delivery requires separate live evidence.",
   );

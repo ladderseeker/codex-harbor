@@ -1,10 +1,9 @@
+import { pruneReplay } from "./replay.ts";
 import type { DB } from "./index.ts";
 /** Replay is disposable; durable messages and unresolved operations are not. */
 export async function maintain(db: DB, at = new Date()) {
-  await db.query(
-    "DELETE FROM events e WHERE EXISTS(SELECT 1 FROM sessions s WHERE s.id=e.session_id AND e.sequence<s.sequence-2000) OR (e.created_at<$1::timestamptz-interval '7 days' AND NOT EXISTS(SELECT 1 FROM operations o WHERE o.session_id=e.session_id AND o.state IN ('queued','dispatching','running','waiting_approval','waiting_input','uncertain')))",
-    [at],
-  );
+  for (const row of (await db.query("SELECT id FROM sessions")).rows)
+    await pruneReplay(db, row.id, at);
   await db.query(
     "DELETE FROM intents i WHERE i.created_at<$1::timestamptz-interval '24 hours' AND to_timestamp(split_part(i.key,':',1)::double precision/1000)<$1::timestamptz-interval '24 hours' AND NOT EXISTS(SELECT 1 FROM operations o WHERE o.id::text=i.result->'operation'->>'id' AND o.state IN ('queued','dispatching','running','waiting_approval','waiting_input','uncertain'))",
     [at],

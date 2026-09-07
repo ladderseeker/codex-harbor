@@ -1,0 +1,31 @@
+# P005 workspace/history integration — 7 September 2026
+
+This checkpoint integrates the reviewed P005 attachment feature (`088c15a`) with P002 fresh authority, P003 managed workspaces and P007 history/recovery (`ca1a2cf`). The standalone [attachment report](2026-09-07-p005-attachments.md) remains the record of its original source and three feature review rounds. P005 stays Implemented: the dedicated-account image/text response gate remains blocked.
+
+## Integrated behavior
+
+Ordinary turns and deliberate recovery continuations share atomic attachment association, draft revision checks and fresh server authority. Recovery accepts new references only through the acknowledged continuation path. Original uncertain operations and their attachment provenance remain unchanged; metadata archive preserves the associated bytes.
+
+Publication resolves the session's selected checkout and the registered project separately. The quota helper validates the original project identity under its storage lock; the launcher independently validates project, checkout and attachment directory identities. A derived checkout is never substituted for the project quota root. Read-only session attachment mounts remain separate from writable workspace mounts. When the test harness uses the actual trusted storage socket, external Codex fixtures still traverse real Linux attachment publication.
+
+## Application evidence
+
+The final `pnpm test:e2e` run exited 0 on Node 24.11.1. `.test-runs/harbor-e2e-055d710de4/result.json` records identical start/end `b4de09a4f03ab6857b9c966e21a7a3dfcdd932afdb366ff0b1da9c7a7ba88d71` over 854 source files. It passed the real P001/P002/P005/P007 application stack and the added P003 derived-copy attachment scenario, including deliberate new-input recovery, exact retry identity, original uncertain attachment provenance and archive byte preservation. Only external OIDC/Codex responses are fixtures. The distinct `pnpm test:e2e --workspaces` regression also exited 0 on the explicitly selected Node 24.11.1 runtime: `.test-runs/harbor-workspaces-052aaf86a4/result.json` records the same matching `b4de09a4…88d71` source. It covers the full P003 manager, archive, release and durable workspace failure/retry flow against the combined branch.
+
+The first combined run, `.test-runs/harbor-e2e-61434a60f3/result.json`, passed on Node 26.7.0 but its source changed from `a3bd8c6fee5a09f2e1a3c0b9a67f21fb7381799bd23fbf4d2f51f5a3ca6f8ad4` to `85cf8fd5a835b5b8ca8bd9cd7a2177c3a04c23179c4984236d52a70a93ec7105` while additional acceptance assertions were written. It is intermediate evidence, not a frozen-source gate. An initial Node 24 run failed at the existing upload-recovery page visibility assertion. Its post-run observation record is `.test-runs/harbor-e2e-6d6c1fabe8/observed-failure.json`; no failure-page capture existed, so the cause remains unexplained. The final run adds HTTP/page-body diagnostics without weakening that assertion. A passing rerun does not explain the failed checkpoint.
+
+On Node 24.11.1, `pnpm check`, `pnpm build`, `pnpm test` (11/11) and `pnpm test:contract` (16/16) passed at source `85cf8fd5a835b5b8ca8bd9cd7a2177c3a04c23179c4984236d52a70a93ec7105`. The subsequent delta only adds diagnostics to that browser assertion. A final `pnpm check` passed again at `b4de09a4…88d71`, including 57-document link/whitespace validation, TypeScript, schema compilation and formatting. Contracts include pinned Codex 0.153.4 initialization, model/account and native history smoke; these do not establish an authenticated model response.
+
+## Actual Linux evidence
+
+`.test-runs/p005-integration-first-linux-result.json` records exit-success and matching start/end source `3f216ef3586a65f2fb273d25bb0827453a3b8789872dd2bf05f7bee5f2f1ca97` over 854 files. The command was `HARBOR_TEST_XFS_MOUNT=/srv/harbor-verification pnpm test:isolation --attachments`, on Ubuntu 24.04 arm64, kernel 6.8.0-134, Node 24.11.1 and Docker 29.1.3 with real XFS project quotas.
+
+The lane exercises real API/PostgreSQL/supervisor publication into a derived copy workspace, deferred publication COMMIT rejection and same-inode retry, then simultaneous confined pinned Codex runners for that derived checkout and another Local session. Each runner can read only its own attachment mount and cannot write, unlink or create entries there. Replacing the registered Local project identity rejects both launch and publication for the derived session. Content and attachment-directory replacement also fail closed. External OIDC and dispatch responses are fixtures; the separate native initialize/thread and Docker filesystem assertions use actual confined Codex runners.
+
+A byte comparison against the exact Linux source archive shows that only `tests/e2e/p005.ts` and `tests/e2e/p005-workspaces.ts` changed afterward. Production code and Linux assertions are identical. This evidence does not claim a combined Git worktree/common-metadata attachment test, physical power-loss simulation or a real image-aware model answer. Run-owned processes, containers and quota resources were cleaned; the VM baseline and evidence were retained and the VM returned to the deployment owner.
+
+## Review and remaining gates
+
+One independent cumulative integration review found no actionable defect in shared turn/recovery association, snapshot linkage, draft fencing, modality validation, session/workspace/project binding or the separated mount identities. The reviewer inspected the final matching-source application result and closed the bounded integration review with no actionable finding, retaining the separate Linux source qualification and unexplained earlier visibility failure; the prior three feature review rounds remain distinct.
+
+The [P005 proposal](../../design/proposals/005-attachments-and-rich-input.md), [review issue](../../issues/2026-09-07-213300-p005-implementation-review.md), [user guide](../user/attachments.md) and [developer guide](../developer/attachments.md) retain the current scope. P005-06 remains blocked by the [dedicated live credential gate](../../issues/2026-09-07-171225-live-runtime-credentials.md). P009 deployment/restore integration has its own registry and identity acceptance and is not established by these tests.

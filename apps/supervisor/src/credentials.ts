@@ -1,5 +1,9 @@
 import { requireAuthority } from "../../../packages/policy/src/authority.ts";
 import {
+  admitOrdinaryIntent,
+  lockIntentAdmission,
+} from "../../../packages/storage/src/admission.ts";
+import {
   createCipheriv,
   createDecipheriv,
   createHmac,
@@ -134,7 +138,7 @@ export class CredentialStore {
           throw new HarborError(
             403,
             "BROWSER_REQUIRED",
-            "Owner browser session required",
+            "Owner browser required",
           );
         if (request.action === "status") {
           const stored = (
@@ -179,6 +183,39 @@ export class CredentialStore {
           return prior.rows[0].result;
         }
         checkKey(request.idempotencyKey);
+        await lockIntentAdmission(db, this.c.HARBOR_OWNER_SUBJECT);
+        let controlTarget: string | null = null;
+        if (request.action === "set")
+          await admitOrdinaryIntent(db, this.c.HARBOR_OWNER_SUBJECT);
+        else {
+          const existing = (
+            await db.query(
+              "SELECT ciphertext FROM runtime_credentials FOR UPDATE",
+            )
+          ).rows[0];
+          if (!existing) {
+            await requireAuthority(db, request.actor, this.c);
+            await this.beforeChange();
+            await requireAuthority(db, request.actor, this.c);
+            return { credentialId: null, configured: false, available: true };
+          }
+          controlTarget =
+            "credential-remove:" +
+            createHash("sha256").update(existing.ciphertext).digest("hex");
+          if (
+            (
+              await db.query(
+                "SELECT 1 FROM intents WHERE actor=$1 AND control_target=$2",
+                [this.c.HARBOR_OWNER_SUBJECT, controlTarget],
+              )
+            ).rowCount
+          )
+            throw new HarborError(
+              409,
+              "CREDENTIAL_REMOVE_PENDING",
+              "Reconcile the existing removal intent",
+            );
+        }
         await requireAuthority(db, request.actor, this.c);
         await this.beforeChange();
         if (
@@ -231,13 +268,14 @@ export class CredentialStore {
           available: true,
         };
         await db.query(
-          "INSERT INTO intents(actor,route,key,request_hash,result) VALUES($1,$2,$3,$4,$5)",
+          "INSERT INTO intents(actor,route,key,request_hash,result,control_target) VALUES($1,$2,$3,$4,$5,$6)",
           [
             this.c.HARBOR_OWNER_SUBJECT,
             route,
             request.idempotencyKey,
             hash,
             JSON.stringify(result),
+            controlTarget,
           ],
         );
         await db.query("INSERT INTO audits(kind) VALUES($1)", [

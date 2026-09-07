@@ -1,7 +1,7 @@
 # P009 — Portable deployment and restore
 
 - Decision: Accepted
-- Delivery: Planned
+- Delivery: In progress
 - Dependencies: [P001](001-secure-persistent-conversations.md), [P007](007-session-history-and-recovery.md)
 - Outcome: The owner installs a working Harbor on a compatible Linux VPS, updates it deliberately, and recovers its data on a fresh compatible host.
 
@@ -23,7 +23,7 @@ Cover all delivered module state through a backup registry: PostgreSQL, native C
 
 [D006 — Portable releases and a fenced host restore](../decisions/006-portable-release-and-restore.md) owns the accepted packaging, service privilege, backup consistency/encryption, module registry, destination rebinding and administrator-operation decisions. Implement that contract with the [architecture's migration/draining/rollback rules](../architecture.md#release-retention-and-rollback-rules). The initial profile retains a trusted root supervisor and separate root storage service, with an unprivileged API and private dependencies; installer packaging must not claim a privilege separation absent from the launcher implementation.
 
-P009 delivers the complete operator outcome using D006's immutable packages and pinned Restic checkpoint. Restoration uses a new disabled instance, explicit authority revocation, credential re-encryption and validated filesystem rebinding before activation. Installed module registry coverage includes P002 and incoming P003/P007/P005 when delivered; adding those entries does not make undelivered modules dependencies. Show the recovery point, uncertain work and possible lost writes. The accepted design amendment is In progress; P009 implementation remains Planned and the proposed administrator commands are unavailable until implemented and tested.
+P009 delivers the complete operator outcome using D006's immutable packages and pinned Restic checkpoint. Restoration uses a new disabled instance, explicit authority revocation, credential re-encryption and validated filesystem rebinding before activation. Installed module registry coverage includes P002 and delivered P003/P007/P005; adding those entries does not make undelivered modules dependencies. Show the recovery point, uncertain work and possible lost writes. Implementation is In progress; the proposed administrator commands are unavailable until implemented and tested.
 
 ## Independent acceptance
 
@@ -42,3 +42,7 @@ Provision isolated Linux environments A and B using P001/P007 plus synthetic sta
 Use planned build/check/E2E, contract/live, and isolation lanes. Host reboot/restore scenarios run only in explicitly disposable VMs/VPS fixtures identified in the manifest. Record provider-independent prerequisites and measured resource use, not an unsupported claim to run on every VPS or OS. Follow [shared evidence rules](README.md#shared-verification-contract).
 
 Add usable installation, operations, update, backup, and recovery guides under `docs/` with tested commands. Release packaging must remain independently testable before P010 self-development exists. Missing fresh-host restore or real isolation evidence keeps this delivery unverified.
+
+## Implementation record
+
+- 2026-09-07: Started isolated implementation from the integrated P001–P003 baseline `d4f9e96`, under the owner's roadmap authorization. Incorporate the reviewed P007 integration and delivered attachment module before final registry/restore checks. Disposable Linux A/B prerequisite setup and the pinned Restic download are preparation, not completed P009 acceptance. Migration 009 is reserved for this feature.

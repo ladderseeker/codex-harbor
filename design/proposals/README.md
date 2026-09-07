@@ -1,6 +1,6 @@
 # Feature proposals
 
-P001–P003 are Accepted and Implemented, with required live-account evidence and upstream follow-ups still open. P005 and P007 are Accepted and In progress. P004 and P009 have Accepted designs and Planned implementation; the remaining proposals are Draft and Planned. No proposal has passed its completion gate. Design review, implementation, and verification are separate events. Follow the [proposal template](../proposal-template.md) and [canonical lifecycle rules](../../AGENTS.md#document-ownership-and-lifecycle) when changing status.
+P001–P003 are Accepted and Implemented, with required live-account evidence and upstream follow-ups still open. P005, P007 and P009 are Accepted and In progress. P004 has an Accepted design and Planned implementation; the remaining proposals are Draft and Planned. No proposal has passed its completion gate. Design review, implementation, and verification are separate events. Follow the [proposal template](../proposal-template.md) and [canonical lifecycle rules](../../AGENTS.md#document-ownership-and-lifecycle) when changing status.
 
 The [proposal archive](archive/README.md) is empty. Review it and the [issue index](../../issues/README.md) when discovering work or allocating IDs.
 
@@ -20,7 +20,7 @@ An independently verifiable feature may rely on its declared dependencies. Imple
 | [P006](006-persistent-terminal.md) | Use and reconnect to a terminal in a selected project workspace | Draft | Planned | P003 | P006-01–06; contract, live, isolation |
 | [P007](007-session-history-and-recovery.md) | Find past work and resolve reconnect, crash, and uncertain-delivery states | Accepted | In progress | P001 | P007-01–07; contract, live |
 | [P008](008-scheduled-tasks.md) | Run recurring or one-time work and review its results | Draft | Planned | P003, P007 | P008-01–07; live |
-| [P009](009-portable-deployment-and-restore.md) | Install, update, back up, and restore a working Harbor on a compatible VPS | Accepted | Planned | P001, P007 | D006 records release/restore decisions; P009-01–07 implementation, live and isolation pending |
+| [P009](009-portable-deployment-and-restore.md) | Install, update, back up, and restore a working Harbor on a compatible VPS | Accepted | In progress | P001, P007 | D006 packaging/checkpoint/restore implementation started; P009-01–07 live and Linux acceptance pending |
 | [P010](010-self-development.md) | Develop and test Harbor through its running stable instance | Draft | Planned | P002, P003, P009 | P010-01–07; self E2E, isolation, live |
 | [P011](011-private-project-previews.md) | Open a private preview of a project's running application | Draft | Planned | P003 | P011-01–06; isolation |
 | [P012](012-managed-skills-and-mcp.md) | Configure and use trusted skills and MCP tools within a project | Draft | Planned | P003 | P012-01–06; contract, live, isolation |
