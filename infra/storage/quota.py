@@ -71,7 +71,8 @@ def main():
     root=next(r for r in profile['roots']if r['id']==request['rootId'])
     trusted(root['path']);trusted(root['pool']);state=os.environ['HARBOR_LAUNCHER_STATE_DIR'];trusted(state)
     relative=request['relativePath'];parts=relative.split('/')
-    if len(parts)>2 or not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}',parts[0])or(len(parts)==2 and parts[1]!='workspace'):raise ValueError('managed project name required')
+    derived=request['action']=='native' and len(parts)==4 and parts[1]=='workspaces' and re.fullmatch('[a-f0-9-]{36}',parts[2]) and parts[3]=='checkout'
+    if not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}',parts[0])or not(derived or len(parts)==1 or len(parts)==2 and parts[1]=='workspace'):raise ValueError('managed project name required')
     target=os.path.join(root['path'],parts[0]);action=request['action']
     if any(os.stat(state).st_dev==os.stat(r['path']).st_dev for r in profile['roots']):raise ValueError('Control storage must be outside project filesystem')
     with open(os.path.join(state,'storage.lock'),'a')as lock:
@@ -95,6 +96,8 @@ def main():
         elif action not in ['validate','native','clearCredentials','inspect','attachments']:raise ValueError('unsupported action')
         workspace,storage=verify(target,profile,action not in ['clearCredentials','inspect'])
         if action=='attachments':
+            expected=request['project'];identity=os.stat(workspace,follow_symlinks=False)
+            if workspace!=expected['canonical']or str(identity.st_dev)!=expected['device']or str(identity.st_ino)!=expected['inode']:raise ValueError('attachment project identity changed')
             from attachments import publish
             print(json.dumps(publish(target,request)));return
         if action=='inspect':print(json.dumps(storage));return

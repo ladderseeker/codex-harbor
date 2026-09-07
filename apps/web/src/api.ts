@@ -54,6 +54,7 @@ export type Intent = {
   body: unknown;
   key: string;
   label: string;
+  method?: "POST" | "DELETE";
 };
 export const newIntent = (
   path: string,
@@ -68,7 +69,7 @@ export const newIntent = (
 
 export function mutate<T>(intent: Intent, csrf: string): Promise<T> {
   return request<T>(intent.path, {
-    method: "POST",
+    method: intent.method ?? "POST",
     headers: {
       "Content-Type": "application/json",
       "X-CSRF-Token": csrf,

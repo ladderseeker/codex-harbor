@@ -9,6 +9,10 @@ if (process.argv.includes("--attachments")) {
   await import("../isolation/attachments.js");
   process.exit(0);
 }
+if (process.argv.includes("--workspaces")) {
+  await import("../workspaces/live.ts");
+  process.exit(process.exitCode ?? 0);
+}
 import { stat } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";

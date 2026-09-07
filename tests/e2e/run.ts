@@ -1,4 +1,9 @@
 import { p005 } from "./p005.ts";
+if (process.argv.includes("--workspaces")) {
+  await import("../workspaces/e2e.ts");
+  process.exit(process.exitCode ?? 0);
+}
+import { authorityExpiry } from "./authority-expiry.ts";
 import { p002 } from "./p002.ts";
 import { sourceDigest } from "../../scripts/source-digest.ts";
 import { localComposeFiles } from "../../infra/compose.ts";
@@ -484,7 +489,54 @@ try {
       decision: "accept",
     });
     expect(stale.status()).toBe(409);
+    // Separate regression scenarios explicitly acknowledge prior unknown effects through
+    // the owner recovery API; no database lease bypass is used.
+    const releasePriorWorkspace = async () => {
+      await expect
+        .poll(
+          async () => {
+            const projectId = sessions.sessions[0].projectId;
+            const workspaces = (
+              await (
+                await context.request.get(
+                  origin + `/api/v1/projects/${projectId}/workspaces`,
+                )
+              ).json()
+            ).workspaces;
+            const held = workspaces.find(
+              (w: any) => w.kind === "local" && w.writerSessionId,
+            );
+            if (!held) return true;
+            const prior = await (
+              await context.request.get(
+                origin + `/api/v1/sessions/${held.writerSessionId}/snapshot`,
+              )
+            ).json();
+            if (
+              prior.operations.some((o: any) =>
+                [
+                  "dispatching",
+                  "running",
+                  "waiting_approval",
+                  "waiting_input",
+                ].includes(o.state),
+              )
+            )
+              return false;
+            const release = await command(`/workspaces/${held.id}/release`, {
+              acknowledgeUnknownEffects: true,
+              expectedSessionId: held.writerSessionId,
+              expectedGeneration: held.writerGeneration,
+            });
+            expect([200, 409]).toContain(release.status());
+            return false;
+          },
+          { timeout: 30000 },
+        )
+        .toBe(true);
+    };
     const newSession = async () => {
+      await releasePriorWorkspace();
       await expect
         .poll(
           async () =>
@@ -577,6 +629,15 @@ try {
         traceFile: env.HARBOR_FIXTURE_TRACE_FILE,
         artifacts,
       });
+      await authorityExpiry(
+        testDb,
+        {
+          HARBOR_OIDC_ISSUER: env.HARBOR_OIDC_ISSUER,
+          HARBOR_OWNER_SUBJECT: env.HARBOR_OWNER_SUBJECT,
+          HARBOR_IDLE_SECONDS: 300,
+        },
+        sessions.sessions[0].projectId,
+      );
       rotationBearer = await p002({
         page: reopened,
         context,
@@ -586,6 +647,12 @@ try {
         projectId: sessions.sessions[0].projectId,
         logs: () => diagnosticText,
         artifacts,
+        pauseSupervisor: () => {
+          supervisor.kill("SIGSTOP");
+        },
+        resumeSupervisor: () => {
+          supervisor.kill("SIGCONT");
+        },
       });
       const interruptCrashSession = await newSession();
       const interruptCrash = await (
@@ -1068,6 +1135,7 @@ try {
     expect(
       (await command(`/sessions/${stuckSession}/turns`, payload)).status(),
     ).toBe(409);
+    await releasePriorWorkspace();
     const crash = await (
       await command(`/sessions/${id}/turns`, {
         ...payload,

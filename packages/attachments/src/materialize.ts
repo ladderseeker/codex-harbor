@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { relative, isAbsolute } from "node:path";
+import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Pool } from "pg";
 import { transaction } from "../../storage/src/index.ts";
@@ -16,17 +16,22 @@ export async function prepareAttachments(
   operationId: string,
   workspace: string,
   fixture: boolean,
-): Promise<{ directory?: NativeStorage; inputs: AttachmentInput[] }> {
+): Promise<{
+  directory?: NativeStorage;
+  project?: NativeStorage;
+  inputs: AttachmentInput[];
+}> {
   return transaction(pool, async (db) => {
     await lockSession(db, sessionId);
     const files = await operationAttachments(db, sessionId, operationId);
     const operation = (
       await db.query(
-        "SELECT payload FROM operations WHERE id=$1 AND session_id=$2",
+        "SELECT o.payload,p.root_id,p.relative_path AS project_relative,p.canonical_path AS project_path,p.device AS project_device,p.inode AS project_inode,w.canonical_path AS workspace_path FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id AND w.project_id=p.id WHERE o.id=$1 AND o.session_id=$2",
         [operationId, sessionId],
       )
     ).rows[0];
-    if (!operation) throw Error("Attachment operation unavailable");
+    if (!operation || operation.workspace_path !== workspace)
+      throw Error("Attachment operation workspace unavailable");
     await validateAttachmentModalities(db, files, operation.payload.model);
     const inputs: AttachmentInput[] = files.map((f) => ({
       id: f.id,
@@ -44,14 +49,21 @@ export async function prepareAttachments(
     if (process.platform !== "linux" || process.getuid?.() !== 0)
       throw Error("Trusted Linux attachment authority required");
     const profile = JSON.parse(process.env.HARBOR_XFS_PROFILE ?? "null");
-    const root = profile?.roots?.find((r: { path: string }) => {
-      const sub = relative(r.path, workspace);
-      return sub && !sub.startsWith("..") && !isAbsolute(sub);
-    });
+    const project: NativeStorage = {
+      canonical: operation.project_path,
+      device: operation.project_device,
+      inode: operation.project_inode,
+    };
+    const root = profile?.roots?.find(
+      (r: { id: string }) => r.id === operation.root_id,
+    );
     if (!root) throw Error("Managed attachment storage unavailable");
-    const relativePath = relative(root.path, workspace);
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}\/workspace$/.test(relativePath))
-      throw Error("Managed attachment mapping invalid");
+    const relativePath = relative(root.path, project.canonical);
+    if (
+      !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}\/workspace$/.test(relativePath) ||
+      relativePath !== operation.project_relative
+    )
+      throw Error("Managed attachment project mapping invalid");
     const directory = (
       await db.query(
         "SELECT canonical,device,inode FROM session_attachment_storage WHERE session_id=$1",
@@ -105,6 +117,7 @@ export async function prepareAttachments(
       child.stdin.end(
         JSON.stringify({
           action: "attachments",
+          project,
           rootId: root.id,
           relativePath,
           sessionId,
@@ -134,6 +147,6 @@ export async function prepareAttachments(
         f.device,
         f.inode,
       ]);
-    return { directory: result.directory, inputs };
+    return { directory: result.directory, project, inputs };
   });
 }

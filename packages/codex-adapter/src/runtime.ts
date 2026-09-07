@@ -8,9 +8,12 @@ import {
 } from "./index.js";
 import { launchRunner } from "../../../infra/runner/launcher.js";
 export type RuntimeConfig = RuntimeCallbacks & {
+  attachmentProject?: import("../../../infra/storage/admission.ts").NativeStorage;
   attachmentDirectory?: import("../../../infra/storage/admission.ts").NativeStorage;
   onTransport?: (adapter: CodexAdapter) => void;
   withDispatch?: <T>(send: () => T) => Promise<T>;
+  workspaceId?: string;
+  gitCommon?: { canonical: string; device: string; inode: string };
   sessionId: string;
   projectId: string;
   workspacePath: string;
@@ -32,6 +35,13 @@ export async function createRuntime(
     config,
     15_000,
     config.withDispatch,
+    config.gitCommon && config.workspaceId
+      ? [
+          "/workspace",
+          `/harbor/workspaces/${config.workspaceId}`,
+          "/git-common",
+        ]
+      : ["/workspace"],
   );
   try {
     config.onTransport?.(adapter);
@@ -62,6 +72,7 @@ function fixtureProcess(config: RuntimeConfig) {
       env: {
         PATH: process.env.PATH,
         NODE_ENV: "test",
+        HARBOR_FIXTURE_WORKSPACE: config.workspacePath,
         HARBOR_FIXTURE_INIT_DELAY_MS: process.env.HARBOR_FIXTURE_INIT_DELAY_MS,
         HARBOR_FIXTURE_TRACE_FILE: process.env.HARBOR_FIXTURE_TRACE_FILE,
         HARBOR_FIXTURE_STATE_FILE: process.env.HARBOR_FIXTURE_STATE_DIR
@@ -73,13 +84,21 @@ function fixtureProcess(config: RuntimeConfig) {
       },
     },
   ) as OwnedRuntimeProcess;
-  let background = false;
+  let background = false,
+    retirementUnknown = false;
+  child.closeOwned = async () => {
+    if (retirementUnknown)
+      throw Error("Fixture external retirement unavailable");
+  };
   child.on("message", (message) => {
     if ((message as { background?: boolean }).background) background = true;
+    if ((message as { retirementUnknown?: boolean }).retirementUnknown)
+      retirementUnknown = true;
   });
   child.inspectOwned = async () => ({
-    status:
-      child.exitCode !== null || child.signalCode !== null
+    status: retirementUnknown
+      ? "unavailable"
+      : child.exitCode !== null || child.signalCode !== null
         ? "runtime_gone"
         : "known",
     generation: config.generation,

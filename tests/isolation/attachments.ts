@@ -316,6 +316,7 @@ try {
     instanceId: fixture.id,
     permissionProfile: "workspace-write" as const,
     attachmentDirectory: prepared.directory,
+    attachmentProject: prepared.project,
   };
   const completions = new Map<string, string>(),
     messages: string[] = [];

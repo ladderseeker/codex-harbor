@@ -4,7 +4,9 @@ P001's foundation is implemented and has completed four independent review round
 
 The [architecture](../../design/architecture.md) defines the target system. The [proposal index](../../design/proposals/README.md) defines independently verifiable feature outcomes and their dependencies. The [issue index](../../issues/README.md) exposes active findings and pending work transferred to proposals. Both indexes link their archives. [AGENTS.md](../../AGENTS.md#document-ownership-and-lifecycle) contains the canonical lifecycle and working rules.
 
-P002 adds scoped credentials for external clients; use the [programmatic API guide](programmatic-api.md). Its [implementation report](../reports/2026-09-07-p002-api-tokens.md) records two review rounds and validation separately from the still-open live-account gate.
+P002 adds scoped credentials for external clients; use the [programmatic API guide](programmatic-api.md). Its [implementation report](../reports/2026-09-07-p002-api-tokens.md) records the original two review rounds, a focused third authority-correction round, and Node 24 validation separately from the still-open live-account and feature-integration gates.
+
+P003 adds managed parallel workspaces; see the [workspace guide](workspaces.md) and [implementation evidence](../reports/2026-09-07-p003-workspaces.md). Its combined P001/P002/P003 application and actual Linux checks passed on Node 24; the real-account parallel-turn gate remains open.
 
 P005 adds bounded image/text attachments and saved drafts. See [attachment verification](attachments.md) for API/storage boundaries, real Linux publication checks, and the separate live-account command. Three independent review rounds and the recorded browser/Linux checks passed; the mandatory real-account and cross-feature integration gates remain open.
 
