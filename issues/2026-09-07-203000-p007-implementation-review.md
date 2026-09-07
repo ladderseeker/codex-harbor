@@ -27,3 +27,11 @@ The reviewer withdrew an initial continuation-result-size concern after inspecti
 ## Disposition
 
 The implementer is batching fixes, followed by focused regressions, the complete changed-feature/critical suite, and independent re-review. P007 remains active and In progress. The [dedicated live-account gate](2026-09-07-171225-live-runtime-credentials.md) remains a separate prerequisite; fixture/native non-model checks cannot close it. Record the corrected source identity and results before resolving and archiving this review issue.
+
+## Corrective review checkpoint — 7 September 2026
+
+Two independent review rounds now close on feature commit `93a034a444cc95b6d8da8f5c6a905d1fc0f256c9`, source digest `90aa34aa3d55516ce3e4a0209cb697d10011a07d8314f07955a4499470e5a507` (812 files). Check/build, nine integration tests, thirteen contracts and full real P001/P007 E2E `harbor-e2e-2f859a3a33` passed; the E2E source digest matched at both ends. The implementer recorded Node 26.7.0, pnpm 12.3.4, Chromium 1194 and Codex 0.153.4 with disposable external fixtures.
+
+The second review required an event inserted between snapshot and subscription, plus supervisor restart while durable recovery settlement remained pending. Those assertions were corrected. A later real database-outage run exposed an unhandled error from a checked-out PostgreSQL client, beyond the earlier idle-pool handling. The final fix keeps query errors and the supervisor's fatal lease response intact while preventing an unrelated API process crash; exact owned-backend termination and full database-outage/recovery tests passed and received focused independent review. Duplicate React keys in adjacent history/recovery controls were also corrected and visually checked.
+
+All six original findings and the subsequent bounded corrections passed their feature-branch checks. This issue stays active until P003/P002 integration and the combined regression are recorded; independent branch evidence does not establish shared writer/recovery behavior.

@@ -1,7 +1,7 @@
 # P003 — Parallel project workspaces
 
 - Decision: Accepted
-- Delivery: In progress
+- Delivery: Implemented
 - Dependencies: [P001](001-secure-persistent-conversations.md)
 - Outcome: The owner switches among projects and works in several conversations concurrently with clear control of each workspace.
 
@@ -42,11 +42,14 @@ The D005 owner-browser release command requires explicit unknown-effects acknowl
 
 ## Implementation references and remaining gates
 
-The implemented workflow and commands are documented in [Managed project workspaces](../../docs/developer/workspaces.md). Migration 006 owns workspace identities, stable storage operations and recovery reservations. Final review and source-bound evidence remain required before verification.
+The implemented workflow and commands are documented in [Managed project workspaces](../../docs/developer/workspaces.md) and the [user guide](../../docs/user/workspaces.md). Migration 006 owns workspace identities, stable storage operations and recovery reservations. The [implementation report](../../docs/reports/2026-09-07-p003-workspaces.md) records two completed feature review rounds, separate P002/P003 integration review and passing application/Linux evidence at source `b012ef67ca4bc6cf35c190256f50504f53b6c32f4d3e4f1e77bdb50f35cdd972` (831 files), integrated through `ea8816f`. P003 remains unverified pending its dedicated live-account gate and applicable upstream obligations.
 
 ## Source issues
 
 [Dedicated live-test credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md) remains a High release blocker for **P003-06**. The bounded two-runtime native workspace lane exists, but missing dedicated credentials leave actual authenticated parallel-turn effects unverified. Fixture and accountless Linux results do not waive this gate.
+
+The [P003 implementation review](../../issues/archive/2026-09-07-210500-p003-implementation-review.md) is Resolved after bounded IPC, durable removal/retry, filesystem barrier and combined authorization checks. The [shared authority finding](../../issues/2026-09-07-202308-authority-expiry-after-lock-wait.md) has passed its P003 integration; P007 remains its active integration owner.
+
 ## Implementation record
 
 - 2026-09-07: Started isolated implementation on the committed P001 foundation under the owner's roadmap authorization. Managed Local/Git Worktree/copy behavior, trusted metadata ownership, writer coordination, and complete UI/API/Linux acceptance belong to this delivery. Material storage/Git decisions are recorded before use; P001's remaining gates stay visible.

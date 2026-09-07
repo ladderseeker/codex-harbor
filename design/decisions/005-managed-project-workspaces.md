@@ -3,7 +3,7 @@
 - Decision: Accepted
 - Recorded: 2026-09-07
 - Scope: [P003](../proposals/003-parallel-project-workspaces.md), extending [D002](002-registered-mount-authority.md) and [D003](003-quota-backed-project-storage.md)
-- Delivery: In progress; acceptance evidence is owned by P003
+- Delivery: Implemented; verification remains owned by P003 and its live-account gate
 
 ## Context
 
