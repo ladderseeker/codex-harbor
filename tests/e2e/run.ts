@@ -1,3 +1,4 @@
+import { p005 } from "./p005.ts";
 import { p002 } from "./p002.ts";
 import { sourceDigest } from "../../scripts/source-digest.ts";
 import { localComposeFiles } from "../../infra/compose.ts";
@@ -566,6 +567,16 @@ try {
     ).toBe(beforeCredentialChange.state);
     const testDb = new pg.Pool({ connectionString: env.DATABASE_URL });
     try {
+      await p005({
+        page: reopened,
+        context,
+        origin,
+        csrf: me.csrfToken,
+        db: testDb,
+        projectId: sessions.sessions[0].projectId,
+        traceFile: env.HARBOR_FIXTURE_TRACE_FILE,
+        artifacts,
+      });
       rotationBearer = await p002({
         page: reopened,
         context,
@@ -1217,7 +1228,7 @@ try {
           browser: "Chromium1194",
           node: process.version,
           scope:
-            "P001/P002 deterministic external-fixture acceptance; live/isolation separate",
+            "P001/P002/P005 deterministic external-fixture acceptance; live/isolation separate",
         },
         null,
         2,

@@ -1,3 +1,5 @@
+import { prepareAttachments } from "../../../packages/attachments/src/materialize.ts";
+import { maintainAttachments } from "../../../packages/attachments/src/store.ts";
 import {
   requireAuthority,
   type Scope,
@@ -498,6 +500,7 @@ async function tick() {
   }
   if (Date.now() - lastMaintenance > 60000) {
     await maintain(pool);
+    await maintainAttachments(pool);
     lastMaintenance = Date.now();
   }
   if (credentials.mutating) return;
@@ -761,6 +764,13 @@ async function tick() {
           operationId: o.id,
         });
       });
+      const attachments = await prepareAttachments(
+        pool,
+        o.session_id,
+        o.id,
+        workspacePath,
+        !!c.HARBOR_FIXTURE_MODE,
+      );
       const credentialVersion = await credentials.version();
       let r = runtimes.get(o.session_id);
       if (
@@ -802,6 +812,7 @@ async function tick() {
           sessionId: o.session_id,
           projectId: o.project_id,
           workspacePath,
+          attachmentDirectory: attachments.directory,
           workspaceDevice: o.device,
           workspaceInode: o.inode,
           generation: runtimeGeneration,
@@ -945,11 +956,10 @@ async function tick() {
       r.operation = o.id;
       r.authorityActor = o.actor_hash;
       r.authorityScope = "execute";
-      const turn = await r.adapter.startTurn(
-        r.thread,
-        o.payload.text,
-        o.payload as TurnOptions,
-      );
+      const turn = await r.adapter.startTurn(r.thread, o.payload.text, {
+        ...o.payload,
+        attachments: attachments.inputs,
+      } as TurnOptions);
       r.turn = turn.turn.id;
       await pool.query("UPDATE sessions SET native_turn_id=$2 WHERE id=$1", [
         o.session_id,

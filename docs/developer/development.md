@@ -6,6 +6,8 @@ The [architecture](../../design/architecture.md) defines the target system. The 
 
 P002 adds scoped credentials for external clients; use the [programmatic API guide](programmatic-api.md). Its [implementation report](../reports/2026-09-07-p002-api-tokens.md) records two review rounds and validation separately from the still-open live-account gate.
 
+P005 adds bounded image/text attachments and saved drafts. See [attachment verification](attachments.md) for API/storage boundaries, real Linux publication checks, and the separate live-account command. Three independent review rounds and the recorded browser/Linux checks passed; the mandatory real-account and cross-feature integration gates remain open.
+
 ## Run the deterministic application locally
 
 The tested macOS toolchain uses Node 24.11.1, pnpm 12.3.4, and a running Linux Docker engine with Compose. The repository pins JavaScript dependencies and the external Codex protocol baseline at 0.153.4. PostgreSQL 17.6 and Caddy 2.10.2 are provisioned by the run-specific Compose instance.

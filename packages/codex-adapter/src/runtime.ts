@@ -8,6 +8,7 @@ import {
 } from "./index.js";
 import { launchRunner } from "../../../infra/runner/launcher.js";
 export type RuntimeConfig = RuntimeCallbacks & {
+  attachmentDirectory?: import("../../../infra/storage/admission.ts").NativeStorage;
   onTransport?: (adapter: CodexAdapter) => void;
   withDispatch?: <T>(send: () => T) => Promise<T>;
   sessionId: string;

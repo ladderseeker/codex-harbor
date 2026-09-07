@@ -19,6 +19,7 @@ const exec = promisify(execFile);
 const idPattern = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 export const RUNNER_IMAGE = "codex-harbor-runner:0.153.4";
 export type RunnerConfig = {
+  attachmentDirectory?: NativeStorage;
   sessionId: string;
   projectId: string;
   workspacePath: string;
@@ -83,6 +84,29 @@ export async function runnerArguments(
     )
       throw Error("Native history identity changed");
   }
+  if (config.attachmentDirectory) {
+    const a = config.attachmentDirectory;
+    const info = await lstat(a.canonical, { bigint: true });
+    if (
+      a.canonical !==
+        resolve(dirname(workspace), "attachments", config.sessionId) ||
+      (await realpath(a.canonical)) !== a.canonical ||
+      !info.isDirectory() ||
+      info.uid !== 0n ||
+      (info.mode & 0o022n) !== 0n ||
+      info.dev.toString() !== a.device ||
+      info.ino.toString() !== a.inode
+    )
+      throw Error("Attachment mount identity changed");
+    const parent = await lstat(dirname(a.canonical));
+    if (
+      !parent.isDirectory() ||
+      parent.isSymbolicLink() ||
+      parent.uid !== 0 ||
+      (parent.mode & 0o022) !== 0
+    )
+      throw Error("Untrusted attachment mount ancestor");
+  }
   if (workspace.includes(",")) throw Error("Unsupported workspace path");
   const name =
     `harbor-${config.instanceId ?? "local"}-${config.sessionId}-${config.generation}`.toLowerCase();
@@ -130,6 +154,12 @@ export async function runnerArguments(
     native
       ? `type=bind,source=${native.canonical},target=/home/runner/.codex`
       : `type=volume,source=harbor-${config.instanceId ?? "local"}-${config.projectId}-${config.sessionId}-codex,target=/home/runner/.codex`,
+    ...(config.attachmentDirectory
+      ? [
+          "--mount",
+          `type=bind,source=${config.attachmentDirectory.canonical},target=/attachments,readonly`,
+        ]
+      : []),
     "--env",
     "CODEX_HOME=/home/runner/.codex",
     "--env",

@@ -1,0 +1,139 @@
+import { spawn } from "node:child_process";
+import { relative, isAbsolute } from "node:path";
+import { fileURLToPath } from "node:url";
+import type { Pool } from "pg";
+import { transaction } from "../../storage/src/index.ts";
+import {
+  lockSession,
+  operationAttachments,
+  validateAttachmentModalities,
+} from "./store.ts";
+import type { NativeStorage } from "../../../infra/storage/admission.ts";
+import type { AttachmentInput } from "../../codex-adapter/src/index.ts";
+export async function prepareAttachments(
+  pool: Pool,
+  sessionId: string,
+  operationId: string,
+  workspace: string,
+  fixture: boolean,
+): Promise<{ directory?: NativeStorage; inputs: AttachmentInput[] }> {
+  return transaction(pool, async (db) => {
+    await lockSession(db, sessionId);
+    const files = await operationAttachments(db, sessionId, operationId);
+    const operation = (
+      await db.query(
+        "SELECT payload FROM operations WHERE id=$1 AND session_id=$2",
+        [operationId, sessionId],
+      )
+    ).rows[0];
+    if (!operation) throw Error("Attachment operation unavailable");
+    await validateAttachmentModalities(db, files, operation.payload.model);
+    const inputs: AttachmentInput[] = files.map((f) => ({
+      id: f.id,
+      kind: f.media_type === "image/png" ? "image" : "text",
+      path: `/attachments/${f.id}`,
+    }));
+    if (fixture) {
+      if (
+        process.env.NODE_ENV !== "test" ||
+        process.env.HARBOR_FIXTURE_MODE !== "private-test"
+      )
+        throw Error("Private fixture mode disabled");
+      return { inputs };
+    }
+    if (process.platform !== "linux" || process.getuid?.() !== 0)
+      throw Error("Trusted Linux attachment authority required");
+    const profile = JSON.parse(process.env.HARBOR_XFS_PROFILE ?? "null");
+    const root = profile?.roots?.find((r: { path: string }) => {
+      const sub = relative(r.path, workspace);
+      return sub && !sub.startsWith("..") && !isAbsolute(sub);
+    });
+    if (!root) throw Error("Managed attachment storage unavailable");
+    const relativePath = relative(root.path, workspace);
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}\/workspace$/.test(relativePath))
+      throw Error("Managed attachment mapping invalid");
+    const directory = (
+      await db.query(
+        "SELECT canonical,device,inode FROM session_attachment_storage WHERE session_id=$1",
+        [sessionId],
+      )
+    ).rows[0];
+    const result = await new Promise<{
+      directory: NativeStorage;
+      files: { id: string; device: string; inode: string }[];
+    }>((resolve, reject) => {
+      const child = spawn(
+        "python3",
+        [
+          fileURLToPath(
+            new URL("../../../infra/storage/quota.py", import.meta.url),
+          ),
+        ],
+        {
+          stdio: "pipe",
+          env: {
+            PATH: process.env.PATH,
+            HARBOR_XFS_PROFILE: process.env.HARBOR_XFS_PROFILE,
+            HARBOR_LAUNCHER_STATE_DIR: process.env.HARBOR_LAUNCHER_STATE_DIR,
+          },
+        },
+      );
+      let output = "";
+      const timer = setTimeout(() => child.kill("SIGKILL"), 12000);
+      child.stdout.on("data", (b) => {
+        output += b;
+        if (output.length > 8192) child.kill("SIGKILL");
+      });
+      child.stderr.resume();
+      child.stdin.on("error", () => {});
+      child.on("error", () => {
+        clearTimeout(timer);
+        reject(Error("Attachment publication unavailable"));
+      });
+      child.on("exit", (code) => {
+        clearTimeout(timer);
+        try {
+          if (code !== 0)
+            throw Error(
+              "Attachment publication or identity verification failed",
+            );
+          resolve(JSON.parse(output));
+        } catch (e) {
+          reject(e);
+        }
+      });
+      child.stdin.end(
+        JSON.stringify({
+          action: "attachments",
+          rootId: root.id,
+          relativePath,
+          sessionId,
+          directory,
+          files: files.map((f) => ({
+            id: f.id,
+            digest: f.digest,
+            content: f.content.toString("base64"),
+            device: f.device,
+            inode: f.inode,
+          })),
+        }),
+      );
+    });
+    await db.query(
+      "INSERT INTO session_attachment_storage(session_id,canonical,device,inode) VALUES($1,$2,$3,$4) ON CONFLICT(session_id) DO NOTHING",
+      [
+        sessionId,
+        result.directory.canonical,
+        result.directory.device,
+        result.directory.inode,
+      ],
+    );
+    for (const f of result.files)
+      await db.query("UPDATE attachments SET device=$2,inode=$3 WHERE id=$1", [
+        f.id,
+        f.device,
+        f.inode,
+      ]);
+    return { directory: result.directory, inputs };
+  });
+}
