@@ -13,6 +13,7 @@ Cover all delivered module state through a backup registry: PostgreSQL, native C
 
 ## Source issues
 
+- [Created workspace validation identity](../../issues/2026-09-08-035221-workspace-validation-identity.md): High, In progress with P003/P008. The installed post-create verifier discards identity required by the private storage service, blocking derived/copy readiness. P009-01 requires actual corrected application acceptance and independent review.
 - [Workspace quota import](../../issues/2026-09-08-031857-workspace-quota-import.md): High, In progress with P003. The cumulative installed validator cannot load quota definitions after the guarded-dispatcher change. P009-01 requires the corrected Linux workspace/file path and matching independent review.
 - [Installed web assets](../../issues/2026-09-08-031032-p009-installed-web-assets.md): High, In progress. Fresh installed browser acceptance exposed omitted `apps/web/dist/` content despite passing backend readiness. P009-01 requires corrected immutable packaging, actual installed browser/assets and independent review; the earlier administrator evidence does not close this new finding.
 - [P009 implementation review](../../issues/archive/2026-09-08-005028-p009-implementation-review.md): High, Resolved on 2026-09-08. Two baseline rounds and the separate enrollment/SSH correction review closed with available local/Linux evidence. Installed administrator recovery and inventory checks passed; later-module integration and blocked protected transfer/live gates remain separate obligations.

@@ -79,6 +79,7 @@ Prepared on 7 September 2026 against main `fa65f6a` and delivered P003/P007/P005
 
 ## Source issues
 
+- [Created workspace validation identity](../../issues/2026-09-08-035221-workspace-validation-identity.md): High, In progress with P003/P009. Standalone preparation must preserve the captured workspace/root/kind and returned filesystem/common identity through managed validation. Actual Linux copy execution passed after the worker correction; independent feature review and cumulative integration remain required.
 - [Dedicated live credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md): High, active and Blocked. P008-07 requires a bounded real-account unattended occurrence; fixture scheduling, non-model contracts and inherited isolation do not close that gate.
 - [P009 backup transfer authorization](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, active and Blocked in P009. When deployment integration is present, protected off-host restore coverage for P008's registry/state inherits the blocked checkpoint prerequisite. P008 implementation and unaffected local acceptance continue.
 

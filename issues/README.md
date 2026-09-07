@@ -4,10 +4,11 @@ Use this index and the [issue archive](archive/README.md) to find existing findi
 
 ## Active issues
 
-The archive contains resolved P001/P003/P005/P007/P009 review findings, authority and retention corrections, allocation detection/reconciliation, and the P002/P005 harness corrections. P004/P006 integration reviews, the installed web-asset and workspace-import defects, the P007 regression observation, live-account and backup-transfer blockers, and gateway availability remain active. The earlier runtime finding remains Transferred with partial local evidence below.
+The archive contains resolved P001/P003/P005/P007/P009 review findings, authority and retention corrections, allocation detection/reconciliation, and the P002/P005 harness corrections. P004/P006 integration reviews, installed web-asset, workspace-import and post-create identity defects, the P007 regression observation, live-account and backup-transfer blockers, and gateway availability remain active. The earlier runtime finding remains Transferred with partial local evidence below.
 
 | Issue | Severity | Status | Owner | Next action |
 | --- | --- | --- | --- | --- |
+| [Created workspace identity](2026-09-08-035221-workspace-validation-identity.md) | High | In progress | P003/P009; P008 worker | Preserve complete identity in post-create managed validation, independently review and verify actual derived/copy application readiness/use on Linux. |
 | [Workspace quota import](2026-09-08-031857-workspace-quota-import.md) | High | In progress | P003/P009; installed-module integration | Replace the broken textual quota import and verify real Linux workspace/file paths with independent review. |
 | [Installed web assets](2026-09-08-031032-p009-installed-web-assets.md) | High | In progress | P009; installed-module integration | Package the actual served Vite output and verify authenticated UI/assets plus file/terminal outcomes on a fresh immutable artifact; independently review the correction. |
 | [P007 regression evidence](2026-09-08-020429-p007-regression-evidence.md) | Medium | Open | Regression maintainer | Original-error/cleanup diagnostics are reviewed and a full critical run passed; inspect them on recurrence to establish the earlier409 cause. |

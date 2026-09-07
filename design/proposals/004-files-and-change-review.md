@@ -7,6 +7,7 @@
 
 ## Source issues
 
+- [Created workspace validation identity](../../issues/2026-09-08-035221-workspace-validation-identity.md): High, In progress with P003/P009. The managed derived-workspace prerequisite becomes unavailable after successful storage creation. Correct and verify this application handoff before completing the derived file/Git acceptance lane.
 - [P004 implementation review](../../issues/2026-09-08-012652-p004-implementation-review.md): High, In progress. Two feature review rounds closed the draft, byte/mode and receipt-parent durability findings with exact-source managed-XFS and critical regression evidence. Shared P006/P009 writer, module inventory, drain and restore behavior still require integration and verification.
 
 ## Scope and user/API flow
