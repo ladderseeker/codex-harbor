@@ -119,7 +119,7 @@ Treat model output, chat Markdown, filenames, diffs, and terminal links as untru
 
 Offer Local and Worktree modes. Prefer worktrees for concurrent Git work and explicit copies for non-Git folders. Worktrees share repository metadata and are not a security boundary. Show starting revisions and handle uncommitted files deliberately; review before applying changes elsewhere. [Official worktree explanation](https://learn.chatgpt.com/docs/environments/git-worktrees)
 
-Workspace admission coordinates managed runs, editor writes, and Git operations. Terminals retain writer reservations while shells or background jobs remain active; conflicting managed operations queue. This is cooperative coordination: arbitrary processes and external SSH can bypass it. Show Local conflicts and warn before simultaneous editing; never promise unconditional overwrite prevention.
+[D005](decisions/005-managed-project-workspaces.md) defines managed Local, Git Worktree and copy storage, stable common metadata mounts, and the confined Git helper. Workspace admission coordinates managed runs, editor writes, and Git operations. Terminals retain writer reservations while shells or background jobs remain active; conflicting managed operations queue. This is cooperative coordination: arbitrary processes and external SSH can bypass it. Show Local conflicts and warn before simultaneous editing; never promise unconditional overwrite prevention.
 
 The supervisor, not the browser, owns running work and subscriptions. Closing every page, changing networks, or restarting the HTTP service must leave execution intact. A turn may still complete, fail, hit a usage limit, or wait for approval. Waiting is visible and never interpreted as permission to continue.
 
@@ -224,6 +224,8 @@ Reserve CPU, memory, disk, PID, and connection capacity for the stable instance 
 Promotion is a distinct trusted operation referencing an immutable artifact digest and verification report. The user's existing authorization governs whether it can proceed; do not impose a standing manual deployment-approval rule. If current authorization does not cover promotion, first complete the candidate and tests, then request approval for that concrete artifact. Never substitute a generic early permission question for preparing a reviewable change.
 
 ## Release, retention, and rollback rules
+
+[D006](decisions/006-portable-release-and-restore.md) specifies P009's immutable installed layout, actual trusted supervisor/storage privilege, encrypted backup checkpoint and module registry, fresh-host authority/filesystem rebinding, and SSH recovery. It is an accepted design under development; its administrator commands and A-to-B restore gate are not yet implemented or verified.
 
 Use additive, backward-compatible database migrations before swapping traffic. Back up and validate restore prerequisites before migrations that could lose data. A single migration owner acquires a deployment lock; candidates never migrate the stable database. Record application, schema, runner, Codex, and native-history format versions together in the release manifest. Compatibility across all of them is a release gate.
 

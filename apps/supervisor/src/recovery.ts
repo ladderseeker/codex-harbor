@@ -15,7 +15,7 @@ export interface RecoveryHooks {
     input: {
       workspaceId: string;
       sessionId: string;
-      generation: number;
+      generation: number | null;
       recoveryId: string;
     },
   ): Promise<void>;
@@ -42,7 +42,7 @@ async function lockedSession(h: RecoveryHooks, db: PoolClient, r: any) {
   await h.lockWorkspace?.(db, r.session_id);
   const s = (
     await db.query(
-      "SELECT s.*,p.device,p.inode,p.root_id,p.relative_path FROM sessions s JOIN projects p ON p.id=s.project_id WHERE s.id=$1 FOR UPDATE OF s",
+      "SELECT s.*,p.root_id,w.device,w.inode,w.relative_path,w.canonical_path,w.common_path,w.common_device,w.common_inode,w.writer_session_id,w.writer_generation FROM sessions s JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id WHERE s.id=$1 FOR UPDATE OF s",
       [r.session_id],
     )
   ).rows[0];
@@ -160,7 +160,10 @@ export async function processRecovery(h: RecoveryHooks) {
         await h.releaseWorkspace(db, {
           workspaceId: session.workspace_id,
           sessionId: session.id,
-          generation: Number(next.expected_generation),
+          generation:
+            session.writer_generation === null
+              ? null
+              : Number(session.writer_generation),
           recoveryId: next.id,
         });
       if (native) await reconcileNative(db, session.id, native, report);

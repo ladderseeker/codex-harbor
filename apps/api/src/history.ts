@@ -88,6 +88,38 @@ export function historyRoutes(
       };
     });
   });
+  // Retained P003 API spelling; archival now changes visibility only.
+  app.post<{ Params: { id: string } }>(
+    "/api/v1/sessions/:id/archive",
+    async (req) => {
+      z.object({})
+        .strict()
+        .parse(req.body ?? {});
+      return command(req, async (db) => {
+        await lockWorkspace?.(db, req.params.id);
+        const old = (
+          await db.query("SELECT * FROM sessions WHERE id=$1 FOR UPDATE", [
+            req.params.id,
+          ])
+        ).rows[0];
+        if (!old)
+          throw new HarborError(404, "NOT_FOUND", "Conversation not found");
+        if (old.archived) return { session: publicRow(old) };
+        const row = (
+          await db.query(
+            "UPDATE sessions SET archived=true,archived_at=now(),metadata_revision=metadata_revision+1 WHERE id=$1 RETURNING *",
+            [old.id],
+          )
+        ).rows[0];
+        await event(db, old.id, "session.metadata", {
+          title: row.title,
+          archived: true,
+          revision: Number(row.metadata_revision),
+        });
+        return { session: publicRow(row) };
+      });
+    },
+  );
   app.post<{ Params: { id: string } }>(
     "/api/v1/sessions/:id/metadata",
     async (req) => {

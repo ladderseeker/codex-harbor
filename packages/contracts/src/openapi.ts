@@ -1,3 +1,4 @@
+import { tokenSchema } from "./tokens.ts";
 import { z } from "zod";
 import { projectSchema, sessionSchema, turnSchema } from "./index.ts";
 const string = { type: "string" },
@@ -16,6 +17,29 @@ export const publicSchemas = {
       requestId: string,
       retryable: { type: "boolean" },
     }),
+  }),
+  Workspace: object({
+    id: uuid,
+    projectId: uuid,
+    name: string,
+    kind: { enum: ["local", "worktree", "copy"] },
+    state: {
+      enum: [
+        "creating",
+        "removing",
+        "ready",
+        "unavailable",
+        "failed",
+        "archived",
+        "removed",
+      ],
+    },
+    relativePath: string,
+    baseRevision: { type: ["string", "null"] },
+    sourceDirty: { type: "boolean" },
+    writerSessionId: { type: ["string", "null"] },
+    writerGeneration: { type: ["integer", "null"] },
+    failureCode: { type: ["string", "null"] },
   }),
   Project: object({ id: uuid, name: string, createdAt: timestamp }),
   Session: object({
@@ -151,6 +175,18 @@ const snapshot = object({
     processes: array(object({ pid: { type: "integer" }, executable: string })),
   }),
 });
+const tokenRecord = object({
+  id: uuid,
+  name: string,
+  prefix: string,
+  scopes: array({ enum: ["read", "execute", "approve", "cancel"] }),
+  project_ids: array(uuid),
+  permission_profile: { enum: ["read-only", "workspace-write"] },
+  expires_at: timestamp,
+  revoked: { type: "boolean" },
+  created_at: timestamp,
+  last_used_at: { type: ["string", "null"] },
+});
 const recovery = object({
   id: uuid,
   state: { enum: ["queued", "fencing", "ready", "failed", "consumed"] },
@@ -257,6 +293,23 @@ const paths: Record<string, any> = {
       accepted,
       202,
     ),
+  },
+  "/security/api-tokens": {
+    get: read(object({ tokens: array(tokenRecord) })),
+    post: mutation(
+      z.toJSONSchema(tokenSchema),
+      object(
+        {
+          token: tokenRecord,
+          secret: string,
+          secretUnavailable: { type: "boolean" },
+        },
+        ["token", "secretUnavailable"],
+      ),
+    ),
+  },
+  "/security/api-tokens/{id}/revoke": {
+    post: mutation(empty, object({ token: tokenRecord })),
   },
   "/me": {
     get: read(
@@ -371,20 +424,124 @@ const paths: Record<string, any> = {
   },
   "/openapi.json": { get: read({ type: "object" }) },
 };
+const workspaceResult = object({ workspace: ref("Workspace") });
+Object.assign(paths, {
+  "/projects/{id}/workspaces": {
+    get: read(object({ workspaces: array(ref("Workspace")) })),
+    post: mutation(
+      object(
+        {
+          name: string,
+          kind: { enum: ["worktree", "copy"] },
+          sourceWorkspaceId: uuid,
+          revision: {
+            type: "string",
+            pattern: "^(?:[a-f0-9]{40}|[a-f0-9]{64})$",
+          },
+          dirtyPolicy: { enum: ["exclude", "snapshot"] },
+        },
+        ["name", "kind", "sourceWorkspaceId", "dirtyPolicy"],
+      ),
+      workspaceResult,
+    ),
+  },
+  "/workspaces/{id}": {
+    get: read(
+      object({
+        workspace: ref("Workspace"),
+        inspection: object({
+          available: { type: "boolean" },
+          git: { type: "boolean" },
+          dirty: { type: "boolean" },
+        }),
+      }),
+    ),
+    delete: mutation(empty, workspaceResult),
+  },
+  "/workspaces/{id}/archive": { post: mutation(empty, workspaceResult) },
+  "/projects/{id}/archive": {
+    post: mutation(empty, object({ project: ref("Project") })),
+  },
+  "/sessions/{id}/archive": {
+    post: mutation(empty, object({ session: ref("Session") })),
+  },
+  "/workspaces/{id}/release": {
+    post: mutation(
+      object({
+        acknowledgeUnknownEffects: { const: true },
+        expectedSessionId: uuid,
+        expectedGeneration: { type: "integer", minimum: 1 },
+      }),
+      object({
+        release: object({
+          id: uuid,
+          state: { enum: ["queued", "dispatching", "completed", "failed"] },
+        }),
+      }),
+    ),
+  },
+});
 for (const [name, item] of Object.entries(paths))
   if (name.includes("{id}")) item.parameters = [idParameter];
+const tokenRoutes: Record<string, string> = {
+  "GET /openapi.json": "read",
+  "GET /capabilities": "read",
+  "GET /projects": "read",
+  "GET /sessions": "read",
+  "POST /sessions": "execute",
+  "GET /sessions/{id}/snapshot": "read",
+  "GET /sessions/{id}/events": "read",
+  "POST /sessions/{id}/turns": "execute",
+  "GET /operations/{id}": "read",
+  "POST /approvals/{id}/answer": "approve",
+  "POST /turns/{id}/cancel": "cancel",
+};
+for (const [path, item] of Object.entries(paths))
+  for (const [method, operation] of Object.entries(item) as [string, any][]) {
+    const scope = tokenRoutes[method.toUpperCase() + " " + path];
+    if (scope) {
+      operation.security = [{ ownerCookie: [] }, { personalToken: [] }];
+      operation["x-required-token-scope"] = scope;
+      operation.description =
+        "Bearer authority intersects project grants, current policy, and token execution ceiling. Revocation denies queued dispatch and closes streams; already-running work continues.";
+      operation.parameters = (operation.parameters ?? []).filter(
+        (p: any) => p.name !== "X-CSRF-Token" && p.name !== "Origin",
+      );
+      operation.parameters.push({
+        in: "header",
+        name: "Origin",
+        required: false,
+        schema: { type: "string" },
+        description:
+          "Required exact application Origin for cookie-authenticated mutations; unused for bearer authentication.",
+      });
+      operation.parameters.push({
+        in: "header",
+        name: "X-CSRF-Token",
+        required: false,
+        schema: { type: "string" },
+        description:
+          "Required with exact Origin for cookie-authenticated mutations; unused for bearer authentication.",
+      });
+    }
+  }
 export const openapi = {
   openapi: "3.1.0",
   info: {
     title: "Codex Harbor owner API",
-    version: "1.0.0",
+    version: "1.1.0",
     description:
-      "P001 owner-cookie facade; app-server is private. Uncertain execution is never automatically replayed.",
+      "Versioned cookie/bearer facade. Use Authorization: Bearer; query tokens are never accepted. App-server and token/credential administration remain browser-only. Mutations require timestamped Idempotency-Key, reuse exact key/input after uncertain transport within 24h; conflict409 forbids changed input. 429 is retryable after 10 seconds (login60s), maximum200 requests per10s per IP/control class. Unknown versions fail closed. Uncertain execution is never automatically replayed. Token creation retries return secretUnavailable; revoke/recreate if the one-time secret was lost.",
   },
   servers: [{ url: "/api/v1" }],
   components: {
     securitySchemes: {
       ownerCookie: { type: "apiKey", in: "cookie", name: "__Host-harbor" },
+      personalToken: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "hbr_ followed by 256-bit base64url secret",
+      },
     },
     schemas: {
       ...publicSchemas,

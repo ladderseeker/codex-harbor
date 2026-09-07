@@ -1,5 +1,11 @@
 import { p007 } from "./p007.ts";
 import { createPool } from "../../packages/storage/src/index.ts";
+if (process.argv.includes("--workspaces")) {
+  await import("../workspaces/e2e.ts");
+  process.exit(process.exitCode ?? 0);
+}
+import { authorityExpiry } from "./authority-expiry.ts";
+import { p002 } from "./p002.ts";
 import { sourceDigest } from "../../scripts/source-digest.ts";
 import { localComposeFiles } from "../../infra/compose.ts";
 import { maintain } from "../../packages/storage/src/maintenance.ts";
@@ -12,9 +18,11 @@ import { mkdtemp, mkdir, writeFile, rm, readFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { createServer } from "node:net";
-import { chromium, expect } from "@playwright/test";
+import { chromium, expect, request as apiRequest } from "@playwright/test";
 const sourceAtStart = sourceDigest();
 const children: ChildProcess[] = [];
+let diagnosticText = "";
+let rotationBearer = "";
 const serve = process.argv.includes("--serve");
 const dir = await mkdtemp(
     path.join(
@@ -78,6 +86,11 @@ const start = (file: string) => {
     env,
     stdio: ["ignore", "pipe", "pipe"],
   });
+  const capture = (b: Buffer) => {
+    diagnosticText = (diagnosticText + b.toString()).slice(-131072);
+  };
+  p.stdout?.on("data", capture);
+  p.stderr?.on("data", capture);
   let diagnostics = "";
   p.stderr?.on("data", (b) => {
     diagnostics = (diagnostics + b.toString()).slice(-4000);
@@ -477,7 +490,54 @@ try {
       decision: "accept",
     });
     expect(stale.status()).toBe(409);
+    // Separate regression scenarios explicitly acknowledge prior unknown effects through
+    // the owner recovery API; no database lease bypass is used.
+    const releasePriorWorkspace = async () => {
+      await expect
+        .poll(
+          async () => {
+            const projectId = sessions.sessions[0].projectId;
+            const workspaces = (
+              await (
+                await context.request.get(
+                  origin + `/api/v1/projects/${projectId}/workspaces`,
+                )
+              ).json()
+            ).workspaces;
+            const held = workspaces.find(
+              (w: any) => w.kind === "local" && w.writerSessionId,
+            );
+            if (!held) return true;
+            const prior = await (
+              await context.request.get(
+                origin + `/api/v1/sessions/${held.writerSessionId}/snapshot`,
+              )
+            ).json();
+            if (
+              prior.operations.some((o: any) =>
+                [
+                  "dispatching",
+                  "running",
+                  "waiting_approval",
+                  "waiting_input",
+                ].includes(o.state),
+              )
+            )
+              return false;
+            const release = await command(`/workspaces/${held.id}/release`, {
+              acknowledgeUnknownEffects: true,
+              expectedSessionId: held.writerSessionId,
+              expectedGeneration: held.writerGeneration,
+            });
+            expect([200, 409]).toContain(release.status());
+            return false;
+          },
+          { timeout: 30000 },
+        )
+        .toBe(true);
+    };
     const newSession = async () => {
+      await releasePriorWorkspace();
       await expect
         .poll(
           async () =>
@@ -560,6 +620,31 @@ try {
     ).toBe(beforeCredentialChange.state);
     const testDb = new pg.Pool({ connectionString: env.DATABASE_URL });
     try {
+      await authorityExpiry(
+        testDb,
+        {
+          HARBOR_OIDC_ISSUER: env.HARBOR_OIDC_ISSUER,
+          HARBOR_OWNER_SUBJECT: env.HARBOR_OWNER_SUBJECT,
+          HARBOR_IDLE_SECONDS: 300,
+        },
+        sessions.sessions[0].projectId,
+      );
+      rotationBearer = await p002({
+        page: reopened,
+        context,
+        origin,
+        csrf: me.csrfToken,
+        db: testDb,
+        projectId: sessions.sessions[0].projectId,
+        logs: () => diagnosticText,
+        artifacts,
+        pauseSupervisor: () => {
+          supervisor.kill("SIGSTOP");
+        },
+        resumeSupervisor: () => {
+          supervisor.kill("SIGCONT");
+        },
+      });
       const interruptCrashSession = await newSession();
       const interruptCrash = await (
         await command(`/sessions/${interruptCrashSession}/turns`, {
@@ -1041,6 +1126,7 @@ try {
     expect(
       (await command(`/sessions/${stuckSession}/turns`, payload)).status(),
     ).toBe(409);
+    await releasePriorWorkspace();
     const crash = await (
       await command(`/sessions/${id}/turns`, {
         ...payload,
@@ -1249,6 +1335,14 @@ try {
         await oldOwner.request.get(origin + `/api/v1/sessions/${id}/events`)
       ).status(),
     ).toBe(401);
+    const machineAfterRotation = await apiRequest.newContext({
+      ignoreHTTPSErrors: true,
+      extraHTTPHeaders: { Authorization: "Bearer " + rotationBearer },
+    });
+    expect(
+      (await machineAfterRotation.get(origin + "/api/v1/projects")).status(),
+    ).toBe(401);
+    await machineAfterRotation.dispose();
     const newOwner = await browser.newContext({ ignoreHTTPSErrors: true }),
       newOwnerPage = await newOwner.newPage();
     await newOwnerPage.goto(origin + "/auth/login");
@@ -1271,8 +1365,9 @@ try {
           sourceAtEnd: sourceDigest(),
           runtime: "0.153.4",
           browser: "Chromium1194",
+          node: process.version,
           scope:
-            "P001/P007 deterministic external-fixture acceptance; live/isolation separate",
+            "P001/P002/P007 deterministic external-fixture acceptance; workspace/Linux lanes separate",
         },
         null,
         2,

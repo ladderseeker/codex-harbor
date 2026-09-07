@@ -147,6 +147,35 @@ export async function p007(h: Context) {
   expect(await readFile(sourceFile, "utf8")).toBe(
     "Run-owned source file preserved across metadata changes",
   );
+  // P007 archival stays visibility-only while P003 owns actual writer retirement.
+  const archiveActive = await newSession();
+  await command(`/sessions/${archiveActive}/turns`, {
+    ...payload,
+    text: "[delay] archive while running",
+  });
+  await expect
+    .poll(async () => (await snapshot(archiveActive)).session.state, {
+      timeout: 30000,
+    })
+    .toBe("running");
+  expect(
+    (await command(`/sessions/${archiveActive}/archive`, {})).status(),
+  ).toBe(200);
+  await expect
+    .poll(async () => (await snapshot(archiveActive)).session.state, {
+      timeout: 30000,
+    })
+    .toBe("succeeded");
+  const archivedActive = (await snapshot(archiveActive)).session;
+  expect(archivedActive.archived).toBe(true);
+  expect(
+    (
+      await command(`/sessions/${archiveActive}/metadata`, {
+        expectedRevision: archivedActive.metadataRevision,
+        archived: false,
+      })
+    ).status(),
+  ).toBe(200);
   const microIds = [];
   for (let i = 0; i < 4; i++) {
     const micro = await newSession();
@@ -620,7 +649,7 @@ export async function p007(h: Context) {
           Number(
             (
               await db.query(
-                "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT s.*,p.device,p.inode,p.root_id,p.relative_path FROM sessions%FOR UPDATE OF s'",
+                "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%FROM sessions%FOR UPDATE OF s'",
               )
             ).rows[0].count,
           ),
@@ -790,6 +819,87 @@ export async function p007(h: Context) {
       })
     ).status(),
   ).toBe(409);
+  // Restart changes the session fence but retains the original writer epoch.
+  // P007 must release that exact P003 reservation, then permit a fresh turn.
+  const restarted = (await snapshot(approvalSession)).session;
+  const oldWriter = (
+    await db.query(
+      "SELECT writer_session_id,writer_generation FROM workspaces WHERE id=$1",
+      [restarted.workspaceId],
+    )
+  ).rows[0];
+  expect(oldWriter.writer_session_id).toBe(approvalSession);
+  const recoveryAfterRestart = await command(
+    `/sessions/${approvalSession}/recovery`,
+    { expectedGeneration: restarted.generation },
+  );
+  expect(recoveryAfterRestart.status()).toBe(202);
+  const recoveryId = (await recoveryAfterRestart.json()).recovery.id;
+  await expect
+    .poll(
+      async () =>
+        (
+          await db.query("SELECT state FROM session_recoveries WHERE id=$1", [
+            recoveryId,
+          ])
+        ).rows[0].state,
+      { timeout: 30000 },
+    )
+    .toBe("ready");
+  expect(
+    (
+      await db.query("SELECT writer_session_id FROM workspaces WHERE id=$1", [
+        restarted.workspaceId,
+      ])
+    ).rows[0].writer_session_id,
+  ).toBeNull();
+  const fencedSession = (await snapshot(approvalSession)).session;
+  expect(
+    (
+      await command(`/sessions/${approvalSession}/recovery/continue`, {
+        ...payload,
+        recoveryId,
+        expectedGeneration: fencedSession.generation,
+        acknowledgeUnknownEffects: true,
+      })
+    ).status(),
+  ).toBe(202);
+  await expect
+    .poll(async () => (await snapshot(approvalSession)).session.state, {
+      timeout: 30000,
+    })
+    .toBe("succeeded");
+  await expect
+    .poll(
+      async () =>
+        (
+          await db.query(
+            "SELECT writer_session_id FROM workspaces WHERE id=$1",
+            [restarted.workspaceId],
+          )
+        ).rows[0].writer_session_id,
+      { timeout: 30000 },
+    )
+    .toBeNull();
+  expect(
+    (await snapshot(approvalSession)).operations.filter(
+      (o: any) => o.state === "uncertain",
+    ),
+  ).toHaveLength(1);
+  // Keep a distinct unresolved effect for the later actor-wide reserve test.
+  expect(
+    (
+      await command(`/sessions/${approvalSession}/turns`, {
+        ...payload,
+        text: "[crash] reserved recovery",
+      })
+    ).status(),
+  ).toBe(202);
+  await expect
+    .poll(async () => (await snapshot(approvalSession)).session.state, {
+      timeout: 30000,
+    })
+    .toBe("uncertain");
   // Apply the actual additive migration over a legacy full conversation.
   const legacySchema = "p007_" + randomUUID().replaceAll("-", "");
   const legacy = await db.connect();
@@ -820,11 +930,11 @@ export async function p007(h: Context) {
         ])
       ).rows[0];
     await legacy.query(
-      "INSERT INTO projects SELECT * FROM public.projects WHERE id=$1",
+      "INSERT INTO projects(id,name,root_id,relative_path,created_at,device,inode,canonical_path) SELECT id,name,root_id,relative_path,created_at,device,inode,canonical_path FROM public.projects WHERE id=$1",
       [project.id],
     );
     await legacy.query(
-      "INSERT INTO workspaces SELECT * FROM public.workspaces WHERE id=$1",
+      "INSERT INTO workspaces(id,project_id) SELECT id,project_id FROM public.workspaces WHERE id=$1",
       [workspace.id],
     );
     const legacySession = randomUUID();

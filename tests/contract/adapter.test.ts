@@ -164,3 +164,70 @@ test("P001-06 completed target during activation wait sends no interrupt", async
     await adapter.closeAndWait();
   }
 });
+test("P002 cancellation rechecks authority after delayed activation and writes no interrupt after revocation", async () => {
+  let allowed = true,
+    interrupts = 0;
+  const process = fixture();
+  const write = process.stdin.write.bind(process.stdin);
+  process.stdin.write = ((chunk: any, ...args: any[]) => {
+    if (String(chunk).includes('"method":"turn/interrupt"')) interrupts++;
+    return (write as any)(chunk, ...args);
+  }) as any;
+  const adapter = new CodexAdapter(process, {}, 1000, async (send) => {
+    if (!allowed) throw Error("revoked");
+    return send();
+  });
+  try {
+    await adapter.initialize();
+    const { thread } = await adapter.startThread({ cwd: "/workspace" });
+    const { turn } = await adapter.startTurn(thread.id, "[activation-delay]");
+    allowed = false;
+    await assert.rejects(adapter.interruptTurn(thread.id, turn.id), /revoked/);
+    assert.equal(interrupts, 0);
+  } finally {
+    adapter.close();
+  }
+});
+test("P002 rejected pre-send approval preserves the native request for an authorized answer", async () => {
+  let allowed = true,
+    pending: any,
+    answers = 0;
+  const child = fixture(),
+    write = child.stdin.write.bind(child.stdin);
+  child.stdin.write = ((chunk: any, ...args: any[]) => {
+    if (String(chunk).includes('"decision"')) answers++;
+    return (write as any)(chunk, ...args);
+  }) as any;
+  const adapter = new CodexAdapter(
+    child,
+    {
+      onRequest: (r) => {
+        pending = r;
+      },
+    },
+    1000,
+    async (send) => {
+      if (!allowed) throw Error("revoked");
+      return send();
+    },
+  );
+  try {
+    await adapter.initialize();
+    const { thread } = await adapter.startThread({ cwd: "/workspace" });
+    await adapter.startTurn(thread.id, "[approval]");
+    for (let n = 0; !pending && n < 100; n++)
+      await new Promise((r) => setTimeout(r, 10));
+    assert.ok(pending);
+    allowed = false;
+    await assert.rejects(
+      adapter.respond(pending.id, { decision: "accept" }),
+      /revoked/,
+    );
+    assert.equal(answers, 0);
+    allowed = true;
+    await adapter.respond(pending.id, { decision: "decline" });
+    assert.equal(answers, 1);
+  } finally {
+    adapter.close();
+  }
+});

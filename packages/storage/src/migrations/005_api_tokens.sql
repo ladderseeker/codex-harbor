@@ -1,0 +1,2 @@
+CREATE TABLE api_tokens(id uuid PRIMARY KEY,name text NOT NULL,verifier text UNIQUE NOT NULL,prefix text NOT NULL,identity_pin text NOT NULL,instance_id text NOT NULL,scopes text[] NOT NULL,project_ids uuid[] NOT NULL,permission_profile text NOT NULL,expires_at timestamptz NOT NULL,revoked boolean NOT NULL DEFAULT false,created_at timestamptz NOT NULL DEFAULT now(),last_used_at timestamptz);
+CREATE INDEX api_tokens_expiry ON api_tokens(expires_at) WHERE NOT revoked;

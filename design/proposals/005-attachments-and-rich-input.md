@@ -1,7 +1,7 @@
 # P005 — Attachments and rich input
 
-- Decision: Draft
-- Delivery: Planned
+- Decision: Accepted
+- Delivery: In progress
 - Dependencies: [P001](001-secure-persistent-conversations.md)
 - Outcome: The owner attaches a file or pastes an image into a conversation and can confirm what was sent to the selected runtime.
 

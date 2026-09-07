@@ -1,5 +1,6 @@
 import { History, ConversationDetails } from "./History.tsx";
 import { Recovery } from "./Recovery.tsx";
+import { Tokens } from "./Tokens.tsx";
 import {
   useCallback,
   useEffect,
@@ -11,17 +12,26 @@ import type {
   Approval,
   HarborEvent,
   PermissionProfile,
-  Session,
+  Session as SessionRecord,
   Snapshot,
 } from "../../../packages/contracts/src/index.ts";
+import {
+  WorkspaceManager,
+  WorkspaceSummary,
+  useWorkspaces,
+  workspaceNames,
+} from "./Workspaces.tsx";
 import { Credentials } from "./Credentials.tsx";
 import { ApiError, mutate, newIntent, request, type Intent } from "./api.ts";
+
+type Session = SessionRecord & { archivedAt?: string | null };
 
 interface Project {
   id: string;
   name: string;
   path?: string;
   relativePath?: string;
+  archivedAt?: string | null;
 }
 interface Root {
   id: string;
@@ -99,6 +109,26 @@ export function App() {
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
   const [projectId, setProjectId] = useState("");
+  const workspaceData = useWorkspaces(projectId);
+  const [newWorkspaceId, setNewWorkspaceId] = useState("");
+  const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  useEffect(() => {
+    setNewWorkspaceId("");
+  }, [projectId]);
+  useEffect(() => {
+    if (!newWorkspaceId)
+      setNewWorkspaceId(
+        workspaceData.workspaces.find(
+          (workspace) =>
+            workspace.kind === "local" && workspace.state === "ready",
+        )?.id ??
+          workspaceData.workspaces.find(
+            (workspace) => workspace.state === "ready",
+          )?.id ??
+          "",
+      );
+  }, [workspaceData.workspaces, newWorkspaceId]);
   const [projectStorage, setProjectStorage] = useState<{
     status: string;
     usedBytes?: number;
@@ -135,6 +165,7 @@ export function App() {
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [tokensOpen, setTokensOpen] = useState(false);
   const [replayGap, setReplayGap] = useState(false);
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [stopped, setStopped] = useState(false);
@@ -475,6 +506,16 @@ export function App() {
   const project = projects.find(
     (item) => item.id === (current?.projectId ?? projectId),
   );
+  const boundWorkspace = workspaceData.workspaces.find(
+    (workspace) => workspace.id === current?.workspaceId,
+  );
+  const workspaceWritable =
+    boundWorkspace?.state === "ready" && !project?.archivedAt;
+  const canCreateConversation =
+    workspaceData.workspaces.some(
+      (workspace) =>
+        workspace.id === newWorkspaceId && workspace.state === "ready",
+    ) && !project?.archivedAt;
   const activeOperation = snapshot?.operations.findLast(
     (operation) => operation.kind === "turn" && busyStates.has(operation.state),
   );
@@ -499,11 +540,17 @@ export function App() {
     ) ?? [];
 
   function newSession() {
-    if (!projectId || !settingsReady) return;
+    if (!projectId || !settingsReady || !canCreateConversation) return;
     void execute(
       newIntent(
         "/sessions",
-        { projectId, model, effort, permissionProfile: permission },
+        {
+          projectId,
+          workspaceId: newWorkspaceId,
+          model,
+          effort,
+          permissionProfile: permission,
+        },
         "Create conversation",
       ),
       (result) => {
@@ -522,7 +569,8 @@ export function App() {
       blocked ||
       active ||
       uncertain ||
-      !settingsReady
+      !settingsReady ||
+      !workspaceWritable
     )
       return;
     const id = current.id;
@@ -607,45 +655,109 @@ export function App() {
           </button>
         </div>
         <nav className="project-list" aria-label="Projects">
-          {projects.map((item) => (
-            <div key={item.id} className="project-group">
-              <button
-                className={`project-button ${projectId === item.id ? "selected" : ""}`}
-                onClick={() => {
-                  setProjectId(item.id);
-                  const first = sessions.find(
-                    (session) => session.projectId === item.id,
-                  );
-                  selectSession(first?.id ?? "");
-                }}
-              >
-                <svg aria-hidden="true" viewBox="0 0 24 24">
-                  <path d="M3 7V5h6l2 2h10v12H3Z" />
-                </svg>
-                <span>{item.name}</span>
-              </button>
-              {projectId === item.id && (
-                <History
-                  projectId={item.id}
-                  selectedId={selectedId}
-                  revision={JSON.stringify(sessions)}
-                  select={selectSession}
-                />
-              )}
-            </div>
-          ))}
+          {projects
+            .filter(
+              (item) =>
+                showArchived || !item.archivedAt || item.id === projectId,
+            )
+            .map((item) => (
+              <div key={item.id} className="project-group">
+                <button
+                  className={`project-button ${projectId === item.id ? "selected" : ""}`}
+                  onClick={() => {
+                    setProjectId(item.id);
+                    const first = sessions.find(
+                      (session) => session.projectId === item.id,
+                    );
+                    selectSession(first?.id ?? "");
+                  }}
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="M3 7V5h6l2 2h10v12H3Z" />
+                  </svg>
+                  <span>
+                    {item.name}
+                    {item.archivedAt ? " (archived)" : ""}
+                  </span>
+                </button>
+                {projectId === item.id && (
+                  <History
+                    projectId={item.id}
+                    selectedId={selectedId}
+                    revision={JSON.stringify(sessions)}
+                    select={selectSession}
+                    workspaces={workspaceData.workspaces}
+                  />
+                )}
+              </div>
+            ))}
           {!projects.length && !loading && (
             <p className="rail-empty">Add a project folder to begin.</p>
           )}
         </nav>
+        <label className="archive-toggle">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(event) => setShowArchived(event.target.checked)}
+          />
+          Show archived
+        </label>
+        {projectId && (
+          <div className="rail-workspaces">
+            <label>
+              New conversation workspace
+              <select
+                aria-label="New conversation workspace"
+                value={newWorkspaceId}
+                onChange={(event) => setNewWorkspaceId(event.target.value)}
+                disabled={blocked || !!project?.archivedAt}
+              >
+                <option value="">Choose workspace</option>
+                {workspaceData.workspaces
+                  .filter((workspace) => workspace.state !== "removed")
+                  .map((workspace) => (
+                    <option
+                      key={workspace.id}
+                      value={workspace.id}
+                      disabled={workspace.state !== "ready"}
+                    >
+                      {workspace.name} ({workspaceNames[workspace.kind]})
+                      {workspace.state !== "ready"
+                        ? ` — ${workspace.state}`
+                        : ""}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <button
+              className="quiet-button"
+              onClick={() => setWorkspaceManagerOpen(true)}
+            >
+              Manage workspaces
+            </button>
+            {workspaceData.error && (
+              <p className="inline-error">{workspaceData.error}</p>
+            )}
+          </div>
+        )}
         <button
           className="new-conversation"
           onClick={newSession}
-          disabled={!projectId || !settingsReady || blocked}
+          disabled={
+            !projectId || !settingsReady || !canCreateConversation || blocked
+          }
         >
           <span aria-hidden="true">+</span> New conversation
         </button>
         <div className="rail-footer">
+          <button
+            className="account-button"
+            disabled={!identity}
+            onClick={() => setTokensOpen(true)}
+          >
+            API tokens
+          </button>
           <button
             className="account-button"
             onClick={() => setAccountOpen(true)}
@@ -814,7 +926,7 @@ export function App() {
             ) : settingsReady ? (
               <button
                 className="primary"
-                disabled={blocked}
+                disabled={blocked || !canCreateConversation}
                 onClick={newSession}
               >
                 New conversation
@@ -885,15 +997,17 @@ export function App() {
                   </p>
                 </details>
 
-                <div className="workspace-note">
-                  <span className="workspace-icon" aria-hidden="true">
-                    ⌁
-                  </span>{" "}
-                  Local workspace{" "}
-                  <span>
-                    {project?.relativePath ?? project?.path ?? project?.name}
-                  </span>
-                </div>
+                <WorkspaceSummary
+                  workspace={boundWorkspace}
+                  sessionId={current.id}
+                  queued={current.state === "queued"}
+                />
+                {project?.archivedAt && (
+                  <p className="writer-notice">
+                    This project is archived. Source folders and conversation
+                    history remain available.
+                  </p>
+                )}
                 {!snapshot?.messages.length && (
                   <div className="conversation-start">
                     <h2>What would you like to work on?</h2>
@@ -1172,7 +1286,8 @@ export function App() {
                         active ||
                         uncertain ||
                         !text.trim() ||
-                        !settingsReady
+                        !settingsReady ||
+                        !workspaceWritable
                       }
                     >
                       {sending ? "Sending…" : "Send"}
@@ -1213,6 +1328,36 @@ export function App() {
           </>
         )}
       </main>
+      {workspaceManagerOpen && project && (
+        <Modal
+          title={`Workspaces in ${project.name}`}
+          failure={error}
+          retry={
+            pending
+              ? () => void execute(pending.intent, pending.complete)
+              : undefined
+          }
+          close={() => setWorkspaceManagerOpen(false)}
+        >
+          <WorkspaceManager
+            key={project.id}
+            projectId={project.id}
+            projectName={project.name}
+            archived={!!project.archivedAt}
+            workspaces={workspaceData.workspaces}
+            disabled={blocked}
+            execute={execute}
+            refresh={workspaceData.refresh}
+            selected={newWorkspaceId}
+            select={setNewWorkspaceId}
+          />
+        </Modal>
+      )}
+      {tokensOpen && identity && (
+        <Modal title="API tokens" close={() => setTokensOpen(false)}>
+          <Tokens csrf={identity.csrfToken} projects={projects} />
+        </Modal>
+      )}
       {accountOpen && identity && (
         <Modal title="Codex account" close={() => setAccountOpen(false)}>
           <Credentials

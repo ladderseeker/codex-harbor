@@ -1,3 +1,7 @@
+if (process.argv.includes("--workspaces")) {
+  await import("../workspaces/linux.ts");
+  process.exit(process.exitCode ?? 0);
+}
 if (process.platform === "linux" && process.env.HARBOR_TEST_XFS_MOUNT) {
   await import("./xfs.js");
   process.exit(0);

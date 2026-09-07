@@ -1204,3 +1204,233 @@ body,
   font-size: 12px;
   color: #526575;
 }
+.rail-workspaces {
+  margin: 8px 6px 0;
+  border-top: 1px solid #cfdbe3;
+  padding-top: 10px;
+}
+.rail-workspaces label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.rail-workspaces select {
+  width: 100%;
+  font-size: 12px;
+  padding: 7px;
+}
+.rail-workspaces .quiet-button {
+  margin-top: 4px;
+  padding-left: 0;
+}
+.archive-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--muted);
+  margin: 5px 12px;
+}
+.archive-toggle input {
+  accent-color: var(--blue);
+}
+.workspace-summary {
+  margin: 4px 0 12px;
+  padding: 12px 15px;
+  background: #edf3f6;
+  border-left: 3px solid #8eaabb;
+  font-size: 12px;
+}
+.workspace-summary > p:first-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.workspace-summary dl {
+  font-size: 10px;
+  color: var(--muted);
+  margin: 9px 0 0;
+}
+.workspace-summary dl div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 3px;
+}
+.workspace-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.workspace-path {
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  margin: 7px 0;
+}
+.workspace-state {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #dce7ee;
+}
+.workspace-state-unavailable,
+.workspace-state-failed {
+  background: #fcf1ed;
+  color: #823f31;
+}
+.writer-notice {
+  margin: 12px 0;
+  padding: 10px 13px;
+  border-left: 3px solid #b5a273;
+  background: #f5f2e8;
+  color: #6c6759;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.archive-conversation {
+  margin: 0 0 22px;
+  color: var(--muted);
+}
+.managed-workspaces {
+  margin: 15px 0 20px;
+}
+.managed-workspace {
+  padding: 15px 0;
+  border-bottom: 1px solid var(--line);
+}
+.managed-workspace-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.managed-workspace-heading h3 {
+  font-size: 14px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.managed-workspace-heading > span {
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.workspace-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+.workspace-actions button {
+  font-size: 11px;
+  padding: 6px 9px;
+  min-height: 34px;
+}
+.workspace-create {
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.workspace-create h3 {
+  font-size: 16px;
+  margin: 0;
+}
+.project-archive {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-top: 20px;
+}
+@media (max-width: 720px) {
+  .rail-workspaces {
+    margin-top: 4px;
+    padding-top: 7px;
+  }
+  .sidebar .new-conversation {
+    margin-top: 8px;
+    margin-bottom: 8px;
+  }
+  .workspace-summary {
+    padding: 10px 12px;
+  }
+}
+
+.conversation-workspace {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  color: #637987;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+/* Scoped credential controls share the conversation interface's quiet form style. */
+.token-settings {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.token-settings fieldset {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  margin: 14px 0;
+}
+.token-settings legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+.token-settings form > fieldset > label,
+.token-settings > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+}
+.token-settings fieldset fieldset {
+  display: grid;
+  gap: 8px;
+}
+.token-settings fieldset fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.token-settings input:not([type="checkbox"]),
+.token-settings select {
+  width: 100%;
+  min-width: 0;
+}
+.token-settings input[type="checkbox"] {
+  margin: 0;
+}
+.token-settings ul {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  gap: 12px;
+}
+.token-settings li {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  overflow-wrap: anywhere;
+}
+.token-settings li p {
+  color: var(--muted);
+  margin: 6px 0;
+}
+.token-settings li button {
+  margin: 6px 0;
+}
+.token-settings [role="alert"] {
+  color: var(--danger);
+}
+.dialog:has(.token-settings) .dialog-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fcfdfe;
+  padding: 8px 0;
+}

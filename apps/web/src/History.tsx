@@ -6,11 +6,13 @@ export function History({
   selectedId,
   revision,
   select,
+  workspaces = [],
 }: {
   projectId: string;
   selectedId: string;
   revision: string;
   select(id: string): void;
+  workspaces?: { id: string; name: string }[];
 }) {
   const [q, setQ] = useState(""),
     [state, setState] = useState("active"),
@@ -78,6 +80,10 @@ export function History({
             <span className={`rail-dot dot-${s.state}`} aria-hidden="true" />
             <span>
               {s.title}
+              <small className="conversation-workspace">
+                {workspaces.find((w) => w.id === s.workspaceId)?.name ??
+                  "Loading workspace…"}
+              </small>
               {q && s.snippet && (
                 <small className="history-snippet">{s.snippet}</small>
               )}

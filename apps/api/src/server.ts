@@ -1,8 +1,18 @@
+import { registerWorkspaceRoutes } from "./workspace-routes.ts";
 import {
+  selectedWorkspace,
+  sessionWorkspace,
+  verifyWorkspace,
+} from "../../../packages/workspaces/src/service.ts";
+import {
+  authenticateBearer,
   requireAuthority,
   authenticateBrowser,
   lockOwnerIdentity,
+  type Authority,
 } from "../../../packages/policy/src/authority.ts";
+import { authorizeTokenRoute } from "./token-access.ts";
+import { registerTokenRoutes } from "./tokens.ts";
 import {
   admitOrdinaryIntent,
   lockIntentAdmission,
@@ -24,7 +34,7 @@ import staticFiles from "@fastify/static";
 import * as oidc from "openid-client";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { stat } from "node:fs/promises";
+import { stat, chmod } from "node:fs/promises";
 import { z } from "zod";
 import {
   createPool,
@@ -78,7 +88,7 @@ export async function buildServer(c: Config) {
   app.addHook("preClose", async () => {
     for (const stream of openStreams) stream.end();
   });
-  const auth = new WeakMap<object, { hash: string; csrf: string }>();
+  const auth = new WeakMap<object, Authority>();
   const externalEffectsGranted = new WeakSet<object>();
   const selfRevocations = new WeakSet<object>();
   app.setErrorHandler((error, request, reply) => {
@@ -157,6 +167,13 @@ export async function buildServer(c: Config) {
     });
     if (["/auth/login", "/auth/callback"].includes(req.url.split("?")[0]!))
       return;
+    if (req.headers.authorization !== undefined) {
+      auth.set(
+        req,
+        await authenticateBearer(pool, c, req.headers.authorization),
+      );
+      return;
+    }
     const token = req.cookies["__Host-harbor"];
     if (!token)
       throw new HarborError(401, "AUTH_REQUIRED", "Sign in to continue");
@@ -171,6 +188,9 @@ export async function buildServer(c: Config) {
       )
         throw new HarborError(403, "CSRF_DENIED", "CSRF token required");
     }
+  });
+  app.addHook("preHandler", async (req) => {
+    if (auth.has(req)) await authorizeTokenRoute(pool, c, auth.get(req)!, req);
   });
   app.get("/auth/login", async (_req, reply) => {
     const state = oidc.randomState(),
@@ -252,7 +272,10 @@ export async function buildServer(c: Config) {
     return reply.redirect("/");
   });
   async function command(req: any, fn: (db: PoolClient) => Promise<unknown>) {
-    const actor = c.HARBOR_OWNER_SUBJECT,
+    const actor =
+        auth.get(req)!.kind === "token"
+          ? auth.get(req)!.hash
+          : c.HARBOR_OWNER_SUBJECT,
       route = req.routeOptions.url as string,
       key = req.headers["idempotency-key"];
     if (typeof key !== "string")
@@ -273,6 +296,11 @@ export async function buildServer(c: Config) {
         );
       }
       await requireAuthority(db, auth.get(req)!.hash, c);
+      if (auth.get(req)!.kind === "token")
+        await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+          "token-intents:" + actor,
+        ]);
+      await authorizeTokenRoute(db, c, auth.get(req)!, req);
       await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
         actor + route + key,
       ]);
@@ -308,6 +336,23 @@ export async function buildServer(c: Config) {
         route === "/api/v1/security/emergency-stop" ||
         route === "/api/v1/security/logout";
       if (!reserved) await admitOrdinaryIntent(db, actor);
+      if (auth.get(req)!.kind === "token") {
+        const reserve = route.endsWith("/cancel") || route.endsWith("/answer");
+        if (
+          Number(
+            (
+              await db.query("SELECT count(*) FROM intents WHERE actor=$1", [
+                actor,
+              ])
+            ).rows[0].count,
+          ) >= (reserve ? 1100 : 1000)
+        )
+          throw new HarborError(
+            429,
+            "TOKEN_INTENT_QUOTA",
+            "Token intent quota reached; existing intents remain retryable and owner browser controls remain available",
+          );
+      }
       await requireAuthority(db, auth.get(req)!.hash, c);
       const result = await fn(db);
       if (!externalEffectsGranted.has(req) && !selfRevocations.has(req))
@@ -397,13 +442,24 @@ export async function buildServer(c: Config) {
       throw new HarborError(404, "NOT_FOUND", "Conversation not found");
     return r.rows[0];
   }
-  historyRoutes(app, { pool, command });
+  const lockWorkspace = async (db: PoolClient, id: string) => {
+    await sessionWorkspace(db, id, true);
+  };
+  historyRoutes(app, { pool, command, lockWorkspace });
   recoveryRoutes(app, {
     pool,
     command,
     actor: (req) => auth.get(req)!.hash,
     acceptTurn,
+    lockWorkspace,
   });
+  registerWorkspaceRoutes(app, {
+    pool,
+    c,
+    command,
+    actor: (req) => auth.get(req)!.hash,
+  });
+  registerTokenRoutes(app, pool, c, command);
   app.get("/api/v1/openapi.json", async () => openapi);
   app.get("/api/v1/security/runtime-credentials", async (req) =>
     credentialCommand(c.HARBOR_CONTROL_SOCKET, {
@@ -438,7 +494,7 @@ export async function buildServer(c: Config) {
   app.get("/api/v1/project-roots", async () => ({
     roots: c.roots.map(({ id, name }) => ({ id, name })),
   }));
-  app.get("/api/v1/capabilities", async () => ({
+  app.get("/api/v1/capabilities", async (req) => ({
     emergencyStopped: (await pool.query("SELECT emergency FROM harbor_meta"))
       .rows[0].emergency,
     models: (
@@ -457,7 +513,8 @@ export async function buildServer(c: Config) {
           .filter((e: string) => ["low", "medium", "high"].includes(e)),
       })),
     permissionProfiles:
-      c.HARBOR_PERMISSION_CEILING === "workspace-write"
+      c.HARBOR_PERMISSION_CEILING === "workspace-write" &&
+      auth.get(req)!.permissionProfile !== "read-only"
         ? ["read-only", "workspace-write"]
         : ["read-only"],
     limits: {
@@ -473,9 +530,12 @@ export async function buildServer(c: Config) {
     account: (await pool.query("SELECT data FROM runtime_capabilities")).rows[0]
       ?.data?.account ?? { authenticated: false, authMode: null },
   }));
-  app.get("/api/v1/projects", async () => ({
+  app.get("/api/v1/projects", async (req) => ({
     projects: (
-      await pool.query("SELECT * FROM projects ORDER BY created_at")
+      await pool.query(
+        "SELECT * FROM projects WHERE ($1::uuid[] IS NULL OR id=ANY($1)) ORDER BY created_at",
+        [auth.get(req)!.projectIds ?? null],
+      )
     ).rows.map(publicRow),
   }));
   app.get<{ Params: { id: string } }>(
@@ -513,6 +573,8 @@ export async function buildServer(c: Config) {
           "ROOT_DENIED",
           "Project root is not allowed",
         );
+      // Existing browser-authorized storage work keeps its accepted grant.
+      // Expiry after filesystem effects cannot undo them by rolling back SQL.
       await requireAuthority(db, auth.get(req)!.hash, c);
       externalEffectsGranted.add(req);
       const provisioned =
@@ -524,6 +586,8 @@ export async function buildServer(c: Config) {
       const canonical =
         provisioned?.canonical ??
         (await resolveProject(c.roots, b.rootId, b.path, b.create));
+      if (c.HARBOR_FIXTURE_MODE && !provisioned && b.create)
+        await chmod(canonical, 0o755);
       const storedRelative = path.relative(root.path, canonical);
       const identity = provisioned
         ? { dev: provisioned.device, ino: provisioned.inode }
@@ -555,17 +619,25 @@ export async function buildServer(c: Config) {
           canonical,
         ],
       );
-      await db.query("INSERT INTO workspaces(id,project_id) VALUES($1,$2)", [
-        randomUUID(),
-        id,
-      ]);
+      await db.query(
+        "INSERT INTO workspaces(id,project_id,relative_path,canonical_path,device,inode) VALUES($1,$2,$3,$4,$5,$6)",
+        [
+          randomUUID(),
+          id,
+          storedRelative,
+          canonical,
+          String(identity.dev),
+          String(identity.ino),
+        ],
+      );
       return { project: publicRow(row.rows[0]) };
     }),
   );
-  app.get("/api/v1/sessions", async () => ({
+  app.get("/api/v1/sessions", async (req) => ({
     sessions: (
       await pool.query(
-        "SELECT * FROM sessions WHERE NOT archived ORDER BY updated_at DESC",
+        "SELECT * FROM sessions WHERE NOT archived AND ($1::uuid[] IS NULL OR project_id=ANY($1)) ORDER BY updated_at DESC",
+        [auth.get(req)!.projectIds ?? null],
       )
     ).rows.map(publicRow),
   }));
@@ -587,18 +659,30 @@ export async function buildServer(c: Config) {
           "SESSION_QUOTA",
           "Conversation limit reached",
         );
-      const w = await db.query(
-        "SELECT id FROM workspaces WHERE project_id=$1",
-        [b.projectId],
+      const choice = await db.query(
+        "SELECT id FROM workspaces WHERE project_id=$1 AND ($2::uuid IS NULL AND kind='local' OR id=$2)",
+        [b.projectId, b.workspaceId ?? null],
       );
-      if (!w.rowCount)
-        throw new HarborError(404, "NOT_FOUND", "Project not found");
+      if (!choice.rowCount)
+        throw new HarborError(
+          404,
+          "NOT_FOUND",
+          "Workspace not found in project",
+        );
+      const chosen = await selectedWorkspace(db, choice.rows[0].id, true);
+      if (chosen.project_archived || chosen.state !== "ready")
+        throw new HarborError(
+          409,
+          "WORKSPACE_UNAVAILABLE",
+          "Select an available workspace",
+        );
+      await verifyWorkspace(chosen);
       const r = await db.query(
         "INSERT INTO sessions(id,project_id,workspace_id,title,model,effort,permission_profile) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",
         [
           randomUUID(),
           b.projectId,
-          w.rows[0].id,
+          chosen.id,
           b.title,
           b.model,
           b.effort,
@@ -656,10 +740,18 @@ export async function buildServer(c: Config) {
     await effectiveSettings(db, b.model, b.effort);
     if (!c.models.includes(b.model))
       throw new HarborError(403, "MODEL_DENIED", "Model unavailable");
+    const selected = await sessionWorkspace(db, req.params.id, true);
     await db.query("SELECT * FROM sessions WHERE id=$1 FOR UPDATE", [
       req.params.id,
     ]);
     const s = await session(db, req.params.id);
+    if (selected.project_archived || selected.state !== "ready")
+      throw new HarborError(
+        409,
+        "WORKSPACE_UNAVAILABLE",
+        "Conversation workspace is unavailable or archived",
+      );
+    await verifyWorkspace(selected);
     await capacity(db, s.id, "turn");
     const total = await db.query(
       "SELECT coalesce(sum(octet_length(text)),0) AS bytes,count(*) AS count FROM messages WHERE session_id=$1",
@@ -959,7 +1051,10 @@ export async function buildServer(c: Config) {
         if (busy) return;
         busy = true;
         try {
-          await requireAuthority(pool, auth.get(req)!.hash, c);
+          await requireAuthority(pool, auth.get(req)!.hash, c, {
+            scope: "read",
+            projectId: (await session(pool as any, req.params.id)).project_id,
+          });
           const current = await pruneReplay(pool, req.params.id);
           if (
             !current ||
