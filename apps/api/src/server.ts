@@ -1,6 +1,8 @@
 import {
   authenticateBearer,
   requireAuthority,
+  authenticateBrowser,
+  lockOwnerIdentity,
   type Authority,
 } from "../../../packages/policy/src/authority.ts";
 import { authorizeTokenRoute } from "./token-access.ts";
@@ -73,6 +75,8 @@ export async function buildServer(c: Config) {
     for (const stream of openStreams) stream.end();
   });
   const auth = new WeakMap<object, Authority>();
+  const externalEffectsGranted = new WeakSet<object>();
+  const selfRevocations = new WeakSet<object>();
   app.setErrorHandler((error, request, reply) => {
     const e =
       error instanceof HarborError
@@ -160,18 +164,13 @@ export async function buildServer(c: Config) {
     if (!token)
       throw new HarborError(401, "AUTH_REQUIRED", "Sign in to continue");
     const hash = digest(token);
-    const r = await pool.query(
-      "UPDATE browser_sessions SET last_seen=now() WHERE hash=$1 AND NOT revoked AND expires_at>now() AND last_seen>now()-($2*interval '1 second') AND identity_pin=$3 AND (SELECT identity_pin FROM harbor_meta)=$3 RETURNING csrf",
-      [hash, c.HARBOR_IDLE_SECONDS, ownerPin],
-    );
-    if (!r.rowCount)
-      throw new HarborError(401, "AUTH_EXPIRED", "Session expired or revoked");
-    auth.set(req, { kind: "browser", hash, csrf: r.rows[0].csrf });
+    const authority = await authenticateBrowser(pool, c, hash);
+    auth.set(req, authority);
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
       requireOrigin(req.headers.origin, c.HARBOR_ORIGIN);
       if (
         typeof req.headers["x-csrf-token"] !== "string" ||
-        !equalSecret(req.headers["x-csrf-token"], r.rows[0].csrf)
+        !equalSecret(req.headers["x-csrf-token"], authority.csrf)
       )
         throw new HarborError(403, "CSRF_DENIED", "CSRF token required");
     }
@@ -275,6 +274,13 @@ export async function buildServer(c: Config) {
       JSON.stringify({ params: req.params, body: req.body ?? {} }),
     );
     return transaction(pool, async (db) => {
+      if (route === "/api/v1/security/logout") {
+        await lockOwnerIdentity(db);
+        await db.query(
+          "SELECT hash FROM browser_sessions WHERE hash=$1 FOR UPDATE",
+          [auth.get(req)!.hash],
+        );
+      }
       await requireAuthority(db, auth.get(req)!.hash, c);
       if (auth.get(req)!.kind === "token")
         await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
@@ -295,6 +301,7 @@ export async function buildServer(c: Config) {
             "IDEMPOTENCY_CONFLICT",
             "Key already identifies different input",
           );
+        await requireAuthority(db, auth.get(req)!.hash, c);
         return old.rows[0].result;
       }
       checkKey(key);
@@ -315,7 +322,10 @@ export async function buildServer(c: Config) {
             "Token intent quota reached; existing intents remain retryable and owner browser controls remain available",
           );
       }
+      await requireAuthority(db, auth.get(req)!.hash, c);
       const result = await fn(db);
+      if (!externalEffectsGranted.has(req) && !selfRevocations.has(req))
+        await requireAuthority(db, auth.get(req)!.hash, c);
       await db.query(
         "INSERT INTO intents(actor,route,key,request_hash,result) VALUES($1,$2,$3,$4,$5)",
         [actor, route, key, hash, JSON.stringify(result)],
@@ -474,6 +484,10 @@ export async function buildServer(c: Config) {
           "ROOT_DENIED",
           "Project root is not allowed",
         );
+      // Existing browser-authorized storage work keeps its accepted grant.
+      // Expiry after filesystem effects cannot undo them by rolling back SQL.
+      await requireAuthority(db, auth.get(req)!.hash, c);
+      externalEffectsGranted.add(req);
       const provisioned =
         c.HARBOR_FIXTURE_MODE && !process.env.HARBOR_STORAGE_SOCKET
           ? null
@@ -876,6 +890,8 @@ export async function buildServer(c: Config) {
   );
   app.post("/api/v1/security/logout", async (req, reply) => {
     const result = await command(req, async (db) => {
+      await requireAuthority(db, auth.get(req)!.hash, c);
+      selfRevocations.add(req);
       await db.query("UPDATE browser_sessions SET revoked=true WHERE hash=$1", [
         auth.get(req)!.hash,
       ]);

@@ -1,3 +1,5 @@
+import { stat } from "node:fs/promises";
+import { digest } from "../../packages/policy/src/index.ts";
 import path from "node:path";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import {
@@ -18,6 +20,8 @@ export async function p002({
   projectId,
   logs,
   artifacts,
+  pauseSupervisor,
+  resumeSupervisor,
 }: {
   page: Page;
   context: BrowserContext;
@@ -27,6 +31,8 @@ export async function p002({
   projectId: string;
   logs: () => string;
   artifacts: string;
+  pauseSupervisor(): void;
+  resumeSupervisor(): void;
 }) {
   const key = () => `${Date.now()}:${randomUUID()}`;
   const owner = async (route: string, body: unknown, k = key()) =>
@@ -343,125 +349,560 @@ export async function p002({
         { timeout: 30000 },
       )
       .toBe("succeeded");
-    for (const control of ["approve", "cancel"] as const) {
-      const controlToken = await (
+    for (const actorKind of ["token", "browser"] as const) {
+      const anchor = (
+        await (
+          await send(`/sessions/${session.id}/turns`, {
+            ...settings,
+            text: "[approval]",
+          })
+        ).json()
+      ).operation;
+      await expect
+        .poll(async () => (await snapshot(session.id)).session.state, {
+          timeout: 30000,
+        })
+        .toBe("waiting_approval");
+      const queuedTarget = (
+        await (
+          await send(`/sessions/${session.id}/turns`, {
+            ...settings,
+            text: "queued owner work",
+          })
+        ).json()
+      ).operation;
+      const grant = await (
         await owner("/security/api-tokens", {
-          name: `P002 delayed ${control}`,
-          scopes: ["read", control],
+          name: "Queued expiry",
+          scopes: ["cancel"],
           projectIds: [projectId],
           permissionProfile: "read-only",
           expiresInDays: 1,
         })
       ).json();
-      const controlClient = await request.newContext({
-        ignoreHTTPSErrors: true,
-        extraHTTPHeaders: { Authorization: "Bearer " + controlToken.secret },
-      });
-      const target = await (
-        await send(`/sessions/${session.id}/turns`, {
-          ...settings,
-          text: "[approval]",
-        })
-      ).json();
-      await expect
-        .poll(
-          async () =>
-            (await snapshot(session.id)).approvals.filter(
-              (a: any) => a.state === "pending",
-            ).length,
-          { timeout: 30000 },
-        )
-        .toBe(1);
-      const before = await snapshot(session.id),
-        waiting = before.approvals.find((a: any) => a.state === "pending");
-      const hold = await db.connect();
-      let controlResult: any;
-      try {
-        await hold.query("BEGIN");
-        await hold.query("SELECT id FROM harbor_meta FOR UPDATE");
-        const response = await controlClient.post(
-          origin +
-            "/api/v1" +
-            (control === "approve"
-              ? `/approvals/${waiting.id}/answer`
-              : `/turns/${target.operation.id}/cancel`),
-          {
-            headers: { "Idempotency-Key": key() },
-            data:
-              control === "approve"
-                ? { generation: waiting.generation, decision: "accept" }
-                : {},
-          },
+      const cookieContext =
+        actorKind === "browser"
+          ? await context.browser()!.newContext({ ignoreHTTPSErrors: true })
+          : undefined;
+      let cookieActor = "",
+        cookieCsrf = "";
+      if (cookieContext) {
+        const view = await cookieContext.newPage();
+        await view.goto(origin + "/auth/login");
+        await view
+          .getByRole("button", { name: "Sign in as owner", exact: true })
+          .click();
+        cookieCsrf = (
+          await (await cookieContext.request.get(origin + "/api/v1/me")).json()
+        ).csrfToken;
+        cookieActor = digest(
+          (await cookieContext.cookies()).find(
+            (c) => c.name === "__Host-harbor",
+          )!.value,
         );
-        expect(response.status()).toBe(202);
-        controlResult = await response.json();
+      }
+      const controlClient = await request.newContext({
+          ignoreHTTPSErrors: true,
+          extraHTTPHeaders: { Authorization: "Bearer " + grant.secret },
+        }),
+        hold = await db.connect();
+      let paused = false;
+      try {
+        pauseSupervisor();
+        paused = true;
+        const cancelled = await (
+          cookieContext ? cookieContext.request : controlClient
+        ).post(origin + `/api/v1/turns/${queuedTarget.id}/cancel`, {
+          headers: {
+            "Idempotency-Key": key(),
+            ...(cookieContext
+              ? { Origin: origin, "X-CSRF-Token": cookieCsrf }
+              : {}),
+          },
+          data: {},
+        });
+        expect(cancelled.status()).toBe(202);
+        const control = (await cancelled.json()).operation;
+        await db.query(
+          actorKind === "token"
+            ? "UPDATE api_tokens SET expires_at=clock_timestamp()+interval '2 seconds' WHERE id=$1"
+            : "UPDATE browser_sessions SET expires_at=clock_timestamp()+interval '2 seconds' WHERE hash=$1",
+          [actorKind === "token" ? grant.token.id : cookieActor],
+        );
+        await hold.query("BEGIN");
+        await hold.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
+          session.id,
+        ]);
+        resumeSupervisor();
+        paused = false;
         await expect
           .poll(
             async () =>
               Number(
                 (
                   await db.query(
-                    "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT generation,emergency,identity_pin FROM harbor_meta FOR UPDATE%' ",
+                    "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query='SELECT id FROM sessions WHERE id=$1 FOR UPDATE'",
                   )
                 ).rows[0].count,
               ),
             { timeout: 10000 },
           )
           .toBeGreaterThan(0);
-        expect(
-          (
-            await owner(
-              `/security/api-tokens/${controlToken.token.id}/revoke`,
-              {},
-            )
-          ).status(),
-        ).toBe(200);
-      } finally {
-        await hold.query("ROLLBACK");
-        hold.release();
-      }
-      if (control === "approve")
         await expect
           .poll(
             async () =>
-              (await snapshot(session.id)).approvals.find(
-                (a: any) => a.id === waiting.id,
-              ).state,
-            { timeout: 10000 },
+              (
+                await db.query(
+                  actorKind === "token"
+                    ? "SELECT expires_at<=clock_timestamp() AS expired FROM api_tokens WHERE id=$1"
+                    : "SELECT expires_at<=clock_timestamp() AS expired FROM browser_sessions WHERE hash=$1",
+                  [actorKind === "token" ? grant.token.id : cookieActor],
+                )
+              ).rows[0].expired,
+            { timeout: 5000 },
           )
-          .toBe("pending");
-      else
+          .toBe(true);
+        await hold.query("ROLLBACK");
         await expect
           .poll(
             async () =>
-              (await snapshot(session.id)).operations.find(
-                (o: any) => o.id === controlResult.operation.id,
-              ).state,
-            { timeout: 10000 },
+              (
+                await db.query("SELECT state FROM operations WHERE id=$1", [
+                  control.id,
+                ])
+              ).rows[0].state,
           )
           .toBe("failed");
-      const unchanged = await snapshot(session.id);
-      expect(unchanged.session.state).toBe("waiting_approval");
-      expect(unchanged.session.generation).toBe(before.session.generation);
+        expect(
+          (
+            await db.query("SELECT state FROM operations WHERE id=$1", [
+              queuedTarget.id,
+            ])
+          ).rows[0].state,
+        ).toBe("queued");
+      } finally {
+        if (paused) resumeSupervisor();
+        await hold.query("ROLLBACK");
+        hold.release();
+        await controlClient.dispose();
+        await cookieContext?.close();
+      }
+      await owner(`/turns/${queuedTarget.id}/cancel`, {});
+      const approval = (await snapshot(session.id)).approvals.find(
+        (a: any) => a.state === "pending",
+      );
+      await owner(`/approvals/${approval.id}/answer`, {
+        generation: approval.generation,
+        decision: "decline",
+      });
+      await expect
+        .poll(
+          async () =>
+            (
+              await db.query("SELECT state FROM operations WHERE id=$1", [
+                anchor.id,
+              ])
+            ).rows[0].state,
+          { timeout: 30000 },
+        )
+        .toBe("succeeded");
+    }
+    const wider = (
+      await (
+        await owner("/sessions", {
+          ...settings,
+          projectId,
+          permissionProfile: "workspace-write",
+        })
+      ).json()
+    ).session;
+    const widerTurn = (
+      await (
+        await owner(`/sessions/${wider.id}/turns`, {
+          ...settings,
+          permissionProfile: "workspace-write",
+          text: "[approval]",
+        })
+      ).json()
+    ).operation;
+    await expect
+      .poll(async () => (await snapshot(wider.id)).session.state, {
+        timeout: 30000,
+      })
+      .toBe("waiting_approval");
+    const cancelOnly = await (
+      await owner("/security/api-tokens", {
+        name: "Read-only cancellation ceiling",
+        scopes: ["cancel"],
+        projectIds: [projectId],
+        permissionProfile: "read-only",
+        expiresInDays: 1,
+      })
+    ).json();
+    const narrower = await request.newContext({
+      ignoreHTTPSErrors: true,
+      extraHTTPHeaders: { Authorization: "Bearer " + cancelOnly.secret },
+    });
+    try {
       expect(
         (
-          await owner(`/approvals/${waiting.id}/answer`, {
-            generation: waiting.generation,
-            decision: "decline",
+          await narrower.post(origin + `/api/v1/turns/${widerTurn.id}/cancel`, {
+            headers: { "Idempotency-Key": key() },
+            data: {},
           })
         ).status(),
       ).toBe(202);
       await expect
         .poll(
           async () =>
-            (await snapshot(session.id)).operations.find(
-              (o: any) => o.id === target.operation.id,
+            (await snapshot(wider.id)).operations.find(
+              (o: any) => o.id === widerTurn.id,
             ).state,
           { timeout: 30000 },
         )
-        .toBe("succeeded");
-      await controlClient.dispose();
+        .toBe("interrupted");
+    } finally {
+      await narrower.dispose();
     }
+    const shortBrowser = await context
+      .browser()!
+      .newContext({ ignoreHTTPSErrors: true });
+    const shortPage = await shortBrowser.newPage(),
+      projectHold = await db.connect();
+    let pendingProject: Promise<any> | undefined;
+    try {
+      await shortPage.goto(origin + "/auth/login");
+      await shortPage
+        .getByRole("button", { name: "Sign in as owner", exact: true })
+        .click();
+      const identity = await (
+          await shortBrowser.request.get(origin + "/api/v1/me")
+        ).json(),
+        cookie = (await shortBrowser.cookies()).find(
+          (c) => c.name === "__Host-harbor",
+        )!;
+      const actorHash = digest(cookie.value),
+        folder = "expired-registration-" + randomUUID();
+      const base = path.dirname(
+        (
+          await db.query("SELECT canonical_path FROM projects WHERE id=$1", [
+            projectId,
+          ])
+        ).rows[0].canonical_path,
+      );
+      await db.query(
+        "UPDATE browser_sessions SET expires_at=clock_timestamp()+interval '2 seconds' WHERE hash=$1",
+        [actorHash],
+      );
+      await projectHold.query("BEGIN");
+      await projectHold.query("SELECT pg_advisory_xact_lock(740012)");
+      pendingProject = shortBrowser.request.post(origin + "/api/v1/projects", {
+        headers: {
+          Origin: origin,
+          "X-CSRF-Token": identity.csrfToken,
+          "Idempotency-Key": key(),
+        },
+        data: {
+          name: "Expired owner project",
+          rootId: root.id,
+          path: folder,
+          create: true,
+        },
+      });
+      await expect
+        .poll(async () =>
+          Number(
+            (
+              await db.query(
+                "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query='SELECT pg_advisory_xact_lock(740012)'",
+              )
+            ).rows[0].count,
+          ),
+        )
+        .toBeGreaterThan(0);
+      await expect
+        .poll(
+          async () =>
+            (
+              await db.query(
+                "SELECT expires_at<=clock_timestamp() AS expired FROM browser_sessions WHERE hash=$1",
+                [actorHash],
+              )
+            ).rows[0].expired,
+          { timeout: 5000 },
+        )
+        .toBe(true);
+      await projectHold.query("ROLLBACK");
+      expect((await pendingProject).status()).toBe(401);
+      expect(
+        await stat(path.join(base, folder)).then(
+          () => true,
+          () => false,
+        ),
+      ).toBe(false);
+      expect(
+        (
+          await db.query(
+            "SELECT 1 FROM projects WHERE name='Expired owner project'",
+          )
+        ).rowCount,
+      ).toBe(0);
+    } finally {
+      await projectHold.query("ROLLBACK");
+      projectHold.release();
+      await pendingProject;
+      await shortBrowser.close();
+    }
+    for (const replay of [false, true]) {
+      const authorityToken = await (
+        await owner("/security/api-tokens", {
+          name: "P002 command lock expiry",
+          scopes: ["read", "execute"],
+          projectIds: [projectId],
+          permissionProfile: "read-only",
+          expiresInDays: 1,
+        })
+      ).json();
+      const authorityClient = await request.newContext({
+        ignoreHTTPSErrors: true,
+        extraHTTPHeaders: { Authorization: "Bearer " + authorityToken.secret },
+      });
+      const k = key(),
+        body = {
+          projectId,
+          model: "fixture",
+          effort: "medium",
+          permissionProfile: "read-only",
+        },
+        held = await db.connect();
+      let response: Promise<any> | undefined;
+      try {
+        if (replay)
+          expect(
+            (
+              await authorityClient.post(origin + "/api/v1/sessions", {
+                headers: { "Idempotency-Key": k },
+                data: body,
+              })
+            ).status(),
+          ).toBe(200);
+        const beforeCount = Number(
+          (await db.query("SELECT count(*) FROM sessions")).rows[0].count,
+        );
+        await db.query(
+          "UPDATE api_tokens SET expires_at=clock_timestamp()+interval '2 seconds' WHERE id=$1",
+          [authorityToken.token.id],
+        );
+        await held.query("BEGIN");
+        await held.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+          ["pat:" + authorityToken.token.id + "/api/v1/sessions" + k],
+        );
+        response = authorityClient.post(origin + "/api/v1/sessions", {
+          headers: { "Idempotency-Key": k },
+          data: body,
+        });
+        await expect
+          .poll(async () =>
+            Number(
+              (
+                await db.query(
+                  "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT pg_advisory_xact_lock(hashtextextended%'",
+                )
+              ).rows[0].count,
+            ),
+          )
+          .toBeGreaterThan(0);
+        await expect
+          .poll(
+            async () =>
+              (
+                await db.query(
+                  "SELECT expires_at<=clock_timestamp() AS expired FROM api_tokens WHERE id=$1",
+                  [authorityToken.token.id],
+                )
+              ).rows[0].expired,
+            { timeout: 5000 },
+          )
+          .toBe(true);
+        await held.query("ROLLBACK");
+        expect((await response).status()).toBe(401);
+        expect(
+          Number(
+            (await db.query("SELECT count(*) FROM sessions")).rows[0].count,
+          ),
+        ).toBe(beforeCount);
+      } finally {
+        await held.query("ROLLBACK");
+        held.release();
+        await response;
+        await authorityClient.dispose();
+      }
+    }
+    for (const mode of ["revoke", "expire"] as const)
+      for (const control of ["approve", "cancel"] as const) {
+        const controlToken = await (
+          await owner("/security/api-tokens", {
+            name: `P002 delayed ${control}`,
+            scopes: ["read", control],
+            projectIds: [projectId],
+            permissionProfile: "read-only",
+            expiresInDays: 1,
+          })
+        ).json();
+        const controlClient = await request.newContext({
+          ignoreHTTPSErrors: true,
+          extraHTTPHeaders: { Authorization: "Bearer " + controlToken.secret },
+        });
+        const target = await (
+          await send(`/sessions/${session.id}/turns`, {
+            ...settings,
+            text: "[approval]",
+          })
+        ).json();
+        await expect
+          .poll(
+            async () =>
+              (await snapshot(session.id)).approvals.filter(
+                (a: any) => a.state === "pending",
+              ).length,
+            { timeout: 30000 },
+          )
+          .toBe(1);
+        const before = await snapshot(session.id),
+          waiting = before.approvals.find((a: any) => a.state === "pending");
+        const hold = await db.connect();
+        let controlResult: any;
+        try {
+          await hold.query("BEGIN");
+          await hold.query("SELECT id FROM harbor_meta FOR UPDATE");
+          const response = await controlClient.post(
+            origin +
+              "/api/v1" +
+              (control === "approve"
+                ? `/approvals/${waiting.id}/answer`
+                : `/turns/${target.operation.id}/cancel`),
+            {
+              headers: { "Idempotency-Key": key() },
+              data:
+                control === "approve"
+                  ? { generation: waiting.generation, decision: "accept" }
+                  : {},
+            },
+          );
+          expect(response.status()).toBe(202);
+          controlResult = await response.json();
+          await expect
+            .poll(
+              async () =>
+                Number(
+                  (
+                    await db.query(
+                      "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT generation,emergency,identity_pin FROM harbor_meta FOR UPDATE%' ",
+                    )
+                  ).rows[0].count,
+                ),
+              { timeout: 10000 },
+            )
+            .toBeGreaterThan(0);
+          if (mode === "revoke") {
+            expect(
+              (
+                await owner(
+                  `/security/api-tokens/${controlToken.token.id}/revoke`,
+                  {},
+                )
+              ).status(),
+            ).toBe(200);
+          } else {
+            await db.query(
+              "UPDATE api_tokens SET expires_at=clock_timestamp()+interval '2 seconds' WHERE id=$1",
+              [controlToken.token.id],
+            );
+            const actorHold = await db.connect();
+            try {
+              await actorHold.query("BEGIN");
+              await actorHold.query(
+                "SELECT id FROM api_tokens WHERE id=$1 FOR UPDATE",
+                [controlToken.token.id],
+              );
+              await hold.query("ROLLBACK");
+              await expect
+                .poll(
+                  async () =>
+                    Number(
+                      (
+                        await db.query(
+                          "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT id FROM api_tokens WHERE id=%FOR SHARE%'",
+                        )
+                      ).rows[0].count,
+                    ),
+                  { timeout: 10000 },
+                )
+                .toBeGreaterThan(0);
+              await expect
+                .poll(
+                  async () =>
+                    (
+                      await actorHold.query(
+                        "SELECT expires_at<=clock_timestamp() AS expired FROM api_tokens WHERE id=$1",
+                        [controlToken.token.id],
+                      )
+                    ).rows[0].expired,
+                  { timeout: 5000 },
+                )
+                .toBe(true);
+            } finally {
+              await actorHold.query("ROLLBACK");
+              actorHold.release();
+            }
+          }
+        } finally {
+          await hold.query("ROLLBACK");
+          hold.release();
+        }
+        if (control === "approve")
+          await expect
+            .poll(
+              async () =>
+                (await snapshot(session.id)).approvals.find(
+                  (a: any) => a.id === waiting.id,
+                ).state,
+              { timeout: 10000 },
+            )
+            .toBe("pending");
+        else
+          await expect
+            .poll(
+              async () =>
+                (await snapshot(session.id)).operations.find(
+                  (o: any) => o.id === controlResult.operation.id,
+                ).state,
+              { timeout: 10000 },
+            )
+            .toBe("failed");
+        const unchanged = await snapshot(session.id);
+        expect(unchanged.session.state).toBe("waiting_approval");
+        expect(unchanged.session.generation).toBe(before.session.generation);
+        expect(
+          (
+            await owner(`/approvals/${waiting.id}/answer`, {
+              generation: waiting.generation,
+              decision: "decline",
+            })
+          ).status(),
+        ).toBe(202);
+        await expect
+          .poll(
+            async () =>
+              (await snapshot(session.id)).operations.find(
+                (o: any) => o.id === target.operation.id,
+              ).state,
+            { timeout: 30000 },
+          )
+          .toBe("succeeded");
+        await controlClient.dispose();
+      }
     const writable = (
       await (
         await owner("/sessions", {

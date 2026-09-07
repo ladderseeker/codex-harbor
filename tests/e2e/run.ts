@@ -1,3 +1,4 @@
+import { authorityExpiry } from "./authority-expiry.ts";
 import { p002 } from "./p002.ts";
 import { sourceDigest } from "../../scripts/source-digest.ts";
 import { localComposeFiles } from "../../infra/compose.ts";
@@ -566,6 +567,15 @@ try {
     ).toBe(beforeCredentialChange.state);
     const testDb = new pg.Pool({ connectionString: env.DATABASE_URL });
     try {
+      await authorityExpiry(
+        testDb,
+        {
+          HARBOR_OIDC_ISSUER: env.HARBOR_OIDC_ISSUER,
+          HARBOR_OWNER_SUBJECT: env.HARBOR_OWNER_SUBJECT,
+          HARBOR_IDLE_SECONDS: 300,
+        },
+        sessions.sessions[0].projectId,
+      );
       rotationBearer = await p002({
         page: reopened,
         context,
@@ -575,6 +585,12 @@ try {
         projectId: sessions.sessions[0].projectId,
         logs: () => diagnosticText,
         artifacts,
+        pauseSupervisor: () => {
+          supervisor.kill("SIGSTOP");
+        },
+        resumeSupervisor: () => {
+          supervisor.kill("SIGCONT");
+        },
       });
       const interruptCrashSession = await newSession();
       const interruptCrash = await (

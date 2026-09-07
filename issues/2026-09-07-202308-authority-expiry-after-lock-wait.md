@@ -36,3 +36,11 @@ P002 review round 3 inspected the proposed correction at source digest `84cd8ec7
 - The repeated pre-wire check must preserve cancellation's existing permission-profile rule: a token with cancellation authority can stop an already-running workspace-write turn even when the token's ceiling would prevent starting that turn.
 
 These are unresolved review findings, not delivered corrections. The implementer accepted all three. Existing logout acceptance plus targeted queued-cancellation expiry and cross-profile cancellation scenarios must pass before the focused round closes.
+
+## P002 correction evidence — 7 September 2026
+
+The three caller corrections and shared helper are now implemented in feature commit `482f632`, source digest `9b01ead96025c7b47664911b76ed08496f245fa8b03d3640a6e52d6fa4e6672a` (808 files). Independent focused round 3 closed with no remaining actionable critical findings in that scope. The preceding paragraph records the initial review disposition; this is its subsequent correction evidence.
+
+Check/build, nine integration tests, thirteen pinned-runtime contracts and full P001/P002 E2E passed in the feature worktree (Node 26.7.0, `harbor-e2e-cc7b466f60`) and integrated main source (Node 24.11.1, `harbor-e2e-402f47b9ab`). Both E2E artifacts have matching start/end source digests. The original fresh-PostgreSQL probe now rejects the expired token after the same lock wait: `{"outcome":"rejected","expiredBeforeRelease":true,"elapsedMs":3112}`. See the [corrective report](../docs/reports/2026-09-07-p002-api-tokens.md#authority-correction-and-integration--7-september-2026).
+
+This issue remains In progress for P007 recovery and P003 resource-lock integration. The corrected P002 baseline does not establish the combined feature behavior or waive dedicated live-account evidence.

@@ -1,5 +1,6 @@
 import {
   requireAuthority,
+  lockOwnerIdentity,
   type Scope,
 } from "../../../packages/policy/src/authority.ts";
 import { RetirementRegistry } from "./retirement.ts";
@@ -619,6 +620,10 @@ async function tick() {
           await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
             cancel.session_id,
           ]);
+          await requireAuthority(db, cancel.actor_hash, c, {
+            scope: "cancel",
+            projectId,
+          });
           await db.query(
             "UPDATE operations SET state='interrupted',updated_at=now() WHERE id=$1 AND state='queued'",
             [t.id],
@@ -837,6 +842,7 @@ async function tick() {
               throw Error("Runtime authority lost");
             await fence.query("BEGIN");
             try {
+              await lockOwnerIdentity(fence);
               const meta = await fence.query(
                 "SELECT generation,emergency,identity_pin FROM harbor_meta FOR UPDATE",
               );
@@ -872,6 +878,17 @@ async function tick() {
                 runtimes.get(o.session_id) !== captured
               )
                 throw Error("Runtime generation invalid");
+              // Session/generation locks can themselves wait past expiration.
+              // Re-evaluate authority after every lock, immediately before wire send.
+              if (captured.authorityActor)
+                await requireAuthority(fence, captured.authorityActor, c, {
+                  projectId: o.project_id,
+                  scope: captured.authorityScope,
+                  permissionProfile:
+                    captured.authorityScope === "cancel"
+                      ? undefined
+                      : captured.permissionProfile,
+                });
               const result = send();
               await fence.query("COMMIT");
               return result;
