@@ -5,6 +5,10 @@
 - Dependencies: [P003](003-parallel-project-workspaces.md)
 - Outcome: The owner opens a shell in the selected workspace, leaves the page, and reconnects to its bounded output and running process.
 
+## Source issues
+
+- [P006 implementation review](../../issues/2026-09-08-005028-p006-implementation-review.md): High, In progress. Round1 identified outcome lookup admitting input, an emergency-stop dispatch race and unmarked restart output loss, plus distinct stream/retirement denial coverage. P006-02–06 and independent round2 own correction/verification; the proposal remains unverified.
+
 ## Scope and user/API flow
 
 Add terminal creation, input, resize, output, reconnect, exit status, and explicit termination. The UI shows workspace identity, whether a process is still alive, and whether older output has expired. Closing the panel or browser detaches; it does not terminate the shell. Expose the same create/control lifecycle through authenticated HTTP and terminal WebSocket operations.
