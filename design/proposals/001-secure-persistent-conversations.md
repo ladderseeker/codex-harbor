@@ -1,7 +1,7 @@
 # P001 — Secure persistent conversations
 
-- Decision: Draft
-- Delivery: Planned
+- Decision: Accepted
+- Delivery: Implemented
 - Dependencies: None
 - Outcome: The owner signs in, selects an allowed project folder, asks Codex to do work, and returns to the same conversation after closing the browser.
 
@@ -13,8 +13,12 @@ Implement the actual runtime adapter, isolated runner, durable dispatch, history
 
 ## Source issues
 
+- [Resolved P001 implementation review](../../issues/archive/2026-09-07-174757-p001-review-findings.md): critical lifecycle/security and input-decline corrections passed four independent review rounds and corresponding regression/isolation checks.
+- [Replay/control storage bounds](../../issues/2026-09-07-185228-p001-retention-control-bounds.md): Medium severity, Open; P001-03/07 still require exact replay count/age and bounded reserved cancellation storage. Existing behavior and remaining discrepancies are recorded explicitly.
+- [Linux gateway availability](../../issues/2026-09-07-185228-linux-gateway-availability.md): Medium severity, Open; intermittent approved-endpoint failures remain a measured environment limitation despite final passing isolation. P009 must verify target-host connectivity.
+- [Dedicated live-test credentials unavailable](../../issues/2026-09-07-171225-live-runtime-credentials.md): High severity verification blocker for P001-08's real-account smoke. No test credentials are configured; contract, deterministic application, and Linux isolation work continue. This does not waive the live gate.
 - [Codex runtime compatibility finding](../../issues/archive/2026-09-07-073831-codex-runtime-compatibility.md): Medium severity; transferred on 2026-09-07, not resolved. P001 owns the pinned runtime and matching schemas, conversation/streaming/approval/cancel/recovery contracts, and local Linux runner prerequisites/isolation. These map to **P001-03–08** and [Delivery and verification](#delivery-and-verification), under the [architecture's compatibility boundary](../architecture.md#official-foundation-and-compatibility-boundary).
-- Evidence is pending. Publish the supported, unsupported, and experimental capabilities demonstrated by this local baseline, with versions, limitations, and reproducible checks. Missing real runtime/account or Linux evidence blocks P001 verification. Later feature owners extend this baseline through their own acceptance under the [shared runtime verification contract](../architecture.md#repeatable-verification-through-the-application).
+- Partial evidence is recorded in the [foundation verification report](../../docs/reports/2026-09-07-p001-foundation.md): pinned contracts, deterministic UI/API outcomes, and actual Linux/XFS isolation passed. The missing real-account gate still blocks P001 verification. Later feature owners extend this baseline through their own acceptance under the [shared runtime verification contract](../architecture.md#repeatable-verification-through-the-application).
 - [P009](009-portable-deployment-and-restore.md#source-issues) owns the separate target-host/release/restore evidence and upgrade gates. Local success does not establish deployment readiness or require P001 to wait for P009. Update this finding's P001 evidence when verified; leave the issue Transferred while P009's part remains pending.
 
 ## Contracts and security
@@ -22,6 +26,10 @@ Implement the actual runtime adapter, isolated runner, durable dispatch, history
 Use the [architecture's state/API contract](../architecture.md#api-events-and-state-transitions). Persist project/workspace, facade session/native thread mapping, operation intent, effective execution grant, approvals, and events. One active turn per conversation; additional input is explicitly queued or steered. Duplicate submissions resolve to the same operation. An ambiguous runtime delivery is never silently replayed.
 
 Implement normal authorization on pages/assets, cookie API requests, and SSE. Use a disposable real OIDC provider for deterministic tests, not an auth bypass. Keep app-server private, protect the owner credential onboarding flow, enforce permission ceilings and project-root confinement, and isolate coding processes from Harbor configuration/database credentials. Render streamed content as untrusted. Baseline quota/retention settings, logout revocation, and emergency stop are part of the feature, not deferred security hardening.
+
+[D004](../decisions/004-protected-runtime-credentials.md) defines the initial capability and encrypted credential onboarding path. Initial bounded conversation storage admits at most 2 MiB of text, 2,000 messages, 500 operations, and 100 approvals per conversation, with a 32 KiB approval scope. Stop admitting new work before reaching these limits; preserve cancellation and recovery. Event replay retains at most 2,000 events and seven days, with explicit snapshot resynchronization for older or missing cursors. These limits govern the initial implementation and must be visible to the owner. Durable history and unresolved work do not expire through replay cleanup.
+
+Retain active and uncertain idempotency records throughout their operations and completed tombstones for the 24-hour retry window. Reject old immutable timestamps after collection, rather than treating them as new intent. Apply ordered, checksum-validated SQL migrations under an exclusive migration lock; a changed previously applied migration fails explicitly.
 
 Browser closure and API restarts leave the supervisor's subscriptions and work alive. A runtime crash produces a safe interrupted/uncertain state with preserved native history; P007 later adds richer navigation and recovery workflows. Pending approval survives a viewer disconnect, expires with its runtime generation, and is answered once after current authorization is rechecked.
 
@@ -40,6 +48,16 @@ Start from an empty test instance with an owner and denied identity, known proje
 
 ## Delivery and verification
 
-Introduce real scripts for the ordinary command contract and relevant contract/live/isolation lanes, pinned tools/lockfile, setup/teardown, and feature-tag selection. Run `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm test:contract`, `pnpm test:live`, and `pnpm test:isolation` as applicable to the criteria. These commands are planned until implemented. Follow [shared test isolation/evidence rules](README.md#shared-verification-contract).
+The ordinary command contract and relevant contract/live/isolation lanes, pinned tools/lockfile, and setup/teardown are implemented. Run `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm test:contract`, `pnpm test:live`, and `pnpm test:isolation` as applicable to the criteria. Later feature suites extend scenario selection. Follow [shared test isolation/evidence rules](README.md#shared-verification-contract).
 
 Record host/runtime capabilities and update the developer guide with commands that actually work. No public deployment is claimed by this local feature. Missing account or Linux evidence keeps delivery unverified and links an issue. Initial schema/configuration must leave room for additive feature migrations, without implementing later capabilities. Complete independent review and link its report before `Verified`.
+
+## Implementation record
+
+- 2026-09-07: Adopted this proposal for implementation under the owner's authorization to deliver the roadmap and make implementation decisions autonomously. Started the executable backend, persistent supervisor, real OIDC flow, React interface, pinned-runtime adapter, and Linux runner/test foundation. Current checks and delivery remain incomplete; acceptance and archival require the evidence above.
+- 2026-09-07: Recorded [D001](../decisions/001-confined-runtime-egress.md) for the trusted egress proxy and project-internal network. This refines the existing execution boundary without weakening the required Linux or live checks.
+- 2026-09-07: Recorded [D002](../decisions/002-registered-mount-authority.md) for trusted mount ancestry, disjoint project roots, filesystem identity, and descriptor-relative project operations. Implementation and adversarial verification remain in progress.
+- 2026-09-07: Independent review found lifecycle, workspace-access, and CONNECT hostname-confinement defects. Fixes and regression coverage are in progress; the fixed gateway supersedes the unsafe tunnel in D001. Recorded [D004](../decisions/004-protected-runtime-credentials.md) for protected credential/bootstrap ownership and the initial storage/retention bounds above.
+- 2026-09-07: Recorded [D003](../decisions/003-quota-backed-project-storage.md) for administrator-provisioned XFS project storage, automatic session-native allocation, restricted runner access, and mandatory hard-limit evidence.
+- 2026-09-07: Added the [current user guide](../../docs/user/conversations.md) and [tested local workflow](../../docs/developer/development.md). Runtime/live gates and critical review fixes remain open; these guides do not mark delivery verified.
+- 2026-09-07: Marked Implemented after the final browser E2E and full Linux isolation passed matching source SHA256 05971cd8dfcba617b16dd68eaf33f17dadcc0fbfbc1aad99c4c1e65d118183e0, and four review rounds closed all critical findings. See the [report](../../docs/reports/2026-09-07-p001-foundation.md) for commands, environment, results, and limitations. This is not completion: live-account acceptance and recorded medium bounds remain open, so this proposal stays active.

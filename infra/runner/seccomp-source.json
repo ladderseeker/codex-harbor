@@ -1,0 +1,16 @@
+{
+  "source": "https://raw.githubusercontent.com/moby/moby/v28.2.2/profiles/seccomp/default.json",
+  "sha256": "01536f1d1df938ae611eba20d6349e0de7a99b6ecdee1549427a0b01b8301e28",
+  "deniedIoctlCommands": [
+    1075599392,
+    1074292226,
+    1074030082
+  ],
+  "removedSyscalls": [
+    "quotactl",
+    "quotactl_fd",
+    "file_setattr"
+  ],
+  "license": "Apache-2.0",
+  "ioctlPolicy": "Allow only requests without the Linux _IOC_WRITE direction bit; includes denial of FSSETXATTR and SETFLAGS (32/64-bit). Legacy non-direction terminal ioctls remain subject to baseline allow."
+}

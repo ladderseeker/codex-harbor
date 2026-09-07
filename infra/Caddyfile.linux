@@ -1,0 +1,13 @@
+{
+  admin off
+  auto_https disable_redirects
+}
+https://localhost:{$HARBOR_HTTPS_PORT} {
+  bind 127.0.0.1
+  tls internal
+  reverse_proxy 127.0.0.1:{$HARBOR_API_PORT}
+  header {
+    -Server
+    Cache-Control "no-store"
+  }
+}

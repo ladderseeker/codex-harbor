@@ -1,0 +1,13 @@
+{
+  admin off
+  auto_https disable_redirects
+}
+https://localhost:3443 {
+  tls internal
+  # All assets and pages pass through Harbor's owner authentication gate.
+  reverse_proxy host.docker.internal:{$HARBOR_API_PORT}
+  header {
+    -Server
+    Cache-Control "no-store"
+  }
+}

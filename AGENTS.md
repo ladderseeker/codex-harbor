@@ -3,7 +3,7 @@
 ## Scope and sources of truth
 
 - Build a single-owner web interface and authenticated API around the official Codex runtime. Keep deployment portable across compatible Linux VPS providers.
-- This repository is currently at the design stage. Do not claim an application, command, test, deployment, or security control exists without inspecting its implementation and evidence.
+- Implementation has started with P001. Use the proposal and issue indexes for current delivery state. Do not claim an application, command, test, deployment, or security control exists without inspecting its implementation and evidence.
 - Read [design/architecture.md](design/architecture.md) and the relevant entry in [design/proposals/README.md](design/proposals/README.md) before implementation. Resolve contradictions in the documents rather than silently choosing a different contract.
 - Read [docs/developer/development.md](docs/developer/development.md) for the current development and verification workflow.
 

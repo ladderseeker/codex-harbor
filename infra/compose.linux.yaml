@@ -1,0 +1,12 @@
+# Trusted local HTTPS proxy only. Project runners never use this network mode.
+services:
+  caddy:
+    network_mode: host
+    networks: !reset []
+    ports: !reset []
+    extra_hosts: !reset []
+    environment:
+      HARBOR_API_PORT: ${HARBOR_API_PORT:-3000}
+      HARBOR_HTTPS_PORT: ${HARBOR_HTTPS_PORT:-3443}
+    volumes:
+      - ./Caddyfile.linux:/etc/caddy/Caddyfile:ro

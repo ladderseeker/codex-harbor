@@ -1,0 +1,7 @@
+{
+  "name": "codex-harbor-egress",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": { "ipaddr.js": "2.2.0" }
+}

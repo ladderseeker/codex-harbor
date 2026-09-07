@@ -1,0 +1,286 @@
+import {
+  type ChildProcessWithoutNullStreams,
+  execFile,
+  spawn,
+} from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import { realpath, stat, lstat } from "node:fs/promises";
+import { relative, isAbsolute, dirname, resolve } from "node:path";
+import { provisionEgress } from "../egress/network.mjs";
+import type { OwnedRuntimeProcess } from "../../packages/codex-adapter/src/index.js";
+import { inspectRunnerProcesses } from "./processes.js";
+import {
+  prepareNativeStorage,
+  type NativeStorage,
+} from "../storage/admission.js";
+import { withRunnerAuthority } from "./authority.js";
+const exec = promisify(execFile);
+const idPattern = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+export const RUNNER_IMAGE = "codex-harbor-runner:0.153.4";
+export type RunnerConfig = {
+  sessionId: string;
+  projectId: string;
+  workspacePath: string;
+  generation: number;
+  instanceId?: string;
+  permissionProfile?: "read-only" | "workspace-write";
+  workspaceDevice?: string;
+  workspaceInode?: string;
+};
+/** This module is trusted supervisor code, never executed or mounted inside a project. */
+export async function runnerArguments(
+  config: RunnerConfig,
+  native?: NativeStorage,
+) {
+  for (const id of [
+    config.sessionId,
+    config.projectId,
+    config.instanceId ?? "local",
+  ])
+    if (!idPattern.test(id)) throw Error("Invalid runner identity");
+  if (!Number.isSafeInteger(config.generation) || config.generation < 1)
+    throw Error("Invalid runtime generation");
+  const roots: { id: string; name: string; path: string }[] = JSON.parse(
+    process.env.HARBOR_PROJECT_ROOTS ?? "[]",
+  );
+  const workspace = await realpath(config.workspacePath);
+  if (workspace !== resolve(config.workspacePath))
+    throw Error("Workspace canonical path changed");
+  let allowed = false;
+  for (const setting of roots) {
+    const root = await realpath(setting.path);
+    const sub = relative(root, workspace);
+    if (sub && !sub.startsWith("..") && !isAbsolute(sub)) allowed = true;
+  }
+  if (!allowed || !(await stat(workspace)).isDirectory())
+    throw Error("Workspace outside configured project root");
+  const identity = await stat(workspace, { bigint: true });
+  if (
+    config.workspaceDevice !== identity.dev.toString() ||
+    config.workspaceInode !== identity.ino.toString()
+  )
+    throw Error("Workspace identity changed or unavailable");
+  // A runner cannot rename its mount point; each ancestor is administrator controlled.
+  for (let ancestor = dirname(workspace); ; ancestor = dirname(ancestor)) {
+    const metadata = await lstat(ancestor);
+    if (
+      metadata.isSymbolicLink() ||
+      ![0, process.getuid?.()].includes(metadata.uid) ||
+      metadata.uid === 10001 ||
+      ((metadata.mode & 0o022) !== 0 && (metadata.mode & 0o1000) === 0)
+    )
+      throw Error("Untrusted workspace ancestor");
+    if (ancestor === dirname(ancestor)) break;
+  }
+  if (native) {
+    const identity = await stat(native.canonical, { bigint: true });
+    if (
+      (await realpath(native.canonical)) !== native.canonical ||
+      identity.dev.toString() !== native.device ||
+      identity.ino.toString() !== native.inode ||
+      native.canonical.includes(",")
+    )
+      throw Error("Native history identity changed");
+  }
+  if (workspace.includes(",")) throw Error("Unsupported workspace path");
+  const name =
+    `harbor-${config.instanceId ?? "local"}-${config.sessionId}-${config.generation}`.toLowerCase();
+  return [
+    "run",
+    "--rm",
+    "-i",
+    "--name",
+    name,
+    "--label",
+    "org.codex-harbor.owner=runner",
+    "--label",
+    `org.codex-harbor.instance=${config.instanceId ?? "local"}`,
+    "--log-driver",
+    "local",
+    "--log-opt",
+    "max-size=1m",
+    "--log-opt",
+    "max-file=2",
+    "--user",
+    "10001:10001",
+    "--read-only",
+    "--cap-drop=ALL",
+    "--security-opt",
+    "no-new-privileges:true",
+    "--security-opt",
+    `seccomp=${fileURLToPath(new URL("./seccomp.json", import.meta.url))}`,
+    "--pids-limit",
+    "128",
+    "--memory",
+    "512m",
+    "--memory-swap",
+    "512m",
+    "--cpus",
+    "1",
+    "--network",
+    "none",
+    "--ipc",
+    "none",
+    "--tmpfs",
+    "/tmp:rw,nosuid,nodev,noexec,size=64m,uid=10001,gid=10001,mode=1700",
+    "--mount",
+    `type=bind,source=${workspace},target=/workspace${config.permissionProfile === "workspace-write" ? "" : ",readonly"}`,
+    "--mount",
+    native
+      ? `type=bind,source=${native.canonical},target=/home/runner/.codex`
+      : `type=volume,source=harbor-${config.instanceId ?? "local"}-${config.projectId}-${config.sessionId}-codex,target=/home/runner/.codex`,
+    "--env",
+    "CODEX_HOME=/home/runner/.codex",
+    "--env",
+    "HOME=/home/runner",
+    "--workdir",
+    "/workspace",
+    RUNNER_IMAGE,
+    "codex",
+    "app-server",
+    "--listen",
+    "stdio://",
+  ];
+}
+/** Starts the fixed restricted-egress profile. This also serves the actual Linux test lane. */
+export async function startConfinedRunner(
+  config: RunnerConfig,
+  nativeInput?: NativeStorage | (() => Promise<NativeStorage>),
+): Promise<ChildProcessWithoutNullStreams> {
+  const info = await exec("docker", ["info", "--format", "{{.OSType}}"], {
+    timeout: 10_000,
+    maxBuffer: 4096,
+  });
+  if (info.stdout.trim() !== "linux")
+    throw Error("A supported Linux container engine is required");
+  await runnerArguments(config);
+  return withRunnerAuthority(config, async () => {
+    const native =
+      typeof nativeInput === "function" ? await nativeInput() : nativeInput;
+    if (!native) {
+      const volume = `harbor-${config.instanceId ?? "local"}-${config.projectId}-${config.sessionId}-codex`;
+      await exec(
+        "docker",
+        [
+          "volume",
+          "create",
+          "--label",
+          "org.codex-harbor.owner=native-history",
+          "--label",
+          `org.codex-harbor.instance=${config.instanceId ?? "local"}`,
+          "--label",
+          `org.codex-harbor.session=${config.sessionId}`,
+          volume,
+        ],
+        { timeout: 10_000, maxBuffer: 4096 },
+      );
+      const volumeInfo = JSON.parse(
+        (
+          await exec("docker", ["volume", "inspect", volume], {
+            timeout: 10_000,
+            maxBuffer: 8192,
+          })
+        ).stdout,
+      )[0];
+      if (
+        volumeInfo.Labels?.["org.codex-harbor.owner"] !== "native-history" ||
+        volumeInfo.Labels?.["org.codex-harbor.session"] !== config.sessionId ||
+        volumeInfo.Labels?.["org.codex-harbor.instance"] !==
+          (config.instanceId ?? "local")
+      )
+        throw Error("Native history volume ownership mismatch");
+    }
+    const egress = await provisionEgress(config);
+    try {
+      // Revalidate after provisioning and before Docker resolves the administrator-controlled mount.
+      const args = await runnerArguments(config, native);
+      args[args.indexOf("--network") + 1] = egress.networkName;
+      const imageIndex = args.indexOf(RUNNER_IMAGE);
+      args.splice(
+        imageIndex,
+        0,
+        "--env",
+        `HARBOR_MODEL_BASE_URL=${egress.modelBaseUrl}`,
+      );
+      args.push(
+        "--strict-config",
+        "-c",
+        'cli_auth_credentials_store="file"',
+        "-c",
+        'model_provider="harbor"',
+        "-c",
+        `model_providers.harbor={name="Harbor model gateway",base_url="${egress.modelBaseUrl}",wire_api="responses",requires_openai_auth=true,supports_websockets=false}`,
+      );
+      const child: OwnedRuntimeProcess = spawn("docker", args, {
+        stdio: "pipe",
+        env: {
+          PATH: process.env.PATH,
+          HOME: process.env.HOME,
+          DOCKER_HOST: process.env.DOCKER_HOST,
+          DOCKER_CONTEXT: process.env.DOCKER_CONTEXT,
+        },
+      });
+      const name = args[args.indexOf("--name") + 1]!;
+      let cleanupPromise: Promise<void> | undefined;
+      const cleanup = () =>
+        (cleanupPromise ??= (async () => {
+          try {
+            await exec("docker", ["rm", "--force", name], {
+              timeout: 15_000,
+              maxBuffer: 4096,
+            });
+          } catch {
+            const found = await exec(
+              "docker",
+              ["ps", "-aq", "--filter", `name=^/${name}$`],
+              { timeout: 10_000, maxBuffer: 4096 },
+            );
+            if (found.stdout.trim())
+              throw Error("Owned runner termination unconfirmed");
+          }
+          await egress.cleanup();
+        })());
+      child.closeOwned = cleanup;
+      child.inspectOwned = () => inspectRunnerProcesses(config);
+      const cleanupEventually = () => {
+        void cleanup().catch(() =>
+          console.error(
+            "Owned runner cleanup incomplete; explicit reconciliation required.",
+          ),
+        );
+      };
+      child.once("harbor:close", cleanupEventually);
+      child.once("exit", cleanupEventually);
+      child.once("error", cleanupEventually);
+      await new Promise<void>((resolve, reject) => {
+        child.once("spawn", resolve);
+        child.once("error", reject);
+      });
+      return child;
+    } catch (error) {
+      await egress.cleanup();
+      throw error;
+    }
+  });
+}
+export async function launchRunner(
+  config: RunnerConfig,
+): Promise<ChildProcessWithoutNullStreams> {
+  const context = await exec(
+    "docker",
+    ["context", "inspect", "--format", "{{.Endpoints.docker.Host}}"],
+    { timeout: 10_000, maxBuffer: 4096 },
+  );
+  if (
+    process.platform !== "linux" ||
+    !context.stdout.trim().startsWith("unix://") ||
+    (process.env.DOCKER_HOST && !process.env.DOCKER_HOST.startsWith("unix://"))
+  )
+    throw Error(
+      "Managed XFS launcher and Docker must share the same Linux host",
+    );
+  return startConfinedRunner(config, () =>
+    prepareNativeStorage(config.workspacePath, config.sessionId),
+  );
+}

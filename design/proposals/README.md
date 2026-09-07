@@ -1,6 +1,6 @@
 # Feature proposals
 
-Every active proposal below has **Decision: Draft** and **Delivery: Planned**. These documents define work; no feature or application test is implemented. Design review, implementation, and verification are separate events. Follow the [proposal template](../proposal-template.md) and [canonical lifecycle rules](../../AGENTS.md#document-ownership-and-lifecycle) when changing status.
+P001 is Accepted and Implemented, with required live-account evidence and medium follow-ups still open. The remaining proposals are Draft and Planned. No proposal has passed its completion gate. Design review, implementation, and verification are separate events. Follow the [proposal template](../proposal-template.md) and [canonical lifecycle rules](../../AGENTS.md#document-ownership-and-lifecycle) when changing status.
 
 The [proposal archive](archive/README.md) is empty. Review it and the [issue index](../../issues/README.md) when discovering work or allocating IDs.
 
@@ -8,11 +8,11 @@ The [architecture](../architecture.md) owns shared security, runtime, state, and
 
 ## Active proposals and dependencies
 
-An independently verifiable feature may rely on its declared, already delivered dependencies. Its own outcome must be usable and testable in a fresh environment without any future proposal. Dependencies include their transitive dependencies. Split by outcome, not complexity, layer, or estimated effort; implementation tasks within a proposal may be as small as useful.
+An independently verifiable feature may rely on its declared dependencies. Implementation can proceed once prerequisite behavior exists and is available in an isolated test instance. Any missing mandatory upstream evidence remains visible and blocks dependent verification where relevant; it does not turn an Implemented dependency into a finished proposal. This sequencing follows the owner's authorization to implement the roadmap and the repository requirement to continue unaffected work. Each outcome must be usable and testable without a future proposal. Dependencies include their transitive dependencies. Split by outcome, not complexity, layer, or estimated effort.
 
 | ID | Complete outcome | Decision | Delivery | Direct dependencies | Acceptance IDs / specialist lanes |
 | --- | --- | --- | --- | --- | --- |
-| [P001](001-secure-persistent-conversations.md) | Sign in and conduct a protected Codex conversation that survives browser closure | Draft | Planned | None | P001-01–08; contract, live, isolation |
+| [P001](001-secure-persistent-conversations.md) | Sign in and conduct a protected Codex conversation that survives browser closure | Accepted | Implemented | None | P001-01–08; contracts/E2E/Linux passed, live and medium follow-ups pending |
 | [P002](002-programmatic-api-access.md) | Use revocable, scoped credentials from an external API client | Draft | Planned | P001 | P002-01–06; contract/live when adapter behavior changes |
 | [P003](003-parallel-project-workspaces.md) | Work across projects and parallel conversations with clear workspace ownership | Draft | Planned | P001 | P003-01–06; isolation, live |
 | [P004](004-files-and-change-review.md) | Inspect, edit, download, and review project changes through Harbor | Draft | Planned | P003 | P004-01–06; isolation |
@@ -25,7 +25,7 @@ An independently verifiable feature may rely on its declared, already delivered 
 | [P011](011-private-project-previews.md) | Open a private preview of a project's running application | Draft | Planned | P003 | P011-01–06; isolation |
 | [P012](012-managed-skills-and-mcp.md) | Configure and use trusted skills and MCP tools within a project | Draft | Planned | P003 | P012-01–06; contract, live, isolation |
 
-Next action: begin P001's capability spike and complete conversation outcome; every other proposal awaits delivery of its listed prerequisites before implementation. The transferred [runtime compatibility finding](../../issues/archive/2026-09-07-073831-codex-runtime-compatibility.md) has pending evidence owned by [P001's local gate](001-secure-persistent-conversations.md#source-issues) and [P009's deployment gate](009-portable-deployment-and-restore.md#source-issues).
+Next action: implement P002 scoped API access and P003 parallel workspaces on the tested P001 foundation, then follow the dependency paths below. Keep P001's live and medium follow-ups active. [Dedicated live credentials are unavailable](../../issues/2026-09-07-171225-live-runtime-credentials.md), so real-account evidence remains blocked while unaffected work continues. The transferred [runtime compatibility finding](../../issues/archive/2026-09-07-073831-codex-runtime-compatibility.md) has partial evidence owned by [P001's local gate](001-secure-persistent-conversations.md#source-issues) and pending [P009 deployment evidence](009-portable-deployment-and-restore.md#source-issues).
 
 All features require their relevant deterministic browser/API E2E scenarios and critical regressions. Specialist lanes supplement those tests; they do not replace them. P001 includes the executable development/test foundation because a working, secure conversation is the first complete outcome. It does not require later API tokens, attachment UI, file editor, terminal UI, or scheduler.
 
@@ -33,7 +33,7 @@ One valid order that enables self-development early is **P001 → P002 → P003 
 
 ## Shared verification contract
 
-The [planned command contract](../architecture.md#local-first-development-and-portable-environments) is not runnable today. P001 introduces working setup, `pnpm dev`, `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm test:contract`, `pnpm test:live`, and `pnpm test:isolation` as its acceptance requires. P010 adds `pnpm test:e2e:self`. Missing prerequisites or unimplemented commands never become successful placeholders.
+P001 implements setup, `pnpm dev`, `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm test:contract`, `pnpm test:live`, and `pnpm test:isolation` under the [command contract](../architecture.md#local-first-development-and-portable-environments). The [developer workflow](../../docs/developer/development.md#command-availability) records availability, actual results, and prerequisites. P010 will add `pnpm test:e2e:self`; it remains unavailable. Missing prerequisites or unimplemented commands never become successful placeholders.
 
 Tag executable acceptance tests with their stable proposal IDs; document the implemented feature-selection syntax when the harness exists. Each run starts the actual proxy, UI where applicable, API, PostgreSQL, supervisor, adapter, and relevant workspace/launcher services. Only external Codex and OIDC boundaries use deterministic fixtures. An API-only assertion may use an HTTP client instead of a browser. Fixture mode is private and rejected for public deployments; remote inspection uses the approved authenticated access route.
 

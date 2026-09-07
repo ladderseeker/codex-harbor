@@ -1,10 +1,10 @@
 # Codex Harbor
 
-A planned single-owner web interface and authenticated API for Codex, running on a compatible Linux VPS. The intended experience includes projects, parallel conversations that continue after the browser closes, scheduled tasks, terminals, files, and attachments.
+A single-owner web interface and authenticated API for Codex, being built for compatible Linux VPS hosts. The first conversation workflow runs locally; the roadmap includes parallel workspaces, scheduled tasks, terminals, files, and attachments.
 
 ## Status
 
-Design stage. This repository contains the architecture, feature proposals, and development rules. It does not yet contain a runnable application or executable end-to-end tests.
+P001 is Implemented. Its deterministic browser/API E2E and actual Linux/XFS isolation passed, and four review rounds closed the critical findings. Required live-account evidence and medium follow-ups remain open, so no proposal is marked finished. See the [foundation report](docs/reports/2026-09-07-p001-foundation.md) and [developer workflow](docs/developer/development.md) for tested commands and limits.
 
 ## Start here
 

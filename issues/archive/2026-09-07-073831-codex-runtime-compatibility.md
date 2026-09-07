@@ -45,6 +45,12 @@ The [architecture's compatibility boundary](../../design/architecture.md#officia
 
 Reciprocal ownership is recorded in [P001 Source issues](../../design/proposals/001-secure-persistent-conversations.md#source-issues) and [P009 Source issues](../../design/proposals/009-portable-deployment-and-restore.md#source-issues). Track pending work from the [active issue index](../README.md) and [proposal index](../../design/proposals/README.md); the [archive index](README.md) records this disposition. Record each owner's eventual evidence here separately, retaining Transferred until both mapped parts are verified under the [issue lifecycle](../../AGENTS.md#issue-resolution-and-transfer).
 
+## Implementation evidence addendum — 2026-09-07
+
+P001 now has matching pinned generated schemas, eleven adapter/launcher/schema contracts, real-stack fixture E2E, and actual Linux/XFS isolation evidence on source SHA256 05971cd8dfcba617b16dd68eaf33f17dadcc0fbfbc1aad99c4c1e65d118183e0. The [foundation report](../../docs/reports/2026-09-07-p001-foundation.md) records versions, artifacts, commands, supported behavior, and limitations.
+
+P001's authenticated real-account gate remains blocked, so its transferred part is only partially evidenced. P009 target-host, deployed account, reboot, release, and restore obligations remain pending. Keep this record Transferred and visible from the active index; no local fixture or Linux-only result resolves the full finding.
+
 ## History
 
 - 2026-09-07 07:38:31 Asia/Shanghai: Recorded Open during design planning, with P001 and P009 identified as future validation owners.

@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS harbor_meta(id boolean PRIMARY KEY DEFAULT true CHECK(id), generation bigint NOT NULL DEFAULT 0, emergency boolean NOT NULL DEFAULT false);
+INSERT INTO harbor_meta(id) VALUES(true) ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS browser_sessions(hash text PRIMARY KEY,csrf text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),last_seen timestamptz NOT NULL DEFAULT now(),expires_at timestamptz NOT NULL,revoked boolean NOT NULL DEFAULT false);
+CREATE TABLE IF NOT EXISTS login_states(hash text PRIMARY KEY, verifier text NOT NULL,nonce text NOT NULL,expires_at timestamptz NOT NULL);
+CREATE TABLE IF NOT EXISTS projects(id uuid PRIMARY KEY,name text NOT NULL,root_id uuid NOT NULL,relative_path text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),UNIQUE(root_id,relative_path));
+CREATE TABLE IF NOT EXISTS workspaces(id uuid PRIMARY KEY,project_id uuid NOT NULL REFERENCES projects(id),UNIQUE(project_id));
+CREATE TABLE IF NOT EXISTS sessions(id uuid PRIMARY KEY,project_id uuid NOT NULL REFERENCES projects(id),workspace_id uuid NOT NULL REFERENCES workspaces(id),title text NOT NULL,state text NOT NULL DEFAULT 'idle',model text NOT NULL,effort text NOT NULL,permission_profile text NOT NULL,native_thread_id text,native_turn_id text,generation bigint NOT NULL DEFAULT 0,sequence bigint NOT NULL DEFAULT 0,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS operations(id uuid PRIMARY KEY,session_id uuid REFERENCES sessions(id),kind text NOT NULL,state text NOT NULL,payload jsonb NOT NULL,actor_hash text NOT NULL,generation bigint,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS intents(actor text NOT NULL,route text NOT NULL,key text NOT NULL,request_hash text NOT NULL,result jsonb NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(actor,route,key));
+CREATE TABLE IF NOT EXISTS messages(id uuid PRIMARY KEY,session_id uuid NOT NULL REFERENCES sessions(id),operation_id uuid REFERENCES operations(id),native_item_id text,role text NOT NULL,text text NOT NULL,status text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),UNIQUE(session_id,native_item_id));
+CREATE TABLE IF NOT EXISTS events(session_id uuid NOT NULL REFERENCES sessions(id),sequence bigint NOT NULL,type text NOT NULL,data jsonb NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(session_id,sequence));
+CREATE TABLE IF NOT EXISTS approvals(id uuid PRIMARY KEY,session_id uuid NOT NULL REFERENCES sessions(id),operation_id uuid NOT NULL REFERENCES operations(id),generation bigint NOT NULL,request_id text NOT NULL,kind text NOT NULL,scope jsonb NOT NULL,state text NOT NULL DEFAULT 'pending',answer jsonb,deadline timestamptz NOT NULL,UNIQUE(session_id,generation,request_id));
+CREATE TABLE IF NOT EXISTS audits(id bigserial PRIMARY KEY,kind text NOT NULL,record_id text,created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS operations_queue ON operations(state,created_at);
+CREATE TABLE IF NOT EXISTS runtime_capabilities(id boolean PRIMARY KEY DEFAULT true CHECK(id),data jsonb NOT NULL,updated_at timestamptz NOT NULL DEFAULT now());
+
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS device text;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS inode text;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS canonical_path text;
+CREATE SEQUENCE IF NOT EXISTS runtime_generation_seq;
+ALTER TABLE approvals ADD COLUMN IF NOT EXISTS answer_actor_hash text;
