@@ -1,5 +1,10 @@
 import { attachmentRoutes } from "./attachments.ts";
 import { associateAttachments } from "../../../packages/attachments/src/store.ts";
+import {
+  deploymentAdmission,
+  deploymentState,
+  verifyInstalledSchema,
+} from "../../../packages/storage/src/deployment.ts";
 import { registerWorkspaceRoutes } from "./workspace-routes.ts";
 import {
   selectedWorkspace,
@@ -65,7 +70,8 @@ import type { Config } from "./config.ts";
 import type { PoolClient } from "pg";
 export async function buildServer(c: Config) {
   const pool = createPool(c.DATABASE_URL);
-  await migrate(pool);
+  if (process.env.HARBOR_MANAGED_RELEASE) await verifyInstalledSchema(pool);
+  else await migrate(pool);
   const ownerPin = digest(c.HARBOR_OIDC_ISSUER + "\0" + c.HARBOR_OWNER_SUBJECT);
   await bindIdentity(pool, ownerPin);
   const client = await oidc.discovery(
@@ -167,7 +173,11 @@ export async function buildServer(c: Config) {
       "referrer-policy": "no-referrer",
       "x-frame-options": "DENY",
     });
-    if (["/auth/login", "/auth/callback"].includes(req.url.split("?")[0]!))
+    if (
+      ["/auth/login", "/auth/callback", "/health"].includes(
+        req.url.split("?")[0]!,
+      )
+    )
       return;
     if (req.headers.authorization !== undefined) {
       auth.set(
@@ -193,6 +203,10 @@ export async function buildServer(c: Config) {
   });
   app.addHook("preHandler", async (req) => {
     if (auth.has(req)) await authorizeTokenRoute(pool, c, auth.get(req)!, req);
+  });
+  app.get("/health", async () => {
+    await pool.query("SELECT 1");
+    return { status: "ready" };
   });
   app.get("/auth/login", async (_req, reply) => {
     const state = oidc.randomState(),
@@ -356,6 +370,15 @@ export async function buildServer(c: Config) {
           );
       }
       await requireAuthority(db, auth.get(req)!.hash, c);
+      await deploymentAdmission(
+        db,
+        route.endsWith("/cancel") ||
+          route.endsWith("/answer") ||
+          [
+            "/api/v1/security/emergency-stop",
+            "/api/v1/security/logout",
+          ].includes(route),
+      );
       const result = await fn(db);
       if (!externalEffectsGranted.has(req) && !selfRevocations.has(req))
         await requireAuthority(db, auth.get(req)!.hash, c);

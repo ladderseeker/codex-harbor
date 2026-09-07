@@ -1,8 +1,10 @@
 import { createServer } from "node:http";
+import { createServer as createTlsServer } from "node:https";
+import { readFileSync } from "node:fs";
 import { generateKeyPair, exportJWK, SignJWT } from "jose";
 import { randomUUID, createHash } from "node:crypto";
 const port = Number(process.env.OIDC_PORT),
-  issuer = `http://127.0.0.1:${port}`,
+  issuer = `${process.env.OIDC_TLS_CERT ? "https" : "http"}://127.0.0.1:${port}`,
   client = process.env.HARBOR_OIDC_CLIENT_ID!,
   callback = process.env.HARBOR_ORIGIN! + "/auth/callback";
 if (
@@ -18,7 +20,17 @@ const codes = new Map<
   string,
   { nonce: string; challenge: string; subject: string }
 >();
-createServer(async (req, res) => {
+const serverFactory = process.env.OIDC_TLS_CERT
+  ? (handler: import("node:http").RequestListener) =>
+      createTlsServer(
+        {
+          cert: readFileSync(process.env.OIDC_TLS_CERT!),
+          key: readFileSync(process.env.OIDC_TLS_KEY!),
+        },
+        handler,
+      )
+  : createServer;
+serverFactory(async (req, res) => {
   const url = new URL(req.url!, issuer);
   const send = (data: unknown, status = 200) => {
     res.writeHead(status, {

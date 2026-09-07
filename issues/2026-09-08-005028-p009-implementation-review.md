@@ -4,7 +4,7 @@
 - Status: In progress
 - Owner: P009 implementer; independent reviewer and main-agent integration
 - Recorded: 2026-09-08
-- Affected files: infra/deploy/common.py, harborctl, backup.py, control.py, extract.py, publish.py and probe.ts, in the P009 implementation worktree
+- Affected files: infra/deploy/common.py, harborctl, backup.py, control.py, extract.py, publish.py, probe.ts and destination configuration
 - Acceptance: [P009-01–07](../design/proposals/009-portable-deployment-and-restore.md#independent-acceptance)
 
 ## Round 1 evidence
@@ -25,3 +25,17 @@ Findings3–6 are source-inferred concrete paths, not claims of executed A-to-B 
 These findings affect core administration, checkpoint usability, preservation of unknown bytes and restore activation. The implementer owns one focused correction batch with harmless/local fault tests, followed by independent round2 and applicable installed checks. Preserve earlier evidence and do not modify selected immutable releases in place.
 
 The [protected transfer approval](2026-09-07-231526-p009-backup-transfer-approval.md) and [dedicated live-account](2026-09-07-171225-live-runtime-credentials.md) gates remain separate blockers. Do not bypass either gate or describe local fixtures as a real checkpoint/restore. Record correction identities, actual commands/results and review closure before archiving this same issue; P009 remains active while mandatory verification is incomplete.
+
+## Round 2 and real CLI contract — 8 September 2026
+
+Independent round 2 inspected frozen source `3c34d0aee9be82362ce0aeb85834a2bf4424ccdb1e07bf459235cb3d7ebb9554` (892 files). It accepted the six original source corrections and their explicitly limited local/installed evidence, then found a Medium filename collision: `extract.py` selected every descendant named `registry.json` as a possible authoritative registry. A normal project file with that name prevented checkpoint verification or restore. Select only the dedicated authenticated top-level backup source and preserve ordinary project files with the same name.
+
+During that correction, the implementer checked pinned Restic 0.19.1 and found that real `ls` JSON omits symlink targets assumed by the snapshot-verification fixture. Verification now reads bounded authenticated tree metadata. A new real CLI contract uses only fresh public text/symlink fixtures in a disposable local repository; it accesses no Harbor installation, private configuration, SFTP destination or rejected payload and is not A-to-B acceptance. Its first run exposed a further interaction: the strict small-file output limit also constrained Restic's repository lock-file creation. Immutable snapshot `ls`, `dump` and `cat tree` reads now use `--no-lock` under the administrator operation lock, retaining content limits and write-operation locking. Missing content still fails verification.
+
+The final focused review closed without actionable findings on source `b6599ab31a6b4690b54a9bd0632f3c668e98ebb88b2905f1f7f82066327a4289` (893 files). Seventeen Python contracts and the actual public Restic CLI contract passed; the latter's record explicitly qualifies a subsequent narrowing from generic `cat` to `cat tree`, with the exercised commands unchanged. Main-agent Node 24.11.1 `pnpm check` and full E2E `harbor-e2e-d47ae72678` passed with identical start/end source. Root integration preserves that exact source; only documentation needed conflict resolution. Two review rounds are closed for this baseline. The [deployment report](../docs/reports/2026-09-08-p009-development.md) preserves separate installed-artifact and Linux publication evidence without relabeling those artifacts as the final source.
+
+## Remaining implementation audit — 8 September 2026
+
+The issue remains In progress because a required operator flow is still missing: a freshly restored host cannot yet enroll or update its own ongoing off-host backup destination independently of the repository used as its restore source. The current configuration uses one endpoint for both roles. A repository located on restored B cannot qualify as B's ongoing off-host destination.
+
+P009 owns a bounded, versioned administrator enrollment/update path that retains immutable restore-source authority, validates a distinct pinned remote host identity, compares expected destination revisions and prevents configuration changes from redirecting an interrupted restore. Its connectivity probes transfer only public canaries; no protected payload or repository-secret initialization may bypass the existing approval blocker. Available Linux administrator stale-lock recovery and complete allocation-inventory/reconciliation evidence also remain pending. Complete and independently review this required behavior and its available checks before closing this record; keep the separate blocked transfer/live gates visible afterward.

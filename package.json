@@ -16,7 +16,8 @@
     "test:live": "node --import tsx tests/live/run.ts",
     "test:isolation": "node --import tsx tests/isolation/run.ts",
     "test:egress": "node --test tests/egress/*.test.mjs",
-    "test:workspaces": "node --import tsx --test tests/workspaces/*.test.ts"
+    "test:workspaces": "node --import tsx --test tests/workspaces/*.test.ts",
+    "test:deployment:contract": "python3 -m unittest discover -s tests/deployment -p '*_test.py' && node --import tsx --test tests/deployment/storage-transport.test.ts tests/deployment/probe.test.ts"
   },
   "dependencies": {
     "@fastify/cookie": "11.0.2",

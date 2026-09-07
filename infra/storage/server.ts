@@ -1,3 +1,4 @@
+import { recoverManagedSocket } from "../deploy/socket.ts";
 import { executeWorkspace } from "./workspace-service.ts";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
@@ -59,9 +60,7 @@ for (const root of profile.roots)
   }
 try {
   await lstat(socket);
-  throw Error(
-    "Storage socket already exists; explicit owned-instance recovery required",
-  );
+  await recoverManagedSocket(socket, uid);
 } catch (error) {
   if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
 }

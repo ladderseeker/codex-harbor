@@ -3,6 +3,8 @@
 This directory describes available behavior, developer workflows, and completed reports. P001–P003, P005 and P007 are Implemented with required verification/follow-ups still open; the proposal index distinguishes current evidence from finished delivery.
 
 - [Developer workflow](developer/development.md): working on the repository now, command availability, and verification requirements.
+- [Deployment development commands](developer/deployment.md): current P009 administrator tooling, partial Linux evidence and blocked restore/transfer gates.
+- [P009 development checkpoint](reports/2026-09-08-p009-development.md): partial implementation and installed-profile results; not a release-readiness report.
 - [Linux execution verification](developer/linux-verification.md): dedicated XFS storage, real runner checks, and scoped cleanup.
 - [Attachment verification](developer/attachments.md): upload/draft persistence, Linux publication checks and the separate live gate.
 - [Programmatic API](developer/programmatic-api.md): bearer authentication, current scopes, streaming, and safe retries.

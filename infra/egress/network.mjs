@@ -1,3 +1,4 @@
+import { releaseImage } from "../deploy/images.mjs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createHash, randomBytes } from "node:crypto";
@@ -206,7 +207,7 @@ export async function provisionEgress(config) {
       `HARBOR_EGRESS_INTERNAL_SUBNET=${subnet}`,
       "--env",
       `HARBOR_EGRESS_DNS_PROFILE=${dnsProfile}`,
-      EGRESS_IMAGE,
+      releaseImage("gateway", EGRESS_IMAGE),
     ]);
     await docker([
       "network",

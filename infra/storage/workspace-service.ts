@@ -55,6 +55,11 @@ export async function executeWorkspace(
   fixture = false,
 ): Promise<any> {
   if (
+    (command as unknown as { restoredAuthorityRevoked?: boolean })
+      .restoredAuthorityRevoked
+  )
+    throw Error("Restored operation authority revoked");
+  if (
     fixture &&
     !(
       process.env.NODE_ENV === "test" &&
@@ -62,7 +67,7 @@ export async function executeWorkspace(
     )
   )
     throw Error("Private fixture required");
-  if (command.action === "workspaceInspect")
+  if (["workspaceInspect", "workspaceValidate"].includes(command.action))
     return executeUnreceipted(command, fixture);
   return withWorkspaceReceipt(
     command,
@@ -147,9 +152,12 @@ async function executeUnreceipted(
     throw Error("Private fixture required");
   if (
     !command ||
-    !["workspaceCreate", "workspaceInspect", "workspaceRemove"].includes(
-      command.action,
-    ) ||
+    ![
+      "workspaceCreate",
+      "workspaceInspect",
+      "workspaceValidate",
+      "workspaceRemove",
+    ].includes(command.action) ||
     !["local", "worktree", "copy"].includes(command.kind) ||
     typeof command.relativePath !== "string" ||
     command.relativePath.length > 300
@@ -193,6 +201,7 @@ async function executeUnreceipted(
   }
 
   if (!fixture) await paths({ ...command, action: "validate" });
+  if (command.action === "workspaceValidate") return { valid: true };
   if (command.action === "workspaceInspect")
     return fixedGitHelper({
       action: "inspect",

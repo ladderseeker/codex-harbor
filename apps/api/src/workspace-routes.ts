@@ -323,7 +323,7 @@ export function registerWorkspaceRoutes(
           );
         const prior = (
           await db.query(
-            "SELECT id FROM workspace_storage_operations WHERE workspace_id=$1 AND action='remove' AND state='failed' ORDER BY created_at DESC LIMIT 1",
+            "SELECT id FROM workspace_storage_operations WHERE workspace_id=$1 AND action='remove' AND state='failed' AND retry_authority ORDER BY created_at DESC LIMIT 1",
             [w.id],
           )
         ).rows[0];

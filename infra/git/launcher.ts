@@ -1,3 +1,4 @@
+import { releaseImage } from "../deploy/images.mjs";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
@@ -84,7 +85,7 @@ async function launchHelper(config: Parameters<typeof fixedGitHelper>[0]) {
       "--mount",
       `type=bind,source=${config.common.canonical},target=/git-common${config.action === "inspect" ? ",readonly" : ""}`,
     );
-  args.push(GIT_IMAGE);
+  args.push(releaseImage("git", GIT_IMAGE));
   // Never start by a reusable name: a delayed predecessor cannot start a successor.
   const containerId = (
     await exec("docker", args, {

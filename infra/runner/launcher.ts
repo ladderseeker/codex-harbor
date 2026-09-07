@@ -1,3 +1,4 @@
+import { releaseImage } from "../deploy/images.mjs";
 import {
   type ChildProcessWithoutNullStreams,
   execFile,
@@ -218,7 +219,7 @@ export async function runnerArguments(
     "HOME=/home/runner",
     "--workdir",
     "/workspace",
-    RUNNER_IMAGE,
+    releaseImage("runner", RUNNER_IMAGE),
     "codex",
     "app-server",
     "--listen",
@@ -278,7 +279,9 @@ export async function startConfinedRunner(
       // Revalidate after provisioning and before Docker resolves the administrator-controlled mount.
       const args = await runnerArguments(config, native);
       args[args.indexOf("--network") + 1] = egress.networkName;
-      const imageIndex = args.indexOf(RUNNER_IMAGE);
+      const imageIndex = args.indexOf(releaseImage("runner", RUNNER_IMAGE));
+      if (imageIndex < 0)
+        throw Error("Fixed runner image boundary unavailable");
       args.splice(
         imageIndex,
         0,

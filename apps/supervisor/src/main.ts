@@ -1,6 +1,11 @@
 import { prepareAttachments } from "../../../packages/attachments/src/materialize.ts";
 import { maintainAttachments } from "../../../packages/attachments/src/store.ts";
 import { processRecovery } from "./recovery.ts";
+import {
+  deploymentAdmission,
+  deploymentState,
+  verifyInstalledSchema,
+} from "../../../packages/storage/src/deployment.ts";
 import { processWorkspaceStorage } from "./workspace-storage.ts";
 import {
   processWorkspaceReleases,
@@ -48,7 +53,8 @@ import type {
 } from "../../../packages/codex-adapter/src/index.ts";
 const c = config(),
   pool = createPool(c.DATABASE_URL);
-await migrate(pool);
+if (process.env.HARBOR_MANAGED_RELEASE) await verifyInstalledSchema(pool);
+else await migrate(pool);
 const ownerPin = digest(c.HARBOR_OIDC_ISSUER + "\0" + c.HARBOR_OWNER_SUBJECT);
 await bindIdentity(pool, ownerPin);
 let discovering = false;
@@ -211,7 +217,13 @@ async function clearNativeCredentials() {
 const closeCredentials = await serveCredentials(credentials, c);
 let lastDiscovery = 0;
 async function discover() {
-  if (discovering || credentials.mutating) return;
+  if (
+    discovering ||
+    credentials.mutating ||
+    (await deploymentState(pool)).maintenance ||
+    (await deploymentState(pool)).activation_required
+  )
+    return;
   discovering = true;
   try {
     if (
@@ -529,6 +541,7 @@ async function tick() {
     lastMaintenance = Date.now();
   }
   if (credentials.mutating) return;
+  if ((await deploymentState(pool)).activation_required) return;
   await processWorkspaceStorage(pool, !!c.HARBOR_FIXTURE_MODE, c.roots);
   await processWorkspaceReleases(pool, {
     config: c,
@@ -866,6 +879,7 @@ async function tick() {
         cancel.id,
       ]);
   }
+  if ((await deploymentState(pool)).maintenance) return;
   const candidates = await pool.query(
     "SELECT o.*,s.native_thread_id,s.project_id,s.workspace_id,p.root_id,w.relative_path,w.device,w.inode,w.canonical_path,w.common_path,w.common_device,w.common_inode FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id WHERE w.state='ready' AND p.archived_at IS NULL AND w.writer_session_id IS NULL AND o.kind='turn' AND o.state='queued' AND s.state<>'uncertain' AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.session_id=o.session_id AND active.kind='turn' AND (active.state IN ('dispatching','running','waiting_approval','waiting_input') OR (active.state='uncertain' AND active.uncertainty_acknowledged_at IS NULL))) ORDER BY o.created_at LIMIT 4",
   );
@@ -1069,6 +1083,10 @@ async function tick() {
                       ? undefined
                       : captured.permissionProfile,
                 });
+              await deploymentAdmission(
+                fence,
+                captured.authorityScope !== "execute",
+              );
               const result = send();
               await fence.query("COMMIT");
               return result;
