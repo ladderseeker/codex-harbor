@@ -4,7 +4,7 @@ Use this index and the [issue archive](archive/README.md) to find existing findi
 
 ## Active issues
 
-The archive contains resolved source-review findings, installed web/workspace corrections, authority and retention corrections, allocation detection/reconciliation, and the P002/P005 harness corrections. Shared acknowledgement and preview retirement integration, test-host access recovery, P010 integration, P004/P006 restore obligations, P005/P007 regression observations, live-account and backup-transfer blockers, and gateway availability remain active. The earlier runtime finding remains Transferred with partial local evidence below.
+The archive contains resolved source-review findings, installed web/workspace corrections, authority and retention corrections, allocation detection/reconciliation, the P002/P005 harness corrections, and the Linux native PTY test prerequisite. Shared acknowledgement and preview retirement integration, test-host access recovery, P010 integration, P004/P006 restore obligations, P005/P007 regression observations, live-account and backup-transfer blockers, and gateway availability remain active. The earlier runtime finding remains Transferred with partial local evidence below.
 
 | Issue | Severity | Status | Owner | Next action |
 | --- | --- | --- | --- | --- |

@@ -8,6 +8,7 @@
 
 ## Source issues
 
+- [Native PTY contract home](../../issues/archive/2026-09-13-024011-terminal-contract-home.md): Medium, Resolved. Fresh persistent test homes fix a reproduced Linux helper-path prerequisite; independent review, actual unchanged PTY checks and main integration passed. This is separate from full feature and deployment verification.
 - [P006 implementation review](../../issues/2026-09-08-005028-p006-implementation-review.md): High, Blocked for required fresh-host protected restore/authority evidence under P009-04. Two corrective feature rounds and module review closed the dispatch, input, output, retention and installed retirement/local rebind scope.
 
 ## Scope and user/API flow
