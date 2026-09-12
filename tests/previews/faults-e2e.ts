@@ -70,12 +70,35 @@ export async function previewFaults(h: {
     "CREATE CONSTRAINT TRIGGER preview_retirement_fault AFTER UPDATE ON previews DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION preview_retirement_fault()",
   );
   const stopKey = `${Date.now()}:${randomUUID()}`;
-  const stopped = await command(
-    "/stop",
-    { expectedGeneration: Number(active.generation) },
-    202,
-    stopKey,
-  );
+  let stopped: any;
+  h.supervisor.kill("SIGSTOP");
+  try {
+    stopped = await command(
+      "/stop",
+      { expectedGeneration: Number(active.generation) },
+      202,
+      stopKey,
+    );
+    for (let pending = 0; pending < 4; pending++)
+      expect(
+        await command("/stop", {
+          expectedGeneration: Number(active.generation),
+        }),
+      ).toEqual(stopped);
+    expect((await row()).stop_attempts).toBe(1);
+    expect(
+      Number(
+        (
+          await h.db.query(
+            "SELECT count(*) FROM intents WHERE control_target=$1",
+            [`preview-stop:${h.previewId}:${active.generation}`],
+          )
+        ).rows[0].count,
+      ),
+    ).toBe(1);
+  } finally {
+    h.supervisor.kill("SIGCONT");
+  }
   await expect
     .poll(async () => (await row()).state, { timeout: 20000 })
     .toBe("uncertain");
@@ -108,15 +131,42 @@ export async function previewFaults(h: {
   await h.db.query("UPDATE previews SET command_count=128 WHERE id=$1", [
     h.previewId,
   ]);
+  const capacityRoute = "/owned-preview-history-" + h.previewId;
+  await h.db.query(
+    "INSERT INTO intents(actor,route,key,request_hash,result) SELECT 'owner',$1,n::text,'owned-public-fixture','{}' FROM generate_series(1,10000) n",
+    [capacityRoute],
+  );
+  await command("/start", { expectedRevision: uncertain.revision }, 429);
+  const second = await command("/stop", {
+    expectedGeneration: Number(active.generation),
+    acknowledgeUnconfirmed: stopped.stopId,
+  });
+  await expect
+    .poll(async () => (await row()).state, { timeout: 20000 })
+    .toBe("uncertain");
+  expect((await row()).stop_attempts).toBe(2);
   await h.db.query(
     "DROP TRIGGER preview_retirement_fault ON previews; DROP FUNCTION preview_retirement_fault()",
   );
   await command("/stop", {
     expectedGeneration: Number(active.generation),
-    acknowledgeUnconfirmed: stopped.stopId,
+    acknowledgeUnconfirmed: second.stopId,
   });
   await waitRetired();
-  expect((await row()).stop_attempts).toBe(2);
+  expect((await row()).stop_attempts).toBe(3);
+  expect(
+    Number(
+      (
+        await h.db.query(
+          "SELECT count(*) FROM intents WHERE control_target=$1",
+          [`preview-stop:${h.previewId}:${active.generation}`],
+        )
+      ).rows[0].count,
+    ),
+  ).toBe(3);
+  await h.db.query("DELETE FROM intents WHERE actor='owner' AND route=$1", [
+    capacityRoute,
+  ]);
   await command("/start", { expectedRevision: (await row()).revision }, 429);
   await h.db.query("UPDATE previews SET command_count=0 WHERE id=$1", [
     h.previewId,
@@ -178,6 +228,8 @@ export async function previewFaults(h: {
       {
         status: "passed",
         retirementCommitRejected: true,
+        pendingNewKeysRetainOneIntent: true,
+        threePhysicalAttemptsRemainAvailable: true,
         ownershipRetainedUntilAcknowledgedRetry: true,
         reservedStopAfterOrdinaryCapacity: true,
         readyCommitRejectedNoReplay: failed.generation,

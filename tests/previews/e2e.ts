@@ -1,4 +1,5 @@
 import { previewOutputFlood } from "./output-e2e.ts";
+import { previewReadiness } from "./readiness-e2e.ts";
 import { previewControls } from "./controls-e2e.ts";
 import { previewQueuedAuthority } from "./authority-e2e.ts";
 import { previewFaults } from "./faults-e2e.ts";
@@ -161,7 +162,7 @@ try {
   }
   start("tests/fixtures/oidc/server.ts");
   await new Promise((r) => setTimeout(r, 300));
-  start("apps/api/src/main.ts");
+  let api = start("apps/api/src/main.ts");
   const supervisor = start("apps/supervisor/src/main.ts");
   await expect
     .poll(
@@ -252,7 +253,7 @@ try {
     JSON.stringify({
       name: "harbor-preview-fixture",
       private: true,
-      scripts: { dev: "node server.mjs" },
+      scripts: { dev: "node server.mjs", delayed: "node delayed.mjs" },
     }),
   );
   await mkdir(path.join(row.canonical_path, "node_modules"), {
@@ -267,163 +268,229 @@ try {
     path.join(row.canonical_path, "server.mjs"),
     `import http from 'node:http';import {WebSocketServer} from 'ws';\nconst server=http.createServer((req,res)=>{if(req.url==='/__fixture_stream_flood'){res.writeHead(200,{'content-type':'text/event-stream'});res.write('data: slow reader\\n\\n');let n=0;const timer=setInterval(()=>{res.write('X'.repeat(16384));n+=16384;if(n>=3*1024*1024){clearInterval(timer);res.end();}},1);res.on('close',()=>clearInterval(timer));return;}if(req.url==='/__fixture_log_flood'){res.end('public flood requested');setTimeout(()=>process.stdout.write('X'.repeat(131072)),50);return;}if(req.url==='/headers'){res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({cookie:req.headers.cookie,names:Object.keys(req.headers)}));return;}if(req.url==='/events'){res.writeHead(200,{'content-type':'text/event-stream'});res.write('data: preview event\\n\\n');return;}res.writeHead(200,{'content-type':'text/html'});res.end('<!doctype html><h1>Private application</h1><p id="event">waiting</p><p id="socket">waiting</p><script>const socket=new WebSocket(location.origin.replace("https:","wss:")+"/socket");socket.onopen=()=>socket.send("preview websocket");socket.onmessage=e=>document.querySelector("#socket").textContent=e.data;new EventSource("/events").onmessage=e=>document.querySelector("#event").textContent=e.data</script>');});new WebSocketServer({server,perMessageDeflate:false}).on('connection',client=>client.on('message',(data,binary)=>client.send(data,{binary})));server.listen(Number(process.env.PORT),'127.0.0.1',()=>console.log('PREVIEW_READY'));\n`,
   );
-  await page.reload();
-  await page
-    .getByRole("button", { name: "Project previews", exact: true })
-    .click();
-  await page
-    .getByLabel("Preview name", { exact: true })
-    .fill("Local private app");
-  await page
-    .getByLabel("Application port", { exact: true })
-    .fill(String(appPort));
-  const created = page.waitForResponse(
-    (r) =>
-      r.url().endsWith("/api/v1/previews") && r.request().method() === "POST",
+  await writeFile(
+    path.join(row.canonical_path, "delayed.mjs"),
+    `import {access,writeFile} from 'node:fs/promises';await writeFile(new URL('./.preview-execution-started',import.meta.url),'PREVIEW_EXECUTED\\n');console.log('PREVIEW_EXECUTED');for(;;){try{await access(new URL('./.preview-readiness-allowed',import.meta.url));break;}catch{await new Promise(r=>setTimeout(r,50));}}await import('./server.mjs');\n`,
   );
-  await page.getByRole("button", { name: "Save preview", exact: true }).click();
-  const p = (await (await created).json()).preview;
-  await page
-    .getByRole("button", { name: "Start preview", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "Prepare private access", exact: true }),
-  ).toBeEnabled({ timeout: 30000 });
-  expect(
-    (await db.query("SELECT state,retired FROM previews WHERE id=$1", [p.id]))
-      .rows[0],
-  ).toEqual({ state: "ready", retired: false });
-  expect(
-    (
-      await db.query(
-        "SELECT count(*)::int n FROM preview_readers WHERE owner_id=$1",
-        [p.id],
-      )
-    ).rows[0].n,
-  ).toBe(1);
-  if (managed) await previewLinuxBoundary(db, p.id, artifacts);
-  await page
-    .getByRole("button", { name: "Prepare private access", exact: true })
-    .click();
-  const popupPromise = context.waitForEvent("page");
-  await page
-    .getByRole("link", { name: "Open preview in new tab", exact: false })
-    .click();
-  const popup = await popupPromise;
-  await expect(
-    popup.getByRole("heading", { name: "Private application" }),
-  ).toBeVisible({ timeout: 15000 });
-  await expect(popup.locator("#event")).toHaveText("preview event");
-  await expect(popup.locator("#socket")).toHaveText("preview websocket");
-  expect(new URL(popup.url()).hostname).toMatch(
-    /^[a-f0-9]{32}\.preview\.localhost$/,
-  );
-  expect(await popup.evaluate(() => window.opener)).toBeNull();
-  const cookies = await context.cookies(popup.url());
-  expect((await Promise.all(previewCookieChecks)).some(Boolean)).toBe(false);
-  const previewCookie = cookies.find(
-    (c) =>
-      c.name === "__Host-harbor-preview" &&
-      c.domain === new URL(popup.url()).hostname,
-  );
-  expect(
-    previewCookie && {
-      secure: previewCookie.secure,
-      httpOnly: previewCookie.httpOnly,
-      path: previewCookie.path,
-    },
-  ).toEqual({ secure: true, httpOnly: true, path: "/" });
-  await page.screenshot({
-    path: path.join(artifacts, "preview-panel.png"),
-    fullPage: true,
-  });
-  await popup.screenshot({
-    path: path.join(artifacts, "preview-application.png"),
-    fullPage: true,
-  });
-  await previewControls({
-    db,
-    context,
-    popup,
-    origin,
-    csrf: me.csrfToken,
-    previewId: p.id,
-  });
-  const previewUrl = popup.url();
-  await popup.goto("about:blank");
-  await previewAccess({
-    db,
-    url: previewUrl,
-    cookie: previewCookie!.value,
-    ownerOrigin: origin,
-    ticketBody,
-    artifacts,
-  });
-  await page.getByRole("button", { name: "Stop preview", exact: true }).click();
-  await expect
-    .poll(
-      async () =>
-        (await db!.query("SELECT retired FROM previews WHERE id=$1", [p.id]))
-          .rows[0].retired,
-      { timeout: 15000 },
-    )
-    .toBe(true);
-  expect(
-    (
-      await db.query(
-        "SELECT count(*)::int n FROM preview_readers WHERE owner_id=$1",
-        [p.id],
-      )
-    ).rows[0].n,
-  ).toBe(0);
-  await popup.goto(previewUrl);
-  await expect(
-    popup.getByText("Preview unavailable.", { exact: false }),
-  ).toBeVisible();
-  await previewLifecycle({
-    db,
-    context,
-    origin,
-    csrf: me.csrfToken,
-    supervisor,
-    previewId: p.id,
-  });
-  if (managed && process.env.HARBOR_PREVIEW_FAULTS_ONLY !== "1")
-    await previewDerivedLinux({
+  const readiness = () =>
+    previewReadiness({
+      db: db!,
+      context,
+      origin,
+      csrf: me.csrfToken,
+      workspaceId: workspace.id,
+      workspacePath: row.canonical_path,
+      port: appPort,
+      artifacts,
+      restartApi: async () => {
+        const exited = new Promise<void>((resolve) =>
+          api.once("exit", () => resolve()),
+        );
+        api.kill("SIGKILL");
+        await exited;
+        api = start("apps/api/src/main.ts");
+        await expect
+          .poll(
+            async () => {
+              try {
+                return (await fetch(`http://127.0.0.1:${apiPort}/health`))
+                  .status;
+              } catch {
+                return 0;
+              }
+            },
+            { timeout: 30000 },
+          )
+          .toBe(200);
+      },
+    });
+  if (process.env.HARBOR_PREVIEW_REVIEW_ONLY === "1") {
+    await readiness();
+    const { preview } = await command(
+      "/previews",
+      {
+        workspaceId: workspace.id,
+        name: "Stop reservation review",
+        script: "dev",
+        port: appPort,
+        permissionProfile: "read-only",
+      },
+      201,
+    );
+    await previewFaults({
       db,
       context,
       origin,
       csrf: me.csrfToken,
-      workspace,
-      port: appPort,
+      previewId: preview.id,
+      supervisor,
+      restartSupervisor: () => start("apps/supervisor/src/main.ts"),
       artifacts,
     });
-  await previewQueuedAuthority({
-    db,
-    context,
-    origin,
-    csrf: me.csrfToken,
-    previewId: p.id,
-    supervisor,
-  });
-  await previewFaults({
-    db,
-    context,
-    origin,
-    csrf: me.csrfToken,
-    previewId: p.id,
-    supervisor,
-    restartSupervisor: () => start("apps/supervisor/src/main.ts"),
-    artifacts,
-  });
-  await previewOutputFlood({
-    db,
-    context,
-    origin,
-    csrf: me.csrfToken,
-    previewId: p.id,
-    artifacts,
-  });
+  } else {
+    await page.reload();
+    await page
+      .getByRole("button", { name: "Project previews", exact: true })
+      .click();
+    await page
+      .getByLabel("Preview name", { exact: true })
+      .fill("Local private app");
+    await page
+      .getByLabel("Application port", { exact: true })
+      .fill(String(appPort));
+    const created = page.waitForResponse(
+      (r) =>
+        r.url().endsWith("/api/v1/previews") && r.request().method() === "POST",
+    );
+    await page
+      .getByRole("button", { name: "Save preview", exact: true })
+      .click();
+    const p = (await (await created).json()).preview;
+    await page
+      .getByRole("button", { name: "Start preview", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Prepare private access", exact: true }),
+    ).toBeEnabled({ timeout: 30000 });
+    expect(
+      (await db.query("SELECT state,retired FROM previews WHERE id=$1", [p.id]))
+        .rows[0],
+    ).toEqual({ state: "ready", retired: false });
+    expect(
+      (
+        await db.query(
+          "SELECT count(*)::int n FROM preview_readers WHERE owner_id=$1",
+          [p.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    if (managed) await previewLinuxBoundary(db, p.id, artifacts);
+    await page
+      .getByRole("button", { name: "Prepare private access", exact: true })
+      .click();
+    const popupPromise = context.waitForEvent("page");
+    await page
+      .getByRole("link", { name: "Open preview in new tab", exact: false })
+      .click();
+    const popup = await popupPromise;
+    await expect(
+      popup.getByRole("heading", { name: "Private application" }),
+    ).toBeVisible({ timeout: 15000 });
+    await expect(popup.locator("#event")).toHaveText("preview event");
+    await expect(popup.locator("#socket")).toHaveText("preview websocket");
+    expect(new URL(popup.url()).hostname).toMatch(
+      /^[a-f0-9]{32}\.preview\.localhost$/,
+    );
+    expect(await popup.evaluate(() => window.opener)).toBeNull();
+    const cookies = await context.cookies(popup.url());
+    expect((await Promise.all(previewCookieChecks)).some(Boolean)).toBe(false);
+    const previewCookie = cookies.find(
+      (c) =>
+        c.name === "__Host-harbor-preview" &&
+        c.domain === new URL(popup.url()).hostname,
+    );
+    expect(
+      previewCookie && {
+        secure: previewCookie.secure,
+        httpOnly: previewCookie.httpOnly,
+        path: previewCookie.path,
+      },
+    ).toEqual({ secure: true, httpOnly: true, path: "/" });
+    await page.screenshot({
+      path: path.join(artifacts, "preview-panel.png"),
+      fullPage: true,
+    });
+    await popup.screenshot({
+      path: path.join(artifacts, "preview-application.png"),
+      fullPage: true,
+    });
+    await previewControls({
+      db,
+      context,
+      popup,
+      origin,
+      csrf: me.csrfToken,
+      previewId: p.id,
+    });
+    const previewUrl = popup.url();
+    await popup.goto("about:blank");
+    await previewAccess({
+      db,
+      url: previewUrl,
+      cookie: previewCookie!.value,
+      ownerOrigin: origin,
+      ticketBody,
+      artifacts,
+    });
+    await page
+      .getByRole("button", { name: "Stop preview", exact: true })
+      .click();
+    await expect
+      .poll(
+        async () =>
+          (await db!.query("SELECT retired FROM previews WHERE id=$1", [p.id]))
+            .rows[0].retired,
+        { timeout: 15000 },
+      )
+      .toBe(true);
+    expect(
+      (
+        await db.query(
+          "SELECT count(*)::int n FROM preview_readers WHERE owner_id=$1",
+          [p.id],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    await popup.goto(previewUrl);
+    await expect(
+      popup.getByText("Preview unavailable.", { exact: false }),
+    ).toBeVisible();
+    await previewLifecycle({
+      db,
+      context,
+      origin,
+      csrf: me.csrfToken,
+      supervisor,
+      previewId: p.id,
+    });
+    if (managed && process.env.HARBOR_PREVIEW_FAULTS_ONLY !== "1")
+      await previewDerivedLinux({
+        db,
+        context,
+        origin,
+        csrf: me.csrfToken,
+        workspace,
+        port: appPort,
+        artifacts,
+      });
+    await previewQueuedAuthority({
+      db,
+      context,
+      origin,
+      csrf: me.csrfToken,
+      previewId: p.id,
+      supervisor,
+    });
+    await readiness();
+    await previewFaults({
+      db,
+      context,
+      origin,
+      csrf: me.csrfToken,
+      previewId: p.id,
+      supervisor,
+      restartSupervisor: () => start("apps/supervisor/src/main.ts"),
+      artifacts,
+    });
+    await previewOutputFlood({
+      db,
+      context,
+      origin,
+      csrf: me.csrfToken,
+      previewId: p.id,
+      artifacts,
+    });
+  }
   passed = true;
 } catch (error) {
   const quotaUsage =
@@ -565,9 +632,12 @@ if (passed) {
               inodes: managed.profile.inodeHardLimit,
             }
           : null,
-        scope: managed
-          ? "Actual Linux UI/API/PG/supervisor/native Codex preview and fixed relay on XFS; external OIDC only; broader hostile-isolation/installed acceptance pending"
-          : "Real UI/API/PG/supervisor/relay lifecycle, maintenance, rollback-only metadata rebind, framing/credential/idle-stream authority checks; external OIDC/Codex fixtures; actual PG faults, source authority, connection/output bounds; Linux profile evidence is identified separately",
+        scope:
+          process.env.HARBOR_PREVIEW_REVIEW_ONLY === "1"
+            ? `Focused real API/UI/PG/supervisor review regressions: delayed readiness after source revocation, API restart/stream reconnect, pending stop aliases and three reserved attempts with saturated history, COMMIT faults and supervisor retirement. ${managed ? "Actual supported Linux native runtime/XFS/fixed relay" : "External Codex fixture"}; external OIDC. Unchanged mount/egress/hostile-output matrix is separate evidence.`
+            : managed
+              ? "Actual Linux UI/API/PG/supervisor/native Codex preview and fixed relay on XFS; external OIDC only; broader hostile-isolation/installed acceptance pending"
+              : "Real UI/API/PG/supervisor/relay lifecycle, maintenance, rollback-only metadata rebind, framing/credential/idle-stream authority checks; external OIDC/Codex fixtures; actual PG faults, source authority, connection/output bounds; Linux profile evidence is identified separately",
       },
       null,
       2,

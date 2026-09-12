@@ -446,6 +446,25 @@ export async function buildServer(c: Config) {
           ? 1
           : 3
         : 10000;
+      if (route === "/api/v1/previews/:id/stop" && (result as any).stopId) {
+        // Pending controls reconcile to the retained physical attempt. New keys
+        // must not consume the separate reservations for attempts two and three.
+        const pending = (
+          await db.query(
+            "SELECT request_hash,result FROM intents WHERE actor=$1 AND control_target=$2 AND result->>'stopId'=$3 LIMIT 1",
+            [actor, controlTarget, (result as any).stopId],
+          )
+        ).rows[0];
+        if (pending) {
+          if (pending.request_hash !== hash)
+            throw new HarborError(
+              409,
+              "IDEMPOTENCY_CONFLICT",
+              "The retained stop attempt describes different input",
+            );
+          return pending.result;
+        }
+      }
       const count = Number(
         (
           await db.query(

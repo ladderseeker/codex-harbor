@@ -368,17 +368,21 @@ export class PreviewSupervisor {
       await adapter.probePreview();
       await transaction(this.pool, async (db) => {
         await this.owner(db);
-        await requirePreviewAuthority(db, p, r.actor, this.c, "start");
+        // Execution was authorized at the synchronous native send. Readiness
+        // settles that captured effect; it does not grant another execution.
         await deploymentAdmission(db);
         const { p: latest, w } = await lockedPreview(db, p.id);
         await this.lease(db, latest, w);
         if (
           r.reason ||
+          !r.sent ||
+          latest.retired ||
           latest.state !== "starting" ||
-          Number(latest.generation) !== r.generation
+          Number(latest.generation) !== r.generation ||
+          w.state !== "ready" ||
+          w.project_archived
         )
           throw Error("Preview startup changed");
-        await requirePreviewAuthority(db, latest, r.actor, this.c, "start");
         await db.query(
           "UPDATE previews SET state='ready',runner_id=$2,relay_id=$3,updated_at=clock_timestamp() WHERE id=$1",
           [r.id, r.relay!.runnerId, r.relay!.relayId],
