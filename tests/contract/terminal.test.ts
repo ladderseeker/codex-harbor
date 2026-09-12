@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
-import { mkdtemp, rm, realpath, readFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, rm, realpath, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import {
   CodexAdapter,
@@ -14,8 +14,14 @@ test(
   "P006-01 pinned no-account PTY readiness, resize, byte output and delayed exit",
   { timeout: 45000 },
   async () => {
+    // The pinned Linux runtime refuses sandbox helper aliases beneath /tmp.
+    // Keep each account-free home in the repository's ignored test namespace.
+    const homes = fileURLToPath(
+      new URL("../../.test-runs/terminal-contracts/", import.meta.url),
+    );
+    await mkdir(homes, { recursive: true, mode: 0o700 });
     const home = await realpath(
-      await mkdtemp(join(tmpdir(), "harbor-terminal-contract-")),
+      await mkdtemp(join(homes, "harbor-terminal-contract-")),
     );
     const processId = randomUUID();
     const env = { PATH: process.env.PATH, HOME: home, CODEX_HOME: home };
