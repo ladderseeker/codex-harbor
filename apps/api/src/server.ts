@@ -8,6 +8,8 @@ import { acceptConversationTurn } from "../../../packages/storage/src/turns.ts";
 import { effectiveSettings as requireEffectiveSettings } from "../../../packages/policy/src/models.ts";
 import { terminalStreams } from "./terminal-stream.ts";
 import { terminalRoutes } from "./terminals.ts";
+import { previewRoutes } from "./previews.ts";
+import { startPreviewGateway } from "./preview-gateway.ts";
 import {
   deploymentAdmission,
   deploymentState,
@@ -365,6 +367,7 @@ export async function buildServer(c: Config) {
         return { stopped: true };
       }
       const reserved =
+        route === "/api/v1/previews/:id/stop" ||
         route.endsWith("/cancel") ||
         route.endsWith("/terminate") ||
         route.endsWith("/answer") ||
@@ -380,6 +383,7 @@ export async function buildServer(c: Config) {
         (route.endsWith("/inspect") || route.endsWith("/release"));
       if (auth.get(req)!.kind === "token" && !reservedFileControl) {
         const reserve =
+          route === "/api/v1/previews/:id/stop" ||
           route.endsWith("/cancel") ||
           route.endsWith("/answer") ||
           route.endsWith("/terminate");
@@ -401,7 +405,8 @@ export async function buildServer(c: Config) {
       await requireAuthority(db, auth.get(req)!.hash, c);
       await deploymentAdmission(
         db,
-        route.endsWith("/cancel") ||
+        route === "/api/v1/previews/:id/stop" ||
+          route.endsWith("/cancel") ||
           route.endsWith("/terminate") ||
           reservedFileControl ||
           route.endsWith("/answer") ||
@@ -415,23 +420,25 @@ export async function buildServer(c: Config) {
         await requireAuthority(db, auth.get(req)!.hash, c);
       if (route === "/api/v1/security/emergency-stop") return result;
       const controlTarget =
-        route.includes("/file-operations/") && route.endsWith("/inspect")
-          ? "file-inspect:" + req.params.operationId
-          : route.includes("/file-operations/") && route.endsWith("/release")
-            ? "file-release:" + req.params.operationId
-            : route === "/api/v1/security/logout"
-              ? "logout:" + auth.get(req)!.hash
-              : route.endsWith("/terminate")
-                ? "terminal:" + req.params.id
-                : route.endsWith("/cancel")
-                  ? "cancel:" + req.params.id
-                  : route.endsWith("/answer")
-                    ? "approval:" + req.params.id
-                    : route.endsWith("/recovery/continue")
-                      ? "continue:" + req.body.recoveryId
-                      : route.endsWith("/recovery")
-                        ? "recovery:" + (result as any).recovery.id
-                        : null;
+        route === "/api/v1/previews/:id/stop"
+          ? "preview-stop:" + req.params.id + ":" + req.body.expectedGeneration
+          : route.includes("/file-operations/") && route.endsWith("/inspect")
+            ? "file-inspect:" + req.params.operationId
+            : route.includes("/file-operations/") && route.endsWith("/release")
+              ? "file-release:" + req.params.operationId
+              : route === "/api/v1/security/logout"
+                ? "logout:" + auth.get(req)!.hash
+                : route.endsWith("/terminate")
+                  ? "terminal:" + req.params.id
+                  : route.endsWith("/cancel")
+                    ? "cancel:" + req.params.id
+                    : route.endsWith("/answer")
+                      ? "approval:" + req.params.id
+                      : route.endsWith("/recovery/continue")
+                        ? "continue:" + req.body.recoveryId
+                        : route.endsWith("/recovery")
+                          ? "recovery:" + (result as any).recovery.id
+                          : null;
       const limit = controlTarget
         ? controlTarget.startsWith("continue:") ||
           controlTarget.startsWith("logout:") ||
@@ -439,6 +446,25 @@ export async function buildServer(c: Config) {
           ? 1
           : 3
         : 10000;
+      if (route === "/api/v1/previews/:id/stop" && (result as any).stopId) {
+        // Pending controls reconcile to the retained physical attempt. New keys
+        // must not consume the separate reservations for attempts two and three.
+        const pending = (
+          await db.query(
+            "SELECT request_hash,result FROM intents WHERE actor=$1 AND control_target=$2 AND result->>'stopId'=$3 LIMIT 1",
+            [actor, controlTarget, (result as any).stopId],
+          )
+        ).rows[0];
+        if (pending) {
+          if (pending.request_hash !== hash)
+            throw new HarborError(
+              409,
+              "IDEMPOTENCY_CONFLICT",
+              "The retained stop attempt describes different input",
+            );
+          return pending.result;
+        }
+      }
       const count = Number(
         (
           await db.query(
@@ -828,6 +854,7 @@ export async function buildServer(c: Config) {
     },
   );
   attachmentRoutes(app, pool, command);
+  previewRoutes(app, { pool, c, command, actor: (req) => auth.get(req)!.hash });
   terminalRoutes(app, {
     pool,
     c,
@@ -1099,6 +1126,13 @@ export async function buildServer(c: Config) {
       throw new HarborError(404, "NOT_FOUND", "Route not found");
     return applicationDocument(req, reply);
   });
-  app.addHook("onClose", async () => pool.end());
+  const closePreview =
+    c.HARBOR_PREVIEW_DOMAIN && c.HARBOR_PREVIEW_SOCKET
+      ? await startPreviewGateway(pool, c)
+      : undefined;
+  app.addHook("onClose", async () => {
+    await closePreview?.();
+    await pool.end();
+  });
   return app;
 }

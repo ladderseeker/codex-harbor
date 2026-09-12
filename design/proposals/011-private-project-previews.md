@@ -14,7 +14,7 @@ The initial feature supports ordinary project HTTP applications and explicitly t
 
 ## Contracts and security
 
-[D007 — Separate project-preview origins and a confined runner connection](../decisions/007-confined-project-preview-origins.md) is the accepted implementation boundary after independent design review. It owns unique origins, the body-only browser grant exchange, a fixed loopback relay over the exact no-egress runner namespace, and reader/exclusive-writer lifetime rules. It does not weaken D001, the stable Harbor CSP, or the public workspace-management gate. Delivery remains Planned until implementation begins.
+[D007 — Separate project-preview origins and a confined runner connection](../decisions/007-confined-project-preview-origins.md) is the accepted implementation boundary after independent design review. It owns unique origins, the body-only browser grant exchange, a fixed loopback relay over the exact no-egress runner namespace, and reader/exclusive-writer lifetime rules. It does not weaken D001, the stable Harbor CSP, or the public workspace-management gate. Implementation began on 8 September 2026 in an isolated worktree; acceptance remains pending.
 
 Store preview ID, workspace/runtime generation, permitted internal destination, lifecycle, process ownership, access grant, and expiry. Creation is an authenticated durable operation; stopping a preview confirms process/proxy termination and does not cancel an unrelated conversation implicitly.
 
@@ -38,6 +38,7 @@ The trusted proxy resolves only registered runner destinations. Block metadata/c
 ## Source issues
 
 - [Preview retirement race](../../issues/2026-09-13-022008-preview-retirement-race.md): Medium, In progress. Exact disappearance handling passed an actual Docker canary and bounded independent review; recovered checkpoint 4218d71 still requires final main integration and P011-01/05 lifecycle acceptance.
+- [P011 implementation review](../../issues/2026-09-13-024503-p011-implementation-review.md): High, In progress. P011-01/05 retain the stop reservation and accepted-execution readiness corrections and their actual regression/review gates.
 - [P009 backup transfer authorization](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, active and Blocked in P009. Conditional deployed registry/restore coverage inherits this checkpoint prerequisite; it does not prevent P011's local browser/network/isolation implementation and acceptance.
 
 ## Design review record
@@ -57,8 +58,10 @@ Use delivered P003 with a small real HTTP fixture application, hostile-script va
 
 ## Delivery and verification
 
-The [account-free headless-command spike](../../docs/reports/2026-09-08-p011-protocol-spike.md) passed on Codex 0.153.4/Node 24.11.1/macOS. A zero-byte `command/exec/write` acknowledges the exact connection-scoped command identity and rejects unstarted/wrong/exited IDs. This supplies a candidate native identity check for the existing startup contract; it does not replace exact runner/relay checks, completed-generation denial or HTTP readiness. Delivery remains Planned until the complete feature implementation begins.
+The [account-free headless-command spike](../../docs/reports/2026-09-08-p011-protocol-spike.md) passed on Codex 0.153.4/Node 24.11.1/macOS. A zero-byte `command/exec/write` acknowledges the exact connection-scoped command identity and rejects unstarted/wrong/exited IDs. This supplies a candidate native identity check for the existing startup contract; it does not replace exact runner/relay checks, completed-generation denial or HTTP readiness. Implementation began on 8 September 2026; the complete feature acceptance remains pending.
 
-Use planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, and `pnpm test:isolation`; add live/contract lanes only if Codex integration changes. Follow [shared setup/evidence rules](README.md#shared-verification-contract). Configure separate test origins explicitly; a screenshot of a local page is not authentication/isolation evidence.
+Use `pnpm check`, `pnpm test`, `pnpm test:e2e`, and the relevant `pnpm test:isolation` lane; adapter changes require pinned contracts and applicable live gates. Follow [shared setup/evidence rules](README.md#shared-verification-contract). Configure separate test origins explicitly; a screenshot of a local page is not authentication/isolation evidence.
+
+Current implementation evidence is recorded in the [development report](../../docs/reports/2026-09-08-p011-development.md). Full independent review and its two corrective source/application checks have passed. Actual Linux and installed checkpoints retain their precise earlier source identities; the latest stop/readiness lifecycle correction still requires supported Linux acceptance and cumulative integration. Delivery remains In progress, with protected restore and applicable upstream gates explicitly unverified. The [user guide](../../docs/user/previews.md) and [developer setup](../../docs/developer/previews.md) describe the implemented candidate behavior.
 
 Add preview lifecycle migrations and expiry/cleanup registration. Restore metadata as inactive until a process is deliberately restarted; backup never implies a live process survives. Document supported protocols, private access, and limitations once implemented. Review proxy and cookie boundaries independently before verified delivery.

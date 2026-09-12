@@ -1,5 +1,22 @@
 import { z } from "zod";
 const schema = z.object({
+  HARBOR_PREVIEW_DOMAIN: z
+    .string()
+    .regex(/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}$/)
+    .optional(),
+  HARBOR_PREVIEW_HTTPS_PORT: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(65535)
+    .default(443),
+  HARBOR_PREVIEW_PORT: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .max(65535)
+    .default(3002),
+  HARBOR_PREVIEW_SOCKET: z.string().startsWith("/").optional(),
   HARBOR_CONTROL_SOCKET: z.string().startsWith("/").optional(),
   HARBOR_CREDENTIAL_KEY_FILE: z.string().startsWith("/").optional(),
   DATABASE_URL: z.string().min(1),

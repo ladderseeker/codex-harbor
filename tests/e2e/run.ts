@@ -1,3 +1,7 @@
+if (process.argv.includes("--previews")) {
+  await import("../previews/e2e.ts");
+  process.exit(process.exitCode ?? 0);
+}
 import { scheduleDstE2e } from "../schedules/dst-e2e.ts";
 import { scheduleE2e } from "../schedules/e2e.ts";
 if (process.argv.includes("--terminals")) {

@@ -64,7 +64,7 @@ export class CodexAdapter {
     private timeoutMs = 15_000,
     private withDispatch?: <T>(send: () => T) => Promise<T>,
     private workspaceRoots: string[] = ["/workspace"],
-    private purpose: "conversation" | "terminal" = "conversation",
+    private purpose: "conversation" | "terminal" | "preview" = "conversation",
     private terminalOuterSandbox = false,
   ) {
     process.stdout.setEncoding("utf8");
@@ -191,12 +191,28 @@ export class CodexAdapter {
       }
     }
   }
+  private conversationCapability() {
+    if (this.purpose === "preview")
+      throw Error(
+        "Preview transport does not expose conversation or account mutation capabilities",
+      );
+  }
   private request(
     method: string,
     params: unknown,
     timeoutMs = this.timeoutMs,
     terminalProbe?: string,
   ): Promise<any> {
+    if (
+      this.purpose === "preview" &&
+      ![
+        "initialize",
+        "command/exec",
+        "command/exec/write",
+        "account/read",
+      ].includes(method)
+    )
+      return Promise.reject(Error("Unsupported preview runtime capability"));
     if (this.closed)
       return Promise.reject(new RuntimeUncertainError("runtime disconnected"));
     if (this.pending.size >= 32)
@@ -233,6 +249,119 @@ export class CodexAdapter {
     this.send({ method: "initialized" });
     this.initialized = true;
     return result;
+  }
+  /** One explicit shell launch per dedicated transport; exit is a separate promise. */
+  async startPreview(options: {
+    processId: string;
+    script: string;
+    port: number;
+    permissionProfile: "read-only" | "workspace-write";
+  }): Promise<{ completion: Promise<{ exitCode: number }> }> {
+    if (this.purpose !== "preview" || this.terminal || !this.initialized)
+      throw Error("Preview transport is unavailable or already used");
+    if (
+      !/^[a-zA-Z0-9_-]{1,64}$/.test(options.processId) ||
+      !/^[a-zA-Z0-9][a-zA-Z0-9:_-]{0,63}$/.test(options.script) ||
+      !Number.isInteger(options.port) ||
+      options.port < 1024 ||
+      options.port > 65535
+    )
+      throw Error("Invalid fixed preview command");
+    const state = { processId: options.processId, exited: false };
+    this.terminal = state;
+    const send = () => {
+      const completion = this.request(
+        "command/exec",
+        {
+          processId: options.processId,
+          command: ["/usr/local/bin/npm", "run", options.script],
+          tty: false,
+          streamStdin: true,
+          streamStdoutStderr: true,
+          disableOutputCap: true,
+          timeoutMs: 86_400_000,
+          cwd: this.workspaceRoots[0],
+          env: {
+            PORT: String(options.port),
+            HOST: "127.0.0.1",
+            CI: "1",
+            BROWSER: "none",
+            NPM_CONFIG_USERCONFIG: "/opt/harbor/empty-user.npmrc",
+            NPM_CONFIG_GLOBALCONFIG: "/opt/harbor/empty-global.npmrc",
+            NPM_CONFIG_CACHE: "/tmp/harbor-preview-npm",
+            NPM_CONFIG_AUDIT: "false",
+            NPM_CONFIG_FUND: "false",
+            NODE_OPTIONS: null,
+            BASH_ENV: null,
+            ENV: null,
+            HTTP_PROXY: null,
+            HTTPS_PROXY: null,
+            ALL_PROXY: null,
+          },
+          sandboxPolicy: this.terminalOuterSandbox
+            ? { type: "externalSandbox", networkAccess: "restricted" }
+            : options.permissionProfile === "workspace-write"
+              ? {
+                  type: "workspaceWrite",
+                  writableRoots: this.workspaceRoots,
+                  networkAccess: false,
+                  excludeTmpdirEnvVar: true,
+                  excludeSlashTmp: true,
+                }
+              : { type: "readOnly", networkAccess: false },
+        },
+        86_415_000,
+      ).then(
+        (result) => {
+          state.exited = true;
+          if (!Number.isInteger(result?.exitCode))
+            throw new RuntimeUncertainError("Invalid preview exit response");
+          return { exitCode: result.exitCode as number };
+        },
+        (error) => {
+          state.exited = true;
+          throw error;
+        },
+      );
+      void completion.catch(() => {});
+      return { completion };
+    };
+    const launched = this.withDispatch ? await this.withDispatch(send) : send();
+    const deadline = Date.now() + this.timeoutMs;
+    while (Date.now() < deadline) {
+      if (state.exited || this.closed)
+        throw new RuntimeUncertainError(
+          "Preview exited before identity acknowledgement",
+        );
+      try {
+        await this.probePreview();
+        return launched;
+      } catch (error) {
+        if (!(error instanceof TerminalNotPresentError)) throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    this.disconnect("preview identity acknowledgement deadline exceeded");
+    throw new RuntimeUncertainError("Preview launch remains uncertain");
+  }
+  /** Zero bytes acknowledge only the exact non-PTY identity; never type application input. */
+  async probePreview(): Promise<void> {
+    const state = this.terminal;
+    if (this.purpose !== "preview" || !state || state.exited || this.closed)
+      throw new RuntimeUncertainError("Preview process is not live");
+    await this.request(
+      "command/exec/write",
+      {
+        processId: state.processId,
+        deltaBase64: "",
+      },
+      this.timeoutMs,
+      state.processId,
+    );
+    if (state.exited || this.closed)
+      throw new RuntimeUncertainError(
+        "Preview completed during identity acknowledgement",
+      );
   }
   /** One explicit shell launch per dedicated transport; exit is a separate promise. */
   async startTerminal(options: {
@@ -404,6 +533,7 @@ export class CodexAdapter {
     return this.request("account/read", { refreshToken: false });
   }
   async startTurn(threadId: string, text: string, options: TurnOptions = {}) {
+    this.conversationCapability();
     const attachmentInput = (options.attachments ?? []).map((a) => {
       if (!/^[a-f0-9-]{36}$/.test(a.id) || a.path !== `/attachments/${a.id}`)
         throw Error("Invalid attachment reference");
@@ -448,6 +578,7 @@ export class CodexAdapter {
     });
   }
   async interruptTurn(threadId: string, turnId: string) {
+    this.conversationCapability();
     // Pinned Codex acknowledges turn/start before the active turn is installed.
     const key = JSON.stringify([threadId, turnId]),
       deadline = Date.now() + this.timeoutMs;
@@ -475,6 +606,7 @@ export class CodexAdapter {
       answers?: Record<string, { answers: string[] }>;
     },
   ) {
+    this.conversationCapability();
     const method = this.requests.get(id);
     if (!method) throw Error("Expired or already answered request");
     this.requests.delete(id);

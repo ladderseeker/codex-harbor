@@ -1,5 +1,6 @@
 import { scheduleSchemas, schedulePaths } from "./schedules-openapi.ts";
 import { filePaths, fileSchemas } from "./files-openapi.ts";
+import { previewPaths, previewSchemas } from "./previews-openapi.ts";
 import {
   terminalCreate,
   terminalControl,
@@ -21,6 +22,7 @@ const object = (
 const array = (items: unknown) => ({ type: "array", items });
 export const publicSchemas = {
   ...fileSchemas,
+  ...previewSchemas,
   Error: object({
     error: object({
       code: string,
@@ -85,7 +87,7 @@ export const publicSchemas = {
     writerGeneration: { type: ["integer", "null"] },
     writerKind: {
       type: ["string", "null"],
-      enum: ["conversation", "file", "terminal", null],
+      enum: ["conversation", "file", "terminal", "preview", "extension", null],
     },
     writerOwnerId: { type: ["string", "null"] },
     writerEpoch: { type: "integer", minimum: 0 },
@@ -361,6 +363,7 @@ const paths: Record<string, any> = {
     ),
   },
   ...filePaths,
+  ...previewPaths,
   "/history": {
     get: {
       ...read(

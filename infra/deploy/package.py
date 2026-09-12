@@ -10,6 +10,7 @@ IMAGES = {
     "gateway": "codex-harbor-egress:1",
     "git": "codex-harbor-git:2.39.5-p003",
     "files": "codex-harbor-files:2.39.5-p004",
+    "previewRelay": "codex-harbor-preview-relay:24.11.1-p011",
 }
 
 

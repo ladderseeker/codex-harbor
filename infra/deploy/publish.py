@@ -4,7 +4,7 @@ import os, stat, re, json, shutil, importlib.util, ctypes, multiprocessing, fcnt
 from config import layout, trusted
 from common import atomic
 
-NATIVE = re.compile(r"^(?:terminal-)?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
+NATIVE = re.compile(r"^(?:(?:terminal|preview)-)?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
 UUID = re.compile(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
 
 

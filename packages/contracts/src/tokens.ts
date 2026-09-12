@@ -13,6 +13,8 @@ const tokenScopes = [
   "terminal:read",
   "terminal:control",
   "terminal:terminate",
+  "previews:read",
+  "previews:manage",
 ] as const;
 export const tokenSchema = z
   .object({

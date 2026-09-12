@@ -93,6 +93,12 @@ async function registry() {
       "SELECT id,project_id,workspace_id,generation,state,retired,restored_from FROM terminals ORDER BY id LIMIT 257",
     )
   ).rows;
+  const previews = (
+    await pool.query(
+      "SELECT id,project_id,workspace_id,generation,port,state,retired,restored_from FROM previews ORDER BY id LIMIT 129",
+    )
+  ).rows;
+  if (previews.length > 128) throw Error("Preview registry bound");
   const fileEffects = (
     await pool.query(
       "SELECT id,state,acknowledged_at FROM file_operations ORDER BY id LIMIT 4097",
@@ -122,6 +128,7 @@ async function registry() {
     workspaces,
     sessions,
     terminals: terminalRows,
+    previews,
     bootstrap: (await pool.query("SELECT runtime_id FROM runtime_bootstrap"))
       .rows[0]?.runtime_id,
     attachments: (await exists("session_attachment_storage"))
@@ -214,6 +221,16 @@ try {
     await transaction(pool, async (db) => {
       await db.query("UPDATE harbor_meta SET emergency=true");
       await pauseInstalledSchedules(db, "ADMINISTRATOR_INTERRUPTED");
+      await db.query(
+        "INSERT INTO deployment_restored_operations(kind,id,source_instance,historical) SELECT 'preview-interruption',id,$1,to_jsonb(previews) FROM previews WHERE NOT retired ON CONFLICT DO NOTHING",
+        [process.env.HARBOR_INSTANCE_ID],
+      );
+      await db.query("UPDATE preview_openings SET revoked=true");
+      await db.query("UPDATE preview_grants SET revoked=true");
+      await db.query(
+        "UPDATE previews SET stop_attempts=stop_attempts+CASE WHEN state='uncertain' THEN 1 ELSE 0 END,state='stopping',failure_code='ADMINISTRATOR_INTERRUPTED' WHERE NOT retired AND (state<>'uncertain' OR stop_attempts<3)",
+      );
+
       await db.query(
         "INSERT INTO deployment_restored_operations(kind,id,source_instance,historical) SELECT 'terminal-interruption',id,$1,to_jsonb(terminals) FROM terminals WHERE NOT retired AND state='uncertain' AND termination_attempts<3 ON CONFLICT DO NOTHING",
         [process.env.HARBOR_INSTANCE_ID],

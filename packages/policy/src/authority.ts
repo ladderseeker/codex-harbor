@@ -17,6 +17,8 @@ export const tokenScopes = [
   "terminal:read",
   "terminal:control",
   "terminal:terminate",
+  "previews:read",
+  "previews:manage",
 ] as const;
 export type Scope = (typeof tokenScopes)[number];
 export interface Authority {

@@ -1,3 +1,4 @@
+import { retireRelay } from "../previews/launcher.ts";
 import { selectedWorkspace } from "../../packages/workspaces/src/service.ts";
 /** Exact stopped-service runner lock recovery; never a project-facing capability. */
 import {
@@ -31,8 +32,10 @@ if (
   !(
     uuid.test(input.sessionId) ||
     (typeof input.sessionId === "string" &&
-      input.sessionId.startsWith("terminal-") &&
-      uuid.test(input.sessionId.slice(9)))
+      ((input.sessionId.startsWith("terminal-") &&
+        uuid.test(input.sessionId.slice(9))) ||
+        (input.sessionId.startsWith("preview-") &&
+          uuid.test(input.sessionId.slice(8)))))
   ) ||
   !Number.isSafeInteger(input.generation) ||
   input.generation < 0 ||
@@ -64,15 +67,20 @@ try {
   )
     throw Error("Unknown project identity");
   const isTerminal = input.sessionId.startsWith("terminal-");
+  const isPreview = input.sessionId.startsWith("preview-");
   if (
     !(
       await pool.query(
-        isTerminal
-          ? "SELECT 1 FROM terminals WHERE id=$1 AND project_id=$2 AND generation=$3"
-          : "SELECT 1 FROM sessions WHERE id=$1 AND project_id=$2 UNION ALL SELECT 1 FROM runtime_bootstrap WHERE runtime_id=$1",
-        isTerminal
-          ? [input.sessionId.slice(9), input.projectId, input.generation]
-          : [input.sessionId, input.projectId],
+        isPreview
+          ? "SELECT 1 FROM previews WHERE id=$1 AND project_id=$2 AND generation=$3 AND restored_from IS NULL"
+          : isTerminal
+            ? "SELECT 1 FROM terminals WHERE id=$1 AND project_id=$2 AND generation=$3"
+            : "SELECT 1 FROM sessions WHERE id=$1 AND project_id=$2 UNION ALL SELECT 1 FROM runtime_bootstrap WHERE runtime_id=$1",
+        isPreview
+          ? [input.sessionId.slice(8), input.projectId, input.generation]
+          : isTerminal
+            ? [input.sessionId.slice(9), input.projectId, input.generation]
+            : [input.sessionId, input.projectId],
       )
     ).rowCount
   )
@@ -96,6 +104,19 @@ try {
   }
   if ((ledger?.generation ?? 0) !== input.generation)
     throw Error("Recovery generation changed");
+  if (isPreview) {
+    const preview = (
+      await pool.query("SELECT port FROM previews WHERE id=$1", [
+        input.sessionId.slice(8),
+      ])
+    ).rows[0];
+    await retireRelay({
+      id: input.sessionId.slice(8),
+      generation: input.generation,
+      instanceId,
+      port: preview.port,
+    });
+  }
   if (ledger) {
     const name = `harbor-${instanceId}-${input.sessionId}-${input.generation}`;
     if (ledger.container !== name)
@@ -180,6 +201,70 @@ try {
       );
       await db.query(
         "UPDATE terminals SET state='interrupted',retired=true,writer_epoch=NULL,controller_until=NULL,controller_actor=NULL,controller_id=NULL,input_uncertain=true,output_lost=true,failure_code='ADMINISTRATOR_RECOVERED' WHERE id=$1",
+        [row.id],
+      );
+    });
+  }
+  if (isPreview) {
+    await transaction(pool, async (db) => {
+      const before = (
+        await db.query("SELECT * FROM previews WHERE id=$1", [
+          input.sessionId.slice(8),
+        ])
+      ).rows[0];
+      const w = await selectedWorkspace(db, before.workspace_id, true);
+      const row = (
+        await db.query("SELECT * FROM previews WHERE id=$1 FOR UPDATE", [
+          before.id,
+        ])
+      ).rows[0];
+      if (
+        row.project_id !== input.projectId ||
+        Number(row.generation) !== input.generation ||
+        row.restored_from
+      )
+        throw Error("Preview recovery identity changed");
+      if (row.retired) return;
+      await db.query(
+        "INSERT INTO deployment_restored_operations(kind,id,source_instance,historical) VALUES('preview-recovery',$1,$2,$3) ON CONFLICT DO NOTHING",
+        [row.id, instanceId, JSON.stringify(row)],
+      );
+      if (row.permission_profile === "workspace-write") {
+        if (
+          w.writer_kind !== "preview" ||
+          w.writer_owner_id !== row.id ||
+          String(w.writer_epoch) !== String(row.lease_epoch)
+        )
+          throw Error("Preview recovery reservation changed");
+        await db.query(
+          "UPDATE workspaces SET writer_kind=NULL,writer_owner_id=NULL,writer_generation=NULL WHERE id=$1 AND writer_kind='preview' AND writer_owner_id=$2 AND writer_epoch=$3",
+          [w.id, row.id, row.lease_epoch],
+        );
+      } else {
+        if (
+          !(
+            await db.query(
+              "DELETE FROM preview_readers WHERE owner_id=$1 AND workspace_id=$2 AND generation=$3 AND epoch=$4 RETURNING owner_id",
+              [row.id, w.id, row.generation, row.lease_epoch],
+            )
+          ).rowCount
+        )
+          throw Error("Preview recovery reader changed");
+      }
+      await db.query(
+        "UPDATE preview_grants SET revoked=true WHERE preview_id=$1",
+        [row.id],
+      );
+      await db.query(
+        "UPDATE preview_openings SET revoked=true WHERE preview_id=$1",
+        [row.id],
+      );
+      await db.query(
+        "UPDATE preview_stops SET state='completed' WHERE preview_id=$1 AND generation=$2 AND state IN ('queued','retiring')",
+        [row.id, row.generation],
+      );
+      await db.query(
+        "UPDATE previews SET state='stopped',retired=true,lease_epoch=NULL,output_lost=true,failure_code='ADMINISTRATOR_RECOVERED' WHERE id=$1",
         [row.id],
       );
     });

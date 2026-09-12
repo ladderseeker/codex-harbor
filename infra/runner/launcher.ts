@@ -20,7 +20,7 @@ const exec = promisify(execFile);
 const idPattern = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 export const RUNNER_IMAGE = "codex-harbor-runner:0.153.4";
 export type RunnerConfig = {
-  purpose?: "conversation" | "terminal";
+  purpose?: "conversation" | "terminal" | "preview";
   attachmentDirectory?: NativeStorage;
   attachmentProject?: NativeStorage;
   workspaceId?: string;
@@ -39,10 +39,19 @@ export async function runnerArguments(
   config: RunnerConfig,
   native?: NativeStorage,
 ) {
-  if (config.purpose && !["conversation", "terminal"].includes(config.purpose))
+  if (
+    config.purpose &&
+    !["conversation", "terminal", "preview"].includes(config.purpose)
+  )
     throw Error("Unsupported runner purpose");
-  if (config.purpose === "terminal" && config.attachmentDirectory)
-    throw Error("Terminal runners cannot mount conversation attachments");
+  if (
+    config.purpose &&
+    config.purpose !== "conversation" &&
+    config.attachmentDirectory
+  )
+    throw Error(
+      "Dedicated process runners cannot mount conversation attachments",
+    );
   for (const id of [
     config.sessionId,
     config.projectId,
@@ -282,7 +291,9 @@ export async function startConfinedRunner(
         throw Error("Native history volume ownership mismatch");
     }
     const egress =
-      config.purpose === "terminal" ? null : await provisionEgress(config);
+      config.purpose && config.purpose !== "conversation"
+        ? null
+        : await provisionEgress(config);
     try {
       // Revalidate after provisioning and before Docker resolves the administrator-controlled mount.
       const args = await runnerArguments(config, native);

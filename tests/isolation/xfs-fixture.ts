@@ -4,7 +4,21 @@ import { mkdir, realpath, writeFile, rm, chown } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID, randomInt } from "node:crypto";
 const exec = promisify(execFile);
-export async function xfsFixture() {
+export async function xfsFixture(
+  options: { blockHardLimitBytes?: number; inodeHardLimit?: number } = {},
+) {
+  const blockHardLimitBytes = options.blockHardLimitBytes ?? 67108864;
+  const inodeHardLimit = options.inodeHardLimit ?? 512;
+  if (
+    !Number.isSafeInteger(blockHardLimitBytes) ||
+    blockHardLimitBytes < 16777216 ||
+    blockHardLimitBytes > 268435456 ||
+    blockHardLimitBytes % 1048576 !== 0 ||
+    !Number.isSafeInteger(inodeHardLimit) ||
+    inodeHardLimit < 128 ||
+    inodeHardLimit > 4096
+  )
+    throw Error("Bounded owned fixture quota profile required");
   if (
     process.platform !== "linux" ||
     process.getuid?.() !== 0 ||
@@ -50,7 +64,12 @@ export async function xfsFixture() {
     );
     await exec(
       "xfs_quota",
-      ["-x", "-c", `limit -p bhard=64m ihard=512 ${project}`, mount],
+      [
+        "-x",
+        "-c",
+        `limit -p bhard=${blockHardLimitBytes / 1048576}m ihard=${inodeHardLimit} ${project}`,
+        mount,
+      ],
       { timeout: 5000 },
     );
   }
@@ -58,8 +77,8 @@ export async function xfsFixture() {
     roots: [
       { id: rootId, path: join(base, "projects"), pool: join(base, "pool") },
     ],
-    blockHardLimitBytes: 67108864,
-    inodeHardLimit: 512,
+    blockHardLimitBytes,
+    inodeHardLimit,
     reserveBytes: 8388608,
     reserveInodes: 16,
   };

@@ -212,7 +212,7 @@ def maintenance(c, interrupt=False, deadlineSeconds=60):
             status["active"] or status["pendingStorage"] or status["pendingRecovery"]
             or status["activeFiles"] or status["uncertainFiles"]
             or status["pendingFileInspections"] or status["activeTerminals"]
-            or status["activeScheduleEffects"]
+            or status["activeScheduleEffects"] or status["activePreviews"]
         ):
             break
         if time.monotonic() > deadline:

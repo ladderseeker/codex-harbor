@@ -203,7 +203,14 @@ export const filePaths: Record<string, any> = {
             state: str,
             writerKind: {
               type: ["string", "null"],
-              enum: ["conversation", "file", "terminal", null],
+              enum: [
+                "conversation",
+                "file",
+                "terminal",
+                "preview",
+                "extension",
+                null,
+              ],
             },
             writerEpoch: integer,
           }),

@@ -57,6 +57,48 @@ try {
       terminal,
     ])
   ).rows[0];
+  const preview = randomUUID(),
+    opening = randomUUID();
+  await clone.query(
+    "INSERT INTO previews(id,project_id,workspace_id,name,script,port,hostname,permission_profile,actor_hash,generation,lease_epoch,state,retired,runner_id,relay_id) VALUES($1,$2,$3,'Restored preview','dev',3000,$4,'read-only',$5,nextval('runtime_generation_seq'),nextval('runtime_generation_seq'),'ready',false,'original-source-runtime','original-source-relay')",
+    [
+      preview,
+      w.project_id,
+      w.id,
+      randomUUID().replaceAll("-", "") + ".preview.localhost",
+      actor,
+    ],
+  );
+  const originalPreview = (
+    await clone.query("SELECT * FROM previews WHERE id=$1", [preview])
+  ).rows[0];
+  await clone.query(
+    "INSERT INTO preview_readers(owner_id,workspace_id,epoch,generation) VALUES($1,$2,$3,$4)",
+    [preview, w.id, originalPreview.lease_epoch, originalPreview.generation],
+  );
+  await clone.query(
+    "INSERT INTO preview_openings(id,preview_id,generation,actor_hash,ticket_hash,grant_hash,expires_at,consumed_at) VALUES($1,$2,$3,$4,$5,$6,clock_timestamp()+interval '30 seconds',clock_timestamp())",
+    [
+      opening,
+      preview,
+      originalPreview.generation,
+      actor,
+      randomUUID(),
+      randomUUID(),
+    ],
+  );
+  await clone.query(
+    "INSERT INTO preview_grants(id,preview_id,generation,actor_hash,hash,expires_at) VALUES($1,$2,$3,$4,$5,clock_timestamp()+interval '15 minutes')",
+    [opening, preview, originalPreview.generation, actor, randomUUID()],
+  );
+  await clone.query(
+    "INSERT INTO preview_logs(preview_id,sequence,generation,bytes) VALUES($1,1,$2,$3)",
+    [
+      preview,
+      originalPreview.generation,
+      Buffer.from("PUBLIC_PREVIEW_HISTORY"),
+    ],
+  );
   const input = {
     action: "restore-rebind",
     restoreId: randomUUID(),
@@ -85,6 +127,60 @@ try {
       ),
     );
   assert.equal(invoke().disabled, true);
+  const restoredPreview = (
+    await clone.query("SELECT * FROM previews WHERE id=$1", [preview])
+  ).rows[0];
+  assert.equal(restoredPreview.state, "stopped");
+  assert.equal(restoredPreview.retired, true);
+  assert.notEqual(restoredPreview.generation, originalPreview.generation);
+  assert.equal(restoredPreview.runner_id, null);
+  assert.equal(restoredPreview.relay_id, null);
+  assert.equal(restoredPreview.lease_epoch, null);
+  assert.equal(restoredPreview.output_lost, true);
+  assert.equal(
+    (
+      await clone.query(
+        "SELECT count(*)::int n FROM preview_readers WHERE owner_id=$1",
+        [preview],
+      )
+    ).rows[0].n,
+    0,
+  );
+  assert.equal(
+    (
+      await clone.query(
+        "SELECT count(*)::int n FROM preview_grants WHERE preview_id=$1 AND NOT revoked",
+        [preview],
+      )
+    ).rows[0].n,
+    0,
+  );
+  assert.equal(
+    (
+      await clone.query(
+        "SELECT count(*)::int n FROM preview_openings WHERE preview_id=$1 AND NOT revoked",
+        [preview],
+      )
+    ).rows[0].n,
+    0,
+  );
+  assert.equal(
+    (
+      await clone.query("SELECT bytes FROM preview_logs WHERE preview_id=$1", [
+        preview,
+      ])
+    ).rows[0].bytes.toString(),
+    "PUBLIC_PREVIEW_HISTORY",
+  );
+  assert.equal(
+    (
+      await clone.query(
+        "SELECT historical->>'runner_id' id FROM deployment_restored_operations WHERE kind='preview' AND id=$1",
+        [preview],
+      )
+    ).rows[0].id,
+    "original-source-runtime",
+  );
   const f = (
     await clone.query("SELECT * FROM file_operations WHERE id=$1", [file])
   ).rows[0];
@@ -149,6 +245,14 @@ try {
   invoke();
   assert.equal(
     (
+      await clone.query("SELECT generation FROM previews WHERE id=$1", [
+        preview,
+      ])
+    ).rows[0].generation,
+    restoredPreview.generation,
+  );
+  assert.equal(
+    (
       await clone.query("SELECT generation FROM terminals WHERE id=$1", [
         terminal,
       ])
@@ -204,6 +308,9 @@ try {
         status: "passed",
         node: process.version,
         freshLocalDatabaseClone: true,
+        previewStoppedNewGenerationWithoutReplay: true,
+        previewViewerAuthorityRevoked: true,
+        previewLogsAndNativeReferencesHistoricallyPreserved: true,
         actualInstalledDatabaseBridge: release,
         originalFileOutcomePreserved: true,
         oldInspectionNonAuthorizing: true,
