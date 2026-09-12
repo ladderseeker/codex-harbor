@@ -10,6 +10,7 @@
 
 ## Source issues
 
+- [Source upload boundary](../../issues/2026-09-13-052647-p010-source-upload-boundary.md): Low, In progress. The exact accepted source ceiling exceeds the wire limit after framing. P010-01/03/07 require aligned bounded admission/transfer, a boundary regression and independent correction review; actual complete candidate acceptance remains pending.
 - [Worker backing reserve](../../issues/2026-09-13-044423-p010-worker-backing-reserve.md): High, In progress. Logical mount separation and independent free-space checks do not account for a worker backing file on control storage. P010-03/04/07 require production admission to preserve the physical recovery reserve, with actual Linux evidence and independent review; a test-harness check alone does not satisfy this gate.
 - [Worker start after preparation expiry](../../issues/2026-09-08-065900-p010-expired-worker-start.md): Medium, In progress. The corrected preparation/start transition passed 28 exact-source Python contracts and bounded independent review in isolated checkpoint `a51a4bc`. Root integration and actual Linux lifecycle evidence remain required under P010-05.
 - [Candidate relay deadline](../../issues/2026-09-08-061531-p010-relay-deadline.md): Medium, In progress. The early channel omitted its durable worker deadline. The correction passed focused local checks and bounded independent review; committed integration and actual Linux lifecycle evidence remain required under P010-05.
