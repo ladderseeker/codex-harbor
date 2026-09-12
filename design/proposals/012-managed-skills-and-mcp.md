@@ -16,6 +16,8 @@ P004's editor, P006's terminal, schedules, previews and deployment UI are not pr
 
 ## Source issues
 
+- [Restored command replay](../../issues/2026-09-13-060202-p012-restored-command-replay.md): Medium, In progress. The isolated historical-key correction passed actual PostgreSQL replay/collection/fresh-request checks and independent module round 2. P012-04/05 retain main integration and actual installed/managed acceptance obligations; the original prefix-owner finding remains qualified as source-only with no new effect demonstrated.
+
 - [P012 implementation review](../../issues/2026-09-13-042641-p012-implementation-review.md): Medium, In progress. Four corrections passed matching seeded application regressions and independent round 2. The record maps each part to P012 acceptance; actual queued-rejection-to-physical-removal, complete visible UI evidence, main integration and current final regressions remain pending.
 - [Native acknowledgement deadlock](../../issues/2026-09-13-022009-native-acknowledgement-deadlock.md): High, In progress. The isolated shared-turn correction passed a repeated real PostgreSQL contention barrier and independent review. P012-01/04 and inherited P001 lifecycle coverage still require main integration and its current regression evidence.
 - [Dedicated live-test credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md): High, blocked. P012-06 requires a real model-backed skill invocation and MCP-using turn. Account-free protocol checks cover separate non-model compatibility only.
