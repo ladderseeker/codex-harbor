@@ -13,6 +13,7 @@ Implement the actual runtime adapter, isolated runner, durable dispatch, history
 
 ## Source issues
 
+- [Native acknowledgement deadlock](../../issues/2026-09-13-022009-native-acknowledgement-deadlock.md): High, In progress. P012 found a shared acknowledgement/request lock inversion affecting P001-03/07; its isolated correction and historical PostgreSQL barrier passed, while independent review, main integration and current regressions remain required.
 - [Resolved P001 implementation review](../../issues/archive/2026-09-07-174757-p001-review-findings.md): critical lifecycle/security and input-decline corrections passed four independent review rounds and corresponding regression/isolation checks.
 - [Replay/control storage bounds](../../issues/archive/2026-09-07-185228-p001-retention-control-bounds.md): Medium severity, Resolved by reviewed P007 integration; exact replay count/age, reserved control storage and inherited P001-03/07 regressions passed. The archived record preserves discovery and closing evidence.
 - [Linux gateway availability](../../issues/2026-09-07-185228-linux-gateway-availability.md): Medium severity, Open; intermittent approved-endpoint failures remain a measured environment limitation despite final passing isolation. P009 must verify target-host connectivity.

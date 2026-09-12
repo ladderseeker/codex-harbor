@@ -4,10 +4,13 @@ Use this index and the [issue archive](archive/README.md) to find existing findi
 
 ## Active issues
 
-The archive contains resolved source-review findings, installed web/workspace corrections, authority and retention corrections, allocation detection/reconciliation, and the P002/P005 harness corrections. Current P010 integration, P004/P006 restore obligations, P005/P007 regression observations, live-account and backup-transfer blockers, and gateway availability remain active. The earlier runtime finding remains Transferred with partial local evidence below.
+The archive contains resolved source-review findings, installed web/workspace corrections, authority and retention corrections, allocation detection/reconciliation, and the P002/P005 harness corrections. Shared acknowledgement and preview retirement integration, test-host access recovery, P010 integration, P004/P006 restore obligations, P005/P007 regression observations, live-account and backup-transfer blockers, and gateway availability remain active. The earlier runtime finding remains Transferred with partial local evidence below.
 
 | Issue | Severity | Status | Owner | Next action |
 | --- | --- | --- | --- | --- |
+| [Native acknowledgement deadlock](2026-09-13-022009-native-acknowledgement-deadlock.md) | High | In progress | P012 / shared P001 lifecycle | Isolated parent-first correction and historical real PostgreSQL barrier passed; finish independent review, main integration and current regression evidence. |
+| [Preview retirement race](2026-09-13-022008-preview-retirement-race.md) | Medium | In progress | P011 | Hash-matched correction, actual Docker evidence and bounded review recovered in 4218d71; complete final main integration and lifecycle acceptance. |
+| [Test-host SSH recovery](2026-09-13-022007-test-host-ssh-recovery.md) | Medium | Blocked | Verification infrastructure | Existing connections work. Automatic review rejected persistent replacement key enrollment; finish unaffected work, then obtain exact authorization and verify durable management recovery. |
 | [P010 expired worker start](2026-09-08-065900-p010-expired-worker-start.md) | Medium | In progress | P010 | Correction passed 28 exact-source Python contracts and bounded independent review; complete root integration and actual Linux lifecycle evidence. |
 | [P010 relay deadline](2026-09-08-061531-p010-relay-deadline.md) | Medium | In progress | P010 | Corrected lifetime guard passed focused local checks and bounded independent review; finish committed integration and actual Linux channel cleanup evidence. |
 | [P010 artifact link boundary](2026-09-08-045236-p010-artifact-link-boundary.md) | Medium | In progress | P010 | Exact-parent containment correction and independent hostile-archive checks passed; record committed P010 integration before archiving. |

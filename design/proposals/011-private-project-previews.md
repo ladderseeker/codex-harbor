@@ -37,6 +37,7 @@ The trusted proxy resolves only registered runner destinations. Block metadata/c
 
 ## Source issues
 
+- [Preview retirement race](../../issues/2026-09-13-022008-preview-retirement-race.md): Medium, In progress. Exact disappearance handling passed an actual Docker canary and bounded independent review; recovered checkpoint 4218d71 still requires final main integration and P011-01/05 lifecycle acceptance.
 - [P009 backup transfer authorization](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, active and Blocked in P009. Conditional deployed registry/restore coverage inherits this checkpoint prerequisite; it does not prevent P011's local browser/network/isolation implementation and acceptance.
 
 ## Design review record

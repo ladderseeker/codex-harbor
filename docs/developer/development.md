@@ -64,6 +64,8 @@ Use the [proposal lifecycle](../../AGENTS.md#proposal-completion-and-archive) to
 
 Use a branch/worktree for isolated implementation, especially when work happens in parallel. Preserve unrelated changes. Keep the proposal current if requirements change, and update actual user/developer documentation as behavior becomes available. Do not make commits or publish changes without task authorization.
 
+Keep worktrees and verification assets that must survive an interruption in persistent ignored storage, such as this repository's `.test-runs/worktrees/` directory. Operating-system temporary storage is for recreatable scratch files. Record the owner and recovery plan for uncommitted edits and live test resources; preserve coherent checkpoints under existing commit authorization. The [interruption recovery report](../reports/2026-09-13-interrupted-work-recovery.md) records the current restored branches and access limitation.
+
 Implement the outcome, run its end-to-end acceptance scenarios and the critical regression suite, obtain independent review, fix actionable findings, and verify the fixes. Record the revision, environment, commands, results, skipped gates, and review rounds in an appropriate report linked from the proposal. Screenshots and test traces are supporting evidence, not a substitute for assertions about the result.
 
 Finish the lifecycle update with the proposal's closing notes, source-issue evidence, current user/developer documentation, and both active/archive indexes and links. Follow the [reopening and design maintenance rules](../../AGENTS.md#reopening-and-design-maintenance) when findings invalidate closure or materially change the design.
