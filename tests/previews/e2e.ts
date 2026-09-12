@@ -374,7 +374,7 @@ try {
     supervisor,
     previewId: p.id,
   });
-  if (managed)
+  if (managed && process.env.HARBOR_PREVIEW_FAULTS_ONLY !== "1")
     await previewDerivedLinux({
       db,
       context,

@@ -19,8 +19,8 @@ subprocess.run([release + "/bin/node", "--import", release + "/node_modules/tsx/
 # The actual registry and physical native inventory are independent of browser UI.
 from backup import inventory
 registry = db(c, release, "registry")
-assert len(registry["previews"]) == 1
-preview = registry["previews"][0]
+result = json.load(open(evidence / "result.json"))
+preview = next(p for p in registry["previews"] if p["id"] == result["previewId"])
 assert preview["retired"] is True
 project = next(p for p in registry["projects"] if p["id"] == preview["project_id"])
 physical = inventory(str(Path(project["canonical_path"]).parent), exclude_native_auth=True)

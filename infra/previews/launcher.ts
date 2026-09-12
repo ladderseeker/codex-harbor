@@ -35,25 +35,36 @@ function name(c: RelayIdentity) {
     throw Error("Invalid relay identity");
   return `harbor-preview-relay-${c.id}-${c.generation}`;
 }
+async function listed(c: RelayIdentity) {
+  return (
+    await exec("docker", ["ps", "-aq", "--filter", `name=^/${name(c)}$`], {
+      env: env(),
+      timeout: 5000,
+      maxBuffer: 4096,
+    })
+  ).stdout.trim();
+}
 async function inspectExact(c: RelayIdentity) {
   const n = name(c),
-    listing = (
-      await exec("docker", ["ps", "-aq", "--filter", `name=^/${n}$`], {
-        env: env(),
-        timeout: 5000,
-        maxBuffer: 4096,
-      })
-    ).stdout.trim();
+    listing = await listed(c);
   if (!listing) return;
-  const r = JSON.parse(
-    (
+  let raw: string;
+  try {
+    raw = (
       await exec("docker", ["inspect", "--format", "{{json .}}", listing], {
         env: env(),
         timeout: 5000,
         maxBuffer: 65536,
       })
-    ).stdout,
-  );
+    ).stdout;
+  } catch (error) {
+    // --rm may remove this exact container between listing and inspection.
+    // A successful fresh absence check is required; daemon errors or any
+    // replacement at the reserved name remain unconfirmed.
+    if (!(await listed(c))) return;
+    throw error;
+  }
+  const r = JSON.parse(raw);
   if (
     !/^[a-f0-9]{64}$/.test(r.Id) ||
     r.Name !== "/" + n ||
@@ -68,13 +79,19 @@ async function inspectExact(c: RelayIdentity) {
 export async function retireRelay(c: RelayIdentity) {
   const r = await inspectExact(c);
   if (!r) return;
-  await exec("docker", ["rm", "--force", r.Id], {
-    env: env(),
-    timeout: 15000,
-    maxBuffer: 4096,
-  });
+  try {
+    await exec("docker", ["rm", "--force", r.Id], {
+      env: env(),
+      timeout: 15000,
+      maxBuffer: 4096,
+    });
+  } catch (error) {
+    if (!(await inspectExact(c))) return;
+    throw error;
+  }
   if (await inspectExact(c)) throw Error("Relay retirement unconfirmed");
 }
+
 export class PreviewRelay extends EventEmitter {
   private buffer = Buffer.alloc(0);
   private ended = false;

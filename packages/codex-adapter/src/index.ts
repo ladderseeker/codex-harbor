@@ -191,12 +191,28 @@ export class CodexAdapter {
       }
     }
   }
+  private conversationCapability() {
+    if (this.purpose === "preview")
+      throw Error(
+        "Preview transport does not expose conversation or account mutation capabilities",
+      );
+  }
   private request(
     method: string,
     params: unknown,
     timeoutMs = this.timeoutMs,
     terminalProbe?: string,
   ): Promise<any> {
+    if (
+      this.purpose === "preview" &&
+      ![
+        "initialize",
+        "command/exec",
+        "command/exec/write",
+        "account/read",
+      ].includes(method)
+    )
+      return Promise.reject(Error("Unsupported preview runtime capability"));
     if (this.closed)
       return Promise.reject(new RuntimeUncertainError("runtime disconnected"));
     if (this.pending.size >= 32)
@@ -517,6 +533,7 @@ export class CodexAdapter {
     return this.request("account/read", { refreshToken: false });
   }
   async startTurn(threadId: string, text: string, options: TurnOptions = {}) {
+    this.conversationCapability();
     const attachmentInput = (options.attachments ?? []).map((a) => {
       if (!/^[a-f0-9-]{36}$/.test(a.id) || a.path !== `/attachments/${a.id}`)
         throw Error("Invalid attachment reference");
@@ -561,6 +578,7 @@ export class CodexAdapter {
     });
   }
   async interruptTurn(threadId: string, turnId: string) {
+    this.conversationCapability();
     // Pinned Codex acknowledges turn/start before the active turn is installed.
     const key = JSON.stringify([threadId, turnId]),
       deadline = Date.now() + this.timeoutMs;
@@ -588,6 +606,7 @@ export class CodexAdapter {
       answers?: Record<string, { answers: string[] }>;
     },
   ) {
+    this.conversationCapability();
     const method = this.requests.get(id);
     if (!method) throw Error("Expired or already answered request");
     this.requests.delete(id);

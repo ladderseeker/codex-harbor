@@ -402,20 +402,25 @@ export class PreviewSupervisor {
       instanceId: process.env.HARBOR_INSTANCE_ID ?? "harbor",
       port: p.port,
     };
+    let retirementStage = "relay-close";
     try {
       if (r) {
         if (r.relay) await r.relay.close();
+        retirementStage = "runtime-close";
         r.adapter?.close();
         await r.adapter?.closeAndWait();
       }
       if (!this.c.HARBOR_FIXTURE_MODE || process.env.HARBOR_STORAGE_SOCKET) {
+        retirementStage = "relay-retire";
         await retireRelay(identity);
+        retirementStage = "runtime-retire";
         await retireRuntimeIdentity({
           instanceId: identity.instanceId,
           projectId: p.project_id,
           sessionId: "preview-" + p.id,
         });
       }
+      retirementStage = "settlement";
       await transaction(this.pool, async (db) => {
         const { p: fresh, w } = await lockedPreview(db, p.id);
         if (Number(fresh.generation) !== Number(p.generation))
@@ -445,7 +450,31 @@ export class PreviewSupervisor {
       });
       if (r) clearTimeout(r.deadline);
       this.owned.delete(p.id);
-    } catch {
+    } catch (error) {
+      const value = error as {
+        code?: unknown;
+        stderr?: unknown;
+        message?: unknown;
+      };
+      console.error(
+        JSON.stringify({
+          event: "preview-retirement-unconfirmed",
+          stage: retirementStage,
+          code:
+            typeof value.code === "number"
+              ? value.code
+              : typeof value.code === "string" &&
+                  /^[A-Z0-9_]{1,16}$/.test(value.code)
+                ? value.code
+                : "UNKNOWN",
+          absentContainer:
+            typeof value.stderr === "string" &&
+            /No such (object|container)/i.test(value.stderr),
+          ownershipMismatch:
+            typeof value.message === "string" &&
+            /ownership mismatch/i.test(value.message),
+        }),
+      );
       await transaction(this.pool, async (db) => {
         const { p: fresh } = await lockedPreview(db, p.id);
         if (Number(fresh.generation) !== Number(p.generation) || fresh.retired)

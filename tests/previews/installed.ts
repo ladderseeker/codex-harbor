@@ -23,6 +23,28 @@ const browser = await chromium.launch({
 });
 const context = await browser.newContext({ ignoreHTTPSErrors: true });
 const page = await context.newPage();
+const traffic: {
+  method: string;
+  path: string;
+  status?: number;
+  failure?: string;
+}[] = [];
+context.on("response", (r) => {
+  if (traffic.length < 128)
+    traffic.push({
+      method: r.request().method(),
+      path: new URL(r.url()).pathname,
+      status: r.status(),
+    });
+});
+context.on("requestfailed", (r) => {
+  if (traffic.length < 128)
+    traffic.push({
+      method: r.method(),
+      path: new URL(r.url()).pathname,
+      failure: (r.failure()?.errorText ?? "unknown").slice(0, 100),
+    });
+});
 const sourceAtStart = sourceDigest();
 const cli = (args: string[]) =>
   JSON.parse(
@@ -38,6 +60,18 @@ const cli = (args: string[]) =>
     ),
   );
 try {
+  const reusedFixture = process.env.HARBOR_PREVIEW_REUSE_INSTALL === "1";
+  if (reusedFixture) {
+    expect(
+      Number(
+        (await db.query("SELECT count(*) FROM previews WHERE NOT retired"))
+          .rows[0].count,
+      ),
+    ).toBe(0);
+    cli(["resume"]);
+    await db.query("UPDATE harbor_meta SET emergency=false");
+  }
+  const projectName = "Installed private preview " + randomUUID().slice(0, 8);
   await page.goto(c.origin + "/auth/login");
   await page
     .getByRole("button", { name: "Sign in as owner", exact: true })
@@ -60,8 +94,8 @@ try {
   };
   const { project } = await command("/projects", {
     rootId: c.roots[0].id,
-    name: "Installed private preview",
-    path: "preview-app",
+    name: projectName,
+    path: "preview-app-" + randomUUID().slice(0, 8),
     create: true,
   });
   const w = (
@@ -85,6 +119,10 @@ try {
     await chown(file, 10001, 10001);
   }
   await page.reload();
+  await page
+    .getByRole("navigation", { name: "Projects", exact: true })
+    .getByRole("button", { name: projectName, exact: true })
+    .click();
   await page
     .getByRole("button", { name: "Project previews", exact: true })
     .click();
@@ -179,10 +217,13 @@ try {
     }
     expect(absent).toBe(true);
   }
-  await popup.reload();
-  await expect(
-    popup.getByText("Preview unavailable.", { exact: false }),
-  ).toBeVisible();
+  const unavailable = await popup.reload();
+  expect(unavailable?.status()).toBe(502);
+  expect(
+    await popup
+      .getByRole("heading", { name: "Installed private preview", exact: true })
+      .count(),
+  ).toBe(0);
   expect(
     (
       await db.query(
@@ -198,6 +239,9 @@ try {
         sourceAtStart,
         sourceAtEnd: sourceDigest(),
         installedArtifact: manifest.artifact,
+        reusedFixture,
+        explicitFixtureEmergencyReset: reusedFixture,
+        stoppedApiReturns502: true,
         releaseSource: manifest.source,
         node: process.version,
         previewRelay: manifest.images.previewRelay.id,
@@ -223,6 +267,14 @@ try {
         sourceAtStart,
         sourceAtEnd: sourceDigest(),
         error: String(error).slice(0, 3000),
+        traffic,
+        document: await page
+          .evaluate(() => ({
+            ready: document.readyState,
+            path: location.pathname,
+            rootChildren: document.getElementById("root")?.childElementCount,
+          }))
+          .catch(() => null),
         previews: (
           await db.query(
             "SELECT id,state,retired,generation,failure_code FROM previews",
