@@ -10,6 +10,8 @@
 
 ## Source issues
 
+- [Fixture build lifetime](../../issues/2026-09-13-054640-p010-fixture-build-lifetime.md): Medium, In progress. Three bounded independent rounds closed the isolated duration/output, interruption and final-output corrections; six controlled tests passed. P010-01/02/03/05 retain actual confined fixture/Linux/UI acceptance and main integration obligations.
+
 - [Source upload boundary](../../issues/2026-09-13-052647-p010-source-upload-boundary.md): Low, In progress. The isolated framing correction passed bounded independent review and local boundary tests whose retained results are explicitly transcript-derived. P010-01/03/07 still require main integration and actual candidate upload acceptance.
 - [Worker backing reserve](../../issues/2026-09-13-044423-p010-worker-backing-reserve.md): High, In progress. The isolated production budget correction passed source review, actual Linux denial/positive admission and protected allocation cleanup with independently reviewed evidence. P010-03/04/07 still require complete candidate resource acceptance and main integration; the component checks do not establish full exhaustion or worker-family retirement.
 - [Worker start after preparation expiry](../../issues/2026-09-08-065900-p010-expired-worker-start.md): Medium, In progress. The corrected preparation/start transition passed 28 exact-source Python contracts and bounded independent review in isolated checkpoint `a51a4bc`. Root integration and actual Linux lifecycle evidence remain required under P010-05.
