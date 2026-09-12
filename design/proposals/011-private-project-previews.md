@@ -1,8 +1,8 @@
 # P011 — Private project previews
 
 - Decision: Accepted
-- Delivery: In progress
-- Implementation started: 2026-09-08 from reviewed root `80560da`, with an isolated worktree and private pinned dependencies. Browser/relay/runtime implementation and acceptance remain in progress.
+- Delivery: Implemented
+- Implementation started: 2026-09-08 from reviewed root `80560da`, with an isolated worktree and private pinned dependencies. Reviewed implementation accepted on main on 2026-09-13; protected restore and upstream verification remain open.
 - Dependencies: [P003](003-parallel-project-workspaces.md)
 - Outcome: The owner starts a project's application and views it through an authenticated preview without exposing an arbitrary VPS port.
 
@@ -37,8 +37,8 @@ The trusted proxy resolves only registered runner destinations. Block metadata/c
 
 ## Source issues
 
-- [Preview retirement race](../../issues/2026-09-13-022008-preview-retirement-race.md): Medium, In progress. Exact disappearance handling passed an actual Docker canary and bounded independent review; recovered checkpoint 4218d71 still requires final main integration and P011-01/05 lifecycle acceptance.
-- [P011 implementation review](../../issues/2026-09-13-024503-p011-implementation-review.md): High, In progress. P011-01/05 retain the stop reservation and accepted-execution readiness corrections and their actual regression/review gates.
+- [Preview retirement race](../../issues/archive/2026-09-13-022008-preview-retirement-race.md): Medium, Resolved. Exact disappearance handling, bounded independent review, main integration and P011-01/05 lifecycle acceptance passed; historical unidentified failures retain their original qualifications.
+- [P011 implementation review](../../issues/archive/2026-09-13-024503-p011-implementation-review.md): High, Resolved. Stop reservation and accepted-execution readiness corrections passed two review rounds, focused local/Linux acceptance and cumulative main verification.
 - [P009 backup transfer authorization](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, active and Blocked in P009. Conditional deployed registry/restore coverage inherits this checkpoint prerequisite; it does not prevent P011's local browser/network/isolation implementation and acceptance.
 
 ## Design review record
@@ -62,6 +62,6 @@ The [account-free headless-command spike](../../docs/reports/2026-09-08-p011-pro
 
 Use `pnpm check`, `pnpm test`, `pnpm test:e2e`, and the relevant `pnpm test:isolation` lane; adapter changes require pinned contracts and applicable live gates. Follow [shared setup/evidence rules](README.md#shared-verification-contract). Configure separate test origins explicitly; a screenshot of a local page is not authentication/isolation evidence.
 
-Current implementation evidence is recorded in the [development report](../../docs/reports/2026-09-08-p011-development.md). Full independent review, the two corrective local/Linux lifecycle checks and cumulative critical verification passed. Earlier full isolation and installed checkpoints retain their precise source identities. Delivery remains In progress pending main acceptance, with protected/fresh-host restore and applicable upstream gates explicitly unverified. The [user guide](../../docs/user/previews.md) and [developer setup](../../docs/developer/previews.md) describe the implemented candidate behavior.
+Current implementation evidence is recorded in the [development report](../../docs/reports/2026-09-08-p011-development.md#main-acceptance--13-september-2026). Main accepted the implementation after two independent review rounds, corrective local/Linux lifecycle checks and cumulative critical verification. Earlier full isolation and installed checkpoints retain their precise source identities. Delivery is Implemented; protected/fresh-host restore and applicable upstream gates remain unverified, so the proposal stays active. The [user guide](../../docs/user/previews.md) and [developer setup](../../docs/developer/previews.md) describe the available behavior.
 
-Add preview lifecycle migrations and expiry/cleanup registration. Restore metadata as inactive until a process is deliberately restarted; backup never implies a live process survives. Document supported protocols, private access, and limitations once implemented. Review proxy and cookie boundaries independently before verified delivery.
+Preview lifecycle migration, expiry/cleanup and deployment registration are implemented. Local metadata rebind restores previews as inactive until deliberately restarted; this does not establish a protected fresh-host filesystem restore. Proxy, cookie and user/API boundaries have independent review. Complete the remaining restore and upstream gates before verified delivery.

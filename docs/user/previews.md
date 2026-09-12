@@ -1,6 +1,6 @@
 # Private project previews
 
-The P011 preview interface is available in its development branch; complete acceptance and independent review remain in progress. See the [delivery report](../reports/2026-09-08-p011-development.md) for tested sources and remaining gates.
+Private project previews are implemented in the main source branch. See the [delivery report](../reports/2026-09-08-p011-development.md#main-acceptance--13-september-2026) for independent review, tested sources and remaining deployment verification.
 
 Select a registered workspace, then open **Project previews**. Save a name, an existing package script, an application port, and a permission profile. The application must already have its dependencies and listen on the supplied `PORT` on loopback. Harbor runs the package script inside a dedicated confined runner; it does not install dependencies or accept a host command or upstream URL.
 

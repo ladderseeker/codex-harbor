@@ -1,6 +1,6 @@
 # Preview development and installation
 
-P011 is in progress. Its current implementation and evidence are recorded in the [development report](../reports/2026-09-08-p011-development.md); the [user guide](../user/previews.md) describes the interface. Full source review, corrective local/Linux lifecycle and cumulative critical checks passed. Main acceptance, fresh-host and protected-transfer gates remain explicit.
+P011 is implemented on main. Its current implementation and evidence are recorded in the [development report](../reports/2026-09-08-p011-development.md#main-acceptance--13-september-2026); the [user guide](../user/previews.md) describes the interface. Two independent review rounds, corrective local/Linux lifecycle and cumulative critical checks passed. Protected fresh-host restore and applicable upstream verification remain open.
 
 The API owns preview metadata, scoped PAT management, owner-browser opening tickets and the separate HTTP gateway. The supervisor owns native execution, exact writer/reader reservations and the private relay broker. Codex protocol calls remain behind the adapter. Preview-purpose transports accept the fixed non-PTY package command and zero-byte identity probes, with no conversation, model or account mutation capability.
 

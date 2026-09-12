@@ -128,4 +128,8 @@ The API exposes explicit terminal routes and a restricted WebSocket protocol; in
 
 ## Scheduled work development
 
-P008 is in progress. The [schedule API and verification guide](schedules.md) describes its current isolated UI/API and specialist test entry points, including the unverified managed/live and deployment integration gates.
+P008 is implemented. The [schedule API and verification guide](schedules.md) describes its UI/API and specialist test entry points; the [development report](../reports/2026-09-08-p008-development.md) records module integration and remaining live/protected-restore gates.
+
+## Preview development
+
+P011 is implemented on main after two independent review rounds and cumulative local/Linux verification. Use the [preview guide](previews.md) for fixed configuration, browser/API acceptance commands and the remaining protected restore and upstream gates. The [user guide](../user/previews.md) explains profiles, private access, logs and confirmed retirement.

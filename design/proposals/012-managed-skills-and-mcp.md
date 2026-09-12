@@ -16,7 +16,7 @@ P004's editor, P006's terminal, schedules, previews and deployment UI are not pr
 
 ## Source issues
 
-- [Native acknowledgement deadlock](../../issues/2026-09-13-022009-native-acknowledgement-deadlock.md): High, In progress. The isolated shared-turn correction passed a historical real PostgreSQL contention barrier. P012-01/04 and inherited P001 lifecycle coverage require independent review, main integration and current regression evidence.
+- [Native acknowledgement deadlock](../../issues/2026-09-13-022009-native-acknowledgement-deadlock.md): High, In progress. The isolated shared-turn correction passed a repeated real PostgreSQL contention barrier and independent review. P012-01/04 and inherited P001 lifecycle coverage still require main integration and its current regression evidence.
 - [Dedicated live-test credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md): High, blocked. P012-06 requires a real model-backed skill invocation and MCP-using turn. Account-free protocol checks cover separate non-model compatibility only.
 - [P009 backup-transfer authorization](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, blocked for dependent deployed restore evidence. P012-04/05 include extension-state restoration when P009 is present; local registry tests do not satisfy its protected A-to-B checkpoint gate. Other implementation and verification continue.
 
