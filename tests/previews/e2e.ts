@@ -1,3 +1,6 @@
+import { previewOutputFlood } from "./output-e2e.ts";
+import { previewControls } from "./controls-e2e.ts";
+import { previewQueuedAuthority } from "./authority-e2e.ts";
 import { previewFaults } from "./faults-e2e.ts";
 import { inspectManagedStorage } from "../../infra/storage/client.ts";
 import { previewDerivedLinux } from "./derived-linux.ts";
@@ -262,7 +265,7 @@ try {
   );
   await writeFile(
     path.join(row.canonical_path, "server.mjs"),
-    `import http from 'node:http';import {WebSocketServer} from 'ws';\nconst server=http.createServer((req,res)=>{if(req.url==='/headers'){res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({cookie:req.headers.cookie,names:Object.keys(req.headers)}));return;}if(req.url==='/events'){res.writeHead(200,{'content-type':'text/event-stream'});res.write('data: preview event\\n\\n');return;}res.writeHead(200,{'content-type':'text/html'});res.end('<!doctype html><h1>Private application</h1><p id="event">waiting</p><p id="socket">waiting</p><script>const socket=new WebSocket(location.origin.replace("https:","wss:")+"/socket");socket.onopen=()=>socket.send("preview websocket");socket.onmessage=e=>document.querySelector("#socket").textContent=e.data;new EventSource("/events").onmessage=e=>document.querySelector("#event").textContent=e.data</script>');});new WebSocketServer({server,perMessageDeflate:false}).on('connection',client=>client.on('message',(data,binary)=>client.send(data,{binary})));server.listen(Number(process.env.PORT),'127.0.0.1',()=>console.log('PREVIEW_READY'));\n`,
+    `import http from 'node:http';import {WebSocketServer} from 'ws';\nconst server=http.createServer((req,res)=>{if(req.url==='/__fixture_stream_flood'){res.writeHead(200,{'content-type':'text/event-stream'});res.write('data: slow reader\\n\\n');let n=0;const timer=setInterval(()=>{res.write('X'.repeat(16384));n+=16384;if(n>=3*1024*1024){clearInterval(timer);res.end();}},1);res.on('close',()=>clearInterval(timer));return;}if(req.url==='/__fixture_log_flood'){res.end('public flood requested');setTimeout(()=>process.stdout.write('X'.repeat(131072)),50);return;}if(req.url==='/headers'){res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({cookie:req.headers.cookie,names:Object.keys(req.headers)}));return;}if(req.url==='/events'){res.writeHead(200,{'content-type':'text/event-stream'});res.write('data: preview event\\n\\n');return;}res.writeHead(200,{'content-type':'text/html'});res.end('<!doctype html><h1>Private application</h1><p id="event">waiting</p><p id="socket">waiting</p><script>const socket=new WebSocket(location.origin.replace("https:","wss:")+"/socket");socket.onopen=()=>socket.send("preview websocket");socket.onmessage=e=>document.querySelector("#socket").textContent=e.data;new EventSource("/events").onmessage=e=>document.querySelector("#event").textContent=e.data</script>');});new WebSocketServer({server,perMessageDeflate:false}).on('connection',client=>client.on('message',(data,binary)=>client.send(data,{binary})));server.listen(Number(process.env.PORT),'127.0.0.1',()=>console.log('PREVIEW_READY'));\n`,
   );
   await page.reload();
   await page
@@ -338,12 +341,23 @@ try {
     path: path.join(artifacts, "preview-application.png"),
     fullPage: true,
   });
+  await previewControls({
+    db,
+    context,
+    popup,
+    origin,
+    csrf: me.csrfToken,
+    previewId: p.id,
+  });
+  const previewUrl = popup.url();
+  await popup.goto("about:blank");
   await previewAccess({
     db,
-    url: popup.url(),
+    url: previewUrl,
     cookie: previewCookie!.value,
     ownerOrigin: origin,
     ticketBody,
+    artifacts,
   });
   await page.getByRole("button", { name: "Stop preview", exact: true }).click();
   await expect
@@ -362,7 +376,7 @@ try {
       )
     ).rows[0].n,
   ).toBe(0);
-  await popup.reload();
+  await popup.goto(previewUrl);
   await expect(
     popup.getByText("Preview unavailable.", { exact: false }),
   ).toBeVisible();
@@ -384,6 +398,14 @@ try {
       port: appPort,
       artifacts,
     });
+  await previewQueuedAuthority({
+    db,
+    context,
+    origin,
+    csrf: me.csrfToken,
+    previewId: p.id,
+    supervisor,
+  });
   await previewFaults({
     db,
     context,
@@ -392,6 +414,14 @@ try {
     previewId: p.id,
     supervisor,
     restartSupervisor: () => start("apps/supervisor/src/main.ts"),
+    artifacts,
+  });
+  await previewOutputFlood({
+    db,
+    context,
+    origin,
+    csrf: me.csrfToken,
+    previewId: p.id,
     artifacts,
   });
   passed = true;
@@ -537,7 +567,7 @@ if (passed) {
           : null,
         scope: managed
           ? "Actual Linux UI/API/PG/supervisor/native Codex preview and fixed relay on XFS; external OIDC only; broader hostile-isolation/installed acceptance pending"
-          : "Real UI/API/PG/supervisor/relay lifecycle, maintenance, rollback-only metadata rebind, framing/credential/idle-stream authority checks; external OIDC/Codex fixtures; full fault/Linux acceptance pending",
+          : "Real UI/API/PG/supervisor/relay lifecycle, maintenance, rollback-only metadata rebind, framing/credential/idle-stream authority checks; external OIDC/Codex fixtures; actual PG faults, source authority, connection/output bounds; Linux profile evidence is identified separately",
       },
       null,
       2,

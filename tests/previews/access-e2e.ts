@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { writeFile } from "node:fs/promises";
 import WebSocket from "ws";
 import https from "node:https";
 import type { IncomingHttpHeaders } from "node:http";
@@ -12,8 +14,10 @@ export async function previewAccess(h: {
   cookie: string;
   ownerOrigin: string;
   ticketBody: string;
+  artifacts: string;
 }) {
   const target = new URL(h.url);
+  let phase = "origin-policy";
   const options = {
     hostname: target.hostname,
     port: Number(target.port),
@@ -55,7 +59,16 @@ export async function previewAccess(h: {
         );
         req.on("error", reject);
         req.setTimeout(5000, () =>
-          req.destroy(Error("Fixture request deadline")),
+          req.destroy(
+            Error(
+              "Fixture request deadline at " +
+                phase +
+                ": " +
+                route +
+                " declared bytes " +
+                (headers["Content-Length"] ?? "0"),
+            ),
+          ),
         );
         req.end(body);
       },
@@ -171,7 +184,49 @@ export async function previewAccess(h: {
       if (timer) clearTimeout(timer);
     }
   };
+  // The browser fixture was closed first, so these eight actual upstream
+  // streams exclusively occupy the documented per-preview connection budget.
+  phase = "connection-capacity";
+  const saturated = [];
+  try {
+    for (let i = 0; i < 8; i++) saturated.push(await live());
+    expect((await request("/", auth)).status).toBe(403);
+  } finally {
+    for (const stream of saturated) stream.stop();
+    await Promise.all(saturated.map((stream) => stream.closed));
+  }
+  phase = "connection-release";
+  await expect
+    .poll(async () => (await request("/", auth)).status, { timeout: 3000 })
+    .toBe(200);
+  phase = "declared-body-limit";
+  expect(
+    (
+      await request(
+        "/",
+        { ...auth, "Content-Length": "8388609" },
+        "x".repeat(8388609),
+      )
+    ).status,
+  ).toBe(403);
+  phase = "websocket-size";
+  const oversized = new WebSocket(
+    target.origin.replace("https:", "wss:") + "/socket",
+    { ...options, headers: auth, perMessageDeflate: false },
+  );
+  oversized.on("error", () => undefined);
+  await new Promise<void>((resolve, reject) => {
+    oversized.once("open", resolve);
+    oversized.once("error", reject);
+  });
+  const oversizeClosed = new Promise<void>((resolve) =>
+    oversized.once("close", () => resolve()),
+  );
+  oversized.send(Buffer.alloc(65537, 65));
+  await bounded(oversizeClosed, "Oversized preview WebSocket did not close");
+  expect((await request("/", auth)).status).toBe(200);
   // Real row wait stalls refresh; its independent nonrenewed lease closes idle SSE.
+  phase = "authority-db-wait";
   const stalled = await live(),
     locker = await h.db.connect();
   try {
@@ -191,6 +246,98 @@ export async function previewAccess(h: {
     locker.release();
     stalled.stop();
   }
+  const actor = (
+    await h.db.query("SELECT actor_hash FROM preview_grants WHERE hash=$1", [
+      digest(h.cookie),
+    ])
+  ).rows[0].actor_hash;
+  const originalPin = (await h.db.query("SELECT identity_pin FROM harbor_meta"))
+    .rows[0].identity_pin;
+  for (const fence of [
+    "source-browser-revocation",
+    "owner-replacement",
+  ] as const) {
+    phase = fence;
+    const idle = await live();
+    const socket = new WebSocket(
+      target.origin.replace("https:", "wss:") + "/socket",
+      { ...options, headers: auth, perMessageDeflate: false },
+    );
+    socket.on("error", () => undefined);
+    await new Promise<void>((resolve, reject) => {
+      socket.once("open", resolve);
+      socket.once("error", reject);
+    });
+    const closed = new Promise<void>((resolve) =>
+      socket.once("close", () => resolve()),
+    );
+    const replacement = "owned-preview-test-" + randomUUID();
+    try {
+      if (fence === "source-browser-revocation")
+        await h.db.query(
+          "UPDATE browser_sessions SET revoked=true WHERE hash=$1",
+          [actor],
+        );
+      else
+        await h.db.query("UPDATE harbor_meta SET identity_pin=$1", [
+          replacement,
+        ]);
+      await bounded(idle.closed, fence + " left SSE open");
+      await bounded(closed, fence + " left WebSocket open");
+      expect((await request("/", auth)).status).toBe(403);
+    } finally {
+      // Restore only this disposable fixture's injected row change so later
+      // independent cases can use its original owner. Closed transports stay closed.
+      if (fence === "source-browser-revocation")
+        await h.db.query(
+          "UPDATE browser_sessions SET revoked=false WHERE hash=$1",
+          [actor],
+        );
+      else
+        await h.db.query(
+          "UPDATE harbor_meta SET identity_pin=$1 WHERE identity_pin=$2",
+          [originalPin, replacement],
+        );
+      idle.stop();
+      socket.terminate();
+    }
+  }
+  phase = "slow-reader";
+  const slow = await new Promise<{
+    resume: () => void;
+    closed: Promise<void>;
+    count: () => number;
+  }>((resolve, reject) => {
+    const req = https.get(
+      { ...options, path: "/__fixture_stream_flood", headers: auth },
+      (res) => {
+        if (res.statusCode !== 200) {
+          res.resume();
+          reject(Error("Slow-reader fixture denied"));
+          return;
+        }
+        let count = 0;
+        res.on("data", (chunk) => {
+          count += chunk.length;
+        });
+        res.pause();
+        const closed = new Promise<void>((done) => {
+          res.once("close", done);
+          res.once("error", () => done());
+        });
+        resolve({ resume: () => res.resume(), closed, count: () => count });
+      },
+    );
+    req.on("error", reject);
+    req.setTimeout(5000, () => req.destroy());
+  });
+  expect((await request("/", auth)).status).toBe(200);
+  await new Promise((r) => setTimeout(r, 300));
+  slow.resume();
+  await bounded(slow.closed, "Flooding slow-reader stream did not close");
+  expect(slow.count()).toBeLessThanOrEqual(2 * 1024 * 1024);
+  expect((await request("/", auth)).status).toBe(200);
+  phase = "viewer-revocation";
   const ws = new WebSocket(
     target.origin.replace("https:", "wss:") + "/socket",
     { ...options, headers: auth, perMessageDeflate: false },
@@ -216,4 +363,22 @@ export async function previewAccess(h: {
     ws.terminate();
   }
   expect((await request("/", auth)).status).toBe(403);
+  await writeFile(
+    h.artifacts + "/access-cases.json",
+    JSON.stringify(
+      {
+        status: "passed",
+        eightConnectionsThenDenial: true,
+        completeOversizedBodyDenied: true,
+        oversizedWebSocketClosed: true,
+        dbWaitIndependentLeaseClosed: true,
+        sourceBrowserAndOwnerChangeClosedIdleSseAndWebSocket: true,
+        pausedReaderOtherViewerHealthy: true,
+        streamRateBoundBytes: slow.count(),
+        fixtureAuthorityRestoredBetweenIndependentCases: true,
+      },
+      null,
+      2,
+    ),
+  );
 }

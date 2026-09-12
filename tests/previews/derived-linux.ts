@@ -1,3 +1,4 @@
+import { previewCoexistLinux } from "./coexist-linux.ts";
 import { expect, request, type BrowserContext } from "@playwright/test";
 import type { Pool } from "pg";
 import { execFile } from "node:child_process";
@@ -52,6 +53,7 @@ export async function previewDerivedLinux(h: {
       })
     ).workspace,
   );
+  await previewCoexistLinux({ ...h, local, copy });
   const seed = [
     "run",
     "--rm",

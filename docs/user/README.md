@@ -8,4 +8,5 @@ Harbor's conversation, attachment, API-token, workspace and history/recovery fea
 - [Projects and workspaces](workspaces.md): choose Local, Git Worktree or Copy, coordinate conversations and recover an uncertain reservation.
 - [Workspace terminals](terminals.md): run a confined shell, detach/reconnect, take control, inspect a bounded output tail and terminate background work.
 - [Scheduled work](schedules.md): timing previews, bounded grants, standalone results and explicit attention/recovery; P008 remains in progress.
+- [Private project previews](previews.md): existing package scripts on separate authenticated origins; P011 acceptance remains in progress.
 - [Developer setup](../developer/development.md): disposable local instance and current runtime prerequisites.
