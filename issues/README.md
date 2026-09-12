@@ -8,6 +8,7 @@ The archive contains resolved source-review findings, installed web/workspace co
 
 | Issue | Severity | Status | Owner | Next action |
 | --- | --- | --- | --- | --- |
+| [P010 worker backing reserve](2026-09-13-044423-p010-worker-backing-reserve.md) | High | In progress | P010 | Account for worker backing growth and bounded artifacts in the stable storage reserve; verify real Linux denial/admission and independently review the production correction. |
 | [P012 implementation review](2026-09-13-042641-p012-implementation-review.md) | Medium | In progress | P012 | Fix four source-review findings covering queued rejection, failed probe status, captured-source visibility and hidden recovery actions; run actual regressions and independent correction review before main integration. |
 | [Native acknowledgement deadlock](2026-09-13-022009-native-acknowledgement-deadlock.md) | High | In progress | P012 / shared P001 lifecycle | Isolated parent-first correction, real PostgreSQL barrier and independent review passed; finish main integration and its current regression evidence. |
 | [Test-host SSH recovery](2026-09-13-022007-test-host-ssh-recovery.md) | Medium | Blocked | Verification infrastructure | Existing connections work. Automatic review rejected persistent replacement key enrollment; finish unaffected work, then obtain exact authorization and verify durable management recovery. |
