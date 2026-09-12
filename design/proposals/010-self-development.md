@@ -10,6 +10,7 @@
 
 ## Source issues
 
+- [Fresh candidate login](../../issues/2026-09-13-065252-p010-candidate-login-landing.md): Medium, In progress. Candidate-view round 1 found that a fresh unique host opens `/` before candidate authentication and receives 401. P010-01/02/07 retain the fixed login-entry correction, actual browser regression, independent review and complete guest/installed/main evidence.
 - [Broker log diagnostics](../../issues/2026-09-13-063901-p010-log-diagnostics.md): Low, In progress. Safe failure classification and the maximum log envelope correction passed focused subprocess/broker contracts and independent review. P010-03/05/07 retain actual corrected diagnostics, full candidate acceptance and main integration obligations; earlier guest failures have no established cause.
 - [Fixture build lifetime](../../issues/2026-09-13-054640-p010-fixture-build-lifetime.md): Medium, In progress. Three bounded independent rounds closed the isolated duration/output, interruption and final-output corrections; six controlled tests passed. P010-01/02/03/05 retain actual confined fixture/Linux/UI acceptance and main integration obligations.
 
