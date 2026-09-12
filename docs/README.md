@@ -26,6 +26,7 @@ This directory describes available behavior, developer workflows, and completed 
 - [Proposal and issue lifecycle review](reports/2026-09-07-proposal-issue-lifecycle.md): lifecycle rules, archive migration, and documentation verification.
 - [Integration stash reconciliation](reports/2026-09-08-stash-reconciliation.md): accounting for temporary P004/P009 snapshots and their recoverable cleanup.
 - [Interrupted-work recovery](reports/2026-09-13-interrupted-work-recovery.md): restored persistent worktrees, recovered preview corrections/evidence, missing drafts with explicit owners, and the blocked test-host SSH recovery.
+- [P010 command diagnostics](reports/2026-09-13-p010-command-diagnostics.md): qualified failed guest attempts, bounded diagnostic/framing corrections, focused contracts and independent review; complete candidate acceptance remains pending.
 - [P001 foundation verification](reports/2026-09-07-p001-foundation.md): delivered behavior, source/artifact identity, four review rounds, passing checks, and remaining gates.
 - [P005 workspace/history integration](reports/2026-09-07-p005-integration.md): combined Node 24 application/workspace acceptance and inherited actual Linux publication evidence.
 - [P005 attachment checkpoint](reports/2026-09-07-p005-attachments.md): rich drafts/uploads, real Linux publication evidence, review fixes and the blocked live-account gate.

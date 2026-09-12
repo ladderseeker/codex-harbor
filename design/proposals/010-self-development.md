@@ -10,6 +10,7 @@
 
 ## Source issues
 
+- [Broker log diagnostics](../../issues/2026-09-13-063901-p010-log-diagnostics.md): Low, In progress. Safe failure classification and the maximum log envelope correction passed focused subprocess/broker contracts and independent review. P010-03/05/07 retain actual corrected diagnostics, full candidate acceptance and main integration obligations; earlier guest failures have no established cause.
 - [Fixture build lifetime](../../issues/2026-09-13-054640-p010-fixture-build-lifetime.md): Medium, In progress. Three bounded independent rounds closed the isolated duration/output, interruption and final-output corrections; six controlled tests passed. P010-01/02/03/05 retain actual confined fixture/Linux/UI acceptance and main integration obligations.
 
 - [Source upload boundary](../../issues/2026-09-13-052647-p010-source-upload-boundary.md): Low, In progress. The isolated framing correction passed bounded independent review and local boundary tests whose retained results are explicitly transcript-derived. P010-01/03/07 still require main integration and actual candidate upload acceptance.
