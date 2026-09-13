@@ -30,7 +30,18 @@ process.send({ runtimePid: runtime.pid });
 export async function launchLocalRuntime(
   config: RuntimeConfig,
 ): Promise<OwnedRuntimeProcess> {
-  if (process.env.HARBOR_LOCAL_MODE !== "personal")
+  const vps = process.env.HARBOR_PERSONAL_VPS_MODE === "personal";
+  if (
+    vps &&
+    (process.platform !== "linux" ||
+      process.getuid?.() === 0 ||
+      process.env.HARBOR_LOCAL_MODE ||
+      process.env.HARBOR_FIXTURE_MODE)
+  )
+    throw Error(
+      "Personal VPS runtime requires a separate nonroot Linux service",
+    );
+  if (!vps && process.env.HARBOR_LOCAL_MODE !== "personal")
     throw Error("Personal local runtime mode is disabled");
   if (process.platform !== "darwin" && process.platform !== "linux")
     throw Error("Personal local runtime requires macOS or Linux");
@@ -41,8 +52,12 @@ export async function launchLocalRuntime(
     config.attachmentDirectory
   )
     throw Error("Personal local runtime supports plain conversations only");
-  const homeInput = process.env.HARBOR_LOCAL_CODEX_HOME;
-  const binaryInput = process.env.HARBOR_LOCAL_CODEX_BINARY;
+  const homeInput = vps
+    ? process.env.HARBOR_PERSONAL_VPS_CODEX_HOME
+    : process.env.HARBOR_LOCAL_CODEX_HOME;
+  const binaryInput = vps
+    ? process.env.HARBOR_PERSONAL_VPS_CODEX_BINARY
+    : process.env.HARBOR_LOCAL_CODEX_BINARY;
   if (
     !homeInput ||
     !binaryInput ||
@@ -59,6 +74,18 @@ export async function launchLocalRuntime(
     realpath(homedir()),
   ]);
   const homeStat = await stat(home);
+  if (
+    vps &&
+    (config.workspaceDevice !== undefined ||
+      config.workspaceInode !== undefined)
+  ) {
+    const identity = await stat(workspace, { bigint: true });
+    if (
+      String(identity.dev) !== config.workspaceDevice ||
+      String(identity.ino) !== config.workspaceInode
+    )
+      throw Error("Personal VPS workspace identity changed");
+  }
   if (
     !homeStat.isDirectory() ||
     (homeStat.mode & 0o077) !== 0 ||

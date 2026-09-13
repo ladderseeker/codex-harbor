@@ -149,9 +149,10 @@ export async function buildServer(c: Config) {
     if (params?.id !== undefined) z.uuid().parse(params.id);
   });
   app.addHook("onRequest", async (req, reply) => {
-    if (c.HARBOR_LOCAL_MODE) {
+    if (c.HARBOR_LOCAL_MODE || c.HARBOR_PERSONAL_VPS_MODE) {
       const route = req.url.split("?")[0]!;
       if (
+        (c.HARBOR_PERSONAL_VPS_MODE && /\/tokens(?:\/|$)/.test(route)) ||
         /\/(terminals|previews|files|schedules)(?:\/|$)/.test(route) ||
         (req.method !== "GET" && /\/attachments(?:\/|$)/.test(route)) ||
         (req.method !== "GET" &&
@@ -161,8 +162,10 @@ export async function buildServer(c: Config) {
       )
         throw new HarborError(
           409,
-          "LOCAL_FEATURE_UNAVAILABLE",
-          "Personal local mode supports projects and conversations; this operation requires the managed Linux installation",
+          c.HARBOR_PERSONAL_VPS_MODE
+            ? "PERSONAL_VPS_FEATURE_UNAVAILABLE"
+            : "LOCAL_FEATURE_UNAVAILABLE",
+          "This personal profile supports projects and conversations; this operation requires the managed Linux installation",
         );
     }
     const now = Date.now(),
@@ -217,6 +220,12 @@ export async function buildServer(c: Config) {
     )
       return;
     if (req.headers.authorization !== undefined) {
+      if (c.HARBOR_PERSONAL_VPS_MODE)
+        throw new HarborError(
+          403,
+          "PERSONAL_VPS_FEATURE_UNAVAILABLE",
+          "Personal VPS access requires browser sign-in",
+        );
       auth.set(
         req,
         await authenticateBearer(pool, c, req.headers.authorization),
@@ -559,8 +568,13 @@ export async function buildServer(c: Config) {
   app.addHook("onClose", async () => scheduleBoss.stop());
   app.get("/api/v1/openapi.json", async () => openapi);
   app.get("/api/v1/security/runtime-credentials", async (req) =>
-    c.HARBOR_LOCAL_MODE
-      ? { configured: false, available: false, local: true }
+    c.HARBOR_LOCAL_MODE || c.HARBOR_PERSONAL_VPS_MODE
+      ? {
+          configured: false,
+          available: false,
+          local: !!c.HARBOR_LOCAL_MODE,
+          personalVps: !!c.HARBOR_PERSONAL_VPS_MODE,
+        }
       : credentialCommand(c.HARBOR_CONTROL_SOCKET, {
           action: "status",
           actor: auth.get(req)!.hash,
@@ -596,6 +610,7 @@ export async function buildServer(c: Config) {
   }));
   app.get("/api/v1/capabilities", async (req) => ({
     ...(c.HARBOR_LOCAL_MODE ? { local: true } : {}),
+    ...(c.HARBOR_PERSONAL_VPS_MODE ? { personalVps: true } : {}),
     projectBrowsing: projectBrowsingCapability(c),
     files: {
       read: !!(
@@ -703,7 +718,9 @@ export async function buildServer(c: Config) {
       await requireAuthority(db, auth.get(req)!.hash, c);
       externalEffectsGranted.add(req);
       const provisioned =
-        (c.HARBOR_FIXTURE_MODE || c.HARBOR_LOCAL_MODE) &&
+        (c.HARBOR_FIXTURE_MODE ||
+          c.HARBOR_LOCAL_MODE ||
+          c.HARBOR_PERSONAL_VPS_MODE) &&
         !process.env.HARBOR_STORAGE_SOCKET
           ? null
           : await (b.create
@@ -711,7 +728,13 @@ export async function buildServer(c: Config) {
               : validateManagedProject(b.rootId, b.path));
       const canonical =
         provisioned?.canonical ??
-        (await resolveProject(c.roots, b.rootId, b.path, b.create));
+        (await resolveProject(
+          c.roots,
+          b.rootId,
+          b.path,
+          b.create,
+          !!c.HARBOR_PERSONAL_VPS_MODE,
+        ));
       if (c.HARBOR_FIXTURE_MODE && !provisioned && b.create)
         await chmod(canonical, 0o755);
       const storedRelative = path.relative(root.path, canonical);

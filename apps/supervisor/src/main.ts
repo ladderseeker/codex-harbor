@@ -69,7 +69,8 @@ if (process.env.HARBOR_MANAGED_RELEASE) await verifyInstalledSchema(pool);
 else await migrate(pool);
 const ownerPin = digest(c.HARBOR_OIDC_ISSUER + "\0" + c.HARBOR_OWNER_SUBJECT);
 await bindIdentity(pool, ownerPin);
-if (c.HARBOR_LOCAL_MODE) await pool.query("DELETE FROM runtime_capabilities");
+if (c.HARBOR_LOCAL_MODE || c.HARBOR_PERSONAL_VPS_MODE)
+  await pool.query("DELETE FROM runtime_capabilities");
 let discovering = false;
 let discoveryTransport: CodexAdapter | undefined;
 const credentials = new CredentialStore(pool, c, clearNativeCredentials);
@@ -146,11 +147,13 @@ const generation = await transaction(pool, async (db) => {
   }
   return g;
 });
-await recoverFileStartup(pool);
-terminals = new TerminalSupervisor(pool, c, () => alive);
-terminals.start();
-previews = new PreviewSupervisor(pool, c, () => alive);
-await previews.start();
+if (!c.HARBOR_PERSONAL_VPS_MODE) {
+  await recoverFileStartup(pool);
+  terminals = new TerminalSupervisor(pool, c, () => alive);
+  terminals.start();
+  previews = new PreviewSupervisor(pool, c, () => alive);
+  await previews.start();
+}
 if (c.HARBOR_FIXTURE_MODE) {
   const probe = await createRuntime({
     sessionId: randomUUID(),
@@ -160,7 +163,7 @@ if (c.HARBOR_FIXTURE_MODE) {
     fixture: true,
   });
   try {
-    const key = await credentials.read();
+    const key = c.HARBOR_PERSONAL_VPS_MODE ? null : await credentials.read();
     if (key) await probe.loginWithApiKey(key);
     const account = await probe.readAccount();
     const models = await probe.listModels();
@@ -258,7 +261,7 @@ async function discover() {
     const project =
       (await pool.query("SELECT * FROM projects ORDER BY created_at LIMIT 1"))
         .rows[0] ??
-      (c.HARBOR_LOCAL_MODE
+      (c.HARBOR_LOCAL_MODE || c.HARBOR_PERSONAL_VPS_MODE
         ? { id: randomUUID(), relative_path: null }
         : undefined);
     if (!project) return;
@@ -276,9 +279,16 @@ async function discover() {
       ).rows[0].generation,
     );
     const workspacePath =
-      c.HARBOR_LOCAL_MODE && project.relative_path === null
+      (c.HARBOR_LOCAL_MODE || c.HARBOR_PERSONAL_VPS_MODE) &&
+      project.relative_path === null
         ? c.roots[0]!.path
-        : await resolveProject(c.roots, project.root_id, project.relative_path);
+        : await resolveProject(
+            c.roots,
+            project.root_id,
+            project.relative_path,
+            false,
+            !!c.HARBOR_PERSONAL_VPS_MODE,
+          );
     const probe = await createRuntime({
       onTransport: (adapter) => {
         discoveryTransport = adapter;
@@ -295,7 +305,7 @@ async function discover() {
       permissionProfile: "read-only",
     });
     try {
-      const key = await credentials.read();
+      const key = c.HARBOR_PERSONAL_VPS_MODE ? null : await credentials.read();
       if (key) await probe.loginWithApiKey(key);
       const models = await probe.listModels(),
         account = await probe.readAccount();
@@ -593,64 +603,65 @@ async function tick() {
   }
   if (Date.now() - lastMaintenance > 60000) {
     await maintain(pool);
-    await maintainAttachments(pool);
+    if (!c.HARBOR_PERSONAL_VPS_MODE) await maintainAttachments(pool);
     lastMaintenance = Date.now();
   }
   if (credentials.mutating) return;
   if ((await deploymentState(pool)).activation_required) return;
-  if (!scheduleTick)
-    scheduleTick = processSchedules(pool, boss, c, scheduleFence)
-      .catch(() => {
-        console.error("Schedule metadata reconciliation remains pending");
-      })
-      .finally(() => {
-        scheduleTick = undefined;
-      });
-  await processWorkspaceStorage(
-    pool,
-    !!c.HARBOR_FIXTURE_MODE,
-    c.roots,
-    async (db, row) => {
-      if (!row.actor_hash.startsWith("schedule:")) return;
-      const need = {
-        scope: "execute" as const,
-        projectId: row.project_id,
-        internalOperation: { kind: "workspace" as const, id: row.id },
-      };
-      await requireAuthority(db, row.actor_hash, c, need);
-      await scheduleFence(db);
-      await requireAuthority(db, row.actor_hash, c, need);
-    },
-  );
-  if (!filesTick)
-    filesTick = processFiles(pool, c, () => alive, { generation, ownerPin })
-      .catch(() => {
-        console.error("File effect settlement remains pending");
-      })
-      .finally(() => {
-        filesTick = undefined;
-      });
-  await processWorkspaceReleases(pool, {
-    config: c,
-    current: () => alive && !credentials.mutating,
-    retire: async (sessionId, projectId) => {
-      const runtime = runtimes.get(sessionId);
-      if (runtime) {
-        runtimes.delete(sessionId);
-        if (!(await retire(runtime.adapter)))
-          throw Error("Runtime retirement unconfirmed");
-      }
-      if (!c.HARBOR_FIXTURE_MODE)
-        await retireRuntimeIdentity({
-          instanceId: process.env.HARBOR_INSTANCE_ID ?? "harbor",
-          projectId,
-          sessionId,
+  if (!c.HARBOR_PERSONAL_VPS_MODE) {
+    if (!scheduleTick)
+      scheduleTick = processSchedules(pool, boss, c, scheduleFence)
+        .catch(() => {
+          console.error("Schedule metadata reconciliation remains pending");
+        })
+        .finally(() => {
+          scheduleTick = undefined;
         });
-      if (!(await retirement.confirmed()))
-        throw Error("Runtime retirement unconfirmed");
-    },
-  });
-
+    await processWorkspaceStorage(
+      pool,
+      !!c.HARBOR_FIXTURE_MODE,
+      c.roots,
+      async (db, row) => {
+        if (!row.actor_hash.startsWith("schedule:")) return;
+        const need = {
+          scope: "execute" as const,
+          projectId: row.project_id,
+          internalOperation: { kind: "workspace" as const, id: row.id },
+        };
+        await requireAuthority(db, row.actor_hash, c, need);
+        await scheduleFence(db);
+        await requireAuthority(db, row.actor_hash, c, need);
+      },
+    );
+    if (!filesTick)
+      filesTick = processFiles(pool, c, () => alive, { generation, ownerPin })
+        .catch(() => {
+          console.error("File effect settlement remains pending");
+        })
+        .finally(() => {
+          filesTick = undefined;
+        });
+    await processWorkspaceReleases(pool, {
+      config: c,
+      current: () => alive && !credentials.mutating,
+      retire: async (sessionId, projectId) => {
+        const runtime = runtimes.get(sessionId);
+        if (runtime) {
+          runtimes.delete(sessionId);
+          if (!(await retire(runtime.adapter)))
+            throw Error("Runtime retirement unconfirmed");
+        }
+        if (!c.HARBOR_FIXTURE_MODE)
+          await retireRuntimeIdentity({
+            instanceId: process.env.HARBOR_INSTANCE_ID ?? "harbor",
+            projectId,
+            sessionId,
+          });
+        if (!(await retirement.confirmed()))
+          throw Error("Runtime retirement unconfirmed");
+      },
+    });
+  }
   await discover().catch(() => {});
   discovering = true;
   try {
@@ -1210,9 +1221,14 @@ async function tick() {
           adapter.close();
           throw Error("Runtime failed during initialization");
         }
-        const key = await credentials.read();
+        const key = c.HARBOR_PERSONAL_VPS_MODE
+          ? null
+          : await credentials.read();
         if (key) await adapter.loginWithApiKey(key);
-        else if (!c.HARBOR_FIXTURE_MODE && !c.HARBOR_LOCAL_MODE)
+        else if (
+          !c.HARBOR_FIXTURE_MODE &&
+          !(c.HARBOR_LOCAL_MODE || c.HARBOR_PERSONAL_VPS_MODE)
+        )
           throw Error("Runtime credentials not configured");
         const models = await adapter.listModels();
         await pool.query(
@@ -1229,11 +1245,17 @@ async function tick() {
         );
         const native = o.native_thread_id
           ? await adapter.resumeThread(o.native_thread_id, {
-              cwd: c.HARBOR_LOCAL_MODE ? workspacePath : "/workspace",
+              cwd:
+                c.HARBOR_LOCAL_MODE || c.HARBOR_PERSONAL_VPS_MODE
+                  ? workspacePath
+                  : "/workspace",
               permissionProfile: o.payload.permissionProfile,
             })
           : await adapter.startThread({
-              cwd: c.HARBOR_LOCAL_MODE ? workspacePath : "/workspace",
+              cwd:
+                c.HARBOR_LOCAL_MODE || c.HARBOR_PERSONAL_VPS_MODE
+                  ? workspacePath
+                  : "/workspace",
               model: o.payload.model,
               permissionProfile: o.payload.permissionProfile,
             });

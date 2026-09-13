@@ -14,14 +14,18 @@ export async function resolveProject(
   rootId: string,
   relative: string,
   create = false,
+  allowRoot = false,
 ) {
   const root = roots.find((r) => r.id === rootId);
   if (!root)
     throw new HarborError(403, "ROOT_DENIED", "Project root is not allowed");
+  const rootSelf =
+    allowRoot && !create && (relative === "" || relative === ".");
   if (
-    path.isAbsolute(relative) ||
-    relative.split(/[\\/]/).some((s) => s === ".." || s === "." || !s) ||
-    relative.includes("\0")
+    !rootSelf &&
+    (path.isAbsolute(relative) ||
+      relative.split(/[\\/]/).some((s) => s === ".." || s === "." || !s) ||
+      relative.includes("\0"))
   )
     throw new HarborError(
       403,
@@ -34,8 +38,9 @@ export async function resolveProject(
       [
         fileURLToPath(new URL("./confine.py", import.meta.url)),
         root.path,
-        relative,
+        rootSelf ? "" : relative,
         String(create),
+        String(rootSelf),
       ],
       { timeout: 5000, maxBuffer: 8192, env: { PATH: process.env.PATH } },
     );

@@ -5,10 +5,17 @@ import { listProjectDirectories } from "../../../packages/workspaces/src/directo
 import type { Config } from "./config.ts";
 
 export function projectBrowsingCapability(
-  c: Pick<Config, "HARBOR_LOCAL_MODE" | "HARBOR_FIXTURE_MODE">,
+  c: Pick<
+    Config,
+    "HARBOR_LOCAL_MODE" | "HARBOR_FIXTURE_MODE" | "HARBOR_PERSONAL_VPS_MODE"
+  >,
 ) {
   const available =
-    !!(c.HARBOR_LOCAL_MODE || c.HARBOR_FIXTURE_MODE) &&
+    !!(
+      c.HARBOR_LOCAL_MODE ||
+      c.HARBOR_PERSONAL_VPS_MODE ||
+      c.HARBOR_FIXTURE_MODE
+    ) &&
     !process.env.HARBOR_STORAGE_SOCKET &&
     !process.env.HARBOR_MANAGED_RELEASE;
   return {

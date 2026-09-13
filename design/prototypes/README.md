@@ -27,3 +27,5 @@ Moved rename to each chat row and added bounded desktop resizing. One independen
 ### Application integration specimens — 13 September 2026
 
 P014 extends the guide and prototype with secondary tool surfaces and an interactive folder-state dialog. Chromium checks passed folder navigation, loading/empty/error/truncated specimens, retry and focus return; the dialog screenshot was visually inspected. These remain prototype checks. Application acceptance is recorded in the [frontend delivery report](../../docs/reports/2026-09-13-frontend-redesign.md). Current prototype SHA-256: `5a205538d19fad94dc5360fba2ffcf938395608567caea62518d33fb20b35611`; HTML guide SHA-256: `cf7baa656c344c3c3c9b6e28a8ecd933f98350917472a289e09aab1de0852444`. Earlier hashes above retain their historical scope.
+
+P015 adds a personal VPS account specimen under Supporting interface patterns, using existing status/help semantics. It demonstrates readiness and SSH onboarding copy only; actual account and approved-folder behavior requires application acceptance.

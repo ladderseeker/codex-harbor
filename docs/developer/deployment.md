@@ -68,3 +68,7 @@ sudo ./harborctl --config /etc/harbor-install.json backup-destination-enroll --p
 For an update, replace `none` with the exact current destination ID. Failed probes preserve the old record; identical retries reconcile the same admission. Enrollment sends only a public nonce and confirms its exact cleanup. It does not initialize Restic or send Harbor data. An empty destination remains explicitly not initialized/verified. After separately authorized initialization, `repository-init --expected-destination ID` initializes that enrolled destination; `backup-destination-verify --expected-destination ID` authenticates existing repository metadata and reconciles a lost initialization acknowledgement. These later commands are not permission to bypass the recorded blocked transfer. Changed SSH/password/known-host files require explicit re-enrollment. History is bounded to sixteen destination versions.
 
 `backup` uses only the admitted future destination and verifies its repository identity. `restore` uses the original configuration source, whose endpoint and protected-file fingerprints are pinned into its restore journal. Updating future backups cannot redirect a pending restore. Restored historical destination records do not regain authority.
+
+## Personal VPS profile
+
+[P015](../../design/proposals/015-personal-vps-workspace.md) adds a separate subscription/existing-folder profile. See the [personal VPS guide](personal-vps.md) for implemented tooling and explicit acceptance limits. This does not complete P009 managed installation or its restore gates.

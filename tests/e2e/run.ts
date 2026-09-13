@@ -525,8 +525,23 @@ try {
           permissionProfile: "read-only",
         };
       const first = await command(`/sessions/${id}/turns`, payload, key);
-      expect(first.status()).toBe(202);
       const firstBody = await first.json();
+      const firstErrorCode = firstBody?.error?.code;
+      if (first.status() !== 202)
+        console.error(
+          "Second turn admission:",
+          typeof firstErrorCode === "string" &&
+            /^[A-Z_]{1,64}$/.test(firstErrorCode)
+            ? firstErrorCode
+            : "UNCLASSIFIED_RESPONSE",
+        );
+      expect(
+        first.status(),
+        typeof firstErrorCode === "string" &&
+          /^[A-Z_]{1,64}$/.test(firstErrorCode)
+          ? firstErrorCode
+          : "Second turn admission",
+      ).toBe(202);
       expect(
         await (await command(`/sessions/${id}/turns`, payload, key)).json(),
       ).toEqual(firstBody);

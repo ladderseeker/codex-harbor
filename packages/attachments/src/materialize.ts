@@ -38,9 +38,12 @@ export async function prepareAttachments(
       kind: f.media_type === "image/png" ? "image" : "text",
       path: `/attachments/${f.id}`,
     }));
-    if (process.env.HARBOR_LOCAL_MODE === "personal") {
+    if (
+      process.env.HARBOR_LOCAL_MODE === "personal" ||
+      process.env.HARBOR_PERSONAL_VPS_MODE === "personal"
+    ) {
       if (inputs.length)
-        throw Error("Attachments are unavailable in personal local mode");
+        throw Error("Attachments are unavailable in this personal profile");
       return { inputs };
     }
     if (fixture) {

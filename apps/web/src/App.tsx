@@ -52,6 +52,7 @@ interface Root {
 interface Capabilities {
   projectBrowsing?: { available: boolean; reason: string | null };
   local?: boolean;
+  personalVps?: boolean;
   files?: { read: boolean; write: boolean; reason: string | null };
   models: {
     id: string;
@@ -888,10 +889,10 @@ export function App() {
           <summary>Project tools</summary>{" "}
           <button
             className="quiet-button"
-            disabled={capabilities?.local}
+            disabled={capabilities?.local || capabilities?.personalVps}
             title={
-              capabilities?.local
-                ? "Unavailable in local experience mode"
+              capabilities?.local || capabilities?.personalVps
+                ? "Unavailable in this personal profile"
                 : undefined
             }
             onClick={() => setSchedulesOpen(true)}
@@ -935,10 +936,10 @@ export function App() {
               </label>
               <button
                 className="quiet-button"
-                disabled={capabilities?.local}
+                disabled={capabilities?.local || capabilities?.personalVps}
                 title={
-                  capabilities?.local
-                    ? "Workspace management requires the Linux installation"
+                  capabilities?.local || capabilities?.personalVps
+                    ? "Workspace management requires the managed installation"
                     : undefined
                 }
                 onClick={() => setWorkspaceManagerOpen(true)}
@@ -955,14 +956,22 @@ export function App() {
               </button>
               <button
                 className="quiet-button"
-                disabled={!newWorkspaceId || capabilities?.local}
+                disabled={
+                  !newWorkspaceId ||
+                  capabilities?.local ||
+                  capabilities?.personalVps
+                }
                 onClick={() => setTerminalWorkspace(newWorkspaceId)}
               >
                 Open terminals
               </button>
               <button
                 className="quiet-button"
-                disabled={!newWorkspaceId || capabilities?.local}
+                disabled={
+                  !newWorkspaceId ||
+                  capabilities?.local ||
+                  capabilities?.personalVps
+                }
                 onClick={() => setPreviewWorkspace(newWorkspaceId)}
               >
                 Project previews
@@ -977,7 +986,12 @@ export function App() {
           <summary>Account &amp; settings</summary>
           <button
             className="account-button"
-            disabled={!identity}
+            disabled={!identity || capabilities?.personalVps}
+            title={
+              capabilities?.personalVps
+                ? "API tokens are unavailable in this personal profile"
+                : undefined
+            }
             onClick={() => setTokensOpen(true)}
           >
             API tokens
@@ -1311,23 +1325,29 @@ export function App() {
                   disabled={blocked}
                   execute={execute}
                 />
-                {uncertain && capabilities?.local && (
-                  <p className="state-explanation">
-                    Local runtime delivery is uncertain. Stop this instance and
-                    inspect its processes before using a new conversation;
-                    automatic recovery is unavailable.
-                  </p>
-                )}
-                {uncertain && !capabilities?.local && (
-                  <Recovery
-                    key={`recovery:${current.id}`}
-                    id={current.id}
-                    cursor={snapshot?.cursor ?? 0}
-                    disabled={blocked}
-                    settings={{ model, effort, permissionProfile: permission }}
-                    execute={execute}
-                  />
-                )}
+                {uncertain &&
+                  (capabilities?.local || capabilities?.personalVps) && (
+                    <p className="state-explanation">
+                      Native runtime delivery is uncertain. Stop this instance
+                      and inspect its processes before using a new conversation;
+                      automatic recovery is unavailable.
+                    </p>
+                  )}
+                {uncertain &&
+                  !(capabilities?.local || capabilities?.personalVps) && (
+                    <Recovery
+                      key={`recovery:${current.id}`}
+                      id={current.id}
+                      cursor={snapshot?.cursor ?? 0}
+                      disabled={blocked}
+                      settings={{
+                        model,
+                        effort,
+                        permissionProfile: permission,
+                      }}
+                      execute={execute}
+                    />
+                  )}
                 {current.state === "interrupted" && (
                   <div className="state-explanation">
                     <h2>Work was interrupted</h2>
@@ -1438,19 +1458,20 @@ export function App() {
                     }
                   }}
                 />
-                {identity && !capabilities?.local && (
-                  <AttachmentPicker
-                    key={selectedId}
-                    state={richDraft}
-                    csrf={identity.csrfToken}
-                    session={selectedId}
-                    modalities={
-                      capabilities?.models.find((m) => m.id === model)
-                        ?.inputModalities ?? []
-                    }
-                    disabled={blocked || !richDraft.ready}
-                  />
-                )}
+                {identity &&
+                  !(capabilities?.local || capabilities?.personalVps) && (
+                    <AttachmentPicker
+                      key={selectedId}
+                      state={richDraft}
+                      csrf={identity.csrfToken}
+                      session={selectedId}
+                      modalities={
+                        capabilities?.models.find((m) => m.id === model)
+                          ?.inputModalities ?? []
+                      }
+                      disabled={blocked || !richDraft.ready}
+                    />
+                  )}
                 <div className="composer-bottom">
                   <div className="settings">
                     <label>
@@ -1730,6 +1751,7 @@ export function App() {
         <ProjectDialog
           roots={roots}
           browsing={capabilities?.projectBrowsing}
+          allowRoot={capabilities?.personalVps === true}
           failure={error}
           retry={
             pending
@@ -1848,6 +1870,7 @@ function Modal({
 function ProjectDialog({
   roots,
   browsing,
+  allowRoot = false,
   disabled,
   close,
   create,
@@ -1856,6 +1879,7 @@ function ProjectDialog({
 }: {
   roots: Root[];
   browsing?: { available: boolean; reason: string | null };
+  allowRoot?: boolean;
   failure?: string;
   retry?: () => void;
   disabled: boolean;
@@ -1917,7 +1941,11 @@ function ProjectDialog({
   }, [browserOpen, browsing?.available, rootId, browsePath, retryListing]);
   return (
     <Modal title="Add project" close={close} failure={failure} retry={retry}>
-      <p>Choose a folder inside an approved root.</p>
+      <p>
+        {allowRoot
+          ? "Choose an approved folder or one of its subfolders."
+          : "Choose a folder inside an approved root."}
+      </p>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -2014,18 +2042,23 @@ function ProjectDialog({
                 )}
                 <button
                   type="button"
-                  disabled={!browsePath || disabled}
+                  disabled={(!browsePath && !allowRoot) || disabled}
                   onClick={() => {
-                    setPath(browsePath);
+                    setPath(browsePath || ".");
                     if (!name.trim())
-                      setName(browsePath.split("/").at(-1) ?? "");
+                      setName(
+                        browsePath
+                          ? (browsePath.split("/").at(-1) ?? "")
+                          : (roots.find((root) => root.id === rootId)?.name ??
+                              "Project"),
+                      );
                     setMakeFolder(false);
                     setBrowserOpen(false);
                   }}
                 >
                   Use this folder
                 </button>
-                {!browsePath && (
+                {!browsePath && !allowRoot && (
                   <p className="field-help">
                     Open a project folder within this root to select it.
                   </p>

@@ -141,3 +141,9 @@ P008 is implemented. The [schedule API and verification guide](schedules.md) des
 ## Preview development
 
 P011 is implemented on main after two independent review rounds and cumulative local/Linux verification. Use the [preview guide](previews.md) for fixed configuration, browser/API acceptance commands and the remaining protected restore and upstream gates. The [user guide](../user/previews.md) explains profiles, private access, logs and confirmed retirement.
+
+## Personal VPS profile
+
+[P015](../../design/proposals/015-personal-vps-workspace.md) adds a separate subscription/existing-folder profile. See the [personal VPS guide](personal-vps.md) for implemented tooling and explicit acceptance limits. This does not complete P009 managed installation or its restore gates.
+
+On a fresh Linux verification host, the critical suite's workspace inspection requires the pinned Git helper image even when Codex is a fixture: build it with `docker build -f infra/git/Dockerfile -t codex-harbor-git:2.39.5-p003 .` before the suite. Its absence can surface as `WORKSPACE_UNAVAILABLE` during later turn admission. P015's candidate report records this observed prerequisite and successful rerun.

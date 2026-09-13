@@ -134,12 +134,13 @@ export async function inspectWorkspace(db: DB, w: any, fixture: boolean) {
   try {
     await verifyWorkspace(w);
     const result =
-      process.env.HARBOR_LOCAL_MODE === "personal"
+      process.env.HARBOR_LOCAL_MODE === "personal" ||
+      process.env.HARBOR_PERSONAL_VPS_MODE === "personal"
         ? {
             git: null,
             dirty: null,
             snapshotHash: undefined,
-            reason: "Git inspection is unavailable in personal local mode",
+            reason: "Git inspection is unavailable in this personal profile",
           }
         : await storageWorkspace(
             {

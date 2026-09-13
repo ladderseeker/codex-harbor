@@ -23,3 +23,7 @@ Pinned runtime inspection during implementation showed granular approval policy 
 Account replacement/logout occurs through the stopped instance's native login lifecycle. Local account readiness is reported accurately. Shutdown retires only the instance's runtimes and services while keeping its data for reopening. Uncertain operations are never silently replayed.
 
 Local native contracts, real Harbor acceptance, and one user-authenticated conversation are required evidence for P013. Linux gates remain mandatory for changes that affect the deployed launcher or isolation boundary. A successful personal conversation is not evidence for unrelated dedicated live-test or deployment acceptance.
+
+## 2026-09-13 personal VPS addendum
+
+The owner subsequently selected [P015](../proposals/015-personal-vps-workspace.md). [D011](011-personal-vps-workspace.md) authorizes a separately configured personal VPS profile with authenticated HTTPS, subscription login and approved existing folders. It supersedes the native-only-local restriction only for that explicit profile; P013 remains loopback-only, managed isolation requirements and outstanding proposal gates remain unchanged.

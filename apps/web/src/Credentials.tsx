@@ -3,6 +3,7 @@ import { ApiError, mutate, newIntent, request, type Intent } from "./api.ts";
 
 export interface CredentialStatus {
   local?: boolean;
+  personalVps?: boolean;
   configured: boolean;
   available: boolean;
 }
@@ -122,26 +123,32 @@ export function Credentials({
         <strong>
           {loading
             ? "Checking account setup…"
-            : status?.local
+            : status?.personalVps
               ? authenticated
-                ? "Local Codex account ready"
-                : "Local Codex sign-in required"
-              : !status?.available
-                ? "Account setup unavailable"
-                : authenticated
-                  ? "Account ready"
-                  : status.configured
-                    ? "Key saved; checking access"
-                    : "No API key saved"}
+                ? "Codex subscription account ready"
+                : "Codex subscription sign-in required"
+              : status?.local
+                ? authenticated
+                  ? "Local Codex account ready"
+                  : "Local Codex sign-in required"
+                : !status?.available
+                  ? "Account setup unavailable"
+                  : authenticated
+                    ? "Account ready"
+                    : status.configured
+                      ? "Key saved; checking access"
+                      : "No API key saved"}
         </strong>
         <p>
-          {status?.local
-            ? "Harbor uses its own local Codex sign-in. To sign in or change accounts, stop Harbor and run pnpm dev --local --login, then restart. Your ordinary Codex account state is separate."
-            : !hasProjects
-              ? "Add your first project so Harbor can discover available models and check account access."
-              : authenticated
-                ? "The account is authenticated. Available models appear in your conversation settings."
-                : "Harbor checks available models in your project. This can take a few seconds."}
+          {status?.personalVps
+            ? "Sign in to your Codex subscription through the VPS account setup command over SSH, then restart the supervisor. Finish or stop active work before changing accounts. Harbor keeps this sign-in separate from your ordinary Codex state."
+            : status?.local
+              ? "Harbor uses its own local Codex sign-in. To sign in or change accounts, stop Harbor and run pnpm dev --local --login, then restart. Your ordinary Codex account state is separate."
+              : !hasProjects
+                ? "Add your first project so Harbor can discover available models and check account access."
+                : authenticated
+                  ? "The account is authenticated. Available models appear in your conversation settings."
+                  : "Harbor checks available models in your project. This can take a few seconds."}
         </p>
       </div>
       {(error || uncertain) && (

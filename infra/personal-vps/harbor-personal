@@ -1,0 +1,359 @@
+#!/usr/bin/env python3
+"""Render and install a fresh P015 instance; never modify an existing installation."""
+import argparse
+import json
+import os
+import platform
+import stat
+from pathlib import Path
+import pwd
+import re
+import secrets
+import shutil
+import subprocess
+import sys
+from urllib.parse import quote, urlsplit
+import uuid
+
+
+def require(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+
+def absolute(value):
+    require(isinstance(value, str) and re.fullmatch(r'/[A-Za-z0-9_./-]+', value), 'Paths must be absolute and contain only letters, digits, dots, underscores, hyphens and slashes')
+    p = Path(value)
+    require(str(p.resolve()) == value and value != '/', 'Paths must be canonical, non-root, and contain no symlinks')
+    return p
+
+
+def https(value, origin=False):
+    u = urlsplit(value)
+    require(u.scheme == 'https' and u.hostname and not u.username and not u.password and not u.fragment and not u.query, 'Canonical verified HTTPS URL required')
+    require(not origin or (value == 'https://' + u.netloc and u.netloc == u.netloc.lower() and u.port != 443), 'Origin must be canonical without a path, trailing slash or default port')
+    require(u.hostname not in ('localhost', '127.0.0.1', '::1'), 'External HTTPS identity/origin required')
+    require(re.fullmatch(r'[a-zA-Z0-9.-]+', u.hostname), 'DNS hostname required')
+    return u
+
+
+def validate(c):
+    fields = {'instance', 'origin', 'oidcIssuer', 'oidcClientId', 'ownerSubject', 'oidcSecretFile', 'release', 'user', 'apiPort', 'databasePort', 'roots', 'postgresImage', 'models', 'traefik', 'apparmorUserns'}
+    require(set(c) == fields, 'Configuration must contain exactly: ' + ', '.join(sorted(fields)))
+    require(re.fullmatch(r'[a-z][a-z0-9-]{0,23}', c['instance']), 'Invalid instance name')
+    require(re.fullmatch(r'[a-z][a-z0-9-]{0,30}', c['user']) and c['user'] != 'root', 'Dedicated nonroot service user required')
+    https(c['origin'], True)
+    https(c['oidcIssuer'])
+    for key in ('oidcClientId', 'ownerSubject'):
+        require(isinstance(c[key], str) and c[key].strip() and not any(ord(ch) < 32 for ch in c[key]), 'Invalid ' + key)
+    for key in ('apiPort', 'databasePort'):
+        require(type(c[key]) is int and 1024 <= c[key] <= 65535, 'Invalid ' + key)
+    require(c['apiPort'] != c['databasePort'], 'Ports must differ')
+    release = absolute(c['release'])
+    require(release.is_dir(), 'Release must already exist')
+    require(re.fullmatch(r'postgres:17\.6-bookworm@sha256:[0-9a-f]{64}', c['postgresImage']), 'Postgres 17.6 image digest required')
+    require(isinstance(c['models'], list) and c['models'] and all(isinstance(m, str) and re.fullmatch(r'[A-Za-z0-9._-]+', m) for m in c['models']), 'Invalid models')
+    require(type(c['traefik']) is bool, 'traefik must be boolean')
+    require(not c['traefik'] or urlsplit(c['origin']).port is None, 'Existing Traefik websecure routing requires the standard HTTPS port')
+    require(type(c['apparmorUserns']) is bool, 'apparmorUserns must be boolean')
+    require(isinstance(c['roots'], list) and c['roots'], 'At least one explicitly approved existing root required')
+    paths, ids = [], set()
+    for root in c['roots']:
+        require(set(root) == {'id', 'name', 'path'}, 'Invalid root fields')
+        require(str(uuid.UUID(root['id'])) == root['id'] and root['id'] not in ids, 'Unique canonical root UUID required')
+        ids.add(root['id'])
+        require(isinstance(root['name'], str) and root['name'].strip(), 'Root name required')
+        p = absolute(root['path'])
+        require(p.is_dir(), 'Approved project root must exist')
+        require(not any(p == q or p in q.parents or q in p.parents for q in paths), 'Project roots must not overlap')
+        require(not (p == release or p in release.parents or release in p.parents), 'Release and projects must be separate')
+        for protected in ('/etc', '/proc', '/sys', '/dev', '/run', '/var/lib', '/usr', '/bin', '/sbin', '/boot'):
+            q = Path(protected)
+            require(p != q and q not in p.parents and p not in q.parents, 'Project roots must not contain system state')
+        require(p not in (Path('/home'), Path('/var'), Path('/tmp')), 'Register a project folder or the explicitly approved /root directory, not a general host directory')
+        paths.append(p)
+    if c['oidcSecretFile'] is not None:
+        secret = absolute(c['oidcSecretFile'])
+        require(secret.is_file() and secret.stat().st_mode & 0o077 == 0, 'OIDC secret must be a private file')
+        require(not any(p == secret or p in secret.parents for p in paths), 'OIDC secret must be outside project roots')
+    return c
+
+
+def layout(c):
+    name = 'harbor-personal-' + c['instance']
+    return name, '/etc/' + name, '/var/lib/' + name
+
+
+def environment(c, password, oidc_secret):
+    _, _, state = layout(c)
+    env = {
+        'NODE_ENV': 'production', 'PATH': c['release'] + '/bin:/usr/bin:/bin',
+        'HOME': state + '/home', 'HARBOR_PERSONAL_VPS_MODE': 'personal',
+        'HARBOR_PERSONAL_VPS_CODEX_BINARY': c['release'] + '/bin/codex',
+        'HARBOR_PERSONAL_VPS_CODEX_HOME': state + '/codex-home',
+        'HARBOR_PERSONAL_VPS_STATE_DIR': state,
+        'HARBOR_INSTANCE_ID': c['instance'], 'HARBOR_ORIGIN': c['origin'],
+        'HARBOR_OIDC_ISSUER': c['oidcIssuer'], 'HARBOR_OIDC_CLIENT_ID': c['oidcClientId'],
+        'HARBOR_OWNER_SUBJECT': c['ownerSubject'], 'HARBOR_HOST': '127.0.0.1',
+        'HARBOR_PORT': str(c['apiPort']), 'HARBOR_PROJECT_ROOTS': json.dumps(c['roots'], separators=(',', ':')),
+        'HARBOR_PERMISSION_CEILING': 'workspace-write', 'HARBOR_MODELS': ','.join(c['models']),
+        'DATABASE_URL': 'postgres://harbor:' + quote(password, safe='') + '@127.0.0.1:' + str(c['databasePort']) + '/harbor',
+    }
+    if oidc_secret is not None:
+        require(not any(ord(ch) < 32 for ch in oidc_secret), 'OIDC secret must be single-line text without control characters')
+        env['HARBOR_OIDC_CLIENT_SECRET'] = oidc_secret
+    return ''.join(k + '=' + json.dumps(v, ensure_ascii=False) + '\n' for k, v in env.items())
+
+
+def artifacts(c, password, oidc_secret):
+    name, etc, state = layout(c)
+    pg = {
+        'image': c['postgresImage'], 'restart': 'unless-stopped',
+        'environment': {'POSTGRES_USER': 'harbor', 'POSTGRES_DB': 'harbor', 'POSTGRES_PASSWORD_FILE': '/run/secrets/password'},
+        'ports': ['127.0.0.1:' + str(c['databasePort']) + ':5432'],
+        'volumes': [state + '/postgres:/var/lib/postgresql/data', etc + '/database.password:/run/secrets/password:ro'],
+        'healthcheck': {'test': ['CMD', 'pg_isready', '-U', 'harbor', '-d', 'harbor'], 'interval': '2s', 'timeout': '2s', 'retries': 30},
+        'security_opt': ['no-new-privileges:true'], 'mem_limit': '512m', 'cpus': 1,
+        'pids_limit': 256, 'labels': {'traefik.enable': 'false'},
+    }
+    services = {'postgres': pg}
+    if c['traefik']:
+        services['routing'] = {
+            'image': c['postgresImage'], 'entrypoint': ['/bin/sleep', 'infinity'],
+            'user': '65534:65534', 'network_mode': 'host', 'restart': 'unless-stopped',
+            'read_only': True, 'cap_drop': ['ALL'], 'security_opt': ['no-new-privileges:true'],
+            'mem_limit': '32m', 'cpus': 0.1, 'pids_limit': 16,
+            'labels': {'traefik.enable': 'true', 'traefik.http.routers.' + name + '.rule': 'Host(`' + urlsplit(c['origin']).hostname + '`)',
+                       'traefik.http.routers.' + name + '.entrypoints': 'websecure',
+                       'traefik.http.routers.' + name + '.tls.certresolver': 'letsencrypt',
+                       'traefik.http.routers.' + name + '.service': name,
+                       'traefik.http.services.' + name + '.loadbalancer.server.port': str(c['apiPort'])},
+        }
+    out = {'compose.json': json.dumps({'name': name, 'services': services}, indent=2) + '\n',
+           'service.env': environment(c, password, oidc_secret), 'database.password': password + '\n'}
+    out[name + '-dependencies.service'] = f'''[Unit]
+Description=Harbor personal VPS private PostgreSQL and routing
+After=docker.service network-online.target
+Requires=docker.service
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/docker compose -f {etc}/compose.json up -d --wait
+ExecStop=/usr/bin/docker compose -f {etc}/compose.json stop
+TimeoutStartSec=180
+TimeoutStopSec=60
+[Install]
+WantedBy=multi-user.target
+'''
+    if c['apparmorUserns']:
+        out[name + '.apparmor'] = ('abi <abi/4.0>,\ninclude <tunables/global>\nprofile ' + name + ' ' + c['release'] + '/bin/codex flags=(unconfined) {\n  userns,\n}\n')
+    for role in ('api', 'supervisor'):
+        writable = ' '.join([state + '/home', state + '/codex-home', state + '/control'] + [r['path'] for r in c['roots']])
+        out[name + '-' + role + '.service'] = f'''[Unit]
+Description=Harbor personal VPS {role}
+After={name}-dependencies.service
+Requires={name}-dependencies.service
+RequiresMountsFor={state} {' '.join(r['path'] for r in c['roots'])}
+[Service]
+Type=simple
+User={c['user']}
+Group={c['user']}
+WorkingDirectory={c['release']}
+EnvironmentFile={etc}/service.env
+ExecStart={c['release']}/bin/node --import tsx {c['release']}/apps/{role}/src/main.ts
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=45
+KillMode=control-group
+UMask=0077
+MemoryMax={'1G' if role == 'api' else '4G'}
+CPUQuota={'100%' if role == 'api' else '150%'}
+TasksMax={'256' if role == 'api' else '512'}
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ReadWritePaths={writable}
+InaccessiblePaths=-/run/docker.sock -/var/run/docker.sock
+[Install]
+WantedBy=multi-user.target
+'''
+    return out
+
+
+def outside_projects(c, path):
+    resolved = Path(path).resolve()
+    require(not any(resolved == Path(r['path']) or Path(r['path']) in resolved.parents for r in c['roots']), 'Private configuration and candidate bundles must be outside approved project roots')
+
+
+def render(c, output):
+    validate(c)
+    target = Path(output)
+    outside_projects(c, target)
+    require(not target.exists(), 'Output already exists; refusing overwrite')
+    secret = Path(c['oidcSecretFile']).read_text().strip() if c['oidcSecretFile'] else None
+    require(secret is None or secret, 'OIDC secret is empty')
+    files = artifacts(c, secrets.token_hex(32), secret)
+    target.mkdir(mode=0o700)
+    for filename, content in files.items():
+        fd = os.open(target / filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as f:
+            f.write(content)
+    (target / 'config.json').write_text(json.dumps(c, indent=2) + '\n')
+    os.chmod(target / 'config.json', 0o600)
+    print('Rendered private candidate bundle. No host services changed.')
+
+
+def run(args, **kwargs):
+    return subprocess.run(args, check=True, **kwargs)
+
+
+NATIVE_EXECUTABLES = ('bin/codex', 'bin/codex-code-mode-host', 'codex-resources/bwrap',
+                      'codex-resources/zsh/bin/zsh', 'codex-path/rg')
+
+
+def validate_native_distribution(release, require_root=True):
+    release = Path(release).resolve()
+    manifest_path = release / 'codex-package.json'
+    require(manifest_path.is_file() and not manifest_path.is_symlink(), 'Complete native Codex package manifest required')
+    manifest = json.loads(manifest_path.read_text())
+    target = {'x86_64': 'x86_64-unknown-linux-musl', 'aarch64': 'aarch64-unknown-linux-musl'}.get(platform.machine())
+    require(target and manifest == {'layoutVersion': 1, 'version': '0.153.4', 'target': target,
+            'variant': 'codex', 'entrypoint': 'bin/codex', 'resourcesDir': 'codex-resources',
+            'pathDir': 'codex-path'}, 'Pinned native Codex version/platform/layout required')
+    for relative in NATIVE_EXECUTABLES:
+        path = release / relative
+        require(path.is_file() and path.resolve() == path, 'Required native executable missing or symlinked: ' + relative)
+        info = path.stat()
+        require(stat.S_ISREG(info.st_mode) and info.st_mode & 0o555 == 0o555 and not info.st_mode & 0o6022,
+                'Native executable must be executable without set-id or group/world writes: ' + relative)
+        require(not require_root or info.st_uid == 0, 'Native executable must be root-owned: ' + relative)
+    return manifest
+
+
+def check_browse_access(c):
+    # Administrator roots are browsing ceilings; Unix permissions on the chosen
+    # project independently determine which conversation writes can succeed.
+    for root in c['roots']:
+        for permission in ('-r', '-x'):
+            run(['/usr/sbin/runuser', '-u', c['user'], '--', '/usr/bin/test', permission, root['path']])
+
+
+def install(bundle):
+    require(os.geteuid() == 0, 'Install requires root')
+    bundle = absolute(str(Path(bundle).absolute()))
+    require(bundle.stat().st_uid == 0 and bundle.stat().st_mode & 0o077 == 0, 'Bundle must be root-owned and private')
+    metadata = (bundle / 'config.json').lstat()
+    require(not (bundle / 'config.json').is_symlink() and metadata.st_uid == 0 and metadata.st_mode & 0o077 == 0, 'Configuration must be root-owned and private')
+    c = validate(json.loads((bundle / 'config.json').read_text()))
+    outside_projects(c, bundle)
+    name, etc, state = layout(c)
+    account = pwd.getpwnam(c['user'])
+    require(account.pw_uid != 0 and account.pw_gid != 0, 'Nonroot account required')
+    groups = os.getgrouplist(c['user'], account.pw_gid)
+    require(groups == [account.pw_gid], 'Service account must have no supplementary groups')
+    require(account.pw_shell in ('/usr/sbin/nologin', '/sbin/nologin', '/bin/false'), 'Service account must disable interactive login')
+    release = Path(c['release'])
+    for selected in [release] + [Path(r['path']) for r in c['roots']]:
+        require(not any(selected == Path(t) or Path(t) in selected.parents for t in ('/tmp', '/var/tmp')), 'Installed release and project roots must be persistent paths outside private temporary directories')
+    for ancestor in release.parents:
+        info = ancestor.stat()
+        require(info.st_uid == 0 and info.st_mode & 0o022 == 0, 'Release ancestors must be root-owned and not group/world writable')
+    for directory, dirs, files in os.walk(release):
+        for path in [Path(directory)] + [Path(directory) / f for f in dirs + files]:
+            resolved = path.resolve()
+            require(resolved == release or release in resolved.parents, 'Release links must remain inside release')
+            info = resolved.stat()
+            require(info.st_uid == 0 and info.st_mode & 0o022 == 0, 'Release must be root-owned and not group/world writable')
+    for entry in ('bin/node', 'bin/codex', 'node_modules/tsx', 'apps/web/dist/index.html', 'apps/api/src/main.ts', 'apps/supervisor/src/main.ts'):
+        require((release / entry).exists(), 'Release is incomplete: ' + entry)
+    validate_native_distribution(release)
+    require(run([str(release / 'bin/node'), '--version'], capture_output=True, text=True).stdout.strip() == 'v24.11.1', 'Pinned Node 24.11.1 required')
+    require(run([str(release / 'bin/codex'), '--version'], capture_output=True, text=True).stdout.strip() == 'codex-cli 0.153.4', 'Pinned Codex 0.153.4 required')
+    password = (bundle / 'database.password').read_text().strip()
+    require(re.fullmatch(r'[0-9a-f]{64}', password), 'Invalid database password')
+    secret = Path(c['oidcSecretFile']).read_text().strip() if c['oidcSecretFile'] else None
+    expected = artifacts(c, password, secret)
+    for filename, content in expected.items():
+        p = bundle / filename
+        require(not p.is_symlink() and p.stat().st_uid == 0 and p.stat().st_mode & 0o077 == 0 and p.read_text() == content, 'Candidate bundle differs from configuration: ' + filename)
+    units = [k for k in expected if k.endswith('.service')]
+    apparmor = [k for k in expected if k.endswith('.apparmor')]
+    if apparmor:
+        require(shutil.which('apparmor_parser') is not None, 'AppArmor parser required for selected Ubuntu userns prerequisite')
+        require(not (release / 'bin/codex').is_symlink(), 'AppArmor profile requires the exact immutable Codex executable, not a symlink')
+        run(['/usr/sbin/apparmor_parser', '-Q', '-K', str(bundle / apparmor[0])])
+    for p in [Path(etc), Path(state)] + [Path('/etc/systemd/system') / u for u in units] + [Path('/etc/apparmor.d') / a for a in apparmor]:
+        require(not p.exists() and not p.is_symlink(), 'Existing installation path; refusing overwrite: ' + str(p))
+    for entry in ('bin/node', 'bin/codex'):
+        run(['/usr/sbin/runuser', '-u', c['user'], '--', '/usr/bin/test', '-x', str(release / entry)])
+    check_browse_access(c)
+    Path(etc).mkdir(mode=0o700)
+    Path(state).mkdir(mode=0o711)
+    for child in ('home', 'codex-home', 'control'):
+        p = Path(state) / child
+        p.mkdir(mode=0o700)
+        os.chown(p, account.pw_uid, account.pw_gid)
+    pg = Path(state) / 'postgres'
+    pg.mkdir(mode=0o700)
+    os.chown(pg, 999, 999)
+    for filename in expected:
+        destination = (Path('/etc/systemd/system') / filename if filename in units else
+                       Path('/etc/apparmor.d') / filename if filename in apparmor else Path(etc) / filename)
+        shutil.copyfile(bundle / filename, destination)
+        os.chmod(destination, 0o644 if filename in units or filename in apparmor else 0o600)
+    # Bind-mounted secret is read by PostgreSQL after its entrypoint drops to uid 999.
+    os.chown(Path(etc) / 'database.password', 999, 999)
+    os.chmod(Path(etc) / 'database.password', 0o400)
+    shutil.copyfile(bundle / 'config.json', Path(etc) / 'config.json')
+    os.chmod(Path(etc) / 'config.json', 0o600)
+    for filename in apparmor:
+        run(['/usr/sbin/apparmor_parser', '-a', str(Path('/etc/apparmor.d') / filename)])
+    run(['/usr/bin/systemctl', 'daemon-reload'])
+    print('Fresh instance installed but not started. Complete native device login, then enable/start the three generated units.')
+
+
+def login(config):
+    require(os.geteuid() == 0, 'Login requires administrator access to service account')
+    c = validate(json.loads(Path(config).read_text()))
+    outside_projects(c, config)
+    name, _, state = layout(c)
+    for role in ('api', 'supervisor'):
+        result = subprocess.run(['/usr/bin/systemctl', 'is-active', name + '-' + role + '.service'], capture_output=True, text=True)
+        require(result.stdout.strip() in ('inactive', 'failed'), 'Stop API and supervisor before changing the native account; stopping interrupts active work')
+    run(['/usr/sbin/runuser', '-u', c['user'], '--', '/usr/bin/env', '-i', 'PATH=' + c['release'] + '/bin:/usr/bin:/bin', 'HOME=' + state + '/home', 'CODEX_HOME=' + state + '/codex-home', c['release'] + '/bin/codex', 'login', '--device-auth'])
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest='action', required=True)
+    for action in ('validate', 'render', 'login'):
+        p = sub.add_parser(action)
+        p.add_argument('--config', required=True)
+        if action == 'render':
+            p.add_argument('--output', required=True)
+    sub.add_parser('install').add_argument('--bundle', required=True)
+    args = parser.parse_args()
+    if args.action == 'install':
+        install(args.bundle)
+    elif args.action == 'login':
+        login(args.config)
+    else:
+        c = validate(json.loads(Path(args.config).read_text()))
+        outside_projects(c, args.config)
+        if args.action == 'render':
+            render(c, args.output)
+        else:
+            print('Configuration valid; installation and native sandbox acceptance still required.')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (ValueError, OSError, KeyError, subprocess.CalledProcessError) as error:
+        # Do not print subprocess commands or configuration values containing secrets.
+        print('Personal VPS command failed: ' + (str(error) if isinstance(error, ValueError) else type(error).__name__), file=sys.stderr)
+        sys.exit(1)

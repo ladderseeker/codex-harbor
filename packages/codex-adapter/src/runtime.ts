@@ -30,7 +30,9 @@ export async function createRuntime(
   config: RuntimeConfig,
 ): Promise<CodexAdapter> {
   const local =
-    !config.fixture && globalThis.process.env.HARBOR_LOCAL_MODE === "personal";
+    !config.fixture &&
+    (globalThis.process.env.HARBOR_LOCAL_MODE === "personal" ||
+      globalThis.process.env.HARBOR_PERSONAL_VPS_MODE === "personal");
   const process = config.fixture
     ? fixtureProcess(config)
     : local

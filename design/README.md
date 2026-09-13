@@ -15,6 +15,7 @@ The architecture is the accepted implementation baseline. P014 completed the sco
 - [D008 — Confined self-development workers](decisions/008-isolated-self-development-workers.md): accepted broker, container/guest boundary, independent verifier and exact-artifact contract for P010; implementation and Linux/performance evidence remain pending.
 - [D009 — Common-use release before roadmap expansion](decisions/009-common-use-release.md): current delivery priority; finish and verify everyday workflows, preserve deferred P010/P012 work, then deliver one needed outcome at a time. Existing acceptance gates remain unchanged.
 - [D010 — Personal local Codex experience](decisions/010-personal-local-experience.md): the owner's selected local account-login and conversation outcome, implemented under P013 with explicit native execution boundaries.
+- [D011 — Personal VPS existing-project experience](decisions/011-personal-vps-workspace.md): selected P015 subscription/account and original-folder deployment with explicit native execution limits.
 - [Active proposals](proposals/README.md): complete user outcomes, dependencies, acceptance criteria, and implementation status.
 - [Proposal archive](proposals/archive/README.md): completed, superseded, or withdrawn proposals, including completed P014.
 - [Proposal template](proposal-template.md): the required structure for a new or revised feature proposal.

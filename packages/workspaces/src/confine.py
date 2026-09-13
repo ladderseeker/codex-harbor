@@ -1,12 +1,13 @@
 """Trusted directory-relative project admission; accepts only administrator root + relative path."""
 import json, os, stat, sys
-root, relative, create = sys.argv[1:]
+root, relative, create, allow_root = sys.argv[1:]
 flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 handles = []
 try:
     fd = os.open(root, flags)
     handles.append(fd)
-    for part in relative.split('/'):
+    root_self = allow_root == 'true' and relative == '' and create == 'false'
+    for part in ([] if root_self else relative.split('/')):
         if part in ('', '.', '..') or '\\' in part or '\x00' in part:
             raise ValueError('invalid segment')
         if create == 'true':
@@ -22,7 +23,7 @@ try:
     held = os.fstat(fd)
     if (final.st_dev, final.st_ino) != (held.st_dev, held.st_ino):
         raise ValueError('directory changed during admission')
-    if not path.startswith(os.path.realpath(root) + os.sep):
+    if not (root_self and path == os.path.realpath(root)) and not path.startswith(os.path.realpath(root) + os.sep):
         raise ValueError('outside root')
     print(json.dumps({'path': path}))
 except (OSError, ValueError):

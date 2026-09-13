@@ -1,5 +1,11 @@
+import path from "node:path";
+import { realpathSync, statSync } from "node:fs";
 import { z } from "zod";
 const schema = z.object({
+  HARBOR_PERSONAL_VPS_MODE: z.literal("personal").optional(),
+  HARBOR_PERSONAL_VPS_STATE_DIR: z.string().startsWith("/").optional(),
+  HARBOR_PERSONAL_VPS_CODEX_HOME: z.string().startsWith("/").optional(),
+  HARBOR_PERSONAL_VPS_CODEX_BINARY: z.string().startsWith("/").optional(),
   HARBOR_LOCAL_MODE: z.literal("personal").optional(),
   HARBOR_LOCAL_CODEX_HOME: z.string().startsWith("/").optional(),
   HARBOR_LOCAL_CODEX_BINARY: z.string().startsWith("/").optional(),
@@ -51,7 +57,8 @@ export function config(env = process.env) {
   const c = schema.parse(env);
   if (
     c.HARBOR_LOCAL_MODE &&
-    (c.HARBOR_FIXTURE_MODE ||
+    (c.HARBOR_PERSONAL_VPS_MODE ||
+      c.HARBOR_FIXTURE_MODE ||
       ["test", "production"].includes(env.NODE_ENV ?? "") ||
       env.HARBOR_MANAGED_RELEASE ||
       !["localhost", "127.0.0.1"].includes(new URL(c.HARBOR_ORIGIN).hostname) ||
@@ -66,6 +73,28 @@ export function config(env = process.env) {
   )
     throw Error(
       "Personal local mode requires a separate loopback instance and private Codex configuration",
+    );
+  if (
+    c.HARBOR_PERSONAL_VPS_MODE &&
+    (c.HARBOR_LOCAL_MODE ||
+      c.HARBOR_FIXTURE_MODE ||
+      process.platform !== "linux" ||
+      process.getuid?.() === 0 ||
+      c.HARBOR_HOST !== "127.0.0.1" ||
+      new URL(c.HARBOR_OIDC_ISSUER).protocol !== "https:" ||
+      !c.HARBOR_PERSONAL_VPS_STATE_DIR ||
+      !c.HARBOR_PERSONAL_VPS_CODEX_HOME ||
+      !c.HARBOR_PERSONAL_VPS_CODEX_BINARY ||
+      env.HARBOR_MANAGED_RELEASE ||
+      env.HARBOR_STORAGE_SOCKET ||
+      env.HARBOR_FILE_SOCKET ||
+      env.HARBOR_PREVIEW_SOCKET ||
+      env.HARBOR_LAUNCHER_SOCKET ||
+      env.HARBOR_CONTROL_SOCKET ||
+      env.HARBOR_CREDENTIAL_KEY_FILE)
+  )
+    throw Error(
+      "Personal VPS mode requires a separate nonroot Linux instance, loopback backend, HTTPS identity provider and private native Codex configuration",
     );
   const roots = z
     .array(
@@ -89,6 +118,40 @@ export function config(env = process.env) {
       !c.HARBOR_FIXTURE_MODE)
   )
     throw new Error("Schedule test clock requires a private test instance");
+  if (c.HARBOR_PERSONAL_VPS_MODE) {
+    if (roots.length === 0)
+      throw Error("Personal VPS mode requires approved project roots");
+    const state = realpathSync(c.HARBOR_PERSONAL_VPS_STATE_DIR!);
+    const home = realpathSync(c.HARBOR_PERSONAL_VPS_CODEX_HOME!);
+    if (
+      state !== path.resolve(c.HARBOR_PERSONAL_VPS_STATE_DIR!) ||
+      !statSync(state).isDirectory() ||
+      !home.startsWith(state + "/")
+    )
+      throw Error(
+        "Personal VPS native home must be within canonical private instance state",
+      );
+    for (const root of roots) {
+      const canonical = realpathSync(root.path);
+
+      if (
+        canonical !== path.resolve(root.path) ||
+        !statSync(canonical).isDirectory()
+      )
+        throw Error(
+          "Approved project roots must be existing canonical directories without symlinks",
+        );
+      if (
+        canonical === "/" ||
+        state === canonical ||
+        state.startsWith(canonical + "/") ||
+        canonical.startsWith(state + "/")
+      )
+        throw Error(
+          "Approved project roots must be separate from private native state",
+        );
+    }
+  }
   return { ...c, roots, models: c.HARBOR_MODELS.split(",") };
 }
 export type Config = ReturnType<typeof config>;

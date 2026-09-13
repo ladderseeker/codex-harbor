@@ -38,3 +38,7 @@ Resume one complete user outcome at a time: confirm the need, inspect its existi
 The [architecture](../architecture.md#delivery-through-complete-feature-outcomes) continues to define the full target system. [D006](006-portable-release-and-restore.md) remains the deployment/recovery contract and [D008](008-isolated-self-development-workers.md) remains the deferred self-development contract. Their mandatory gates are unchanged. The [issue index](../../issues/README.md) keeps live-account, deployment-transfer and deferred feature findings visible.
 
 This limits concurrent implementation and repeated broad verification. It also means a blocked real-account or recovery gate may prevent proposal closure even after the candidate's available checks pass. Report that distinction directly rather than assigning a completion percentage to unexecuted checks.
+
+## 2026-09-13 personal VPS addendum
+
+The owner subsequently selected [P015](../proposals/015-personal-vps-workspace.md). [D011](011-personal-vps-workspace.md) authorizes a separately configured personal VPS profile with authenticated HTTPS, subscription login and approved existing folders. It supersedes the native-only-local restriction only for that explicit profile; P013 remains loopback-only, managed isolation requirements and outstanding proposal gates remain unchanged.
