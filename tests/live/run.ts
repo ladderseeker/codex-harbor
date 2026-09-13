@@ -1,3 +1,8 @@
+if (process.argv.includes("--history")) {
+  const { liveHistory } = await import("./history.ts");
+  await liveHistory();
+  process.exit(process.exitCode ?? 0);
+}
 if (process.argv.includes("--schedules")) {
   if (!process.env.HARBOR_TEST_OPENAI_API_KEY) {
     console.error(

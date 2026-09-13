@@ -90,6 +90,8 @@ Production-profile isolation needs the [D003 XFS storage profile](../../design/d
 
 `pnpm test:live` requires dedicated `HARBOR_TEST_OPENAI_API_KEY` credentials, plus the supported Linux execution profile. No dedicated credentials are currently configured. The lane reports that missing gate explicitly and makes no model request; do not substitute normal Codex state or personal project directories. `pnpm test:e2e:self` remains unavailable until P010 is implemented.
 
+`pnpm test:live --history` adds P007's pinned native history/restart/resume check. Configure an explicit supported `HARBOR_TEST_CODEX_MODEL` alongside the dedicated test key on the trusted Linux/XFS fixture. The lane attempts at most two short read-only turns, confirms the exact first runtime is retired, resumes its persisted thread in a new generation and submits only new input. It records source identity and owned cleanup separately from the real Harbor application E2E. The [driver report](../reports/2026-09-13-p007-live-history-driver.md) records two review rounds, passing no-model checks and the still-unexecuted authenticated gate. Missing prerequisites return exit 2, not a pass.
+
 Configured `pnpm dev` starts the API and supervisor against explicitly configured dependencies. It requires `DATABASE_URL`, canonical HTTPS `HARBOR_ORIGIN`, the allowlisted OIDC issuer/client/subject, registered project roots, and the protected launcher/storage/credential services. It fails on missing prerequisites. Use the disposable fixture command above while the complete production setup instructions are being verified.
 
 ## End-to-end verification

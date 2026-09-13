@@ -5,6 +5,7 @@ This directory describes available behavior, developer workflows, and completed 
 - [Developer workflow](developer/development.md): working on the repository now, command availability, and verification requirements.
 - [Common-use delivery and deferred work](reports/2026-09-13-common-use-delivery.md): reduced release scope, current verification limits, preserved P010/P012 branches and resumption handoff.
 - [Common-use conversation acknowledgement](reports/2026-09-13-common-use-acknowledgement.md): narrow shared correction, PostgreSQL contention coverage and exact current check/review evidence.
+- [P007 live-history test driver](reports/2026-09-13-p007-live-history-driver.md): reviewed bounded native history/restart command and no-model checks; authenticated execution remains blocked.
 - [Files and changes](developer/files.md): reviewed editor, file and Git behavior, Linux requirements and integration limits.
 - [P004 feature evidence](reports/2026-09-08-p004-files.md): two feature review rounds and exact-source browser/API/Linux results; subsequent module evidence is linked below.
 - [Terminal user guide](user/terminals.md): shell control, detach versus termination, replay limits and current isolation restrictions.

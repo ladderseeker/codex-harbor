@@ -1,21 +1,21 @@
 # Common-use live history and restart acceptance is incomplete
 
 - Severity: High
-- Status: In progress
+- Status: Blocked
 - Recorded: 2026-09-13 11:03:15 Asia/Shanghai
-- Owner: P007 verification (bounded native-history driver); main coordinates the common-use release
+- Owner: P007 live verification; main coordinates the common-use release
 - Affected files: `tests/live/run.ts`, `tests/workspaces/live.ts`, P007 live acceptance and current release documentation
 - Acceptance: [P007-07](../design/proposals/007-session-history-and-recovery.md#independent-acceptance), with the relevant inherited [P001-08](../design/proposals/001-secure-persistent-conversations.md#independent-acceptance) real-runtime boundary
 
-## Evidence and impact
+## Initial audit — root `2d88e99`, 13 September 2026
 
-The common-use scope audit inspected root `2d88e99`. The default live command creates the real runtime adapter and managed storage directly. The workspace live lane also invokes the runtime directly. These are useful boundary checks, but neither implements a Harbor conversation's native-history restart/resume scenario. There is no history-specific live route in `tests/live/run.ts`.
+The common-use scope audit inspected root `2d88e99`. At that revision, the default live command created the real runtime adapter and managed storage directly. The workspace live lane also invoked the runtime directly. These were useful boundary checks, but neither implemented the required native-history restart/resume scenario. There was no history-specific live route in `tests/live/run.ts`.
 
-The deterministic P007 application tests and pinned non-model contracts have separate recorded evidence. They do not establish the bounded authenticated history/restart outcome required by P007-07. Supplying a test key alone will not complete that missing scenario. No failure of an actual live history run is claimed: that acceptance remains unimplemented and unexecuted.
+The deterministic P007 application tests and pinned non-model contracts had separate recorded evidence. They did not establish the bounded authenticated history/restart outcome required by P007-07. At that audit, supplying a test key alone would not have completed the missing scenario. No failure of an actual live history run was claimed: the scenario was then unimplemented and unexecuted. The later implementation is recorded below; authenticated execution remains unverified.
 
 ## Next action
 
-Implement a bounded P007 live history/restart scenario against the pinned runtime using fresh, run-owned managed workspace and native state. Complete a turn, confirm retirement of the exact owned runtime, reopen/read/resume its persisted thread in a new runtime generation, and complete one explicit new turn without resending the original input. Preserve exact source/artifact identity, model, deadlines, results and owned cleanup; add independent review and the appropriate no-model driver checks before running it.
+Run the implemented `pnpm test:live --history` on the supported trusted Linux/XFS fixture when dedicated test credentials and an explicitly selected supported `HARBOR_TEST_CODEX_MODEL` are configured. Preserve its source identity, two-turn bound, exact retirement/history assertions and owned cleanup. Current acceptance cannot be closed from the no-model driver tests.
 
 This is a specialist native/account check. The existing real Harbor UI/API/database/supervisor deterministic P007 acceptance remains the application-level evidence; the new lane must not describe a direct adapter test as application E2E. Reusing that separation avoids constructing a second application harness while preserving the distinct mandatory real-runtime gate.
 
@@ -23,4 +23,8 @@ The [dedicated credential prerequisite](2026-09-07-171225-live-runtime-credentia
 
 ## Review and closing record
 
-The source gap was identified by the independent common-use scope audit and confirmed by main through the live entry points. This record reports missing acceptance coverage, not an independently reproduced application defect. A bounded driver is now being implemented in an isolated worktree; execution evidence and resolution remain pending.
+The source gap was identified by the independent common-use scope audit and confirmed by main through the live entry points. This record reports missing acceptance coverage, not an independently reproduced application defect.
+
+On 2026-09-13, driver implementation and two independent review rounds completed at `7e75de8`, then the three test-only files were integrated on the common-use baseline. Exact integrated source `df0d2b97fb062d75378b791f7e981d08171adaba7fcec4bc479f3499ae057dd8` /1,041 passed typecheck, formatting and five no-model checks. Canonical `pnpm test:live --history` returned exit 2 for missing dedicated credentials before resources/model effects. The [driver report](../docs/reports/2026-09-13-p007-live-history-driver.md) retains review scope, logs, source qualifications and the corrected local CLI invocation failure.
+
+The missing driver is now implemented, but actual native/account execution remains unverified. Keep this issue Blocked and P007 active until that mandatory acceptance passes; neither fixture tests nor this partial closing note resolve the gate.
