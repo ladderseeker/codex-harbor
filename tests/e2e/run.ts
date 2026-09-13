@@ -9,6 +9,7 @@ if (process.argv.includes("--terminals")) {
   process.exit(process.exitCode ?? 0);
 }
 import { p005 } from "./p005.ts";
+import { acknowledgementContention } from "./acknowledgement.ts";
 import { p007 } from "./p007.ts";
 import { createPool } from "../../packages/storage/src/index.ts";
 if (process.argv.includes("--files")) {
@@ -713,6 +714,15 @@ try {
     ).toBe(beforeCredentialChange.state);
     const testDb = new pg.Pool({ connectionString: env.DATABASE_URL });
     try {
+      await acknowledgementContention({
+        db: testDb,
+        command,
+        context,
+        origin,
+        sessionId: await newSession(),
+        traceFile: env.HARBOR_FIXTURE_TRACE_FILE,
+        artifacts,
+      });
       await p005({
         page: reopened,
         context,

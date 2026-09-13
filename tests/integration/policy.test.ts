@@ -11,9 +11,10 @@ import {
 } from "../../packages/policy/src/index.ts";
 import { resolveProject } from "../../packages/workspaces/src/index.ts";
 test("P001-05 old intent is rejected after retained lookup is exhausted", () => {
-  checkKey(`${Date.now()}:${randomUUID()}`);
-  assert.throws(() => checkKey(`${Date.now() - 86400001}:${randomUUID()}`));
-  assert.throws(() => checkKey(`${Date.now() + 300001}:${randomUUID()}`));
+  const now = Date.now();
+  checkKey(`${now}:${randomUUID()}`, now);
+  assert.throws(() => checkKey(`${now - 86400001}:${randomUUID()}`, now));
+  assert.throws(() => checkKey(`${now + 300001}:${randomUUID()}`, now));
 });
 test("P001-07 ceiling and exact Origin deny escalation", () => {
   assert.throws(() => authorizePermission("workspace-write", "read-only"));

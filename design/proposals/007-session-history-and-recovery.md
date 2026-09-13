@@ -75,6 +75,8 @@ If the optional P003 reservation-release hook fails or rejects its exact ownersh
 
 ## Source issues
 
+[Common-use live history acceptance](../../issues/2026-09-13-110315-common-use-live-acceptance.md), High and In progress, records the missing bounded native-history restart/resume driver for P007-07. The current live entry point exercises adapter/storage directly without that history scenario; supplying credentials alone does not complete this criterion. The common-use release retains both the implementation obligation and the separate credential prerequisite.
+
 [Replay and control bounds](../../issues/archive/2026-09-07-185228-p001-retention-control-bounds.md), Medium, is Resolved after strict replay age/count and reserved cancellation/recovery storage passed exact boundary tests and independent combined review for P007-02/05/06 and inherited P001-03/07. The archive records discovery and closing evidence.
 
 [Dedicated live credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md) keeps the bounded live part of P007-07 unverified. Pinned non-model contracts and fixtures cannot waive it.

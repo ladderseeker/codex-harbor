@@ -4,6 +4,8 @@ P001's foundation is implemented and has completed four independent review round
 
 The [architecture](../../design/architecture.md) defines the target system. The [proposal index](../../design/proposals/README.md) defines independently verifiable feature outcomes and their dependencies. The [issue index](../../issues/README.md) exposes active findings and pending work transferred to proposals. Both indexes link their archives. [AGENTS.md](../../AGENTS.md#document-ownership-and-lifecycle) contains the canonical lifecycle and working rules.
 
+Current work follows [D009](../../design/decisions/009-common-use-release.md): finish the common-use candidate, then implement and verify one needed feature at a time. P010/P012 are deferred with their work preserved. Existing fixture, non-model, Linux and installed results retain their own scopes; required live and recovery gates still prevent finished-delivery claims.
+
 P002 adds scoped credentials for external clients; use the [programmatic API guide](programmatic-api.md). Its [implementation report](../reports/2026-09-07-p002-api-tokens.md) records the original two review rounds, a focused third authority-correction round, and Node 24 validation including the now-resolved P003/P007 authority integration and the still-open live-account gate.
 
 P003 adds managed parallel workspaces; see the [workspace guide](workspaces.md) and [implementation evidence](../reports/2026-09-07-p003-workspaces.md). Its combined P001/P002/P003 application and actual Linux checks passed on Node 24; the real-account parallel-turn gate remains open.
@@ -106,7 +108,7 @@ Assign each run a unique identity and clean up only its own processes, container
 
 Development starts locally on macOS/Linux and later uses the same entry points on compatible Linux VPS hosts. The [local environment design](../../design/architecture.md#local-first-development-and-portable-environments) owns the planned topology and Linux VM requirements. [P010](../../design/proposals/010-self-development.md) owns developing Harbor through its stable instance; [P009](../../design/proposals/009-portable-deployment-and-restore.md) owns deployment, restore, and external recovery.
 
-Deployment tooling has partial installed-profile evidence and a [current command guide](deployment.md); complete checkpoint/restore and release readiness remain unverified. The self-development broker and candidate workflow are in implementation. Add tested usage as those outcomes become available, keeping their evolving specifications in the canonical design/proposals. Existing authorization still governs work; self-development does not create a separate standing permission gate.
+Deployment tooling has partial installed-profile evidence and a [current command guide](deployment.md); complete checkpoint/restore and release readiness remain unverified. The self-development broker and candidate workflow are deferred. Add tested usage when that outcome is delivered, keeping its evolving specification in the canonical design/proposal. Existing authorization still governs work; self-development does not create a separate standing permission gate.
 
 ## History and recovery API
 

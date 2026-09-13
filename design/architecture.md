@@ -6,6 +6,8 @@ The owner has authorized implementation of the roadmap and delegated implementat
 
 ## Recommendation and scope
 
+The owner narrowed current delivery on 13 September 2026 to a verified common-use release. [D009](decisions/009-common-use-release.md) replaces the all-proposals implementation schedule: finish existing everyday workflows, defer P010/P012, and then deliver features individually as needed. The full target contracts below remain in force; this priority change waives no verification gate.
+
 Build a private, single-owner web application around official Codex app-server, with persistent execution on the VPS and an authenticated, documented API. Reproduce the requested workflows first: projects, concurrent conversations, unattended execution, scheduling, terminal, files, attachments, and runtime settings. Treat the screenshot as a workflow reference; exact desktop parity needs a capability inventory and cannot be promised yet.
 
 Target a compatible Linux VPS, including the owner's current Hostinger VPS, without provider APIs or services. Check CPU, RAM, OS, architecture, kernel, and disk before deployment; product labels do not establish specifications. Use containers and Compose, with systemd for host startup where appropriate. Hosts that prevent required isolation are outside the initial target.
@@ -267,7 +269,7 @@ The [repository lifecycle rules](../AGENTS.md#document-ownership-and-lifecycle) 
 
 The proposal registry owns current decision/delivery states, the dependency graph, and implementation order. P001 includes its capability spike, secure conversation, and executable local/E2E foundation as one complete outcome; each later feature owns the additional tests and security controls needed for that outcome. Security and recovery baselines are not postponed until a final hardening phase.
 
-The registry includes an early path to P010 self-development without waiting for optional file-editor, terminal, scheduling, preview, or extension interfaces. Feature verification after declared dependencies is distinct from the deployment-readiness gate. P009 verifies deployment for the modules delivered at that point; subsequent modules extend its backup, migration, and release regression coverage as part of their own acceptance.
+The registry retains the dependency path to P010 self-development, but [D009](decisions/009-common-use-release.md) defers its execution until after the common-use release and a concrete need to resume it. Feature verification after declared dependencies is distinct from the deployment-readiness gate. P009 verifies deployment for the modules delivered at that point; subsequent modules extend its backup, migration, and release regression coverage as part of their own acceptance.
 
 Use implementation → independent review → fixes → verification for each delivery slice. Aim for two to three review rounds, stopping earlier when no actionable findings remain. Record unresolved issues with severity, reproduction evidence, impact, and next steps. No critical blocker may be described as completed work.
 

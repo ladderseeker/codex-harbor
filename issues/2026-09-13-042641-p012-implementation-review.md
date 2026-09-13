@@ -10,7 +10,7 @@
 
 The first independent review of the isolated P012 implementation found four Medium defects at frozen checkpoint `344b826beb65dff97b3471dd7478ff9688b0d323` plus adapter correction `e951907`. The schedules below are proven from that source; the reviewer did not reproduce them at runtime. File line numbers refer to this reviewed checkpoint, not necessarily the current main branch. The implementer accepted the findings and is preparing corrections and observable regressions.
 
-This record does not replace the separate [shared native acknowledgement finding](2026-09-13-022009-native-acknowledgement-deadlock.md), other control-retry findings, or the proposal's remaining native, module, restore and live gates. Passing publication tests do not establish these four corrections. Each part remains In progress until its fix, relevant actual application evidence, independent review and main integration are recorded.
+This record does not replace the separate [shared native acknowledgement finding](archive/2026-09-13-022009-native-acknowledgement-deadlock.md), other control-retry findings, or the proposal's remaining native, module, restore and live gates. Passing publication tests do not establish these four corrections. Each part remains In progress until its fix, relevant actual application evidence, independent review and main integration are recorded.
 
 ## R1 — Rejected queued actions can indefinitely pin a version
 

@@ -7,6 +7,12 @@
 - Read [design/architecture.md](design/architecture.md) and the relevant entry in [design/proposals/README.md](design/proposals/README.md) before implementation. Resolve contradictions in the documents rather than silently choosing a different contract.
 - Read [docs/developer/development.md](docs/developer/development.md) for the current development and verification workflow.
 
+## Delivery focus
+
+- Follow [D009's common-use release decision](design/decisions/009-common-use-release.md): finish the existing everyday workflows and their verification before expanding the roadmap. P010 self-development and P012 managed extensions are deferred, with their work and unresolved obligations preserved.
+- Select one complete user outcome at a time. An active proposal index is a discovery list, not authorization to implement every record concurrently. Fix shared critical defects when required by the selected outcome; do not start optional work merely because a required gate is unavailable.
+- Reuse valid evidence for unchanged boundaries and keep its tested revision and limits explicit. Run the relevant acceptance and critical regressions on changed code, review and fix actionable findings, then close only fully verified proposals. Record unavailable gates and deliver a reviewable candidate without inflating completion or repeatedly running unchanged suites.
+
 ## Document ownership and lifecycle
 
 - Put product designs, architecture decisions, and feature proposals in `design/`. Put documentation for available user behavior, developer workflows, and completed reports in `docs/`. Track findings in `issues/`, including their archived history.

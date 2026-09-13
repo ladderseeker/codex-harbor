@@ -2,6 +2,7 @@
 
 - Decision: Accepted
 - Delivery: In progress
+- Queue: Deferred on 2026-09-13 under [D009](../decisions/009-common-use-release.md). Preserve implementation and findings; resume this outcome individually after the common-use release when needed. The [handoff](../../docs/reports/2026-09-13-common-use-delivery.md#deferred-work-and-recovery) records committed and unfinished branches. No acceptance gate is waived.
 - Dependencies: [P002](002-programmatic-api-access.md), [P003](003-parallel-project-workspaces.md), [P009](009-portable-deployment-and-restore.md)
 - Outcome: A conversation in stable Harbor edits Harbor source, builds and tests a separate candidate, and produces a reviewable release while stable Harbor remains usable.
 - Design updated: 2026-09-08; [D008](../decisions/008-isolated-self-development-workers.md) and the concrete contracts below completed one independent design review and focused correction check.

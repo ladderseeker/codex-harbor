@@ -2,6 +2,7 @@
 
 - Decision: Accepted
 - Delivery: In progress
+- Scheduling update: [D009](009-common-use-release.md) defers P010 implementation on 2026-09-13. This worker/isolation contract remains accepted and its unfinished gates remain required when work resumes.
 - Recorded: 2026-09-08
 - Scope: [P010](../proposals/010-self-development.md), refining the [architecture's trusted build/test broker](../architecture.md#developing-harbor-through-harbor)
 - Supersedes: None. This selects a concrete worker boundary; it does not grant candidate code the stable supervisor's authority.

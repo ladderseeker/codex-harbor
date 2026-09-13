@@ -18,7 +18,7 @@ On C, the pristine tools preparation's sealed `guest.qcow2` and certificate rema
 
 On D, immutable release `ad5786c849eefbffe1f4046e2682a9efc825f7c00520fae47a4f949db956ba4e`, public source and specifically named sanitized evidence survived. The recovery archive is 10,639,360 bytes with SHA-256 `a3dd9fc2bc59bc5c964ade1d0f5bfa875368784c66ee5a6aa15453625fd72071`. The relay correction and test match their original hashes. Installed browser/drain, exact administrator retirement and local metadata rebind evidence retain their original artifact/source identities and reused-fixture limitations. No protected filesystem restore or source-contact result is inferred from the metadata clone. The [relay issue](../../issues/archive/2026-09-13-022008-preview-retirement-race.md) tracks remaining main integration.
 
-The recovered P011 source passed Node 24.11.1 `pnpm check` and two focused adapter contracts at source `08e5584bdb0d21203f413e405d534910d9d583e7ad4192a2fc2d9d90bb06d2de` across 1,030 files. These checks validate recovery; they do not repeat its full browser or Linux acceptance. P012's historical shared acknowledgement result is separately qualified in the [active deadlock issue](../../issues/2026-09-13-022009-native-acknowledgement-deadlock.md).
+The recovered P011 source passed Node 24.11.1 `pnpm check` and two focused adapter contracts at source `08e5584bdb0d21203f413e405d534910d9d583e7ad4192a2fc2d9d90bb06d2de` across 1,030 files. These checks validate recovery; they do not repeat its full browser or Linux acceptance. P012's historical shared acknowledgement result is separately qualified in the [deadlock record](../../issues/archive/2026-09-13-022009-native-acknowledgement-deadlock.md).
 
 ## Limits and prevention
 
@@ -106,3 +106,7 @@ The source review then closed two Low warm-driver failure-path corrections in `4
 The current-lock Linux cache proof is therefore blocked independently of private-disk recovery, protected checkpoint, persistent access and live credentials. The deployed module, runtime protections and complete self-development test driver continue locally. No new guest base, candidate, promotion or proposal verification is established by these preparation and source-review results.
 
 This four-file documentation update, based on root `4dbb49c`, passed one independent review without actionable findings. On macOS, `node scripts/check-docs.mjs` passed for 112 documents and `git diff --check` passed. These checks validate documentation only; the source and execution results above retain their own baselines.
+
+### Common-use navigation update — 13 September 2026
+
+The shared acknowledgement finding is now [resolved and archived](../../issues/archive/2026-09-13-022009-native-acknowledgement-deadlock.md) after its narrow common-use integration and current critical checks. This updates navigation and current status only; all recovered sources, failures and historical results above retain their original scope.

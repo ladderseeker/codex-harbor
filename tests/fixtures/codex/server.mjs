@@ -279,7 +279,10 @@ createInterface({ input: process.stdin }).on("line", (line) => {
           itemId: "flood",
           delta: "x".repeat(4096),
         });
-    event("turn/started", { threadId: p.threadId, turn });
+    // The ACK regression isolates request persistence from an earlier started
+    // notification. Both the RPC result and following approval are real protocol
+    // messages; no Harbor persistence is mocked.
+    if (!text.includes("[ack-lock]")) event("turn/started", { threadId: p.threadId, turn });
     if(text.includes("[retirement-unknown]")){process.send?.({retirementUnknown:true});return setTimeout(()=>process.exit(34),50)}
     if (text.includes("[crash]")) return setTimeout(() => process.exit(32), 50);
     if (text.includes("[approval]") || text.includes("[input]")) {
@@ -320,7 +323,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
                 : {}),
             },
           }),
-        30,
+        text.includes("[ack-lock]") ? 100 : 30,
       );
     }
     timers.set(

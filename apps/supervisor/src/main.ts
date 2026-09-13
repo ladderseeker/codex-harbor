@@ -1264,6 +1264,11 @@ async function tick() {
         r.turn,
       ]);
       await transaction(pool, async (db) => {
+        // Match notification persistence: conversation before its operation.
+        // An immediate native request may already be waiting to persist here.
+        await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
+          o.session_id,
+        ]);
         const active = await db.query(
           "UPDATE operations SET state='running',updated_at=now() WHERE id=$1 AND state='dispatching' RETURNING session_id",
           [o.id],
@@ -1277,9 +1282,14 @@ async function tick() {
           });
         }
       });
-    } catch {
+    } catch (error) {
       await update(o.id, "uncertain", {
         reason: "Dispatch failed or acknowledgement uncertain",
+        databaseCode:
+          typeof (error as any)?.code === "string" &&
+          /^[0-9A-Z]{5}$/.test((error as any).code)
+            ? (error as any).code
+            : null,
       });
       runtimes.get(o.session_id)?.adapter.close();
       runtimes.delete(o.session_id);

@@ -2,6 +2,17 @@
 
 P001–P008 and P011 are Accepted and Implemented, with mandatory verification and upstream follow-ups still open. P009, P010 and P012 are Accepted and In progress. No proposal has passed its completion gate. Design review, implementation, and verification are separate events. Follow the [proposal template](../proposal-template.md) and [canonical lifecycle rules](../../AGENTS.md#document-ownership-and-lifecycle) when changing status.
 
+## Current delivery queue
+
+The owner's 13 September scope change is recorded in [D009](../decisions/009-common-use-release.md). This index includes unfinished and deferred work; it is not a queue to implement all proposals concurrently.
+
+| Priority | Proposals | Current action |
+| --- | --- | --- |
+| Common-use release | P001–P007 | Shared conversation correction and current critical acceptance passed. Integrate the reviewed P007 specialist live driver and retain its real-account execution gate, plus applicable installed/recovery gates. |
+| Installed release prerequisites | P009 | Retain the reviewed installer and its evidence; complete the applicable installed acceptance before claiming a usable deployed artifact. Full restore/promotion obligations remain open in P009. |
+| Existing optional behavior | P008, P011 | Preserve integrated code and evidence. No feature expansion during the common-use release; their remaining live/restore gates remain open. |
+| Deferred | P010, P012 | Implementation is paused with commits, drafts and findings retained. Resume one proposal when selected for a concrete need; neither is complete or withdrawn. |
+
 The [proposal archive](archive/README.md) is empty. Review it and the [issue index](../../issues/README.md) when discovering work or allocating IDs.
 
 The [architecture](../architecture.md) owns shared security, runtime, state, and development contracts. A proposal owns the feature-specific additions and observable acceptance criteria. Do not repeat the full architecture in every proposal.
@@ -25,11 +36,11 @@ An independently verifiable feature may rely on its declared dependencies. Imple
 | [P011](011-private-project-previews.md) | Open a private preview of a project's running application | Accepted | Implemented | P003 | Two review rounds, corrective local/Linux lifecycle and cumulative main verification passed; protected/fresh-host restore and upstream gates remain. [Evidence](../../docs/reports/2026-09-08-p011-development.md#main-acceptance--13-september-2026). |
 | [P012](012-managed-skills-and-mcp.md) | Configure and use trusted skills and MCP tools within a project | Accepted | In progress | P003 | Implementation and module corrections passed two review rounds; actual managed publication/removal and desktop/mobile trust inspection passed. Complete native/module/live acceptance and main integration remain pending. |
 
-Next action: complete P010's fixed worker/broker and P012 local extensions with their module integration and independent acceptance. Private previews, file/terminal installed integration, scheduling metadata integration and targeted real-stack DST coverage passed their scoped checks. Keep the live-account, gateway and protected restore gates visible. [Dedicated live credentials are unavailable](../../issues/2026-09-07-171225-live-runtime-credentials.md), and [automatic approval review blocked the P009 backup transfer](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md); continue unaffected work without claiming either mandatory gate passed. The transferred [runtime compatibility finding](../../issues/archive/2026-09-07-073831-codex-runtime-compatibility.md) has partial evidence owned by [P001's local gate](001-secure-persistent-conversations.md#source-issues) and pending [P009 deployment evidence](009-portable-deployment-and-restore.md#source-issues).
+The common-use candidate's [shared acknowledgement correction](../../issues/archive/2026-09-13-022009-native-acknowledgement-deadlock.md) is resolved after independent review and current critical acceptance. Next action: integrate the reviewed [P007 live history/restart driver](../../issues/2026-09-13-110315-common-use-live-acceptance.md) and execute required real-account acceptance when its [dedicated credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md) are available. P010/P012 remain deferred, and [automatic approval review still blocks the P009 backup transfer](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md). Passing available checks does not finish a proposal with an open mandatory gate. The transferred [runtime compatibility finding](../../issues/archive/2026-09-07-073831-codex-runtime-compatibility.md) retains partial [P001 evidence](001-secure-persistent-conversations.md#source-issues) and pending [P009 evidence](009-portable-deployment-and-restore.md#source-issues).
 
 All features require their relevant deterministic browser/API E2E scenarios and critical regressions. Specialist lanes supplement those tests; they do not replace them. P001 includes the executable development/test foundation because a working, secure conversation is the first complete outcome. It does not require later API tokens, attachment UI, file editor, terminal UI, or scheduler.
 
-One valid order that enables self-development early is **P001 → P002 → P003 → P007 → P009 → P010**. P004, P005, P006, P008, P011, and P012 can follow their own dependency paths. IDs are stable references, not a mandatory schedule. P009 supplies an extensible backup/restore registry; every subsequently delivered data-owning feature adds its migration, backup, and restore assertions in its own proposal. We do not wait for every possible feature before verifying deployment.
+The dependency path **P001 → P002 → P003 → P007 → P009 → P010** remains valid, but D009 defers the earlier plan to implement self-development immediately. IDs are stable references, not a mandatory schedule. P009 supplies an extensible backup/restore registry; every subsequently delivered data-owning feature adds its migration, backup, and restore assertions in its own proposal. We do not wait for every possible feature before verifying deployment.
 
 ## Shared verification contract
 

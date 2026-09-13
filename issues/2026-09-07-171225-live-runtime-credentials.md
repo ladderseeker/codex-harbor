@@ -17,6 +17,8 @@ On 2026-09-07, `pnpm test:live` returned exit 2 with an explicit missing-credent
 
 ## Impact and next steps
 
+On 2026-09-13, the common-use scope review repeated a presence-only check of the dedicated key and found it unset. It also identified a separate [P007 live history/restart coverage gap](2026-09-13-110315-common-use-live-acceptance.md). Credential availability alone does not satisfy that unimplemented scenario; this prerequisite record does not imply every required live driver is complete.
+
 The required real-account smoke cannot currently run. This blocks P001 verification and any later proposal's live acceptance gate that remains dependent on the missing credentials. It does not block implementing those paths, deterministic application acceptance, non-model runtime contracts, or Linux isolation tests.
 
 The live runner must accept explicitly configured dedicated test credentials, create fresh run-specific state/workspaces, bound model usage, and redact secrets. Once the credential prerequisite is available, run each required live scenario and record the version, source/artifact identity, command, environment, result, and meaningful limitations. No passing fixture or unavailable-test exit may be counted as live acceptance. Keep this record active until actual live evidence closes the affected gates.
