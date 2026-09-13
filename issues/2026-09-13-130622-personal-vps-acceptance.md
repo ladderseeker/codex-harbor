@@ -1,23 +1,31 @@
 # Personal VPS deployment acceptance is incomplete
 
 - Severity: High
-- Status: In progress
+- Status: Blocked
 - Owner: P015 implementation and verification
 - Recorded: 2026-09-13 13:06 UTC
 - Affected files: `infra/personal-vps/harbor-personal`, native runtime adapter/config, `tests/personal-vps/`, P015 deployment.
-- Gate: [P015-01–06](../design/proposals/015-personal-vps-workspace.md#verification-and-acceptance-criteria).
+- Gate: [P015-01–06](../design/proposals/015-personal-vps-workspace.md#verification-and-acceptance-criteria) and [P015-07–10](../design/proposals/015-personal-vps-workspace.md#complete-development-acceptance).
 
-## Evidence and impact
+## Current status — 14 September 2026
+
+The selected outcome is implemented and source `13204d7` is pushed and deployed. The [current report](../docs/reports/2026-09-14-personal-development.md) records verified package/TLS/migrations, passing native/browser/critical gates, four scoped reviews, and actual installed owner development: Git commits, locked pnpm dependencies, tests/build, real Vite private preview, complete parent final text, child-event isolation, persisted title and continuation. Existing authentication and project data remain available.
+
+Remaining verification: the mandatory rendered-prototype check is unavailable under browser security policy. Actual rendered application inspection passed but does not waive that gate. P015 remains Implemented and this issue is Blocked by that explicit verification obligation; unrelated dedicated-account and managed-restore gates remain with their existing owners.
+
+The isolated preview-security run `harbor-p015-24078e9b83` passed with durable systemd exit 0, including actual 31-second ticket expiry, one-time replay denial, logout revocation, actual 15-minute viewer expiry, fresh-grant positive controls, mobile preview and stopped-server feedback. Its source digest is `1aaeb7a2dee4c2d4138067feb824e68670405a6aed92dc92f795746f79c30071` (application unchanged from `13204d7`; test-only additions), with a measured 869432 ms final expiry wait and no clock override. Installed background stop also passed independent process, listener and writer-release checks. See the current report for full evidence and limits.
+
+## Initial evidence and impact — 13 September 2026 (historical)
 
 Implementation began at `59cfd3f` on this Ubuntu 24.04 VPS. The original managed profile could not fulfill subscription authentication or ordinary ext4 original-folder registration; P015/D011 explicitly define the new profile. Two independent source review rounds found and fixed generated environment incompatibility, exact-root registration, missing resource limits and empty model configuration. Build/check and host integration checks passed within their recorded intermediate source scope.
 
 Actual nonroot systemd/native positive write initially failed because Ubuntu AppArmor denied user-namespace capabilities. A reviewed exact-binary userns allowance removed that denial; the next run failed because the boundary test started native Codex with a different working directory than the real launcher. Correction and positive/negative Linux acceptance remain in progress. Failed tests do not establish sandbox success.
 
-The current critical browser suite failed twice at second-turn admission with HTTP409; its cause remains under investigation. No full current critical pass is claimed. Dedicated personal VPS browser acceptance is being executed separately, without replacing the regression gate.
+At this checkpoint, the critical browser suite failed twice at second-turn admission with HTTP409; its cause remains under investigation. No full current critical pass is claimed. Dedicated personal VPS browser acceptance is being executed separately, without replacing the regression gate.
 
-The owner has not yet supplied the domain, Harbor OIDC provider/client/subject and exact project path. No real subscription login has been performed for this instance. Public route, verified certificate, installed service/disconnect/continuation and bounded subscription acceptance remain unverified. No production installation was started.
+At this checkpoint, the owner had not yet supplied the domain, Harbor OIDC provider/client/subject and exact project path. No real subscription login has been performed for this instance. Public route, verified certificate, installed service/disconnect/continuation and bounded subscription acceptance remain unverified. No production installation was started.
 
-## Next action
+## Initial next action — 13 September 2026 (historical)
 
 Finish current candidate tests and fixes, obtain independent final delta review, record source/artifact identity and actual results, then configure the exact owner-provided deployment inputs and perform provider-assisted subscription login and installed acceptance. Preserve existing Traefik and ordinary Codex state. Keep P015 In progress until its complete outcome exists and Verified only after all mandatory gates pass.
 
@@ -89,6 +97,10 @@ Owner browser inspection confirms the task remains titled New conversation after
 
 The owner approved [D012](../design/decisions/012-personal-vps-development.md), implementation on main, push and VPS deployment. P015 owns all remaining development environment, Git, preview, title, reply completeness and installed reconnect obligations through P015-07–10; severity remains High until the complete outcome passes. Root directs implementation with separate runtime, conversation and preview implementers, followed by independent review and candidate verification. No completion is claimed at this checkpoint.
 
-### Parent/child event investigation
+### Parent/child event investigation — 14 September initial checkpoint (historical)
 
 Read-only inspection of the owner-reported native history found that two latest persisted assistant item IDs were absent from the parent native transcript, whose linked subagent activity is being checked. This is a potential core lifecycle/projection blocker: child events must not finish the parent operation or replace its messages. The conversation owner is implementing thread-scoped event handling and an interleaved-child completion regression; no historical live data mutation has been made. Earlier passing ordinary/fixture development tests do not cover this newly identified boundary.
+
+### 14 September parent/child correction and installed stop evidence
+
+The routing correction is implemented at `13204d7`; the 300-child-event, early-parent-output and rejected foreign approval regression passed, followed by real installed child review and parent final-text comparison. The parent completed after its child and retained its own complete final response. Same-conversation continuation reused the retained runtime; explicit **Stop background processes** removed the process, closed port 3100 and released both session and workspace background ownership. See the [current report](../docs/reports/2026-09-14-personal-development.md#installed-browser-development-acceptance) for exact identities and evidence. These defects are corrected; this record stays active for its remaining verification gate.

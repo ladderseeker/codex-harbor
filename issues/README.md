@@ -12,7 +12,7 @@ Under [D009](../design/decisions/009-common-use-release.md), the common-use rele
 
 | Issue | Severity | Status | Owner | Next action |
 | --- | --- | --- | --- | --- |
-| [Personal VPS acceptance](2026-09-13-130622-personal-vps-acceptance.md) | High | In progress | P015 | D012 full developer environment, Git/network/temp, private preview, durable titles/replies and real browser/reconnect acceptance; push and VPS deployment authorized. |
+| [Personal VPS acceptance](2026-09-13-130622-personal-vps-acceptance.md) | High | Blocked | P015 | Source `13204d7` deployed; native/browser/critical, real installed development/preview/continuation/stop and actual preview expiry/security passed. Only required rendered-prototype verification remains unavailable. |
 | [Common-use live history acceptance](2026-09-13-110315-common-use-live-acceptance.md) | High | Blocked | P007 verification / main | Driver integrated; two review rounds and five no-model checks passed. Execute the bounded native/account history lane with dedicated credentials; its unavailable exit is not acceptance. |
 | [P010 worker backing reserve](2026-09-13-044423-p010-worker-backing-reserve.md) | High | In progress | P010 | Reviewed backing budget, Linux denial, positive admission and protected allocation cleanup passed; finish complete candidate resource acceptance and main integration. |
 | [P012 implementation review](2026-09-13-042641-p012-implementation-review.md) | Medium | In progress | P012 | Two source review rounds, matching application checks and actual queued-rejection/physical-removal evidence passed; trust controls inspected on desktop/mobile. Finish main integration and current regressions. |

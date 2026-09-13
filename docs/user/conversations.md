@@ -41,7 +41,7 @@ Harbor names an untitled conversation from the first substantive request, using 
 
 Open **Search and filters** within a project's chat list to find a title or stored message text. **Show** switches between active, archived, and all conversations; **Load older conversations** fetches the next bounded page. Hover or focus a chat row to reveal its rename action; touch devices keep the action available. Edit **Conversation title** and choose **Save title**. Renaming checks the current revision so another tab's edit cannot be overwritten silently, and renaming an inactive chat preserves the active conversation and its draft.
 
-**Archive conversation** changes list visibility only. It does not stop running work, delete messages, remove files, or change native history. Open a retained direct conversation link, or select archived history, then use **Restore conversation** to return it to the active list.
+**Archive conversation** changes list visibility without deleting messages, removing files, or changing native history. It does not interrupt an active turn. In the personal VPS profile, archiving also retires idle retained development processes and releases their workspace only after retirement is confirmed. Open a retained direct conversation link, or select archived history, then use **Restore conversation** to return it to the active list.
 
 ## Recover an uncertain conversation
 
@@ -59,6 +59,6 @@ With **Edit project files**, the personal VPS profile permits the selected exist
 
 Command disclosures show the command, directory, output and final exit status. Output is bounded at 32 KiB per command and 256 KiB per conversation, with explicit truncation/omission notices. Assistant messages reconcile the final native response with streamed text. The permission selector is restored from the conversation when reopened.
 
-After a successful turn, **Development processes available** shows a 30-minute retention period. Continuing the same conversation renews it; its workspace stays reserved, so other conversations cannot write there concurrently. Use **Stop background work** when finished to end the owned runtime and release that reservation. Closing the browser does not stop it. At most four personal runtime contexts are retained or active simultaneously.
+After a successful turn, **Development processes are available** shows a 30-minute retention period. Continuing the same conversation renews it; its workspace stays reserved, so other conversations cannot write there concurrently. Use **Stop background processes** when finished to end the owned runtime and release that reservation. Closing the browser does not stop it. At most four personal runtime contexts are retained or active simultaneously.
 
 Use [personal development previews](previews.md#personal-vps-development-preview) to view a server after the task completes. A graceful supervisor shutdown retires retained work. An abrupt crash or unconfirmed stop shows uncertainty and preserves the workspace fence; use SSH recovery rather than assuming the processes are absent or replaying work. Standalone terminal UI and managed uncertain-work recovery remain unavailable in the personal profile.

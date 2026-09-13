@@ -445,6 +445,139 @@ try {
     `https://127.0.0.1:${previewTlsPort}`,
     developmentPort,
   );
+  // Exercise the personal gateway itself: no production clock hook or altered
+  // browser-session timestamps. Secrets below live only in this test's memory.
+  const previewOrigin = `https://127.0.0.1:${previewTlsPort}`;
+  const workspaceId = registeredWorkspaces.workspaces[0].id;
+  const prepare = async (client = context, csrf = me.csrfToken) => {
+    const response = await client.request.post(
+      origin + "/api/v1/personal-preview-openings",
+      {
+        data: { workspaceId, port: developmentPort },
+        headers: {
+          Origin: origin,
+          "X-CSRF-Token": csrf,
+          "Idempotency-Key": `${Date.now()}:${randomUUID()}`,
+        },
+      },
+    );
+    expect(response.status()).toBe(200);
+    return (await response.json()).bootstrapPath as string;
+  };
+  const ticketFor = async (bootstrapPath: string, client = context) => {
+    const response = await client.request.get(origin + bootstrapPath);
+    expect(response.status()).toBe(200);
+    const ticket = /name="ticket" value="([A-Za-z0-9_-]{43})"/.exec(
+      await response.text(),
+    )?.[1];
+    if (!ticket)
+      throw Error("Preview bootstrap did not contain its bounded ticket");
+    return ticket;
+  };
+  const exchange = (ticket: string, client = context) =>
+    client.request.post(previewOrigin + "/__harbor/exchange", {
+      data: new URLSearchParams({ ticket }).toString(),
+      headers: {
+        Origin: origin,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+  const viewerCookie = (await context.cookies(previewOrigin)).find(
+    (cookie) => cookie.name === "__Host-harbor-personal-preview",
+  );
+  if (!viewerCookie) throw Error("Preview viewer cookie missing");
+  const rawViewer = `${viewerCookie.name}=${viewerCookie.value}`;
+  const view = (cookie: string, client = context) =>
+    client.request.get(previewOrigin, {
+      headers: { Origin: previewOrigin, Cookie: cookie },
+    });
+  expect((await view(rawViewer)).status()).toBe(200);
+  expect(
+    (
+      await post("/personal-preview-openings", { workspaceId, port: apiPort })
+    ).status(),
+  ).toBe(409);
+  const replayTicket = await ticketFor(await prepare());
+  expect((await exchange(replayTicket)).status()).toBe(200);
+  expect((await exchange(replayTicket)).status()).toBe(403);
+  const mobilePreview = await context.newPage();
+  await mobilePreview.setViewportSize({ width: 390, height: 844 });
+  await mobilePreview.goto(origin + (await prepare()));
+  await expect(
+    mobilePreview.getByRole("heading", {
+      name: "Private development application",
+    }),
+  ).toBeVisible();
+  expect(
+    await mobilePreview.evaluate(() => document.body.scrollWidth <= innerWidth),
+  ).toBe(true);
+  await mobilePreview.screenshot({
+    path: path.join(artifacts, "preview-mobile.png"),
+    fullPage: true,
+  });
+  await mobilePreview.close();
+  const otherContext = await browser.newContext({ ignoreHTTPSErrors: true });
+  const otherPage = await otherContext.newPage();
+  await otherPage.goto(origin + "/auth/login");
+  await otherPage.getByRole("button", { name: "Sign in as owner" }).click();
+  await otherPage.waitForURL(origin + "/");
+  const otherMe = await (
+    await otherContext.request.get(origin + "/api/v1/me")
+  ).json();
+  const otherTicket = await ticketFor(
+    await prepare(otherContext, otherMe.csrfToken),
+    otherContext,
+  );
+  expect((await exchange(otherTicket, otherContext)).status()).toBe(200);
+  const otherCookie = (await otherContext.cookies(previewOrigin)).find(
+    (cookie) => cookie.name === "__Host-harbor-personal-preview",
+  );
+  if (!otherCookie) throw Error("Separate viewer cookie missing");
+  const revokedViewer = `${otherCookie.name}=${otherCookie.value}`;
+  expect((await view(revokedViewer, otherContext)).status()).toBe(200);
+  expect(
+    (
+      await otherContext.request.post(origin + "/api/v1/security/logout", {
+        data: {},
+        headers: {
+          Origin: origin,
+          "X-CSRF-Token": otherMe.csrfToken,
+          "Idempotency-Key": `${Date.now()}:${randomUUID()}`,
+        },
+      })
+    ).status(),
+  ).toBe(200);
+  expect((await view(revokedViewer, otherContext)).status()).toBe(403);
+  expect((await view(rawViewer)).status()).toBe(200);
+  await otherContext.close();
+  const expiringTicket = await ticketFor(await prepare());
+  await new Promise((resolve) => setTimeout(resolve, 31000));
+  expect((await exchange(expiringTicket)).status()).toBe(403);
+  console.log(
+    "Personal preview short gates passed: ticket replay/expiry, logout revocation, mobile render and denied control port",
+  );
+  const remainingViewerLife = Math.max(
+    0,
+    viewerCookie.expires * 1000 - Date.now() + 1500,
+  );
+  console.log("Waiting for real 15-minute viewer expiry; no clock override");
+  const viewerExpiryWaitStarted = Date.now();
+  await new Promise((resolve) => setTimeout(resolve, remainingViewerLife));
+  const viewerExpiryWaitActualMs = Date.now() - viewerExpiryWaitStarted;
+  // Send the retained secret explicitly so this tests server expiry even though
+  // an ordinary browser has already deleted its expired cookie.
+  expect((await view(rawViewer)).status()).toBe(403);
+  const renewedTicket = await ticketFor(await prepare());
+  expect((await exchange(renewedTicket)).status()).toBe(200);
+  expect(
+    (
+      await context.request.get(previewOrigin, {
+        headers: { Origin: previewOrigin },
+      })
+    ).status(),
+  ).toBe(200);
+  expect((await view(rawViewer)).status()).toBe(403);
+  console.log("Personal preview actual viewer expiry passed");
   await expect(
     page.getByRole("button", {
       name: "Stop background processes",
@@ -467,6 +600,14 @@ try {
       }
     })
     .toBe(0);
+  const stoppedTicket = await ticketFor(await prepare());
+  expect((await exchange(stoppedTicket)).status()).toBe(200);
+  const stoppedResponse = await context.request.get(previewOrigin, {
+    headers: { Origin: previewOrigin },
+  });
+  expect(stoppedResponse.status()).toBe(403);
+  expect(await stoppedResponse.text()).toContain("Preview unavailable");
+  console.log("Personal preview stopped-server feedback passed");
   await page.screenshot({
     path: path.join(artifacts, "conversation-desktop.png"),
     fullPage: true,
@@ -539,6 +680,12 @@ try {
         passed: true,
         sourceDigest: digest,
         profile: "personal-vps",
+        previewExpiry: {
+          clockOverride: false,
+          requestedWaitMs: remainingViewerLife,
+          actualWaitMs: viewerExpiryWaitActualMs,
+          expiredGrantRejectedAndRenewedGrantAccepted: true,
+        },
         externalBoundaries: "deterministic OIDC and Codex",
         uid,
         limits: [
@@ -554,6 +701,9 @@ try {
           "restart history",
           "authenticated separate-origin personal preview, large asset and vite-hmr WebSocket",
           "preview cookie stripping, foreign origin and restart grant denial",
+          "ticket replay and actual 30-second expiry",
+          "viewer logout revocation and actual 15-minute expiry",
+          "mobile preview and unreachable-server feedback",
           "desktop/mobile",
         ],
       },
