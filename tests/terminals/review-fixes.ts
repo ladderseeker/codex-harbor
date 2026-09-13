@@ -1,3 +1,4 @@
+import { openProjectTools } from "../e2e/navigation.ts";
 import { terminalLimits } from "./limits.ts";
 import { execFileSync } from "node:child_process";
 import { terminalStreamChecks } from "./streams.ts";
@@ -108,6 +109,7 @@ export async function terminalReviewFixes(h: {
     // Creation may already have selected/opened its socket before route install.
     // Reload forces the test-owned transport to be routed before any input.
     await page.reload();
+    await openProjectTools(page);
     await page
       .getByRole("button", { name: "Open terminals", exact: true })
       .click();

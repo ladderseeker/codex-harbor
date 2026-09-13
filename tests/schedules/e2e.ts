@@ -1,3 +1,4 @@
+import { openProjectTools } from "../e2e/navigation.ts";
 import { scheduleModulesE2e } from "./modules-e2e.ts";
 import { scheduleReviewControlsE2e } from "./review-controls-e2e.ts";
 import { scheduleWorkspacesE2e } from "./workspaces-e2e.ts";
@@ -172,6 +173,7 @@ export async function scheduleE2e(options: {
     ),
   ).toBe(1);
   const page = context.pages().at(-1)!;
+  await openProjectTools(page);
   await page.getByRole("button", { name: "Schedules", exact: true }).click();
   await page
     .getByRole("button", { name: "Create schedule", exact: true })

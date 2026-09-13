@@ -4,7 +4,7 @@
 
 The owner can start a private Harbor instance, authenticate with an independent official Codex account home, create a local project and conduct a real conversation. The current user instance completed official device login and an authenticated Harbor browser conversation using GPT-5.6-Sol. Its visible final response was “你好，我确认正在通过 Harbor 与你对话。” No file or tool operation was requested in that turn. The service remains running for the owner with a read-only ceiling; account state and local project data persist separately from ordinary Codex state.
 
-[P013](../../design/proposals/013-personal-local-experience.md) is Implemented, not Verified. The [critical regression gate](../../issues/2026-09-13-143001-local-critical-regression-gate.md) remains open. Existing Linux/deployment and dedicated live-account proposal obligations are not satisfied by this personal trial.
+[P013](../../design/proposals/013-personal-local-experience.md) is Implemented, not Verified. The [critical regression gate](../../issues/archive/2026-09-13-143001-local-critical-regression-gate.md) remains open. Existing Linux/deployment and dedicated live-account proposal obligations are not satisfied by this personal trial.
 
 ## Source and environment
 
@@ -36,3 +36,7 @@ The [review issue](../../issues/archive/2026-09-13-143000-personal-local-review.
 Use the [personal local guide](../developer/local-personal.md). Default local state is ignored `.harbor-local/`. Normal shutdown preserves it; account replacement requires stopping this instance before native login. Do not rebuild the shared web output while the instance is serving it: restart after a source/build change so static asset registration matches the new files.
 
 The current experience supports read-only conversations. Managed workspaces, file editing, attachments, terminals, schedules, previews and explicit uncertain-work recovery remain unavailable locally. Linux profile behavior and its prior evidence remain separate. The open critical regression prevents P013 verification/archival even though the requested personal account trial works.
+
+## Critical regression addendum — 13 September 2026
+
+The historical open-gate statement above is superseded by the [resolved critical regression record](../../issues/archive/2026-09-13-143001-local-critical-regression-gate.md). Instrumented `pnpm test:e2e` passed at `9edea343237543c013862ce86f6f9f55ce5d327b39f1cfaef5e18f126bb84904`, including retained conversation and replay-gap behavior. The original uncaptured failure remains unattributed. [P014 evidence](2026-09-13-frontend-redesign.md) records the environment, artifact and reviews; P013 is not archived by this addendum.

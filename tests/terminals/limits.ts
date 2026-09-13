@@ -1,3 +1,4 @@
+import { openProjectTools } from "../e2e/navigation.ts";
 import {
   expect,
   type BrowserContext,
@@ -183,6 +184,7 @@ export async function terminalLimits(h: {
   } finally {
     for (const s of sockets) s.terminate();
     await clear();
+    await openProjectTools(page);
     await page
       .getByRole("button", { name: "Open terminals", exact: true })
       .click();

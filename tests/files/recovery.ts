@@ -1,3 +1,4 @@
+import { openProjectTools } from "../e2e/navigation.ts";
 import { expect } from "@playwright/test";
 import pg from "pg";
 import { randomUUID } from "node:crypto";
@@ -93,6 +94,7 @@ export async function filesRecovery(h: any) {
     expect(repeat.status()).toBe(202);
     expect((await repeat.json()).operation.id).toBe(op.id);
     await h.page.reload();
+    await openProjectTools(h.page);
     await h.page
       .getByRole("button", { name: "Files and changes", exact: true })
       .click();

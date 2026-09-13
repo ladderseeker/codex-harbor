@@ -1,11 +1,12 @@
 # Critical browser regression did not reach the replay-gap scenario
 
 - Severity: High (mandatory verification gate)
-- Status: Open
+- Archive disposition: Resolved
+- Resolution date: 2026-09-13
 - Owner: P013 / regression maintainer
 - Affected files: `tests/e2e/run.ts:1004`; relevant application cause not established.
 - Evidence date: 2026-09-13.
-- Proposal: [P013](../design/proposals/013-personal-local-experience.md).
+- Proposal: [P013](../../design/proposals/013-personal-local-experience.md).
 
 ## Evidence and impact
 
@@ -15,8 +16,14 @@ Independent bounded source assessment found no evidence establishing whether thi
 
 The separate personal local E2E passed, and the owner completed a real native account conversation. Those outcomes do not replace this required critical regression. P013 remains Implemented and unverified.
 
-## Next action
+## Original next action (completed)
 
 Add bounded secret-free diagnostics at the failure point (page URL path, DOM/console error, failed API status/route, target snapshot presence), then perform one instrumented rerun. Investigate and fix any established application defect and independently review the result. Do not repeatedly rerun an unchanged suite without additional evidence.
 
-See the [local delivery report](../docs/reports/2026-09-13-personal-local-experience.md) for completed checks and their limits.
+See the [local delivery report](../../docs/reports/2026-09-13-personal-local-experience.md) for completed checks and their limits.
+
+## Resolution — 13 September 2026
+
+The instrumented critical suite passed under P014 at source `9edea343237543c013862ce86f6f9f55ce5d327b39f1cfaef5e18f126bb84904` (1,057 files, matching start/end digest), macOS Node 24.11.1, Chromium 1194, real Caddy/API/PostgreSQL/supervisor with external OIDC/Codex fixtures. Command: `pnpm test:e2e`; artifact: `.test-runs/harbor-e2e-a8116c0385/`. This includes the retained-conversation composer and subsequent replay-gap assertions. Structural failure diagnostics now retain bounded same-origin routes/status and target-snapshot status without secrets.
+
+Three implementation review rounds and an independent bounded test-correction review found no remaining critical findings. New sidebar selectors were scoped to chat links and composer drop coverage was added; a mistaken text-attachment path assertion was corrected to the existing inline-text contract. No production cause is established for the original uncaptured failure, and no such cause is inferred from unrelated later test failures. The current mandatory regression gate is satisfied; P013 overall closure remains a separate lifecycle action. See the [P014 evidence report](../../docs/reports/2026-09-13-frontend-redesign.md).

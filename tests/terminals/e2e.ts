@@ -1,3 +1,4 @@
+import { openProjectTools } from "../e2e/navigation.ts";
 import { terminalModules } from "./modules.ts";
 import { terminalGitFence } from "./git-fence.ts";
 import { terminalReviewFixes } from "./review-fixes.ts";
@@ -166,6 +167,7 @@ try {
   const project = (await created.json()).project;
   await page.reload();
   await page.getByRole("button", { name: "PTY project", exact: true }).click();
+  await openProjectTools(page);
   await expect(
     page.getByRole("button", { name: "Open terminals", exact: true }),
   ).toBeEnabled();
@@ -317,6 +319,7 @@ try {
         .toBe(200);
       page = await context.newPage();
       await page.goto(origin + "/");
+      await openProjectTools(page);
       await page
         .getByRole("button", { name: "Open terminals", exact: true })
         .click();

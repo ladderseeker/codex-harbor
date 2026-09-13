@@ -1,3 +1,4 @@
+import { openProjectTools } from "../e2e/navigation.ts";
 import { filesRecovery } from "./recovery.ts";
 import { filesReads } from "./reads.ts";
 import { xfsFixture } from "../isolation/xfs-fixture.ts";
@@ -286,6 +287,7 @@ try {
     path.join(source, "tracked.txt"),
     'dirty local\n<img src=x onerror="window.harborFileExecuted=true" style="color:red">\nplain style="color:red" stays text\n',
   );
+  await openProjectTools(page);
   await page
     .getByRole("button", { name: "Manage workspaces", exact: true })
     .click();

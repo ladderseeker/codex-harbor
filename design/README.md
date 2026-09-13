@@ -1,6 +1,6 @@
 # Harbor design
 
-The architecture is the accepted implementation baseline. Implementation and verification are under way; no proposal is finished. The [proposal index](proposals/README.md) owns current feature status, dependencies, evidence and next actions. Decision (`Draft`, `Accepted`, `Superseded`) and delivery (`Planned`, `In progress`, `Implemented`, `Verified`) remain separate. Existing session authorization governs work; metadata does not create a universal approval gate.
+The architecture is the accepted implementation baseline. P014 completed the scoped frontend redesign; broader implementation and verification remain under way. The [proposal index](proposals/README.md) owns current feature status, dependencies, evidence and next actions. Decision (`Draft`, `Accepted`, `Superseded`) and delivery (`Planned`, `In progress`, `Implemented`, `Verified`) remain separate. Existing session authorization governs work; metadata does not create a universal approval gate.
 
 - [Architecture](architecture.md): system boundaries, identity, runtime/data contracts, local development, verification, self-development, and releases.
 - [Design tokens and UI guide](design-tokens.html): approved visual baseline, component rules, and workflow for extending the design consistently.
@@ -16,7 +16,7 @@ The architecture is the accepted implementation baseline. Implementation and ver
 - [D009 — Common-use release before roadmap expansion](decisions/009-common-use-release.md): current delivery priority; finish and verify everyday workflows, preserve deferred P010/P012 work, then deliver one needed outcome at a time. Existing acceptance gates remain unchanged.
 - [D010 — Personal local Codex experience](decisions/010-personal-local-experience.md): the owner's selected local account-login and conversation outcome, implemented under P013 with explicit native execution boundaries.
 - [Active proposals](proposals/README.md): complete user outcomes, dependencies, acceptance criteria, and implementation status.
-- [Proposal archive](proposals/archive/README.md): completed, superseded, or withdrawn proposals; currently empty.
+- [Proposal archive](proposals/archive/README.md): completed, superseded, or withdrawn proposals, including completed P014.
 - [Proposal template](proposal-template.md): the required structure for a new or revised feature proposal.
 - [Developer guide](../docs/developer/development.md): implemented commands, development workflow, and verification limits.
 - [Issue index](../issues/README.md): active findings and pending proposal-owned work, with access to issue history.

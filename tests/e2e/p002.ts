@@ -120,6 +120,12 @@ export async function p002({
     200,
   );
   const otherSession = (await otherSessionResponse.json()).session;
+  if (
+    !(await page
+      .locator(".rail-footer")
+      .evaluate((e) => (e as HTMLDetailsElement).open))
+  )
+    await page.locator(".rail-footer summary").click();
   await page.getByRole("button", { name: "API tokens", exact: true }).click();
   const modal = page.getByRole("dialog");
   await modal.getByLabel("Token name").fill("   ");
@@ -1068,6 +1074,12 @@ export async function p002({
         await send(`/sessions/${session.id}/turns`, body)
       ).json(),
       live = stream(session.id);
+    if (
+      !(await page
+        .locator(".rail-footer")
+        .evaluate((e) => (e as HTMLDetailsElement).open))
+    )
+      await page.locator(".rail-footer summary").click();
     await page.getByRole("button", { name: "API tokens", exact: true }).click();
     await page
       .getByRole("button", { name: "Revoke P002 external client", exact: true })

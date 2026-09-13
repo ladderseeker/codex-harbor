@@ -147,6 +147,7 @@ try {
     )
     .toBe(true);
   await page
+    .locator(".sidebar")
     .getByRole("button", { name: "New conversation", exact: true })
     .click();
   await page.getByLabel("Message Codex").fill("P013 local hello");

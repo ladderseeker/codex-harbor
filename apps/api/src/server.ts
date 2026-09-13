@@ -1,3 +1,7 @@
+import {
+  projectDirectoryRoutes,
+  projectBrowsingCapability,
+} from "./project-directories.ts";
 import { emergencyPauseSchedules } from "../../../packages/schedules/src/management.ts";
 import { PgBoss } from "pg-boss";
 import { scheduleRoutes } from "./schedules.ts";
@@ -586,11 +590,13 @@ export async function buildServer(c: Config) {
     owner: { subject: c.HARBOR_OWNER_SUBJECT },
     csrfToken: auth.get(req)!.csrf,
   }));
+  projectDirectoryRoutes(app, c);
   app.get("/api/v1/project-roots", async () => ({
     roots: c.roots.map(({ id, name }) => ({ id, name })),
   }));
   app.get("/api/v1/capabilities", async (req) => ({
     ...(c.HARBOR_LOCAL_MODE ? { local: true } : {}),
+    projectBrowsing: projectBrowsingCapability(c),
     files: {
       read: !!(
         process.env.HARBOR_FILE_SOCKET ?? process.env.HARBOR_STORAGE_SOCKET

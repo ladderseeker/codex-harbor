@@ -1,3 +1,4 @@
+import { openProjectTools } from "../e2e/navigation.ts";
 import { previewOutputFlood } from "./output-e2e.ts";
 import { previewReadiness } from "./readiness-e2e.ts";
 import { previewControls } from "./controls-e2e.ts";
@@ -329,6 +330,7 @@ try {
     });
   } else {
     await page.reload();
+    await openProjectTools(page);
     await page
       .getByRole("button", { name: "Project previews", exact: true })
       .click();

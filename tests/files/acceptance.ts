@@ -1,3 +1,4 @@
+import { openProjectTools } from "../e2e/navigation.ts";
 import { editorRegressions } from "./editor-regressions.ts";
 import { filesReads } from "./reads.ts";
 import { filesRecovery } from "./recovery.ts";
@@ -33,7 +34,9 @@ export async function filesAcceptance(h: any) {
     });
   });
   await page.getByRole("button", { name: "Close dialog", exact: true }).click();
+  await openProjectTools(page);
   await page.getByLabel("New conversation workspace").selectOption(local.id);
+  await openProjectTools(page);
   await page
     .getByRole("button", { name: "Files and changes", exact: true })
     .click();
@@ -341,6 +344,7 @@ export async function filesAcceptance(h: any) {
     [],
   );
   await page.getByRole("button", { name: "Close files", exact: true }).click();
+  await openProjectTools(page);
   await page
     .getByRole("button", { name: "Files and changes", exact: true })
     .click();

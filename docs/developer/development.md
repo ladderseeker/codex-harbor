@@ -98,6 +98,8 @@ Configured `pnpm dev` starts the API and supervisor against explicitly configure
 
 ## End-to-end verification
 
+`pnpm test:e2e --design` exercises the P014 frontend through a fresh real Harbor stack: local-root browsing and denial cases, project registration, real fixture replies, persisted active/inactive rename and drafts, project-targeted creation, sidebar resizing, and desktop/mobile navigation. It retains screenshots and structural failure diagnostics under the owned `.test-runs/harbor-e2e-*` directory. The lane uses bounded pauses between burst-heavy browser/API phases to respect the ordinary request limit; it does not change server rate limits. Run `pnpm build` first and freeze source edits during acceptance. The [redesign delivery report](../reports/2026-09-13-frontend-redesign.md) records the current result and supporting lanes.
+
 End-to-end tests should start from the feature's public entry point and assert its persisted and observable outcome. Browser features use a real browser and Harbor's real API, database, and supervisor. API-only features use an authenticated API client and the same real services. Codex and identity-provider fixtures are permitted at those external boundaries to make ordinary tests repeatable; replacing Harbor's own services does not qualify as end-to-end coverage.
 
 Test the feature's relevant negative and lifecycle cases as well as its successful path. For example, persistent conversation work must distinguish a closed browser from an interrupted runtime; authentication must cover API and streaming entry points, not only the login screen. Exact scenarios belong in the owning proposals rather than in a duplicate checklist here.

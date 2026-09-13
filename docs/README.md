@@ -3,6 +3,7 @@
 This directory describes available behavior, developer workflows, and completed reports. The [proposal index](../design/proposals/README.md) distinguishes implemented behavior, current verification evidence and finished delivery.
 
 - [Developer workflow](developer/development.md): working on the repository now, command availability, and verification requirements.
+- [Frontend redesign delivery](reports/2026-09-13-frontend-redesign.md): completed P014 implementation, review and verification evidence.
 - [Personal local experience](developer/local-personal.md): explicit local Codex account startup and its verification limits.
 - [Personal local delivery](reports/2026-09-13-personal-local-experience.md): reviewed local/native checks, real owner conversation and the open critical regression gate.
 - [Common-use delivery and deferred work](reports/2026-09-13-common-use-delivery.md): reduced release scope, current verification limits, preserved P010/P012 branches and resumption handoff.

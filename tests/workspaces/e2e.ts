@@ -1,3 +1,4 @@
+import { openProjectTools } from "../e2e/navigation.ts";
 import { workspaceAuthorityExpiry } from "./authority-expiry.ts";
 import { sourceDigest } from "../../scripts/source-digest.ts";
 import { localComposeFiles } from "../../infra/compose.ts";
@@ -221,6 +222,7 @@ try {
     });
   await chmod(source, 0o755);
   await writeFile(path.join(source, "tracked.txt"), "dirty local\n");
+  await openProjectTools(page);
   await page
     .getByRole("button", { name: "Manage workspaces", exact: true })
     .click();
@@ -424,6 +426,7 @@ try {
         ).writerSessionId,
     )
     .toBe(null);
+  await openProjectTools(page);
   await page
     .getByRole("button", { name: "Manage workspaces", exact: true })
     .click();
@@ -804,6 +807,7 @@ try {
     .getByRole("button", { name: "Other Git", exact: true })
     .click();
   await page
+    .locator(".sidebar")
     .getByRole("button", { name: "New conversation", exact: true })
     .first()
     .click();
@@ -818,6 +822,7 @@ try {
     .getByRole("navigation", { name: "Projects" })
     .getByRole("button", { name: "Parallel project", exact: true })
     .click();
+  await openProjectTools(page);
   await expect(page.getByLabel("New conversation workspace")).toContainText(
     "First checkout",
   );

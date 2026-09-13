@@ -107,41 +107,45 @@ export function WorkspaceSummary({
               {workspace.state}
             </span>
           </p>
-          <p className="workspace-path">{workspace.relativePath}</p>
-          {inspection?.git && (
-            <p className="field-help">
-              {inspection.branch === null
-                ? "Detached checkout"
-                : inspection.branch
-                  ? `Branch: ${inspection.branch}`
-                  : "Branch status unavailable"}
-              {inspection.dirty
-                ? "; uncommitted changes present"
-                : "; clean checkout"}
-            </p>
-          )}
-          <dl>
-            <div>
-              <dt>Workspace ID</dt>
-              <dd>{workspace.id}</dd>
-            </div>
-            {workspace.baseRevision && (
-              <div>
-                <dt>Base commit</dt>
-                <dd>{workspace.baseRevision}</dd>
-              </div>
+          <details className="workspace-details">
+            <summary>Workspace details</summary>
+            <p className="workspace-path">{workspace.relativePath}</p>
+            {inspection?.git && (
+              <p className="field-help">
+                {inspection.branch === null
+                  ? "Detached checkout"
+                  : inspection.branch
+                    ? `Branch: ${inspection.branch}`
+                    : "Branch status unavailable"}
+                {inspection.dirty
+                  ? "; uncommitted changes present"
+                  : "; clean checkout"}
+              </p>
             )}
-          </dl>
-          {workspace.kind === "worktree" && (
-            <p className="field-help">
-              Based on committed source. Uncommitted Local changes are excluded.
-            </p>
-          )}
-          {workspace.kind === "copy" && (
-            <p className="field-help">
-              An independent snapshot of the non-Git source.
-            </p>
-          )}
+            <dl>
+              <div>
+                <dt>Workspace ID</dt>
+                <dd>{workspace.id}</dd>
+              </div>
+              {workspace.baseRevision && (
+                <div>
+                  <dt>Base commit</dt>
+                  <dd>{workspace.baseRevision}</dd>
+                </div>
+              )}
+            </dl>
+            {workspace.kind === "worktree" && (
+              <p className="field-help">
+                Based on committed source. Uncommitted Local changes are
+                excluded.
+              </p>
+            )}
+            {workspace.kind === "copy" && (
+              <p className="field-help">
+                An independent snapshot of the non-Git source.
+              </p>
+            )}
+          </details>
           {inspection && !inspection.available && (
             <p className="inline-error" role="status">
               Workspace inspection is unavailable. No alternate path will be

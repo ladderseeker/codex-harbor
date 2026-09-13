@@ -6,6 +6,8 @@
 
 ## Context and decision
 
+2026-09-13 interface addendum: the owner selected implementation of the approved visual guide and prototype across the existing frontend. [P014](../proposals/archive/014-consistent-frontend.md) owns this complete UI outcome and bounded local project-folder browsing. It was completed and archived after scoped verification, without resuming deferred modules or waiving existing release gates.
+
 2026-09-13 addendum: the owner subsequently selected a real local account-login and conversation experience. [D010](010-personal-local-experience.md) and [P013](../proposals/013-personal-local-experience.md) own that bounded outcome. It takes current implementation priority without waiving the common-use candidate's existing verification gates or resuming deferred work.
 
 The owner wants a usable, verified product while conserving the remaining agent quota. Main already contains P001–P008 and P011 implementation, with substantial review and verification evidence. P010 and P012 have extensive separate work but unfinished integration and mandatory acceptance. Completing every proposal together has delayed a usable release.

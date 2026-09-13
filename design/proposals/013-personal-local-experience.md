@@ -6,7 +6,7 @@
 - Dependencies: Implemented P001 conversation UI/API/supervisor and P003 local workspace records; their remaining verification is not waived.
 - User outcome: Start a private local Harbor instance, sign in through official Codex login, and conduct a real persistent conversation.
 - Evidence/status updated: 2026-09-13; [local delivery report](../../docs/reports/2026-09-13-personal-local-experience.md) records native/local acceptance, independent review and the real owner conversation.
-- Next action: Diagnose and pass the [critical regression gate](../../issues/2026-09-13-143001-local-critical-regression-gate.md); do not archive as Verified while this mandatory gate remains open.
+- Next action: Reconcile final P013 acceptance and lifecycle separately; the [critical regression gate](../../issues/archive/2026-09-13-143001-local-critical-regression-gate.md) passed under P014.
 
 ## Scope and prerequisites
 
@@ -36,7 +36,7 @@ Apply [D010](../decisions/010-personal-local-experience.md). Use loopback exposu
 
 ## Implementation approach
 
-The implemented development entry/profile, local runtime factory, account readiness and local UI reuse the existing Harbor components. The [personal local guide](../../docs/developer/local-personal.md) documents `pnpm dev --local` and official login; the command is available while the overall critical regression gate remains open.
+The implemented development entry/profile, local runtime factory, account readiness and local UI reuse the existing Harbor components. The [personal local guide](../../docs/developer/local-personal.md) documents `pnpm dev --local` and official login; the command is available; current critical regression acceptance passed under P014.
 
 ## Verification and acceptance criteria
 

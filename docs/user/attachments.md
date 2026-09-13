@@ -1,6 +1,6 @@
 # Attachments and saved drafts
 
-Choose a file with **Choose attachment**, drop it into the attachment area, or paste an image into the message box. A selected file appears below your message. Harbor saves the message and selection for 24 hours; wait for **Draft saved for 24 hours** before closing the page.
+Use the plus button (**Attach file**) to choose an attachment, drop a file anywhere in the message composer, or paste an image into the message box. Open **Attachment limits** for supported types and sizes. A selected file appears below your message. Harbor saves the message and selection for 24 hours; wait for **Draft saved for 24 hours** before closing the page.
 
 Supported files are UTF-8 plain text (`.txt`, at most 64 KiB) and non-interlaced 8-bit RGB/RGBA PNG images (at most 256 KiB and 2048 × 2048 pixels). Other image encodings, SVG, HTML, PDFs, archives and automatic conversion are unsupported. A message accepts up to four files totaling 512 KiB. Each conversation retains at most 32 attachment records and reserves at most 4 MiB; the instance reserves at most 100 MiB. Deleted and expired records may count until their bounded cleanup completes.
 

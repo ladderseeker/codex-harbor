@@ -305,16 +305,41 @@ export async function p005({
       }),
     );
     textPhase = "readiness";
-    // setInputFiles bypasses the hidden input's visible button. Observe the same
-    // readiness gate a real file-picker interaction must pass; never retry a mutation.
+    // A file dropped on the form's padding follows the same readiness gate as
+    // the picker. Verify browser navigation is cancelled and upload occurs once.
     await expect(
       page.getByRole("button", { name: "Attach file", exact: true }),
     ).toBeEnabled();
     textPhase = "selection";
-    await page.getByLabel("Choose attachment").setInputFiles({
-      name: "notes.txt",
-      mimeType: "text/plain",
-      buffer: text,
+    const paddingDrop = await page
+      .locator("form.composer")
+      .evaluate((node, bytes) => {
+        const transfer = new DataTransfer();
+        transfer.items.add(
+          new File([new Uint8Array(bytes)], "notes.txt", {
+            type: "text/plain",
+          }),
+        );
+        const dragover = new DragEvent("dragover", {
+          dataTransfer: transfer,
+          bubbles: true,
+          cancelable: true,
+        });
+        const drop = new DragEvent("drop", {
+          dataTransfer: transfer,
+          bubbles: true,
+          cancelable: true,
+        });
+        return {
+          dragAccepted: !node.dispatchEvent(dragover),
+          dropCancelled: !node.dispatchEvent(drop),
+          defaultPrevented: drop.defaultPrevented,
+        };
+      }, Array.from(text));
+    expect(paddingDrop).toEqual({
+      dragAccepted: true,
+      dropCancelled: true,
+      defaultPrevented: true,
     });
     await expect(
       page.getByText("Selected for this message", { exact: true }),
@@ -323,6 +348,19 @@ export async function p005({
     await expect(
       page.getByText("Draft saved for 24 hours.", { exact: true }),
     ).toBeVisible();
+    const droppedNote = await db.query(
+      "SELECT id FROM attachments WHERE session_id=$1 AND name='notes.txt' AND state='staged'",
+      [other.id],
+    );
+    expect(droppedNote.rowCount).toBe(1);
+    expect(
+      (
+        await db.query(
+          "SELECT attachment_ids FROM conversation_drafts WHERE session_id=$1",
+          [other.id],
+        )
+      ).rows[0].attachment_ids,
+    ).toEqual([droppedNote.rows[0].id]);
     textPhase = "reload";
     await page.reload();
     await expect(
@@ -409,22 +447,35 @@ export async function p005({
       [other.id],
     )
   ).rows[0].id;
-  // Real drop handler plus pasted image are associated with one submitted turn.
-  await page
-    .getByRole("region", { name: "Attachments", exact: true })
+  // Textarea drops bubble through the composer, without double selection.
+  const textareaDrop = await page
+    .getByLabel("Message Codex")
     .evaluate((node) => {
       const transfer = new DataTransfer();
       transfer.items.add(
         new File(["Dropped input"], "drop.txt", { type: "text/plain" }),
       );
-      node.dispatchEvent(
-        new DragEvent("drop", {
-          dataTransfer: transfer,
-          bubbles: true,
-          cancelable: true,
-        }),
-      );
+      const dragover = new DragEvent("dragover", {
+        dataTransfer: transfer,
+        bubbles: true,
+        cancelable: true,
+      });
+      const drop = new DragEvent("drop", {
+        dataTransfer: transfer,
+        bubbles: true,
+        cancelable: true,
+      });
+      return {
+        dragAccepted: !node.dispatchEvent(dragover),
+        dropCancelled: !node.dispatchEvent(drop),
+        defaultPrevented: drop.defaultPrevented,
+      };
     });
+  expect(textareaDrop).toEqual({
+    dragAccepted: true,
+    dropCancelled: true,
+    defaultPrevented: true,
+  });
   await expect(
     page.getByText("Selected for this message", { exact: true }),
   ).toHaveCount(2);
@@ -442,11 +493,29 @@ export async function p005({
     path: path.join(artifacts, "attachments-desktop.png"),
     fullPage: true,
   });
-  const combined = (await readFile(traceFile, "utf8"))
+  const droppedText = await db.query(
+    "SELECT id,state,operation_id FROM attachments WHERE session_id=$1 AND name='drop.txt'",
+    [other.id],
+  );
+  expect(droppedText.rowCount).toBe(1);
+  // Text files become inline text inputs; only images have native file paths.
+  // Assert one attached row, the same operation as the image, and one dispatch.
+  expect(droppedText.rows[0].state).toBe("attached");
+  expect(droppedText.rows[0].operation_id).toBeTruthy();
+  expect(
+    (
+      await db.query("SELECT operation_id FROM attachments WHERE id=$1", [
+        pasted,
+      ])
+    ).rows[0].operation_id,
+  ).toBe(droppedText.rows[0].operation_id);
+  const combinedTurns = (await readFile(traceFile, "utf8"))
     .trim()
     .split("\n")
     .map((x) => JSON.parse(x))
-    .find((x) => x.attachmentPaths?.includes(`/attachments/${pasted}`));
+    .filter((x) => x.attachmentPaths?.includes(`/attachments/${pasted}`));
+  expect(combinedTurns).toHaveLength(1);
+  const combined = combinedTurns[0];
   expect(
     combined.attachmentTypes.filter((t: string) => t === "text"),
   ).toHaveLength(2);
@@ -919,7 +988,8 @@ export async function p005({
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await turnSeen;
   await page
-    .getByRole("button", { name: /Preserved attachment draft B/ })
+    .locator(".conversation-link")
+    .filter({ hasText: "Preserved attachment draft B" })
     .click();
   await expect(
     page.getByRole("heading", {

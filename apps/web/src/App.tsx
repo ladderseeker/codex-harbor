@@ -1,3 +1,5 @@
+import { Icon } from "./Icons.tsx";
+import { SidebarResize } from "./SidebarResize.tsx";
 import { Schedules } from "./Schedules.tsx";
 import {
   useRichDraft,
@@ -48,6 +50,7 @@ interface Root {
   label?: string;
 }
 interface Capabilities {
+  projectBrowsing?: { available: boolean; reason: string | null };
   local?: boolean;
   files?: { read: boolean; write: boolean; reason: string | null };
   models: {
@@ -181,6 +184,8 @@ export function App() {
   const [pendingIntents, setPendingIntents] = useState<Pending[]>([]);
   const pending = pendingIntents[0];
   const [sending, setSending] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const creatingRef = useRef(false);
   const sendingRef = useRef(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -198,6 +203,80 @@ export function App() {
   const followsBottom = useRef(true);
   const visibleApproval = useRef<string | undefined>(undefined);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
+    new Set(),
+  );
+  const [mobile, setMobile] = useState(() => window.innerWidth <= 700);
+  const [sidebarWidth, setSidebarWidth] = useState(260);
+  const resizeComposer = useCallback(() => {
+    const input = composerRef.current;
+    if (!input) return;
+    input.style.height = "24px";
+    input.style.height = Math.min(160, input.scrollHeight) + "px";
+    input.style.overflowY = input.scrollHeight > 160 ? "auto" : "hidden";
+  }, []);
+  useEffect(resizeComposer, [
+    richDraft.draft.text,
+    selectedId,
+    sidebarWidth,
+    snapshot?.session.id,
+    resizeComposer,
+  ]);
+  const updateSidebarWidth = useCallback(
+    (value: number) => setSidebarWidth(value),
+    [],
+  );
+  const closeNavigation = useCallback(() => {
+    setSidebarOpen(false);
+    if (window.innerWidth <= 700)
+      requestAnimationFrame(() =>
+        document
+          .querySelector<HTMLButtonElement>("[aria-label='Open navigation']")
+          ?.focus(),
+      );
+  }, []);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 700px)");
+    const update = () => {
+      const focused = document.activeElement;
+      if (
+        query.matches &&
+        (focused?.closest(".sidebar") || focused?.matches(".sidebar-resize"))
+      )
+        requestAnimationFrame(() =>
+          document
+            .querySelector<HTMLButtonElement>("[aria-label='Open navigation']")
+            ?.focus(),
+        );
+      setMobile(query.matches);
+      setSidebarOpen(false);
+      resizeComposer();
+    };
+    query.addEventListener("change", update);
+    window.addEventListener("resize", resizeComposer);
+    return () => {
+      query.removeEventListener("change", update);
+      window.removeEventListener("resize", resizeComposer);
+    };
+  }, [resizeComposer]);
+  useEffect(() => {
+    if (!mobile || !sidebarOpen) return;
+    document
+      .querySelector<HTMLButtonElement>(
+        ".sidebar [aria-label='Close navigation']",
+      )
+      ?.focus();
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !document.activeElement?.closest("dialog"))
+        closeNavigation();
+    };
+    window.addEventListener("keydown", escape);
+    return () => window.removeEventListener("keydown", escape);
+  }, [mobile, sidebarOpen, closeNavigation]);
+  useEffect(() => {
+    if (projectId)
+      setExpandedProjects((previous) => new Set([...previous, projectId]));
+  }, [projectId]);
   const report = useCallback((failure: unknown) => {
     if (failure instanceof ApiError && failure.status === 401) setExpired(true);
     setError(errorMessage(failure));
@@ -474,7 +553,7 @@ export function App() {
     else url.searchParams.delete("conversation");
     history.pushState({}, "", url);
     setSelectedId(id);
-    setSidebarOpen(false);
+    closeNavigation();
     setNotice("");
   }
 
@@ -559,26 +638,61 @@ export function App() {
         approval.state === "pending" || approval.state === "answering",
     ) ?? [];
 
-  function newSession() {
-    if (!projectId || !settingsReady || !canCreateConversation) return;
-    void execute(
-      newIntent(
-        "/sessions",
-        {
-          projectId,
-          workspaceId: newWorkspaceId,
-          model,
-          effort,
-          permissionProfile: permission,
+  async function newSession(targetProjectId = projectId) {
+    if (!targetProjectId || !settingsReady || blocked || creatingRef.current)
+      return;
+    const target = projects.find((item) => item.id === targetProjectId);
+    if (!target || target.archivedAt) return;
+    creatingRef.current = true;
+    setCreating(true);
+    try {
+      const available =
+        targetProjectId === projectId
+          ? workspaceData.workspaces
+          : (
+              await request<{
+                workspaces: { id: string; kind: string; state: string }[];
+              }>(`/projects/${encodeURIComponent(targetProjectId)}/workspaces`)
+            ).workspaces;
+      const workspace =
+        targetProjectId === projectId
+          ? available.find(
+              (item) => item.id === newWorkspaceId && item.state === "ready",
+            )
+          : (available.find(
+              (item) => item.kind === "local" && item.state === "ready",
+            ) ?? available.find((item) => item.state === "ready"));
+      if (!workspace) {
+        setError(
+          "This project has no ready workspace. Open project tools to manage workspaces.",
+        );
+        return;
+      }
+      await execute(
+        newIntent(
+          "/sessions",
+          {
+            projectId: targetProjectId,
+            workspaceId: workspace.id,
+            model,
+            effort,
+            permissionProfile: permission,
+          },
+          "Create conversation",
+        ),
+        (result) => {
+          const created = (result as { session: Session }).session;
+          setProjectId(targetProjectId);
+          selectSession(created.id);
+          setTimeout(() => composerRef.current?.focus(), 0);
         },
-        "Create conversation",
-      ),
-      (result) => {
-        const created = (result as { session: Session }).session;
-        selectSession(created.id);
-        setTimeout(() => composerRef.current?.focus(), 0);
-      },
-    );
+      );
+    } catch (failure) {
+      report(failure);
+    } finally {
+      creatingRef.current = false;
+      setCreating(false);
+    }
   }
 
   async function send(event: FormEvent) {
@@ -643,7 +757,10 @@ export function App() {
     );
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      style={{ "--rail-width": `${sidebarWidth}px` } as React.CSSProperties}
+    >
       <a className="skip-link" href="#conversation">
         Skip to conversation
       </a>
@@ -651,28 +768,43 @@ export function App() {
         <button
           className="sidebar-scrim"
           aria-label="Close navigation"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeNavigation}
         />
       )}
       <aside
         className={`sidebar ${sidebarOpen ? "is-open" : ""}`}
         aria-label="Projects and conversations"
+        id="project-sidebar"
+        inert={mobile && !sidebarOpen}
       >
         <div className="brand-row">
           <a className="brand" href="/">
+            <Icon name="harbor" />
             Harbor
-            <span className="brand-mark" aria-hidden="true">
-              ∩
-            </span>
           </a>
           <button
             className="icon-button mobile-only"
             aria-label="Close navigation"
-            onClick={() => setSidebarOpen(false)}
+            onClick={closeNavigation}
           >
             ×
           </button>
         </div>
+        <button
+          className="new-conversation"
+          aria-label="New conversation"
+          onClick={() => void newSession()}
+          disabled={
+            !projectId ||
+            !settingsReady ||
+            blocked ||
+            creating ||
+            !canCreateConversation
+          }
+        >
+          <Icon name="compose" />
+          New chat
+        </button>
         <div className="rail-heading">
           <h2>Projects</h2>
           <button
@@ -692,31 +824,58 @@ export function App() {
             )
             .map((item) => (
               <div key={item.id} className="project-group">
-                <button
-                  className={`project-button ${projectId === item.id ? "selected" : ""}`}
-                  onClick={() => {
-                    setProjectId(item.id);
-                    const first = sessions.find(
-                      (session) => session.projectId === item.id,
-                    );
-                    selectSession(first?.id ?? "");
-                  }}
-                >
-                  <svg aria-hidden="true" viewBox="0 0 24 24">
-                    <path d="M3 7V5h6l2 2h10v12H3Z" />
-                  </svg>
-                  <span>
-                    {item.name}
-                    {item.archivedAt ? " (archived)" : ""}
-                  </span>
-                </button>
-                {projectId === item.id && (
+                <div className="project-row">
+                  <button
+                    className={`project-button ${projectId === item.id ? "selected" : ""}`}
+                    aria-expanded={expandedProjects.has(item.id)}
+                    onClick={() => {
+                      setExpandedProjects((previous) => {
+                        const next = new Set(previous);
+                        if (next.has(item.id)) next.delete(item.id);
+                        else next.add(item.id);
+                        return next;
+                      });
+                      if (projectId !== item.id) {
+                        setProjectId(item.id);
+                        const first = sessions.find(
+                          (session) => session.projectId === item.id,
+                        );
+                        selectSession(first?.id ?? "");
+                      }
+                    }}
+                  >
+                    <Icon name="folder" />
+                    <span>
+                      {item.name}
+                      {item.archivedAt ? " (archived)" : ""}
+                    </span>
+                  </button>
+                  <button
+                    className="icon-button project-new"
+                    aria-label={`New conversation in ${item.name}`}
+                    title="New chat"
+                    disabled={
+                      blocked || creating || !settingsReady || !!item.archivedAt
+                    }
+                    onClick={() => void newSession(item.id)}
+                  >
+                    <Icon name="compose" />
+                  </button>
+                </div>
+                {expandedProjects.has(item.id) && (
                   <History
                     projectId={item.id}
                     selectedId={selectedId}
                     revision={JSON.stringify(sessions)}
-                    select={selectSession}
-                    workspaces={workspaceData.workspaces}
+                    select={(id) => {
+                      setProjectId(item.id);
+                      selectSession(id);
+                    }}
+                    workspaces={
+                      projectId === item.id ? workspaceData.workspaces : []
+                    }
+                    disabled={blocked}
+                    execute={execute}
                   />
                 )}
               </div>
@@ -725,102 +884,97 @@ export function App() {
             <p className="rail-empty">Add a project folder to begin.</p>
           )}
         </nav>
-        <button
-          className="quiet-button"
-          disabled={capabilities?.local}
-          title={
-            capabilities?.local
-              ? "Unavailable in local experience mode"
-              : undefined
-          }
-          onClick={() => setSchedulesOpen(true)}
-        >
-          Schedules
-        </button>
-        <label className="archive-toggle">
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(event) => setShowArchived(event.target.checked)}
-          />
-          Show archived
-        </label>
-        {projectId && (
-          <div className="rail-workspaces">
-            <label>
-              New conversation workspace
-              <select
-                aria-label="New conversation workspace"
-                value={newWorkspaceId}
-                onChange={(event) => setNewWorkspaceId(event.target.value)}
-                disabled={blocked || !!project?.archivedAt}
+        <details className="rail-tools">
+          <summary>Project tools</summary>{" "}
+          <button
+            className="quiet-button"
+            disabled={capabilities?.local}
+            title={
+              capabilities?.local
+                ? "Unavailable in local experience mode"
+                : undefined
+            }
+            onClick={() => setSchedulesOpen(true)}
+          >
+            Schedules
+          </button>
+          <label className="archive-toggle">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(event) => setShowArchived(event.target.checked)}
+            />
+            Show archived
+          </label>
+          {projectId && (
+            <div className="rail-workspaces">
+              <label>
+                New conversation workspace
+                <select
+                  aria-label="New conversation workspace"
+                  value={newWorkspaceId}
+                  onChange={(event) => setNewWorkspaceId(event.target.value)}
+                  disabled={blocked || !!project?.archivedAt}
+                >
+                  <option value="">Choose workspace</option>
+                  {workspaceData.workspaces
+                    .filter((workspace) => workspace.state !== "removed")
+                    .map((workspace) => (
+                      <option
+                        key={workspace.id}
+                        value={workspace.id}
+                        disabled={workspace.state !== "ready"}
+                      >
+                        {workspace.name} ({workspaceNames[workspace.kind]})
+                        {workspace.state !== "ready"
+                          ? ` — ${workspace.state}`
+                          : ""}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <button
+                className="quiet-button"
+                disabled={capabilities?.local}
+                title={
+                  capabilities?.local
+                    ? "Workspace management requires the Linux installation"
+                    : undefined
+                }
+                onClick={() => setWorkspaceManagerOpen(true)}
               >
-                <option value="">Choose workspace</option>
-                {workspaceData.workspaces
-                  .filter((workspace) => workspace.state !== "removed")
-                  .map((workspace) => (
-                    <option
-                      key={workspace.id}
-                      value={workspace.id}
-                      disabled={workspace.state !== "ready"}
-                    >
-                      {workspace.name} ({workspaceNames[workspace.kind]})
-                      {workspace.state !== "ready"
-                        ? ` — ${workspace.state}`
-                        : ""}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <button
-              className="quiet-button"
-              disabled={capabilities?.local}
-              title={
-                capabilities?.local
-                  ? "Workspace management requires the Linux installation"
-                  : undefined
-              }
-              onClick={() => setWorkspaceManagerOpen(true)}
-            >
-              Manage workspaces
-            </button>
-            <button
-              className="quiet-button"
-              disabled={!newWorkspaceId || !capabilities?.files?.read}
-              title={capabilities?.files?.reason ?? undefined}
-              onClick={() => setFilesOpen(true)}
-            >
-              Files and changes
-            </button>
-            <button
-              className="quiet-button"
-              disabled={!newWorkspaceId || capabilities?.local}
-              onClick={() => setTerminalWorkspace(newWorkspaceId)}
-            >
-              Open terminals
-            </button>
-            <button
-              className="quiet-button"
-              disabled={!newWorkspaceId || capabilities?.local}
-              onClick={() => setPreviewWorkspace(newWorkspaceId)}
-            >
-              Project previews
-            </button>
-            {workspaceData.error && (
-              <p className="inline-error">{workspaceData.error}</p>
-            )}
-          </div>
-        )}
-        <button
-          className="new-conversation"
-          onClick={newSession}
-          disabled={
-            !projectId || !settingsReady || !canCreateConversation || blocked
-          }
-        >
-          <span aria-hidden="true">+</span> New conversation
-        </button>
-        <div className="rail-footer">
+                Manage workspaces
+              </button>
+              <button
+                className="quiet-button"
+                disabled={!newWorkspaceId || !capabilities?.files?.read}
+                title={capabilities?.files?.reason ?? undefined}
+                onClick={() => setFilesOpen(true)}
+              >
+                Files and changes
+              </button>
+              <button
+                className="quiet-button"
+                disabled={!newWorkspaceId || capabilities?.local}
+                onClick={() => setTerminalWorkspace(newWorkspaceId)}
+              >
+                Open terminals
+              </button>
+              <button
+                className="quiet-button"
+                disabled={!newWorkspaceId || capabilities?.local}
+                onClick={() => setPreviewWorkspace(newWorkspaceId)}
+              >
+                Project previews
+              </button>
+              {workspaceData.error && (
+                <p className="inline-error">{workspaceData.error}</p>
+              )}
+            </div>
+          )}
+        </details>
+        <details className="rail-footer">
+          <summary>Account &amp; settings</summary>
           <button
             className="account-button"
             disabled={!identity}
@@ -860,9 +1014,15 @@ export function App() {
           >
             Sign out
           </button>
-        </div>
+        </details>
       </aside>
-      <main id="conversation" className="main" tabIndex={-1}>
+      <SidebarResize changed={updateSidebarWidth} />
+      <main
+        id="conversation"
+        className="main"
+        tabIndex={-1}
+        inert={mobile && sidebarOpen}
+      >
         <header className="conversation-header">
           <button
             className="icon-button mobile-only"
@@ -870,7 +1030,7 @@ export function App() {
             aria-expanded={sidebarOpen}
             onClick={() => setSidebarOpen(true)}
           >
-            ☰
+            <Icon name="panel" />
           </button>
           <div className="header-title">
             <p>{project?.name ?? "Your workspace"}</p>
@@ -996,8 +1156,8 @@ export function App() {
             ) : settingsReady ? (
               <button
                 className="primary"
-                disabled={blocked || !canCreateConversation}
-                onClick={newSession}
+                disabled={blocked || creating || !canCreateConversation}
+                onClick={() => void newSession()}
               >
                 New conversation
               </button>
@@ -1266,10 +1426,10 @@ export function App() {
                     uncertain ||
                     !richDraft.ready
                   }
-                  rows={3}
+                  rows={1}
                   onKeyDown={(event) => {
                     if (
-                      (event.metaKey || event.ctrlKey) &&
+                      !event.shiftKey &&
                       event.key === "Enter" &&
                       !event.nativeEvent.isComposing
                     ) {
@@ -1419,7 +1579,9 @@ export function App() {
                       ? "Codex can read this project. File edits require a different permission."
                       : "Codex can edit files in this project."}
                 </span>
-                <span className="shortcut">Ctrl / ⌘ Enter to send</span>
+                <span className="shortcut">
+                  Enter to send · Shift Enter for a new line
+                </span>
               </div>
               {capabilities?.limits?.maxConversationBytes && (
                 <details className="storage-limits">
@@ -1567,6 +1729,7 @@ export function App() {
       {showProjectForm && (
         <ProjectDialog
           roots={roots}
+          browsing={capabilities?.projectBrowsing}
           failure={error}
           retry={
             pending
@@ -1684,6 +1847,7 @@ function Modal({
 
 function ProjectDialog({
   roots,
+  browsing,
   disabled,
   close,
   create,
@@ -1691,6 +1855,7 @@ function ProjectDialog({
   retry,
 }: {
   roots: Root[];
+  browsing?: { available: boolean; reason: string | null };
   failure?: string;
   retry?: () => void;
   disabled: boolean;
@@ -1710,6 +1875,46 @@ function ProjectDialog({
   const [name, setName] = useState("");
   const [path, setPath] = useState("");
   const [makeFolder, setMakeFolder] = useState(false);
+  const [browserOpen, setBrowserOpen] = useState(false);
+  const [browsePath, setBrowsePath] = useState("");
+  const [listing, setListing] = useState<{
+    path: string;
+    directories: { name: string; path: string }[];
+    truncated: boolean;
+  }>();
+  const [browseError, setBrowseError] = useState("");
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const [retryListing, setRetryListing] = useState(0);
+  useEffect(() => {
+    setBrowsePath("");
+    setListing(undefined);
+  }, [rootId]);
+  useEffect(() => {
+    if (!browserOpen || !browsing?.available || !rootId) return;
+    let active = true;
+    setBrowseLoading(true);
+    setBrowseError("");
+    setListing(undefined);
+    void request<{
+      path: string;
+      directories: { name: string; path: string }[];
+      truncated: boolean;
+    }>(
+      `/project-roots/${encodeURIComponent(rootId)}/directories?path=${encodeURIComponent(browsePath)}`,
+    )
+      .then((result) => {
+        if (active) setListing(result);
+      })
+      .catch((error) => {
+        if (active) setBrowseError(errorMessage(error));
+      })
+      .finally(() => {
+        if (active) setBrowseLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [browserOpen, browsing?.available, rootId, browsePath, retryListing]);
   return (
     <Modal title="Add project" close={close} failure={failure} retry={retry}>
       <p>Choose a folder inside an approved root.</p>
@@ -1743,6 +1948,95 @@ function ProjectDialog({
             ))}
           </select>
         </label>
+        {browsing?.available ? (
+          <button
+            type="button"
+            onClick={() => setBrowserOpen((value) => !value)}
+            aria-expanded={browserOpen}
+          >
+            Browse folders
+          </button>
+        ) : (
+          <p className="field-help">
+            {browsing?.reason ??
+              "Folder browsing is unavailable. Enter a path relative to the approved root."}
+          </p>
+        )}
+        {browserOpen && browsing?.available && (
+          <section className="folder-browser" aria-label="Project folders">
+            <div className="folder-browser-header">
+              <button
+                type="button"
+                disabled={!browsePath || browseLoading}
+                onClick={() =>
+                  setBrowsePath(browsePath.split("/").slice(0, -1).join("/"))
+                }
+              >
+                Parent folder
+              </button>
+              <code>{browsePath || "Approved root"}</code>
+            </div>
+            {browseLoading && <p role="status">Loading folders…</p>}
+            {browseError && (
+              <div role="alert">
+                <p>{browseError}</p>
+                <button
+                  type="button"
+                  onClick={() => setRetryListing((value) => value + 1)}
+                >
+                  Retry folders
+                </button>
+              </div>
+            )}
+            {listing && (
+              <>
+                <div className="folder-list">
+                  {listing.directories.map((directory) => (
+                    <button
+                      type="button"
+                      key={directory.path}
+                      aria-label={`Open folder ${directory.name}`}
+                      onClick={() => setBrowsePath(directory.path)}
+                    >
+                      <Icon name="folder" />
+                      {directory.name}
+                    </button>
+                  ))}
+                </div>
+                {!listing.directories.length && (
+                  <p className="field-help">No subfolders in this folder.</p>
+                )}
+                {listing.truncated && (
+                  <p role="status" className="field-help">
+                    Only the first folders are shown. Enter a relative path to
+                    select another folder.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  disabled={!browsePath || disabled}
+                  onClick={() => {
+                    setPath(browsePath);
+                    if (!name.trim())
+                      setName(browsePath.split("/").at(-1) ?? "");
+                    setMakeFolder(false);
+                    setBrowserOpen(false);
+                  }}
+                >
+                  Use this folder
+                </button>
+                {!browsePath && (
+                  <p className="field-help">
+                    Open a project folder within this root to select it.
+                  </p>
+                )}
+              </>
+            )}
+            <p className="field-help">
+              Folders belong to this Harbor instance. No files are uploaded.
+            </p>
+          </section>
+        )}
         <label className="field">
           Folder path
           <input

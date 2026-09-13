@@ -155,6 +155,10 @@ export const publicSchemas = {
     available: { type: "boolean" },
   }),
   Capabilities: object({
+    projectBrowsing: object({
+      available: { type: "boolean" },
+      reason: { type: ["string", "null"] },
+    }),
     files: object({
       read: { type: "boolean" },
       write: { type: "boolean" },
@@ -500,6 +504,31 @@ const paths: Record<string, any> = {
   },
   "/project-roots": {
     get: read(object({ roots: array(object({ id: uuid, name: string })) })),
+  },
+  "/project-roots/{id}/directories": {
+    get: {
+      ...read(
+        object({
+          path: string,
+          directories: {
+            type: "array",
+            maxItems: 200,
+            items: object({ name: string, path: string }),
+          },
+          truncated: { type: "boolean" },
+        }),
+      ),
+      description:
+        "Browser owner only. Local/private fixture profiles list bounded non-symlink directories relative to an approved root. Managed profiles refuse browsing; registration remains separately authorized.",
+      parameters: [
+        {
+          in: "query",
+          name: "path",
+          required: false,
+          schema: { type: "string", maxLength: 2048, default: "" },
+        },
+      ],
+    },
   },
   "/capabilities": { get: read(ref("Capabilities")) },
   "/sessions": {

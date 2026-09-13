@@ -36,7 +36,29 @@ export function FileEditor({
       models: Monaco.editor.ITextModel[] = [];
     void load().then((m) => {
       if (dead || !host.current) return;
+      m.editor.defineTheme("harbor-neutral", {
+        base: "vs",
+        inherit: true,
+        rules: [],
+        colors: {
+          "editor.background": "#ffffff",
+          "editor.foreground": "#191919",
+          "editorLineNumber.foreground": "#737373",
+          "editor.selectionBackground": "#dedede",
+          "editor.inactiveSelectionBackground": "#e9e9e9",
+          "editor.lineHighlightBackground": "#fafafa",
+          "diffEditor.insertedTextBackground": "#dedede80",
+          "diffEditor.removedTextBackground": "#adadad66",
+          "diffEditor.insertedLineBackground": "#f5f5f5",
+          "diffEditor.removedLineBackground": "#e9e9e9",
+          "diffEditorGutter.insertedLineBackground": "#dedede",
+          "diffEditorGutter.removedLineBackground": "#adadad",
+          "diffEditorOverview.insertedForeground": "#adadad",
+          "diffEditorOverview.removedForeground": "#737373",
+        },
+      });
       const options = {
+        theme: "harbor-neutral",
         automaticLayout: true,
         minimap: { enabled: false },
         readOnly,

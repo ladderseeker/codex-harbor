@@ -1,6 +1,6 @@
 # API tokens
 
-Open **API tokens** in the navigation. Choose an existing project, capabilities, maximum execution permissions, and an expiry of 1–90 days. Copy the secret when it appears; closing or hiding it removes it from the interface. Harbor stores a verifier, not the secret, and never saves it in browser storage. Keep the secret in your script's secret manager.
+Expand **Account & settings** in the sidebar, then open **API tokens**. Choose an existing project, capabilities, maximum execution permissions, and an expiry of 1–90 days. Copy the secret when it appears; closing or hiding it removes it from the interface. Harbor stores a verifier, not the secret, and never saves it in browser storage. Keep the secret in your script's secret manager.
 
 The capabilities are `read` (projects, conversations, results, events and API documentation), `execute` (create conversations and submit turns), `approve` (answer approval/input requests), and `cancel` (request interruption). Project grants and the execution ceiling apply on the server. Token management, Codex credentials, root registration, and emergency administration require a signed-in owner browser.
 

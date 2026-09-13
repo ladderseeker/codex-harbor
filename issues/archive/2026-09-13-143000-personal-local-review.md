@@ -26,4 +26,8 @@ The fixes and independent verification are recorded below. No user credentials w
 
 ## Resolution
 
-All six findings corrected and independently verified in two cross-component review rounds, plus focused delta review. Local E2E, native no-escalation/denial checks, launcher symlink/cancellation checks and the real owner conversation passed within the scopes documented in the [delivery report](../../docs/reports/2026-09-13-personal-local-experience.md). Reviewed final source digest: `8f914e57677af334c58abb9fc0a7b1990d6df90672d9a55aa0a62eba44abeadb`. No hostile descendant isolation is claimed. The separate [critical regression gate](../2026-09-13-143001-local-critical-regression-gate.md) remains open and keeps P013 unverified.
+All six findings corrected and independently verified in two cross-component review rounds, plus focused delta review. Local E2E, native no-escalation/denial checks, launcher symlink/cancellation checks and the real owner conversation passed within the scopes documented in the [delivery report](../../docs/reports/2026-09-13-personal-local-experience.md). Reviewed final source digest: `8f914e57677af334c58abb9fc0a7b1990d6df90672d9a55aa0a62eba44abeadb`. No hostile descendant isolation is claimed. The separate [critical regression gate](2026-09-13-143001-local-critical-regression-gate.md) remains open and keeps P013 unverified.
+
+### Later regression evidence — 13 September 2026
+
+The historical open-gate statement above is superseded by the [resolved regression record](2026-09-13-143001-local-critical-regression-gate.md): P014 instrumented critical acceptance passed, including retention/replay gap. This addendum does not archive P013.

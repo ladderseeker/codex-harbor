@@ -1,3 +1,4 @@
+import { openProjectTools } from "../e2e/navigation.ts";
 import { expect, type Browser } from "@playwright/test";
 import type { Pool } from "pg";
 import { randomUUID } from "node:crypto";
@@ -59,6 +60,7 @@ export async function scheduleDstE2e(o: {
     200,
   );
   await page.reload();
+  await openProjectTools(page);
   await page.getByRole("button", { name: "Schedules", exact: true }).click();
   await page
     .getByRole("button", { name: "Create schedule", exact: true })

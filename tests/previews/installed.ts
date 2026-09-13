@@ -1,3 +1,4 @@
+import { openProjectTools } from "../e2e/navigation.ts";
 /** Full installed Linux Harbor components; only identity provider is external. */
 import { chromium, expect } from "@playwright/test";
 import { readFile, writeFile, chown } from "node:fs/promises";
@@ -123,6 +124,7 @@ try {
     .getByRole("navigation", { name: "Projects", exact: true })
     .getByRole("button", { name: projectName, exact: true })
     .click();
+  await openProjectTools(page);
   await page
     .getByRole("button", { name: "Project previews", exact: true })
     .click();

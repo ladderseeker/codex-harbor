@@ -1,6 +1,6 @@
 # Feature proposals
 
-P001–P008 and P011 are Accepted and Implemented, with mandatory verification and upstream follow-ups still open. P009, P010 and P012 are Accepted and In progress. No proposal has passed its completion gate. Design review, implementation, and verification are separate events. Follow the [proposal template](../proposal-template.md) and [canonical lifecycle rules](../../AGENTS.md#document-ownership-and-lifecycle) when changing status.
+P001–P008 and P011 are Accepted and Implemented, with mandatory verification and upstream follow-ups still open. P009, P010 and P012 are Accepted and In progress. P013 is Accepted and Implemented. P014 passed its scoped completion gate and is recorded in the archive. Design review, implementation, and verification are separate events. Follow the [proposal template](../proposal-template.md) and [canonical lifecycle rules](../../AGENTS.md#document-ownership-and-lifecycle) when changing status.
 
 ## Current delivery queue
 
@@ -8,13 +8,13 @@ The owner's 13 September scope change is recorded in [D009](../decisions/009-com
 
 | Priority | Proposals | Current action |
 | --- | --- | --- |
-| Selected personal outcome | P013 | Local startup, account login and a real conversation delivered under D010; independently reviewed local/native checks passed. Diagnose the separate critical regression gate. |
+| Selected personal outcome | P013 | Local startup, account login and a real conversation delivered under D010; independently reviewed local/native checks passed. Current critical regression passed under P014; reconcile final P013 acceptance and lifecycle separately. |
 | Common-use release | P001–P007 | Shared conversation correction/current critical acceptance passed; P007 live driver integrated and reviewed. Required real-account execution and applicable installed/recovery gates remain open. |
 | Installed release prerequisites | P009 | Retain the reviewed installer and its evidence; complete the applicable installed acceptance before claiming a usable deployed artifact. Full restore/promotion obligations remain open in P009. |
 | Existing optional behavior | P008, P011 | Preserve integrated code and evidence. No feature expansion during the common-use release; their remaining live/restore gates remain open. |
 | Deferred | P010, P012 | Implementation is paused with commits, drafts and findings retained. Resume one proposal when selected for a concrete need; neither is complete or withdrawn. |
 
-The [proposal archive](archive/README.md) is empty. Review it and the [issue index](../../issues/README.md) when discovering work or allocating IDs.
+The [proposal archive](archive/README.md) records completed P014. Review it and the [issue index](../../issues/README.md) when discovering work or allocating IDs.
 
 The [architecture](../architecture.md) owns shared security, runtime, state, and development contracts. A proposal owns the feature-specific additions and observable acceptance criteria. Do not repeat the full architecture in every proposal.
 
@@ -24,7 +24,7 @@ An independently verifiable feature may rely on its declared dependencies. Imple
 
 | ID | Complete outcome | Decision | Delivery | Direct dependencies | Acceptance IDs / specialist lanes |
 | --- | --- | --- | --- | --- | --- |
-| [P013](013-personal-local-experience.md) | Sign in and try a real Codex conversation on a personal computer | Accepted | Implemented | P001, P003 implemented boundaries | [Local/native review and owner trial passed](../../docs/reports/2026-09-13-personal-local-experience.md); critical regression gate remains open |
+| [P013](013-personal-local-experience.md) | Sign in and try a real Codex conversation on a personal computer | Accepted | Implemented | P001, P003 implemented boundaries | [Local/native review and owner trial passed](../../docs/reports/2026-09-13-personal-local-experience.md); critical regression passed under P014; final lifecycle reconciliation remains |
 | [P001](001-secure-persistent-conversations.md) | Sign in and conduct a protected Codex conversation that survives browser closure | Accepted | Implemented | None | P001-01–08; contracts/E2E/Linux passed, live and medium follow-ups pending |
 | [P002](002-programmatic-api-access.md) | Use revocable, scoped credentials from an external API client | Accepted | Implemented | P001 | Original acceptance, third authority review and combined P003/P007 integration passed; live/upstream gates pending |
 | [P003](003-parallel-project-workspaces.md) | Work across projects and parallel conversations with clear workspace ownership | Accepted | Implemented | P001 | Two feature reviews plus P002 integration passed; [workspace-import](../../issues/archive/2026-09-08-031857-workspace-quota-import.md) and [post-create identity](../../issues/archive/2026-09-08-035221-workspace-validation-identity.md) corrections integrated and passed; P003-06 live and upstream gates pending |

@@ -1,3 +1,4 @@
+import { Icon } from "./Icons.tsx";
 import { useEffect, useRef, useState } from "react";
 import { ApiError, mutate, newIntent, request, type Intent } from "./api.ts";
 export type Attachment = {
@@ -341,34 +342,73 @@ export function AttachmentPicker({
       setError(e instanceof Error ? e.message : "Removal failed");
     }
   }
+  const latestChoose = useRef(choose);
+  latestChoose.current = choose;
+  useEffect(() => {
+    // The attachment section uses display:contents; the composer owns the
+    // complete drop surface, including its textarea and empty padding.
+    const composer = input.current?.closest("form.composer");
+    if (!composer) return;
+    const isFileDrag = (event: DragEvent) =>
+      !!event.dataTransfer &&
+      (event.dataTransfer.types.includes("Files") ||
+        event.dataTransfer.files.length > 0);
+    const over = (event: Event) => {
+      const dragEvent = event as DragEvent;
+      if (!isFileDrag(dragEvent)) return;
+      dragEvent.preventDefault();
+      setDrag(true);
+    };
+    const leave = (event: Event) => {
+      const related = (event as DragEvent).relatedTarget;
+      if (!(related instanceof Node) || !composer.contains(related))
+        setDrag(false);
+    };
+    const drop = (event: Event) => {
+      const dragEvent = event as DragEvent;
+      if (!isFileDrag(dragEvent)) return;
+      dragEvent.preventDefault();
+      setDrag(false);
+      const file = dragEvent.dataTransfer?.files[0];
+      if (file) void latestChoose.current(file);
+    };
+    const end = () => setDrag(false);
+    composer.addEventListener("dragover", over, true);
+    composer.addEventListener("dragleave", leave, true);
+    composer.addEventListener("drop", drop, true);
+    window.addEventListener("dragend", end);
+    window.addEventListener("blur", end);
+    return () => {
+      composer.removeEventListener("dragover", over, true);
+      composer.removeEventListener("dragleave", leave, true);
+      composer.removeEventListener("drop", drop, true);
+      window.removeEventListener("dragend", end);
+      window.removeEventListener("blur", end);
+    };
+  }, []);
   return (
     <section
       className={`attachments ${drag ? "dragging" : ""}`}
       aria-label="Attachments"
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDrag(true);
-      }}
-      onDragLeave={() => setDrag(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDrag(false);
-        const file = e.dataTransfer.files[0];
-        if (file) void choose(file);
-      }}
     >
       <div className="attachment-tools">
         <button
           type="button"
+          className="icon-button attachment-trigger"
+          aria-label="Attach file"
+          title="Attach file"
           disabled={disabled || progress !== null}
           onClick={() => input.current?.click()}
         >
-          Attach file
+          <Icon name="plus" />
         </button>
-        <span>
+        <details className="attachment-limits">
+          <summary aria-label="Attachment limits" title="Attachment limits">
+            <Icon name="more" />
+          </summary>
           Drop or paste one file at a time · PNG 256 KiB · UTF-8 text 64 KiB · 4
           files / 512 KiB
-        </span>
+        </details>
       </div>
       <input
         ref={input}
@@ -455,7 +495,7 @@ export function AttachmentPicker({
             </button>
           </div>
         ))}
-      <p className="field-help" role="status">
+      <p className="field-help draft-status" role="status">
         {state.error
           ? state.error
           : !state.ready

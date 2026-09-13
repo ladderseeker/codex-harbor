@@ -1,3 +1,4 @@
+import { Icon } from "./Icons.tsx";
 import { useEffect, useRef, useState } from "react";
 import type { Session } from "../../../packages/contracts/src/index.ts";
 import { request, newIntent, type Intent } from "./api.ts";
@@ -7,12 +8,16 @@ export function History({
   revision,
   select,
   workspaces = [],
+  disabled,
+  execute,
 }: {
   projectId: string;
   selectedId: string;
   revision: string;
   select(id: string): void;
   workspaces?: { id: string; name: string }[];
+  disabled: boolean;
+  execute(intent: Intent, complete?: (result: unknown) => void): Promise<void>;
 }) {
   const [q, setQ] = useState(""),
     [state, setState] = useState("active"),
@@ -20,6 +25,11 @@ export function History({
     [cursor, setCursor] = useState<string | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<{
+    id: string;
+    title: string;
+    revision: number;
+  } | null>(null);
   const epoch = useRef(0);
   async function load(next?: string) {
     const requestEpoch = ++epoch.current;
@@ -51,46 +61,118 @@ export function History({
   }, [q, state, projectId, revision]);
   return (
     <section className="history" aria-label="Conversation history">
-      <label className="field">
-        Search conversations
-        <input
-          type="search"
-          value={q}
-          maxLength={120}
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </label>
-      <label className="field">
-        Show
-        <select value={state} onChange={(e) => setState(e.target.value)}>
-          <option value="active">Active conversations</option>
-          <option value="archived">Archived conversations</option>
-          <option value="all">All conversations</option>
-        </select>
-      </label>
+      <details className="history-filters">
+        <summary>Search and filters</summary>
+        <label className="field">
+          Search conversations
+          <input
+            type="search"
+            value={q}
+            maxLength={120}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </label>
+        <label className="field">
+          Show
+          <select value={state} onChange={(e) => setState(e.target.value)}>
+            <option value="active">Active conversations</option>
+            <option value="archived">Archived conversations</option>
+            <option value="all">All conversations</option>
+          </select>
+        </label>
+      </details>
       {error && <p role="alert">{error}</p>}
       <div className="conversation-list">
         {rows.map((s) => (
-          <button
+          <div
             key={s.id}
-            className={`conversation-link ${selectedId === s.id ? "selected" : ""}`}
-            aria-current={selectedId === s.id ? "page" : undefined}
-            onClick={() => select(s.id)}
+            className={`session-row ${selectedId === s.id ? "selected" : ""}`}
           >
-            <span className={`rail-dot dot-${s.state}`} aria-hidden="true" />
-            <span>
-              {s.title}
-              <small className="conversation-workspace">
-                {workspaces.find((w) => w.id === s.workspaceId)?.name ??
-                  "Loading workspace…"}
-              </small>
-              {q && s.snippet && (
-                <small className="history-snippet">{s.snippet}</small>
-              )}
-            </span>
-          </button>
+            <button
+              className={`conversation-link ${selectedId === s.id ? "selected" : ""}`}
+              aria-current={selectedId === s.id ? "page" : undefined}
+              onClick={() => select(s.id)}
+            >
+              <span className={`rail-dot dot-${s.state}`} aria-hidden="true" />
+              <span>
+                {s.title}
+                {workspaces.find((w) => w.id === s.workspaceId) && (
+                  <small className="conversation-workspace">
+                    {workspaces.find((w) => w.id === s.workspaceId)?.name}
+                  </small>
+                )}
+                {q && s.snippet && (
+                  <small className="history-snippet">{s.snippet}</small>
+                )}
+              </span>
+            </button>
+            <button
+              className="icon-button session-rename"
+              data-rename-focus={s.id}
+              aria-label={`Rename ${s.title}`}
+              title="Rename conversation"
+              disabled={disabled}
+              onClick={() =>
+                setEditing({
+                  id: s.id,
+                  title: s.title,
+                  revision: s.metadataRevision ?? 0,
+                })
+              }
+            >
+              <Icon name="compose" />
+            </button>
+          </div>
         ))}
       </div>
+      {editing && (
+        <form
+          className="sidebar-rename"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const target = editing;
+            void execute(
+              newIntent(
+                `/sessions/${encodeURIComponent(target.id)}/metadata`,
+                { expectedRevision: target.revision, title: target.title },
+                "Rename conversation",
+              ),
+              () => {
+                setEditing(null);
+                void load();
+                requestAnimationFrame(() =>
+                  document
+                    .querySelector<HTMLButtonElement>(
+                      `[data-rename-focus="${target.id}"]`,
+                    )
+                    ?.focus(),
+                );
+              },
+            );
+          }}
+        >
+          <label className="field">
+            Conversation title
+            <input
+              autoFocus
+              maxLength={200}
+              required
+              value={editing.title}
+              onChange={(event) =>
+                setEditing({ ...editing, title: event.target.value })
+              }
+            />
+          </label>
+          <div className="rename-actions">
+            <button type="submit" disabled={disabled || !editing.title.trim()}>
+              Save title
+            </button>
+            <button type="button" onClick={() => setEditing(null)}>
+              Cancel edit
+            </button>
+          </div>
+        </form>
+      )}
       {!rows.length && !loading && (
         <p className="rail-empty">No matching conversations</p>
       )}
@@ -111,13 +193,6 @@ export function ConversationDetails({
   disabled: boolean;
   execute(intent: Intent, complete?: (result: unknown) => void): Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false),
-    [title, setTitle] = useState(session.title),
-    [revision, setRevision] = useState(session.metadataRevision ?? 0);
-  useEffect(() => {
-    setEditing(false);
-    setTitle(session.title);
-  }, [session.id]);
   return (
     <section className="history-details" aria-label="Conversation details">
       {session.archived && (
@@ -125,48 +200,6 @@ export function ConversationDetails({
           Archived — this only changes history visibility. Work and stored
           history are preserved.
         </p>
-      )}
-      {editing ? (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void execute(
-              newIntent(
-                `/sessions/${session.id}/metadata`,
-                { expectedRevision: revision, title },
-                "Rename conversation",
-              ),
-              () => setEditing(false),
-            );
-          }}
-        >
-          <label className="field">
-            Conversation title
-            <input
-              maxLength={200}
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </label>
-          <button disabled={disabled || !title.trim()} type="submit">
-            Save title
-          </button>
-          <button type="button" onClick={() => setEditing(false)}>
-            Cancel edit
-          </button>
-        </form>
-      ) : (
-        <button
-          disabled={disabled}
-          onClick={() => {
-            setTitle(session.title);
-            setRevision(session.metadataRevision ?? 0);
-            setEditing(true);
-          }}
-        >
-          Rename conversation
-        </button>
       )}
       <button
         disabled={disabled}

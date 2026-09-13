@@ -5,9 +5,11 @@ The text-conversation foundation is implemented, with dedicated live-account acc
 ## Start a conversation
 
 1. Open Harbor's login URL and sign in with the configured owner identity. Other identities cannot open the application, API, assets, or event stream.
-2. Choose **Add project**, select a configured root, and register or create an allowed project folder. The managed Linux profile uses administrator-provisioned storage; incompatible folders and an exhausted storage pool are rejected explicitly.
+2. Choose **Add project** beside Projects, select a configured root, and register or create an allowed project folder. In local mode, browse nested folders inside that root and select the folder to register. Managed installations retain the relative-path form and show why browsing is unavailable. The managed Linux profile uses administrator-provisioned storage; incompatible folders and an exhausted storage pool are rejected explicitly.
 3. Open **Codex account** when setup is needed. Credential entry requires the authenticated owner and a configured protected credential service. The application discovers available models after a project exists. The fixture instance accepts test data only.
-4. Choose **New conversation**, select an available model, reasoning effort, and permission profile, then enter your request. **Send** or Ctrl/Command+Enter submits it. The server enforces the configured permission ceiling.
+4. Choose **New chat**, or the new-conversation action beside a project, select an available model, reasoning effort, and permission profile, then enter your request. **Send** or Enter submits it; Shift+Enter adds a line. Ctrl/Command+Enter also submits. The composer starts at one line, grows with text, and scrolls after its height limit. The server enforces the configured permission ceiling.
+
+Drag the sidebar's right edge to widen or narrow it. Keyboard users can focus the divider and use arrow keys or Home/End. On small screens, **Open navigation** opens the project sidebar; Escape or the backdrop closes it. **Project tools** groups workspace and supporting tools. **Account & settings** contains account, API-token, sign-out and emergency controls.
 
 The conversation shows streamed output and its current state. Closing the browser or restarting only the API does not cancel work owned by a healthy supervisor. Reopen Harbor and select the same conversation to see its persisted result. Reconnect may request a fresh snapshot when older replay events have expired; that does not restart the old request.
 
@@ -31,11 +33,11 @@ If a submission loses its connection, use its retained retry action to submit th
 
 Open **Storage and limits** for persisted conversation usage and managed project quota information. Project usage is marked unavailable when the trusted storage service cannot inspect it. **Conversation limits** explains the server's current replay and retry bounds. Reaching an admission limit prevents new work; it does not grant permission to delete project files automatically.
 
-The application currently focuses on text conversations. Programmatic tokens, multiple workspace modes, file editing, attachments, terminals, schedules, deployment management, previews, and extension management remain tracked in the [active proposals](../../design/proposals/README.md).
+Existing supporting tools retain their capability and installation requirements. The [proposal index](../../design/proposals/README.md) distinguishes implemented behavior from unfinished live-account, deployment, restore and deferred-feature obligations.
 
 ## Search and organize history
 
-Use **Search conversations** in the project rail to find a title or stored message text. **Show** switches between active, archived, and all conversations; **Load older conversations** fetches the next bounded page. **Rename conversation** checks the current revision so another tab's edit cannot be overwritten silently.
+Open **Search and filters** within a project's chat list to find a title or stored message text. **Show** switches between active, archived, and all conversations; **Load older conversations** fetches the next bounded page. Hover or focus a chat row to reveal its rename action; touch devices keep the action available. Edit **Conversation title** and choose **Save title**. Renaming checks the current revision so another tab's edit cannot be overwritten silently, and renaming an inactive chat preserves the active conversation and its draft.
 
 **Archive conversation** changes list visibility only. It does not stop running work, delete messages, remove files, or change native history. Open a retained direct conversation link, or select archived history, then use **Restore conversation** to return it to the active list.
 

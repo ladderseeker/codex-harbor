@@ -780,6 +780,7 @@
         ><a href="#layout"><span>04</span>Layout and spacing</a
         ><a href="#shape"><span>05</span>Shapes, edges, and icons</a
         ><a href="#interaction"><span>06</span>Interaction and accessibility</a>
+        <a href="#supporting-surfaces"><span>07</span>Supporting surfaces</a>
       </nav>
       <div class="rail-bottom">
         Approved direction · 13 Sep 2026<a
@@ -1589,6 +1590,97 @@
           accessibility, end-to-end behavior, and backend integration require
           their own verification.
         </p>
+      </section>
+      <section class="section" id="supporting-surfaces">
+        <div class="section-header">
+          <span>07</span>
+          <h2>Supporting surfaces</h2>
+        </div>
+        <p>
+          The application maps <code>--control-edge</code> to
+          <code>#adadad</code> and <code>--content-width</code> to
+          <code>760px</code>. Existing component aliases <code>--blue</code> and
+          <code>--danger</code> now resolve to <code>--ink</code>;
+          <code>--line</code> resolves to <code>--edge</code> and
+          <code>--paper</code> to <code>--canvas</code>. These aliases preserve
+          existing component structure without preserving its former colored
+          palette.
+        </p>
+        <p>
+          P014 extends the approved direction to existing application workflows.
+          Keep the default rail focused on New chat and projects. Put
+          search/archive filters in a history disclosure, project tools in a
+          contextual disclosure, and account/security tools in a footer
+          disclosure. Every existing capability remains reachable; unavailable
+          controls retain a reason.
+        </p>
+        <div class="specimen">
+          <div class="specimen-label">
+            Secondary surface reference · visual specimen
+          </div>
+          <details>
+            <summary>Project tools</summary>
+            <p>
+              Workspace selection · Files and changes · Workspaces · Terminals ·
+              Previews · Scheduled work
+            </p>
+          </details>
+          <hr
+            style="border: 0; border-top: 1px solid #ececec; margin: 20px 0"
+          />
+          <strong>Choose a project folder</strong>
+          <p>Approved root / nested folder</p>
+          <p>
+            Browse the local instance’s registered roots. Loading, empty,
+            truncated and retry states remain visible. Managed installations
+            retain the relative-path field.
+          </p>
+          <div
+            style="
+              border: 1px solid #dedede;
+              border-radius: 8px;
+              padding: 12px;
+              background: #fafafa;
+            "
+          >
+            Notice: the selected folder is revalidated when the project is
+            added.
+          </div>
+        </div>
+        <ul>
+          <li>
+            Dialogs use the white canvas, 1px edge, 14px radius, 24px padding,
+            and a restrained <code>0 16px 64px #00000018</code> shadow. Standard
+            width is 560px, capped by viewport minus 32px; existing editor,
+            terminal and complex tool panels may expand to their task width.
+            Mobile padding becomes 18px.
+          </li>
+          <li>
+            Secondary controls use 8px radii, 1px neutral borders, 36px minimum
+            height and 12px text. Preserve readable labels and explicit
+            destructive confirmation; status meaning must remain in text when
+            color is removed.
+          </li>
+          <li>
+            Notices and confirmations use soft surfaces and neutral edges with
+            explicit headings. Tables, file lists, schedule lists and settings
+            use the same spacing and selection hierarchy. Code/editor and
+            terminal output use neutral light/dark themes; their content remains
+            escaped or rendered by existing trusted components.
+          </li>
+          <li>
+            Attachments retain their upload/paste/drop flow and error/progress
+            controls; explanatory limits may sit in a disclosure. Composer
+            settings stay compact, with accessible labels. Mobile effort
+            controls remain accessible through the settings surface.
+          </li>
+          <li>
+            Folder browsing is a registration aid, not authority. Show relative
+            breadcrumbs, parent navigation, folder selection,
+            loading/empty/truncated states and retry. Never substitute
+            browser-upload selection for the server’s registered root.
+          </li>
+        </ul>
       </section>
       <footer class="footer">
         <span>Harbor / Interface design tokens</span

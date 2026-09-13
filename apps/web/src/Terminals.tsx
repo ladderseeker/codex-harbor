@@ -314,7 +314,7 @@ function TerminalScreen({
         scrollback: 2000,
         fontSize: 13,
         disableStdin: true,
-        theme: { background: "#101a27", foreground: "#e5edf7" },
+        theme: { background: "#191919", foreground: "#f5f5f5" },
         windowOptions: {},
         linkHandler: { activate: () => {} },
         logLevel: "off",

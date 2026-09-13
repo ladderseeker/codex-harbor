@@ -71,9 +71,7 @@ export async function p007(h: Context) {
     "Run-owned source file preserved across metadata changes",
   );
   await page.goto(origin + "/?conversation=" + id);
-  await page
-    .getByRole("button", { name: "Rename conversation", exact: true })
-    .click();
+  await page.locator(".session-row.selected .session-rename").click();
   await page
     .getByLabel("Conversation title", { exact: true })
     .fill("P007 searchable ledger");
@@ -383,7 +381,7 @@ export async function p007(h: Context) {
     )
     .check();
   await expect(
-    page.getByRole("button", { name: "Rename conversation", exact: true }),
+    page.locator(".session-row.selected .session-rename"),
   ).toHaveCount(1);
   await page
     .getByRole("heading", { name: "The outcome is uncertain" })
@@ -1243,15 +1241,20 @@ export async function p007(h: Context) {
   );
   await page.goto(origin + "/?conversation=" + id);
   await expect(
-    page.getByRole("button", { name: "Rename conversation", exact: true }),
+    page.locator(".session-row.selected .session-rename"),
   ).toHaveCount(1);
-  await page
+  const activeHistory = page
+    .locator(".project-group")
+    .filter({ has: page.locator(".project-button.selected") })
+    .getByRole("region", { name: "Conversation history" });
+  await activeHistory.locator(".history-filters summary").click();
+  await activeHistory
     .getByLabel("Search conversations", { exact: true })
     .fill("P007 searchable ledger");
   await expect(
-    page
-      .getByRole("region", { name: "Conversation history" })
-      .getByRole("button", { name: "P007 searchable ledger" }),
+    activeHistory
+      .locator(".conversation-link")
+      .filter({ hasText: "P007 searchable ledger" }),
   ).toBeVisible();
   await page.screenshot({
     path: path.join(h.artifacts, "p007-history-desktop.png"),
@@ -1262,9 +1265,9 @@ export async function p007(h: Context) {
     .getByRole("button", { name: "Open navigation", exact: true })
     .click();
   await expect(
-    page
-      .getByRole("region", { name: "Conversation history" })
-      .getByRole("button", { name: "P007 searchable ledger" }),
+    activeHistory
+      .locator(".conversation-link")
+      .filter({ hasText: "P007 searchable ledger" }),
   ).toBeVisible();
   expect(
     await page.evaluate(() => document.body.scrollWidth <= window.innerWidth),
