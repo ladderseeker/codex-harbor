@@ -48,6 +48,7 @@ interface Root {
   label?: string;
 }
 interface Capabilities {
+  local?: boolean;
   files?: { read: boolean; write: boolean; reason: string | null };
   models: {
     id: string;
@@ -724,7 +725,16 @@ export function App() {
             <p className="rail-empty">Add a project folder to begin.</p>
           )}
         </nav>
-        <button className="quiet-button" onClick={() => setSchedulesOpen(true)}>
+        <button
+          className="quiet-button"
+          disabled={capabilities?.local}
+          title={
+            capabilities?.local
+              ? "Unavailable in local experience mode"
+              : undefined
+          }
+          onClick={() => setSchedulesOpen(true)}
+        >
           Schedules
         </button>
         <label className="archive-toggle">
@@ -764,6 +774,12 @@ export function App() {
             </label>
             <button
               className="quiet-button"
+              disabled={capabilities?.local}
+              title={
+                capabilities?.local
+                  ? "Workspace management requires the Linux installation"
+                  : undefined
+              }
               onClick={() => setWorkspaceManagerOpen(true)}
             >
               Manage workspaces
@@ -778,14 +794,14 @@ export function App() {
             </button>
             <button
               className="quiet-button"
-              disabled={!newWorkspaceId}
+              disabled={!newWorkspaceId || capabilities?.local}
               onClick={() => setTerminalWorkspace(newWorkspaceId)}
             >
               Open terminals
             </button>
             <button
               className="quiet-button"
-              disabled={!newWorkspaceId}
+              disabled={!newWorkspaceId || capabilities?.local}
               onClick={() => setPreviewWorkspace(newWorkspaceId)}
             >
               Project previews
@@ -1135,7 +1151,14 @@ export function App() {
                   disabled={blocked}
                   execute={execute}
                 />
-                {uncertain && (
+                {uncertain && capabilities?.local && (
+                  <p className="state-explanation">
+                    Local runtime delivery is uncertain. Stop this instance and
+                    inspect its processes before using a new conversation;
+                    automatic recovery is unavailable.
+                  </p>
+                )}
+                {uncertain && !capabilities?.local && (
                   <Recovery
                     key={`recovery:${current.id}`}
                     id={current.id}
@@ -1255,7 +1278,7 @@ export function App() {
                     }
                   }}
                 />
-                {identity && (
+                {identity && !capabilities?.local && (
                   <AttachmentPicker
                     key={selectedId}
                     state={richDraft}
@@ -1680,6 +1703,10 @@ function ProjectDialog({
   }) => void;
 }) {
   const [rootId, setRootId] = useState(roots[0]?.id ?? "");
+  useEffect(() => {
+    if (!roots.some((root) => root.id === rootId))
+      setRootId(roots[0]?.id ?? "");
+  }, [roots, rootId]);
   const [name, setName] = useState("");
   const [path, setPath] = useState("");
   const [makeFolder, setMakeFolder] = useState(false);

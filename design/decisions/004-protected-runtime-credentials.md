@@ -8,6 +8,8 @@
 
 ## Context
 
+2026-09-13 amendment: [D010](010-personal-local-experience.md) defines native account login for the explicit personal local profile under P013. The supervisor API-key onboarding and Linux credential lifecycle in this decision remain the deployed-profile contract; the local profile does not store a subscription token in the API-key mechanism.
+
 Capability discovery must not require a conversation that itself requires already discovered models. Native runtime state is private to each conversation, so authenticating one native home does not authenticate all future conversations. The browser must not receive unrestricted access to the runtime protocol or server credential files.
 
 ## Decision

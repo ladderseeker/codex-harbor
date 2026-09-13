@@ -7,6 +7,7 @@ import {
   type OwnedRuntimeProcess,
 } from "./index.js";
 import { launchRunner } from "../../../infra/runner/launcher.js";
+import { launchLocalRuntime } from "./local-runtime.js";
 export type RuntimeConfig = RuntimeCallbacks & {
   purpose?: "conversation" | "terminal" | "preview";
   attachmentProject?: import("../../../infra/storage/admission.ts").NativeStorage;
@@ -28,23 +29,30 @@ export type RuntimeConfig = RuntimeCallbacks & {
 export async function createRuntime(
   config: RuntimeConfig,
 ): Promise<CodexAdapter> {
+  const local =
+    !config.fixture && globalThis.process.env.HARBOR_LOCAL_MODE === "personal";
   const process = config.fixture
     ? fixtureProcess(config)
-    : await launchRunner(config);
+    : local
+      ? await launchLocalRuntime(config)
+      : await launchRunner(config);
   const adapter = new CodexAdapter(
     process,
     config,
     15_000,
     config.withDispatch,
-    config.gitCommon && config.workspaceId
-      ? [
-          "/workspace",
-          `/harbor/workspaces/${config.workspaceId}`,
-          "/git-common",
-        ]
-      : ["/workspace"],
+    local
+      ? [config.workspacePath]
+      : config.gitCommon && config.workspaceId
+        ? [
+            "/workspace",
+            `/harbor/workspaces/${config.workspaceId}`,
+            "/git-common",
+          ]
+        : ["/workspace"],
     config.purpose,
     !config.fixture && ["terminal", "preview"].includes(config.purpose ?? ""),
+    local,
   );
   try {
     config.onTransport?.(adapter);

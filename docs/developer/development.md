@@ -24,6 +24,8 @@ P009 deployment work is In progress. Its [development command guide](deployment.
 
 ## Run the deterministic application locally
 
+For the newly selected real local account experience, see the [personal local guide](local-personal.md). P013 is implemented and reviewed with an open critical regression gate; the fixture profile below remains separate and must not use real credentials.
+
 The tested macOS toolchain uses Node 24.11.1, pnpm 12.3.4, and a running Linux Docker engine with Compose. The repository pins JavaScript dependencies and the external Codex protocol baseline at 0.153.4. PostgreSQL 17.6 and Caddy 2.10.2 are provisioned by the run-specific Compose instance.
 
 From the repository root:

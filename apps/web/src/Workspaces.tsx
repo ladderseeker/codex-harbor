@@ -4,8 +4,8 @@ import { newIntent, request, type Intent } from "./api.ts";
 
 export type Inspection = {
   available: boolean;
-  git: boolean;
-  dirty: boolean;
+  git: boolean | null;
+  dirty: boolean | null;
   head?: string;
   branch?: string | null;
   reason?: string;
@@ -531,7 +531,7 @@ export function WorkspaceManager({
                   <option value="worktree" disabled={!sourceInfo.git}>
                     Git Worktree
                   </option>
-                  <option value="copy" disabled={sourceInfo.git}>
+                  <option value="copy" disabled={!!sourceInfo.git}>
                     Copy
                   </option>
                 </select>

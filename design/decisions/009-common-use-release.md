@@ -6,6 +6,8 @@
 
 ## Context and decision
 
+2026-09-13 addendum: the owner subsequently selected a real local account-login and conversation experience. [D010](010-personal-local-experience.md) and [P013](../proposals/013-personal-local-experience.md) own that bounded outcome. It takes current implementation priority without waiving the common-use candidate's existing verification gates or resuming deferred work.
+
 The owner wants a usable, verified product while conserving the remaining agent quota. Main already contains P001–P008 and P011 implementation, with substantial review and verification evidence. P010 and P012 have extensive separate work but unfinished integration and mandatory acceptance. Completing every proposal together has delayed a usable release.
 
 Freeze feature expansion. Use the existing main branch as the common-use candidate and integrate only corrections required by its everyday workflows. Preserve the deferred branches, drafts, findings and evidence. Do not merge the combined P010/P012 branch, remove working features or rewrite existing migrations to simplify the release.

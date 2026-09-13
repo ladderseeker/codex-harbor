@@ -69,6 +69,7 @@ if (process.env.HARBOR_MANAGED_RELEASE) await verifyInstalledSchema(pool);
 else await migrate(pool);
 const ownerPin = digest(c.HARBOR_OIDC_ISSUER + "\0" + c.HARBOR_OWNER_SUBJECT);
 await bindIdentity(pool, ownerPin);
+if (c.HARBOR_LOCAL_MODE) await pool.query("DELETE FROM runtime_capabilities");
 let discovering = false;
 let discoveryTransport: CodexAdapter | undefined;
 const credentials = new CredentialStore(pool, c, clearNativeCredentials);
@@ -254,9 +255,12 @@ async function discover() {
     )
       return;
     lastDiscovery = Date.now();
-    const project = (
-      await pool.query("SELECT * FROM projects ORDER BY created_at LIMIT 1")
-    ).rows[0];
+    const project =
+      (await pool.query("SELECT * FROM projects ORDER BY created_at LIMIT 1"))
+        .rows[0] ??
+      (c.HARBOR_LOCAL_MODE
+        ? { id: randomUUID(), relative_path: null }
+        : undefined);
     if (!project) return;
     await pool.query(
       "INSERT INTO runtime_bootstrap(id,runtime_id) VALUES(true,$1) ON CONFLICT DO NOTHING",
@@ -271,11 +275,10 @@ async function discover() {
         )
       ).rows[0].generation,
     );
-    const workspacePath = await resolveProject(
-      c.roots,
-      project.root_id,
-      project.relative_path,
-    );
+    const workspacePath =
+      c.HARBOR_LOCAL_MODE && project.relative_path === null
+        ? c.roots[0]!.path
+        : await resolveProject(c.roots, project.root_id, project.relative_path);
     const probe = await createRuntime({
       onTransport: (adapter) => {
         discoveryTransport = adapter;
@@ -1209,7 +1212,7 @@ async function tick() {
         }
         const key = await credentials.read();
         if (key) await adapter.loginWithApiKey(key);
-        else if (!c.HARBOR_FIXTURE_MODE)
+        else if (!c.HARBOR_FIXTURE_MODE && !c.HARBOR_LOCAL_MODE)
           throw Error("Runtime credentials not configured");
         const models = await adapter.listModels();
         await pool.query(
@@ -1217,19 +1220,20 @@ async function tick() {
           [
             JSON.stringify({
               ...models,
-              account: (await adapter.readAccount()).account
-                ? { authenticated: true, authMode: "apiKey" }
-                : { authenticated: false, authMode: null },
+              account: await adapter.readAccount().then(({ account }) => ({
+                authenticated: !!account,
+                authMode: account?.type ?? null,
+              })),
             }),
           ],
         );
         const native = o.native_thread_id
           ? await adapter.resumeThread(o.native_thread_id, {
-              cwd: "/workspace",
+              cwd: c.HARBOR_LOCAL_MODE ? workspacePath : "/workspace",
               permissionProfile: o.payload.permissionProfile,
             })
           : await adapter.startThread({
-              cwd: "/workspace",
+              cwd: c.HARBOR_LOCAL_MODE ? workspacePath : "/workspace",
               model: o.payload.model,
               permissionProfile: o.payload.permissionProfile,
             });

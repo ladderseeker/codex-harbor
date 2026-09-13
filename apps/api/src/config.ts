@@ -1,5 +1,8 @@
 import { z } from "zod";
 const schema = z.object({
+  HARBOR_LOCAL_MODE: z.literal("personal").optional(),
+  HARBOR_LOCAL_CODEX_HOME: z.string().startsWith("/").optional(),
+  HARBOR_LOCAL_CODEX_BINARY: z.string().startsWith("/").optional(),
   HARBOR_PREVIEW_DOMAIN: z
     .string()
     .regex(/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}$/)
@@ -46,6 +49,24 @@ const schema = z.object({
 });
 export function config(env = process.env) {
   const c = schema.parse(env);
+  if (
+    c.HARBOR_LOCAL_MODE &&
+    (c.HARBOR_FIXTURE_MODE ||
+      ["test", "production"].includes(env.NODE_ENV ?? "") ||
+      env.HARBOR_MANAGED_RELEASE ||
+      !["localhost", "127.0.0.1"].includes(new URL(c.HARBOR_ORIGIN).hostname) ||
+      c.HARBOR_HOST !== "127.0.0.1" ||
+      new URL(c.HARBOR_OIDC_ISSUER).hostname !== "127.0.0.1" ||
+      !c.HARBOR_LOCAL_CODEX_HOME ||
+      !c.HARBOR_LOCAL_CODEX_BINARY ||
+      env.HARBOR_STORAGE_SOCKET ||
+      env.HARBOR_FILE_SOCKET ||
+      env.HARBOR_PREVIEW_SOCKET ||
+      env.HARBOR_LAUNCHER_SOCKET)
+  )
+    throw Error(
+      "Personal local mode requires a separate loopback instance and private Codex configuration",
+    );
   const roots = z
     .array(
       z.object({

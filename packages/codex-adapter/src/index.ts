@@ -66,6 +66,7 @@ export class CodexAdapter {
     private workspaceRoots: string[] = ["/workspace"],
     private purpose: "conversation" | "terminal" | "preview" = "conversation",
     private terminalOuterSandbox = false,
+    private localNativeSandbox = false,
   ) {
     process.stdout.setEncoding("utf8");
     process.stdout.on("data", (chunk: string) => this.receive(chunk));
@@ -244,7 +245,7 @@ export class CodexAdapter {
         title: "Codex Harbor",
         version: "0.1.0",
       },
-      capabilities: { experimentalApi: false },
+      capabilities: { experimentalApi: this.localNativeSandbox },
     });
     this.send({ method: "initialized" });
     this.initialized = true;
@@ -486,6 +487,19 @@ export class CodexAdapter {
       probe,
     );
   }
+  private approvalPolicy() {
+    return this.localNativeSandbox
+      ? {
+          granular: {
+            sandbox_approval: false,
+            rules: true,
+            skill_approval: false,
+            request_permissions: false,
+            mcp_elicitations: false,
+          },
+        }
+      : ("untrusted" as const);
+  }
   startThread(options: {
     cwd: string;
     model?: string;
@@ -495,7 +509,7 @@ export class CodexAdapter {
       cwd: options.cwd,
       model: options.model,
       sandbox: options.permissionProfile ?? "read-only",
-      approvalPolicy: "untrusted",
+      approvalPolicy: this.approvalPolicy(),
       approvalsReviewer: "user",
       ephemeral: false,
     });
@@ -511,7 +525,7 @@ export class CodexAdapter {
       threadId,
       cwd: options.cwd,
       sandbox: options.permissionProfile ?? "read-only",
-      approvalPolicy: "untrusted",
+      approvalPolicy: this.approvalPolicy(),
       approvalsReviewer: "user",
     });
   }
@@ -551,7 +565,7 @@ export class CodexAdapter {
         input: [{ type: "text", text, text_elements: [] }, ...attachmentInput],
         model: options.model,
         effort: options.effort,
-        approvalPolicy: "untrusted",
+        approvalPolicy: this.approvalPolicy(),
         approvalsReviewer: "user",
         sandboxPolicy:
           options.permissionProfile === "workspace-write"

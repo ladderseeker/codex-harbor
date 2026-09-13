@@ -38,6 +38,11 @@ export async function prepareAttachments(
       kind: f.media_type === "image/png" ? "image" : "text",
       path: `/attachments/${f.id}`,
     }));
+    if (process.env.HARBOR_LOCAL_MODE === "personal") {
+      if (inputs.length)
+        throw Error("Attachments are unavailable in personal local mode");
+      return { inputs };
+    }
     if (fixture) {
       if (
         process.env.NODE_ENV !== "test" ||

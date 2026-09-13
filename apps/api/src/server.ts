@@ -91,7 +91,7 @@ export async function buildServer(c: Config) {
     c.HARBOR_OIDC_CLIENT_ID,
     c.HARBOR_OIDC_CLIENT_SECRET,
     undefined,
-    c.HARBOR_FIXTURE_MODE
+    c.HARBOR_FIXTURE_MODE || c.HARBOR_LOCAL_MODE
       ? { execute: [oidc.allowInsecureRequests] }
       : undefined,
   );
@@ -145,6 +145,22 @@ export async function buildServer(c: Config) {
     if (params?.id !== undefined) z.uuid().parse(params.id);
   });
   app.addHook("onRequest", async (req, reply) => {
+    if (c.HARBOR_LOCAL_MODE) {
+      const route = req.url.split("?")[0]!;
+      if (
+        /\/(terminals|previews|files|schedules)(?:\/|$)/.test(route) ||
+        (req.method !== "GET" && /\/attachments(?:\/|$)/.test(route)) ||
+        (req.method !== "GET" &&
+          (/\/workspaces(?:\/|$)/.test(route) ||
+            /\/(recover|recovery|release)(?:\/|$)/.test(route) ||
+            route.includes("/runtime-credentials")))
+      )
+        throw new HarborError(
+          409,
+          "LOCAL_FEATURE_UNAVAILABLE",
+          "Personal local mode supports projects and conversations; this operation requires the managed Linux installation",
+        );
+    }
     const now = Date.now(),
       login = req.url.split("?")[0] === "/auth/login",
       window = login ? 60000 : 10000,
@@ -539,10 +555,12 @@ export async function buildServer(c: Config) {
   app.addHook("onClose", async () => scheduleBoss.stop());
   app.get("/api/v1/openapi.json", async () => openapi);
   app.get("/api/v1/security/runtime-credentials", async (req) =>
-    credentialCommand(c.HARBOR_CONTROL_SOCKET, {
-      action: "status",
-      actor: auth.get(req)!.hash,
-    }),
+    c.HARBOR_LOCAL_MODE
+      ? { configured: false, available: false, local: true }
+      : credentialCommand(c.HARBOR_CONTROL_SOCKET, {
+          action: "status",
+          actor: auth.get(req)!.hash,
+        }),
   );
   app.post("/api/v1/security/runtime-credentials", async (req) => {
     const body = z
@@ -572,6 +590,7 @@ export async function buildServer(c: Config) {
     roots: c.roots.map(({ id, name }) => ({ id, name })),
   }));
   app.get("/api/v1/capabilities", async (req) => ({
+    ...(c.HARBOR_LOCAL_MODE ? { local: true } : {}),
     files: {
       read: !!(
         process.env.HARBOR_FILE_SOCKET ?? process.env.HARBOR_STORAGE_SOCKET
@@ -678,7 +697,8 @@ export async function buildServer(c: Config) {
       await requireAuthority(db, auth.get(req)!.hash, c);
       externalEffectsGranted.add(req);
       const provisioned =
-        c.HARBOR_FIXTURE_MODE && !process.env.HARBOR_STORAGE_SOCKET
+        (c.HARBOR_FIXTURE_MODE || c.HARBOR_LOCAL_MODE) &&
+        !process.env.HARBOR_STORAGE_SOCKET
           ? null
           : await (b.create
               ? createManagedProject(b.rootId, b.path)

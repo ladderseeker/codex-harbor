@@ -24,6 +24,8 @@ Implement the actual runtime adapter, isolated runner, durable dispatch, history
 
 ## Contracts and security
 
+The separately selected [P013 personal local experience](013-personal-local-experience.md) extends local startup and native account login under [D010](../decisions/010-personal-local-experience.md). It does not satisfy or waive this proposal's dedicated live-account and Linux gates.
+
 Use the [architecture's state/API contract](../architecture.md#api-events-and-state-transitions). Persist project/workspace, facade session/native thread mapping, operation intent, effective execution grant, approvals, and events. One active turn per conversation; additional input is explicitly queued or steered. Duplicate submissions resolve to the same operation. An ambiguous runtime delivery is never silently replayed.
 
 Implement normal authorization on pages/assets, cookie API requests, and SSE. Use a disposable real OIDC provider for deterministic tests, not an auth bypass. Keep app-server private, protect the owner credential onboarding flow, enforce permission ceilings and project-root confinement, and isolate coding processes from Harbor configuration/database credentials. Render streamed content as untrusted. Baseline quota/retention settings, logout revocation, and emergency stop are part of the feature, not deferred security hardening.

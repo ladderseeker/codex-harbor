@@ -133,17 +133,25 @@ export async function inspectWorkspace(db: DB, w: any, fixture: boolean) {
     };
   try {
     await verifyWorkspace(w);
-    const result = await storageWorkspace(
-      {
-        action: "workspaceInspect",
-        rootId: w.root_id,
-        relativePath: w.relative_path,
-        workspaceId: w.id,
-        kind: w.kind,
-        identity: storedIdentity(w),
-      },
-      fixture,
-    );
+    const result =
+      process.env.HARBOR_LOCAL_MODE === "personal"
+        ? {
+            git: null,
+            dirty: null,
+            snapshotHash: undefined,
+            reason: "Git inspection is unavailable in personal local mode",
+          }
+        : await storageWorkspace(
+            {
+              action: "workspaceInspect",
+              rootId: w.root_id,
+              relativePath: w.relative_path,
+              workspaceId: w.id,
+              kind: w.kind,
+              identity: storedIdentity(w),
+            },
+            fixture,
+          );
     if (w.state === "unavailable") {
       await db.query(
         "UPDATE workspaces SET state='ready',failure_code=NULL WHERE id=$1 AND state='unavailable'",

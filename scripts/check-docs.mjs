@@ -5,6 +5,7 @@ const root = process.cwd(),
     "node_modules",
     ".git",
     ".test-runs",
+    ".harbor-local",
     "dist",
     "generated",
   ]);

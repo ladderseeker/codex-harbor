@@ -1,6 +1,10 @@
 import { spawn, execFileSync } from "node:child_process";
 const fixture = process.argv.includes("--fixture");
-if (fixture) {
+if (fixture && process.argv.includes("--local"))
+  throw Error("Choose --fixture or --local");
+if (process.argv.includes("--local")) {
+  await import("./local-dev.ts");
+} else if (fixture) {
   execFileSync("pnpm", ["build"], { stdio: "inherit" });
   const child = spawn(
     process.execPath,

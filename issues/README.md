@@ -1,5 +1,7 @@
 # Issue index
 
+Selected local outcome: [P013 critical regression gate](2026-09-13-143001-local-critical-regression-gate.md) — High, Open, owned by P013/regression maintainer; diagnose the retained-conversation composer failure with captured evidence. Implementation [review findings](archive/2026-09-13-143000-personal-local-review.md) are resolved; the local account trial works but P013 remains unverified.
+
 Use this index and the [issue archive](archive/README.md) to find existing findings before creating work. The [repository lifecycle rules](../AGENTS.md#issue-resolution-and-transfer) define direct fixes, proposal transfers, archive dispositions, and reopening. The [active proposal index](../design/proposals/README.md) tracks delivery by the receiving owners.
 
 ## Active issues

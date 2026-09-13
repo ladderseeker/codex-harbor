@@ -612,8 +612,8 @@ Object.assign(paths, {
         workspace: ref("Workspace"),
         inspection: object({
           available: { type: "boolean" },
-          git: { type: "boolean" },
-          dirty: { type: "boolean" },
+          git: { type: ["boolean", "null"] },
+          dirty: { type: ["boolean", "null"] },
         }),
       }),
     ),
