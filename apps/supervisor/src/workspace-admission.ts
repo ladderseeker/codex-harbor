@@ -9,6 +9,7 @@ export async function claimWorkspace(
   workspaceId: string,
   sessionId: string,
   generation: number,
+  continuingOwnedRuntime = false,
 ) {
   const w = await selectedWorkspace(db, workspaceId, true);
   if (w.state !== "ready" || w.project_archived)
@@ -24,7 +25,13 @@ export async function claimWorkspace(
   )
     return false;
   if (
-    w.writer_owner_id ||
+    (w.writer_owner_id &&
+      !(
+        continuingOwnedRuntime &&
+        w.writer_kind === "conversation" &&
+        w.writer_session_id === sessionId &&
+        Number(w.writer_generation) === generation
+      )) ||
     (
       await db.query(
         "SELECT 1 FROM workspace_storage_operations WHERE project_id=$1 AND state IN ('queued','dispatching')",

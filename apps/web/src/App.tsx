@@ -1,3 +1,7 @@
+import {
+  PersonalPreviews,
+  type PersonalPreviewEndpoint,
+} from "./PersonalPreviews.tsx";
 import { Icon } from "./Icons.tsx";
 import { SidebarResize } from "./SidebarResize.tsx";
 import { Schedules } from "./Schedules.tsx";
@@ -53,6 +57,7 @@ interface Capabilities {
   projectBrowsing?: { available: boolean; reason: string | null };
   local?: boolean;
   personalVps?: boolean;
+  personalPreviews?: PersonalPreviewEndpoint[];
   files?: { read: boolean; write: boolean; reason: string | null };
   models: {
     id: string;
@@ -382,8 +387,12 @@ export function App() {
       const selected = list.sessions.find(
         (session) => session.id === selectedRef.current,
       );
-      if (selected) setProjectId(selected.projectId);
-      else {
+      if (selected) {
+        setProjectId(selected.projectId);
+        setModel(selected.model);
+        setEffort(selected.effort);
+        setPermission(selected.permissionProfile);
+      } else {
         setSelectedId("");
         setProjectId(list.projects[0]?.id ?? "");
       }
@@ -970,7 +979,8 @@ export function App() {
                 disabled={
                   !newWorkspaceId ||
                   capabilities?.local ||
-                  capabilities?.personalVps
+                  (capabilities?.personalVps &&
+                    !capabilities.personalPreviews?.length)
                 }
                 onClick={() => setPreviewWorkspace(newWorkspaceId)}
               >
@@ -1282,7 +1292,23 @@ export function App() {
                         })}
                       </time>
                     </div>
-                    <div className="message-text">{message.text}</div>
+                    {message.role === "tool" ? (
+                      <details className="command-output">
+                        <summary>
+                          Command{" "}
+                          {message.status === "streaming"
+                            ? "running"
+                            : "result"}
+                        </summary>
+                        <pre className="message-text">{message.text}</pre>
+                        <small>
+                          Command output is limited to 32 KiB per command and
+                          256 KiB per conversation.
+                        </small>
+                      </details>
+                    ) : (
+                      <div className="message-text">{message.text}</div>
+                    )}
                     {richDraft.files
                       .filter(
                         (a) =>
@@ -1348,6 +1374,37 @@ export function App() {
                       execute={execute}
                     />
                   )}
+                {current.backgroundUntil && !active && (
+                  <div className="state-explanation" role="status">
+                    <h2>Development processes are available</h2>
+                    <p>
+                      Your development server can stay available until{" "}
+                      {new Date(current.backgroundUntil).toLocaleTimeString()}.
+                      Continue here to keep working. Stop these processes before
+                      using this project in another conversation.
+                    </p>
+                    <button
+                      className="quiet-button"
+                      disabled={blocked || current.backgroundStopRequested}
+                      onClick={() =>
+                        void execute(
+                          newIntent(
+                            `/sessions/${current.id}/background-stop`,
+                            { generation: current.generation ?? 0 },
+                            "Stop background processes",
+                          ),
+                          async () => {
+                            await refreshSnapshot(current.id);
+                          },
+                        )
+                      }
+                    >
+                      {current.backgroundStopRequested
+                        ? "Stopping background processes…"
+                        : "Stop background processes"}
+                    </button>
+                  </div>
+                )}
                 {current.state === "interrupted" && (
                   <div className="state-explanation">
                     <h2>Work was interrupted</h2>
@@ -1583,7 +1640,8 @@ export function App() {
                               a.mediaType === "image/png" ? "image" : "text",
                             ),
                         ) ||
-                        !workspaceWritable
+                        !workspaceWritable ||
+                        Boolean(current?.backgroundStopRequested)
                       }
                     >
                       {sending ? "Sending…" : "Send"}
@@ -1721,14 +1779,25 @@ export function App() {
             }
             close={() => setPreviewWorkspace("")}
           >
-            <Previews
-              key={previewWorkspace}
-              workspace={
-                workspaceData.workspaces.find((w) => w.id === previewWorkspace)!
-              }
-              execute={execute}
-              disabled={blocked}
-            />
+            {capabilities?.personalVps ? (
+              <PersonalPreviews
+                key={previewWorkspace}
+                endpoints={capabilities.personalPreviews ?? []}
+                workspaceId={previewWorkspace}
+                csrfToken={identity.csrfToken}
+              />
+            ) : (
+              <Previews
+                key={previewWorkspace}
+                workspace={
+                  workspaceData.workspaces.find(
+                    (w) => w.id === previewWorkspace,
+                  )!
+                }
+                execute={execute}
+                disabled={blocked}
+              />
+            )}
           </Modal>
         )}
       {tokensOpen && identity && (

@@ -1,3 +1,4 @@
+import { saveConversationOutput } from "../../apps/supervisor/src/conversation-output.ts";
 import { digest } from "../../packages/policy/src/index.ts";
 import {
   expect,
@@ -1277,4 +1278,191 @@ export async function p007(h: Context) {
     fullPage: true,
   });
   await page.setViewportSize({ width: 1280, height: 900 });
+  // Personal workbench: names, authoritative final text and command diagnostics
+  // survive refresh and preserve an explicit owner title even when it is blank-like.
+  const named = await newSession();
+  await command(`/sessions/${named}/turns`, { ...payload, text: "你好！" });
+  await expect
+    .poll(async () => (await snapshot(named)).session.state, { timeout: 30000 })
+    .toBe("succeeded");
+  expect((await snapshot(named)).session.title).toBe("New conversation");
+  await page.goto(origin + "/?conversation=" + named);
+  const taskText = "Repair the build [partial-final] [command-result]";
+  await page.getByLabel("Message Codex", { exact: true }).fill(taskText);
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect
+    .poll(async () => (await snapshot(named)).session.state, { timeout: 30000 })
+    .toBe("succeeded");
+  await expect(page.locator(".header-title h1")).toHaveText(taskText);
+  await expect(
+    page.locator(".message-assistant .message-text").last(),
+  ).toHaveText("Fixture response: " + taskText);
+  await page.locator(".command-output summary").click();
+  await expect(page.locator(".command-output pre")).toContainText(
+    "Tests passed",
+  );
+  await expect(page.locator(".command-output pre")).toContainText(
+    "exit code: 0",
+  );
+  await page.reload();
+  await expect(page.locator(".header-title h1")).toHaveText(taskText);
+  await expect(
+    page.locator(".session-row.selected .conversation-link"),
+  ).toContainText(taskText);
+  let namedSnapshot = await snapshot(named);
+  expect(
+    (
+      await command(`/sessions/${named}/metadata`, {
+        expectedRevision: namedSnapshot.session.metadataRevision,
+        title: "New conversation",
+      })
+    ).status(),
+  ).toBe(200);
+  await command(`/sessions/${named}/turns`, {
+    ...payload,
+    text: "Second task [completion-only]",
+  });
+  await expect
+    .poll(async () => (await snapshot(named)).session.state, { timeout: 30000 })
+    .toBe("succeeded");
+  namedSnapshot = await snapshot(named);
+  expect(namedSnapshot.session.title).toBe("New conversation");
+  expect(
+    namedSnapshot.messages.filter((m: any) => m.role === "assistant").at(-1)
+      .text,
+  ).toBe("Fixture response: Second task [completion-only]");
+  // Child events interleave before the parent acknowledgement/final completion.
+  // They must neither contaminate history nor prematurely finish its operation.
+  const parentSession = await newSession();
+  await command(`/sessions/${parentSession}/turns`, {
+    ...payload,
+    text: "Parent task [child-thread]",
+  });
+  await expect
+    .poll(
+      async () =>
+        (await snapshot(parentSession)).messages.some(
+          (m: any) => m.text === "Parent waiting after child",
+        ),
+      { timeout: 30000 },
+    )
+    .toBe(true);
+  const waitingParent = await snapshot(parentSession);
+  expect(waitingParent.session.state).toBe("running");
+  expect(
+    waitingParent.messages.some((m: any) =>
+      m.text.includes("CHILD MUST NOT APPEAR"),
+    ),
+  ).toBe(false);
+  expect(waitingParent.approvals).toHaveLength(0);
+  await expect
+    .poll(async () => (await snapshot(parentSession)).session.state, {
+      timeout: 30000,
+    })
+    .toBe("succeeded");
+  const parentDone = await snapshot(parentSession);
+  expect(
+    parentDone.messages.some(
+      (m: any) => m.text === "Child approval rejected safely",
+    ),
+  ).toBe(true);
+  expect(
+    parentDone.messages.some(
+      (m: any) => m.text === "Fixture response: Parent task [child-thread]",
+    ),
+  ).toBe(true);
+  expect(
+    parentDone.messages.some(
+      (m: any) =>
+        m.text.includes("CHILD MUST NOT APPEAR") ||
+        m.text.includes("UNSAFE CHILD APPROVAL"),
+    ),
+  ).toBe(false);
+  expect(parentDone.approvals).toHaveLength(0);
+
+  // Real PostgreSQL boundary: optional diagnostics cannot exhaust final-text
+  // quota, and replayed command starts cannot reopen completed records.
+  const outputBoundary = await newSession();
+  const boundaryOperation = randomUUID();
+  await db.query(
+    "INSERT INTO operations(id,session_id,kind,state,payload,actor_hash) VALUES($1,$2,'turn','succeeded','{}','fixture')",
+    [boundaryOperation, outputBoundary],
+  );
+  const commandItem = {
+    id: randomUUID(),
+    type: "commandExecution",
+    command: "true",
+    cwd: "/workspace",
+    aggregatedOutput: "ok",
+    status: "completed",
+    exitCode: 0,
+  };
+  await transaction(db, async (client) => {
+    await saveConversationOutput(
+      client,
+      outputBoundary,
+      boundaryOperation,
+      "item/completed",
+      { item: commandItem },
+    );
+    await saveConversationOutput(
+      client,
+      outputBoundary,
+      boundaryOperation,
+      "item/started",
+      {
+        item: { ...commandItem, status: "inProgress", aggregatedOutput: null },
+      },
+    );
+  });
+  expect(
+    (
+      await db.query(
+        "SELECT status FROM messages WHERE session_id=$1 AND native_item_id=$2",
+        [outputBoundary, commandItem.id],
+      )
+    ).rows[0].status,
+  ).toBe("complete");
+  const usedBytes = Number(
+    (
+      await db.query(
+        "SELECT sum(octet_length(text)) AS bytes FROM messages WHERE session_id=$1",
+        [outputBoundary],
+      )
+    ).rows[0].bytes,
+  );
+  let remainingBytes = 2097152 - usedBytes - 50;
+  while (remainingBytes > 0) {
+    const size = Math.min(262144, remainingBytes);
+    await db.query(
+      "INSERT INTO messages(id,session_id,role,text,status) VALUES($1,$2,'assistant',$3,'complete')",
+      [randomUUID(), outputBoundary, "x".repeat(size)],
+    );
+    remainingBytes -= size;
+  }
+  await transaction(db, (client) =>
+    saveConversationOutput(
+      client,
+      outputBoundary,
+      boundaryOperation,
+      "item/completed",
+      {
+        item: {
+          ...commandItem,
+          id: randomUUID(),
+          aggregatedOutput: "z".repeat(200),
+        },
+      },
+    ),
+  );
+  expect(
+    Number(
+      (
+        await db.query(
+          "SELECT sum(octet_length(text)) AS bytes FROM messages WHERE session_id=$1",
+          [outputBoundary],
+        )
+      ).rows[0].bytes,
+    ),
+  ).toBe(2097152 - 50);
 }

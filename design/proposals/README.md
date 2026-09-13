@@ -4,7 +4,7 @@ P001–P008 and P011 are Accepted and Implemented, with mandatory verification a
 
 ## Current delivery queue
 
-The owner selected [P015](015-personal-vps-workspace.md) on 13 September for the complete subscription/existing-folder VPS workflow under [D011](../decisions/011-personal-vps-workspace.md). It is Accepted and In progress; no deployed acceptance is claimed.
+The owner selected [P015](015-personal-vps-workspace.md) on 13 September for the complete subscription/existing-folder VPS workflow under [D011](../decisions/011-personal-vps-workspace.md). It is Accepted and In progress; the owner instance is deployed, with complete acceptance still open. On 14 September the owner selected D012's full development loop, titles, complete replies and private attached previews, with push and VPS deployment authorized.
 
 The owner's 13 September scope change is recorded in [D009](../decisions/009-common-use-release.md). This index includes unfinished and deferred work; it is not a queue to implement all proposals concurrently.
 
@@ -27,7 +27,7 @@ An independently verifiable feature may rely on its declared dependencies. Imple
 
 | ID | Complete outcome | Decision | Delivery | Direct dependencies | Acceptance IDs / specialist lanes |
 | --- | --- | --- | --- | --- | --- |
-| [P015](015-personal-vps-workspace.md) | Use subscription Codex on an existing VPS folder through persistent authenticated Harbor | Accepted | In progress | P001, P003, P007, P013 implemented boundaries | P015-01–06; reviewed candidate/native/browser/critical evidence passed; real account and installed acceptance pending |
+| [P015](015-personal-vps-workspace.md) | Use subscription Codex on an existing VPS folder through persistent authenticated Harbor | Accepted | In progress | P001, P003, P007, P013 implemented boundaries | P015-01–10; original candidate evidence retained; full development, conversation and preview implementation/installed acceptance in progress |
 | [P013](013-personal-local-experience.md) | Sign in and try a real Codex conversation on a personal computer | Accepted | Implemented | P001, P003 implemented boundaries | [Local/native review and owner trial passed](../../docs/reports/2026-09-13-personal-local-experience.md); critical regression passed under P014; final lifecycle reconciliation remains |
 | [P001](001-secure-persistent-conversations.md) | Sign in and conduct a protected Codex conversation that survives browser closure | Accepted | Implemented | None | P001-01–08; contracts/E2E/Linux passed, live and medium follow-ups pending |
 | [P002](002-programmatic-api-access.md) | Use revocable, scoped credentials from an external API client | Accepted | Implemented | P001 | Original acceptance, third authority review and combined P003/P007 integration passed; live/upstream gates pending |

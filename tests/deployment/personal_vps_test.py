@@ -20,7 +20,7 @@ class PersonalVpsTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='harbor-p015-')
         self.addCleanup(self.temp.cleanup)
-        self.base = Path(self.temp.name)
+        self.base = Path(self.temp.name).resolve()
         (self.base / 'release').mkdir()
         (self.base / 'project').mkdir()
         self.c = dict(instance='test', origin='https://harbor.example.org',
@@ -69,6 +69,23 @@ class PersonalVpsTests(unittest.TestCase):
             self.assertIn('TasksMax=', unit)
             self.assertIn(self.c['roots'][0]['path'], unit)
             self.assertNotIn('ExecStart=/usr/bin/docker', unit)
+
+    def test_preview_routes_only_fixed_distinct_origins_to_gateway(self):
+        self.c['previews'] = [{'name': 'App', 'port': 3100, 'origin': 'https://preview.example.org'}]
+        self.c['previewPort'] = 3350
+        personal.validate(self.c)
+        files = personal.artifacts(self.c, 'a' * 64, None)
+        labels = json.loads(files['compose.json'])['services']['routing']['labels']
+        self.assertEqual(labels['traefik.http.services.harbor-personal-test-preview-0.loadbalancer.server.port'], '3350')
+        self.assertIn('HARBOR_PERSONAL_PREVIEWS=', files['service.env'])
+        for port in (3000, 5544, 3350):
+            self.c['previews'][0]['port'] = port
+            with self.assertRaises(ValueError):
+                personal.validate(self.c)
+        self.c['previews'][0]['port'] = 3100
+        self.c['previews'][0]['origin'] = self.c['origin']
+        with self.assertRaises(ValueError):
+            personal.validate(self.c)
 
     def test_apparmor_opt_in_is_exact_binary_only(self):
         files = personal.artifacts(self.c, 'a' * 64, None)
@@ -213,18 +230,26 @@ class PersonalVpsTests(unittest.TestCase):
         node.write_text('fixture-node')
         node.chmod(0o755)
         output = self.base / 'packaged'
+        pnpm_package, pnpm_binary = self.base / 'pnpm-package', self.base / 'pnpm-native'
+        (pnpm_package / 'dist').mkdir(parents=True)
+        (pnpm_package / 'package.json').write_text(json.dumps({'name': 'pnpm', 'version': '12.3.4'}))
+        pnpm_binary.write_text('fixture-pnpm')
+        pnpm_binary.chmod(0o755)
         def command(args, **kwargs):
-            value = ('v24.11.1' if args[0] == str(node) else 'codex-cli 0.153.4') if args[-1] == '--version' else 'fixture-revision'
+            value = ('v24.11.1' if args[0] == str(node) else '12.3.4' if args[0] == str(pnpm_binary) else 'codex-cli 0.153.4') if args[-1] == '--version' else 'fixture-revision'
             return subprocess.CompletedProcess(args, 0, stdout=value)
         with patch.object(packager.subprocess, 'run', side_effect=command):
-            packager.package(source, node, vendor, output)
+            packager.package(source, node, vendor, output, pnpm_package, pnpm_binary)
         for name in personal.NATIVE_EXECUTABLES:
             self.assertEqual((output / 'release' / name).read_bytes(), (vendor / name).read_bytes())
         artifact = json.loads((output / 'release/artifact.json').read_text())
         self.assertEqual(artifact['nativePackage'], metadata)
+        self.assertEqual(artifact['pnpm'], '12.3.4')
+        self.assertIn('toolchain/pnpm/pnpm-native', (output / 'release/bin/pnpm').read_text())
+        self.assertEqual((output / 'release/toolchain/pnpm/pnpm-native').read_bytes(), pnpm_binary.read_bytes())
         self.assertTrue((output / 'harbor-personal-candidate.tar.gz').exists())
         with self.assertRaises(ValueError):
-            packager.package(source, node, vendor, output)
+            packager.package(source, node, vendor, output, pnpm_package, pnpm_binary)
 
     def test_private_candidate_output_cannot_be_inside_approved_root(self):
         with self.assertRaises(ValueError):

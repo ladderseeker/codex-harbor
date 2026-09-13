@@ -5,6 +5,10 @@ import { delimiter, dirname, isAbsolute, join, relative } from "node:path";
 import { promisify } from "node:util";
 import { CODEX_VERSION, type OwnedRuntimeProcess } from "./index.js";
 import type { RuntimeConfig } from "./runtime.js";
+import {
+  preparePersonalDevelopment,
+  developmentEnvironment,
+} from "./personal-development.js";
 
 const exec = promisify(execFile);
 const inside = (root: string, candidate: string) => {
@@ -98,6 +102,9 @@ export async function launchLocalRuntime(
     throw Error(
       "Personal Codex home must be private and separate from normal state and workspace",
     );
+  const development = vps
+    ? await preparePersonalDevelopment(home, workspace)
+    : undefined;
   const env: NodeJS.ProcessEnv = {
     PATH: [
       dirname(process.execPath),
@@ -110,6 +117,7 @@ export async function launchLocalRuntime(
     HOME: home,
     CODEX_HOME: home,
     LANG: "en_US.UTF-8",
+    ...(development ? developmentEnvironment(development) : {}),
   };
   const version = await exec(binary, ["--version"], {
     env,
@@ -124,6 +132,7 @@ export async function launchLocalRuntime(
     stdio: ["pipe", "pipe", "pipe", "ipc"],
     env,
   }) as OwnedRuntimeProcess;
+  child.personalDevelopment = development;
   let runtimePid: number | undefined;
   child.on("message", (message) => {
     const pid = (message as { runtimePid?: unknown }).runtimePid;

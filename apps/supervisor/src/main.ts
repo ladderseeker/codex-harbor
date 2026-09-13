@@ -1,3 +1,5 @@
+import { settleBackgroundRetirement } from "./background-retirement.ts";
+import { saveConversationOutput } from "./conversation-output.ts";
 import { processSchedules } from "../../../packages/schedules/src/worker.ts";
 import {
   initializeScheduleQueue,
@@ -94,6 +96,8 @@ type RuntimeState = {
   thread: string;
   turn: string;
   mailbox: RuntimeMailbox;
+  retiring?: boolean;
+  activation?: Promise<void>;
 };
 const runtimes = new Map<string, RuntimeState>();
 const terminalRepairs = new Map<string, string>();
@@ -136,6 +140,14 @@ const generation = await transaction(pool, async (db) => {
   await db.query(
     "UPDATE approvals SET state='expired' WHERE state IN ('pending','answering')",
   );
+  const abandonedBackground = await db.query(
+    "UPDATE sessions SET state='uncertain',background_until=NULL,background_stop_requested=true WHERE background_until IS NOT NULL RETURNING id",
+  );
+  for (const row of abandonedBackground.rows)
+    await event(db, row.id, "runtime.uncertain", {
+      reason:
+        "Supervisor restarted while development processes were retained; workspace ownership requires trusted process retirement before recovery",
+    });
   for (const row of rows.rows) {
     await db.query(
       "UPDATE sessions SET state='uncertain',generation=$2 WHERE id=$1",
@@ -397,6 +409,14 @@ async function update(id: string, state: string, data: unknown = {}) {
     });
   });
 }
+function belongsToTurn(params: Record<string, any>, runtime: RuntimeState) {
+  return Boolean(
+    runtime.thread &&
+      runtime.turn &&
+      params.threadId === runtime.thread &&
+      (params.turnId ?? params.turn?.id) === runtime.turn,
+  );
+}
 async function onEvent(
   sessionId: string,
   operationId: string,
@@ -410,6 +430,7 @@ async function onEvent(
     runtimes.get(sessionId) !== captured
   )
     return;
+  if (!belongsToTurn(p, captured) || captured.operation !== operationId) return;
   let completed = false;
   await transaction(pool, async (db) => {
     await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
@@ -420,35 +441,8 @@ async function onEvent(
       [operationId, captured.generation],
     );
     if (!valid.rowCount || captured.mailbox.poisoned) return;
-    if (method === "item/agentMessage/delta") {
-      const total = await db.query(
-        "SELECT coalesce(sum(octet_length(text)),0) AS bytes,count(*) AS count FROM messages WHERE session_id=$1",
-        [sessionId],
-      );
-      if (
-        Number(total.rows[0].bytes) + Buffer.byteLength(String(p.delta)) >
-          2097152 ||
-        Number(total.rows[0].count) >= 2000
-      )
-        throw Error("Conversation output quota");
-      const existing = await db.query(
-        "SELECT text FROM messages WHERE session_id=$1 AND native_item_id=$2 FOR UPDATE",
-        [sessionId, p.itemId],
-      );
-      if (
-        (existing.rows[0]?.text.length ?? 0) + String(p.delta).length >
-        262144
-      )
-        throw Error("Output quota");
-      await db.query(
-        "INSERT INTO messages(id,session_id,operation_id,native_item_id,role,text,status) VALUES($1,$2,$3,$4,'assistant',$5,'streaming') ON CONFLICT(session_id,native_item_id) DO UPDATE SET text=messages.text||EXCLUDED.text",
-        [randomUUID(), sessionId, operationId, p.itemId, p.delta],
-      );
-      await event(db, sessionId, "message.delta", {
-        itemId: p.itemId,
-        delta: p.delta,
-      });
-    } else if (method === "turn/completed") {
+    await saveConversationOutput(db, sessionId, operationId, method, p);
+    if (method === "turn/completed") {
       const state =
         p.turn.status === "completed"
           ? "succeeded"
@@ -459,6 +453,13 @@ async function onEvent(
         "UPDATE operations SET state=$2,updated_at=now() WHERE id=$1",
         [operationId, state],
       );
+      if (c.HARBOR_PERSONAL_VPS_MODE && p.turn.status === "completed") {
+        await db.query(
+          "UPDATE sessions SET background_until=clock_timestamp()+interval '30 minutes',background_stop_requested=false WHERE id=$1",
+          [sessionId],
+        );
+        await event(db, sessionId, "background.retained", { expiresIn: 1800 });
+      }
       await deriveSessionState(db, sessionId);
       await db.query(
         "UPDATE messages SET status='complete' WHERE operation_id=$1",
@@ -509,10 +510,42 @@ async function onEvent(
     !captured.mailbox.poisoned &&
     runtimes.get(sessionId) === captured
   ) {
-    runtimes.delete(sessionId);
-    if (await retire(captured.adapter))
-      await releaseWorkspace(pool, sessionId, captured.generation);
+    if (c.HARBOR_PERSONAL_VPS_MODE && p.turn.status === "completed") return;
+    await retireSessionRuntime(sessionId, captured);
   }
+}
+async function retireSessionRuntime(sessionId: string, runtime: RuntimeState) {
+  // Keep ownership on unconfirmed retirement; never admit a new writer on a guess.
+  runtime.retiring = true;
+  return settleBackgroundRetirement({
+    retire: () => retire(runtime.adapter),
+    uncertain: async () => {
+      if (runtimes.get(sessionId) === runtime) runtimes.delete(sessionId);
+      await transaction(pool, async (db) => {
+        const saved = await db.query(
+          "UPDATE sessions SET state='uncertain',background_until=NULL,background_stop_requested=true WHERE id=$1 AND generation=$2 RETURNING id",
+          [sessionId, runtime.generation],
+        );
+        if (saved.rowCount)
+          await event(db, sessionId, "runtime.uncertain", {
+            reason:
+              "Development process retirement could not be confirmed; workspace remains reserved. Trusted SSH inspection and recovery are required.",
+          });
+      });
+    },
+    release: async () => {
+      if (runtimes.get(sessionId) === runtime) runtimes.delete(sessionId);
+      await releaseWorkspace(pool, sessionId, runtime.generation);
+      await transaction(pool, async (db) => {
+        const saved = await db.query(
+          "UPDATE sessions SET background_until=NULL,background_stop_requested=false WHERE id=$1 AND generation=$2 RETURNING id",
+          [sessionId, runtime.generation],
+        );
+        if (saved.rowCount)
+          await event(db, sessionId, "background.stopped", {});
+      });
+    },
+  });
 }
 // Memory follows committed state only; failed COMMIT poisons the captured runtime.
 async function onRequest(
@@ -527,6 +560,13 @@ async function onRequest(
     runtimes.get(sessionId) !== captured
   )
     return;
+  if (
+    !belongsToTurn(r.params, captured) ||
+    captured.operation !== operationId
+  ) {
+    captured.adapter.rejectRequest(r.id);
+    return;
+  }
   await transaction(pool, async (db) => {
     await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
       sessionId,
@@ -765,15 +805,30 @@ async function tick() {
     .rows[0].emergency;
   if (emergency) {
     for (const [id, r] of runtimes) {
-      r.adapter.close();
       if (r.operation)
         await update(r.operation, "interrupted", { reason: "Emergency stop" });
-      runtimes.delete(id);
+      await retireSessionRuntime(id, r);
     }
     await pool.query(
       "UPDATE operations SET state='interrupted' WHERE state='queued'",
     );
     return;
+  }
+  if (c.HARBOR_PERSONAL_VPS_MODE) {
+    const idle = await pool.query(
+      "SELECT id,background_stop_requested,background_until,archived FROM sessions WHERE background_until IS NOT NULL",
+    );
+    for (const row of idle.rows) {
+      const runtime = runtimes.get(row.id);
+      if (
+        runtime &&
+        !runtime.operation &&
+        (row.background_stop_requested ||
+          row.archived ||
+          new Date(row.background_until).getTime() <= Date.now())
+      )
+        await retireSessionRuntime(row.id, runtime);
+    }
   }
   const approvals = await pool.query(
     "SELECT * FROM approvals WHERE state='answering' OR (state='pending' AND deadline<now())",
@@ -980,11 +1035,17 @@ async function tick() {
   }
   if ((await deploymentState(pool)).maintenance) return;
   const candidates = await pool.query(
-    "SELECT o.*,s.native_thread_id,s.project_id,s.workspace_id,p.root_id,w.relative_path,w.device,w.inode,w.canonical_path,w.common_path,w.common_device,w.common_inode FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id WHERE w.state='ready' AND p.archived_at IS NULL AND w.writer_owner_id IS NULL AND o.kind='turn' AND o.state='queued' AND s.state<>'uncertain' AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.session_id=o.session_id AND active.kind='turn' AND (active.state IN ('dispatching','running','waiting_approval','waiting_input') OR (active.state='uncertain' AND active.uncertainty_acknowledged_at IS NULL))) ORDER BY o.created_at LIMIT 4",
+    "SELECT o.*,s.native_thread_id,s.project_id,s.workspace_id,p.root_id,w.relative_path,w.device,w.inode,w.canonical_path,w.common_path,w.common_device,w.common_inode FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id WHERE w.state='ready' AND p.archived_at IS NULL AND (w.writer_owner_id IS NULL OR (w.writer_kind='conversation' AND w.writer_session_id=s.id AND s.background_until IS NOT NULL AND NOT s.background_stop_requested)) AND o.kind='turn' AND o.state='queued' AND s.state<>'uncertain' AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.session_id=o.session_id AND active.kind='turn' AND (active.state IN ('dispatching','running','waiting_approval','waiting_input') OR (active.state='uncertain' AND active.uncertainty_acknowledged_at IS NULL))) ORDER BY o.created_at LIMIT 4",
   );
   for (const o of candidates.rows) {
     if ([...runtimes.values()].filter((r) => r.operation).length >= 4) break;
     if (runtimes.get(o.session_id)?.operation) continue;
+    if (
+      c.HARBOR_PERSONAL_VPS_MODE &&
+      !runtimes.has(o.session_id) &&
+      runtimes.size >= 4
+    )
+      continue;
     try {
       await requireAuthority(pool, o.actor_hash, c, {
         internalOperation: { kind: "turn", id: o.id },
@@ -1012,7 +1073,13 @@ async function tick() {
           permissionProfile: o.payload.permissionProfile,
         });
         if (
-          !(await claimWorkspace(db, o.workspace_id, o.session_id, generation))
+          !(await claimWorkspace(
+            db,
+            o.workspace_id,
+            o.session_id,
+            runtimes.get(o.session_id)?.generation ?? generation,
+            c.HARBOR_PERSONAL_VPS_MODE && !!runtimes.get(o.session_id),
+          ))
         )
           return false;
         await requireAuthority(db, o.actor_hash, c, {
@@ -1082,7 +1149,11 @@ async function tick() {
           const current = captured && runtimes.get(o.session_id) === captured;
           const operation = current ? captured.operation : undefined;
           if (current) runtimes.delete(o.session_id);
-          if (captured) void retire(captured.adapter);
+          if (captured) {
+            if (!operation && !captured.retiring)
+              void retireSessionRuntime(o.session_id, captured).catch(() => {});
+            else void retire(captured.adapter);
+          }
           // Terminal persistence is independent of normal notification processing.
           if (operation)
             void update(operation, "uncertain", { reason }).catch(() => {
@@ -1200,18 +1271,36 @@ async function tick() {
             }
           },
           onEvent: (m, p) => {
+            // Child threads can be noisy; reject them before charging the parent
+            // mailbox, while same-thread early events wait for turn activation.
+            if (!captured?.thread || p.threadId !== captured.thread) return;
             const operation = captured?.operation;
+            const activation = captured?.activation;
             if (operation)
-              mailbox.enqueue(Buffer.byteLength(JSON.stringify(p)), () =>
-                onEvent(o.session_id, operation, m, p, captured),
+              mailbox.enqueue(
+                Buffer.byteLength(JSON.stringify(p)),
+                async () => {
+                  await activation;
+                  await onEvent(o.session_id, operation, m, p, captured);
+                },
               );
           },
           onRequest: (request) => {
             const operation = captured?.operation;
+            if (!operation || request.params.threadId !== captured.thread) {
+              captured?.adapter.rejectRequest(request.id);
+              return;
+            }
+            const activation = captured?.activation;
             if (operation)
-              mailbox.enqueue(Buffer.byteLength(JSON.stringify(request)), () =>
-                onRequest(o.session_id, operation, request, captured),
+              mailbox.enqueue(
+                Buffer.byteLength(JSON.stringify(request)),
+                async () => {
+                  await activation;
+                  await onRequest(o.session_id, operation, request, captured);
+                },
               );
+            else captured?.adapter.rejectRequest(request.id);
           },
           onDisconnect: () =>
             mailbox.poison("Runtime disconnected; delivery uncertain"),
@@ -1276,11 +1365,23 @@ async function tick() {
       r.operation = o.id;
       r.authorityActor = o.actor_hash;
       r.authorityScope = "execute";
-      const turn = await r.adapter.startTurn(r.thread, o.payload.text, {
-        ...o.payload,
-        attachments: attachments.inputs,
-      } as TurnOptions);
-      r.turn = turn.turn.id;
+      // Native notifications/requests can precede the turn/start response. Hold
+      // persistence until that response supplies the authoritative parent turn ID.
+      let activate!: () => void;
+      r.activation = new Promise<void>((resolve) => {
+        activate = resolve;
+      });
+      r.turn = "";
+      try {
+        const turn = await r.adapter.startTurn(r.thread, o.payload.text, {
+          ...o.payload,
+          attachments: attachments.inputs,
+        } as TurnOptions);
+        r.turn = turn.turn.id;
+      } finally {
+        activate();
+        r.activation = undefined;
+      }
       await pool.query("UPDATE operations SET native_turn_id=$2 WHERE id=$1", [
         o.id,
         r.turn,
@@ -1347,7 +1448,10 @@ async function stop() {
   await previews?.stop();
   clearInterval(timer);
   discoveryTransport?.close();
-  for (const r of runtimes.values()) r.adapter.close();
+  for (const [id, r] of runtimes) {
+    if (!r.operation) await retireSessionRuntime(id, r);
+    else await retire(r.adapter);
+  }
   await retireActiveFiles();
   await filesTick;
   await closeCredentials?.();

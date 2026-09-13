@@ -34,6 +34,12 @@ export async function acceptConversationTurn(
   await db.query("SELECT * FROM sessions WHERE id=$1 FOR UPDATE", [sessionId]);
   const s = (await db.query("SELECT * FROM sessions WHERE id=$1", [sessionId]))
     .rows[0];
+  if (s.background_stop_requested)
+    throw new HarborError(
+      409,
+      "BACKGROUND_STOPPING",
+      "Wait for background development processes to stop before continuing",
+    );
   if (selected.project_archived || selected.state !== "ready")
     throw new HarborError(
       409,
@@ -103,6 +109,16 @@ export async function acceptConversationTurn(
     "UPDATE sessions SET state=CASE WHEN state IN ('running','waiting_approval','waiting_input') THEN state ELSE 'queued' END WHERE id=$1",
     [s.id],
   );
+  const named = await db.query(
+    "UPDATE sessions SET title=harbor_conversation_title($2),title_source='automatic',metadata_revision=metadata_revision+1 WHERE id=$1 AND title_source='pending' AND title='New conversation' AND harbor_conversation_title($2) IS NOT NULL RETURNING title,metadata_revision",
+    [s.id, b.text],
+  );
+  if (named.rowCount)
+    await event(db, s.id, "session.metadata", {
+      title: named.rows[0].title,
+      archived: s.archived,
+      revision: Number(named.rows[0].metadata_revision),
+    });
   await event(db, s.id, "operation.queued", { operationId: id });
   return { operation: publicRow(r.rows[0]) };
 }

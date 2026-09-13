@@ -37,6 +37,8 @@ Existing supporting tools retain their capability and installation requirements.
 
 ## Search and organize history
 
+Harbor names an untitled conversation from the first substantive request, using a short excerpt. Greetings such as “你好” leave naming pending. Existing untouched default titles are populated when upgraded. A manual rename always wins, including a deliberate title of “New conversation”.
+
 Open **Search and filters** within a project's chat list to find a title or stored message text. **Show** switches between active, archived, and all conversations; **Load older conversations** fetches the next bounded page. Hover or focus a chat row to reveal its rename action; touch devices keep the action available. Edit **Conversation title** and choose **Save title**. Renaming checks the current revision so another tab's edit cannot be overwritten silently, and renaming an inactive chat preserves the active conversation and its draft.
 
 **Archive conversation** changes list visibility only. It does not stop running work, delete messages, remove files, or change native history. Open a retained direct conversation link, or select archived history, then use **Restore conversation** to return it to the active list.
@@ -50,3 +52,13 @@ A ready recovery offers a separate text field and a risk acknowledgement. Review
 If the response is lost, **Retry same request** reconciles the same intent after reconnect or API restart. A failed fencing attempt requires **Retry fencing deliberately**, with at most three attempts. Exhausted or unconfirmed retirement remains blocked; use the administrator's SSH recovery path rather than trying to force another generation through the UI.
 
 Replay keeps at most 2,000 events and seven days, including uncertain conversations. Messages and unresolved operations are stored separately. A replay gap requests a fresh snapshot and stream; it never resubmits a turn. Reserved controls remain separate from ordinary history-request limits, while a database outage denies new requests until persistence returns.
+
+## Personal VPS development
+
+With **Edit project files**, the personal VPS profile permits the selected existing repository's files and Git metadata, private temporary/cache storage and development networking. Node and pinned pnpm are supplied. Git identity is project configuration; Harbor does not invent the owner's commit identity. Linked/external Git metadata and initializing a new repository inside a turn are unsupported. Select an existing ordinary repository for Git work.
+
+Command disclosures show the command, directory, output and final exit status. Output is bounded at 32 KiB per command and 256 KiB per conversation, with explicit truncation/omission notices. Assistant messages reconcile the final native response with streamed text. The permission selector is restored from the conversation when reopened.
+
+After a successful turn, **Development processes available** shows a 30-minute retention period. Continuing the same conversation renews it; its workspace stays reserved, so other conversations cannot write there concurrently. Use **Stop background work** when finished to end the owned runtime and release that reservation. Closing the browser does not stop it. At most four personal runtime contexts are retained or active simultaneously.
+
+Use [personal development previews](previews.md#personal-vps-development-preview) to view a server after the task completes. A graceful supervisor shutdown retires retained work. An abrupt crash or unconfirmed stop shows uncertainty and preserves the workspace fence; use SSH recovery rather than assuming the processes are absent or replaying work. Standalone terminal UI and managed uncertain-work recovery remain unavailable in the personal profile.

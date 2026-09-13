@@ -126,6 +126,37 @@ const edit = previewCreate
   .omit({ workspaceId: true })
   .extend({ expectedRevision: z.number().int().positive() });
 export const previewPaths: Record<string, any> = {
+  "/personal-preview-openings": {
+    post: {
+      ...mutation(
+        object({
+          workspaceId: uuid,
+          port: { type: "integer", minimum: 1024, maximum: 65535 },
+        }),
+        object({
+          bootstrapPath: string,
+          expiresIn: { type: "integer", const: 30 },
+        }),
+        "browser",
+      ),
+      description:
+        "Personal VPS only. Attach to an administrator-configured loopback development port. One-time opening expires in 30 seconds; viewer access expires after 15 minutes or API restart. Does not start or own the process.",
+    },
+  },
+  "/personal-preview-openings/{id}": {
+    get: {
+      security: [{ ownerCookie: [] }],
+      parameters: [{ in: "path", name: "id", required: true, schema: uuid }],
+      responses: {
+        200: {
+          description:
+            "Authenticated HTML body-only exchange into the configured separate HTTPS preview origin",
+          content: { "text/html": { schema: string } },
+        },
+        410: { description: "Opening expired; prepare another from Harbor" },
+      },
+    },
+  },
   "/workspaces/{id}/previews": {
     get: read(
       object({

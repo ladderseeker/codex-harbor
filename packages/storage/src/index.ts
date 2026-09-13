@@ -105,6 +105,7 @@ export function publicRow(row: Record<string, unknown>) {
       .filter(
         ([k]) =>
           ![
+            "title_source",
             "native_thread_id",
             "native_turn_id",
             "actor_hash",

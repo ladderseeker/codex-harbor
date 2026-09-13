@@ -1,3 +1,7 @@
+import {
+  personalPreviewFixture,
+  checkPersonalPreview,
+} from "./preview-fixture.ts";
 /** P015 deterministic acceptance: actual nonroot Harbor; only external OIDC/Codex simulated. */
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import {
@@ -35,6 +39,9 @@ const node = path.join(run, "node"),
 const children: ChildProcess[] = [];
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 let proxy: ReturnType<typeof httpsServer> | undefined;
+let previewFixture:
+  | Awaited<ReturnType<typeof personalPreviewFixture>>
+  | undefined;
 let userCreated = false,
   databaseCreated = false;
 async function freePort() {
@@ -97,24 +104,26 @@ try {
     ),
     gid = Number(execFileSync("id", ["-g", id], { encoding: "utf8" }).trim());
   execFileSync("chown", ["-R", `${uid}:${gid}`, state, project]);
-  const fixture = path.join(run, "external-codex.mjs");
+  const fixture = path.join(release, "external-codex.mjs");
   await writeFile(
     fixture,
-    (
-      await readFile(
-        path.join(source, "tests/fixtures/codex/server.mjs"),
-        "utf8",
+    `import { startPersonalPreviewApp } from "./tests/personal-vps/preview-app.mjs"; let personalDevApp;
+` +
+      (
+        await readFile(
+          path.join(source, "tests/fixtures/codex/server.mjs"),
+          "utf8",
+        )
       )
-    )
-      .replace("let authenticated = false;", "let authenticated = true;")
-      .replace(
-        "const stateFile = process.env.HARBOR_FIXTURE_STATE_FILE;",
-        'const stateFile = process.env.CODEX_HOME + "/test-history.json";',
-      )
-      .replace(
-        '"Fixture response: " + text',
-        '(text.includes("[write-canary]") ? (writeFileSync(process.cwd() + "/canary.txt", "P015 original folder"), "Fixture response: " + text) : "Fixture response: " + text)',
-      ),
+        .replace("let authenticated = false;", "let authenticated = true;")
+        .replace(
+          "const stateFile = process.env.HARBOR_FIXTURE_STATE_FILE;",
+          'const stateFile = process.env.CODEX_HOME + "/test-history.json";',
+        )
+        .replace(
+          '"Fixture response: " + text',
+          '(text.includes("[write-canary]") ? (writeFileSync(process.cwd() + "/canary.txt", "P015 original folder"), personalDevApp ||= startPersonalPreviewApp(Number(process.env.PORT)), "Fixture response: " + text) : "Fixture response: " + text)',
+        ),
   );
   // This wrapper is explicitly the external deterministic protocol boundary, never native sandbox evidence.
   await writeFile(
@@ -144,7 +153,18 @@ try {
     { stdio: "ignore" },
   );
   await chmod(key, 0o600);
-  const [dbPort, apiPort, httpsPort, oidcPort] = await Promise.all([
+  const [
+    dbPort,
+    apiPort,
+    httpsPort,
+    oidcPort,
+    previewGatewayPort,
+    previewTlsPort,
+    developmentPort,
+  ] = await Promise.all([
+    freePort(),
+    freePort(),
+    freePort(),
     freePort(),
     freePort(),
     freePort(),
@@ -159,6 +179,14 @@ try {
     HOME: path.join(state, "home"),
     NODE_EXTRA_CA_CERTS: cert,
     DATABASE_URL: `postgres://harbor:${password}@127.0.0.1:${dbPort}/harbor`,
+    HARBOR_PERSONAL_PREVIEW_PORT: String(previewGatewayPort),
+    HARBOR_PERSONAL_PREVIEWS: JSON.stringify([
+      {
+        name: "Development app",
+        port: developmentPort,
+        origin: `https://127.0.0.1:${previewTlsPort}`,
+      },
+    ]),
     HARBOR_PERSONAL_VPS_MODE: "personal",
     HARBOR_PERSONAL_VPS_STATE_DIR: state,
     HARBOR_PERSONAL_VPS_CODEX_HOME: path.join(state, "codex"),
@@ -270,6 +298,13 @@ try {
     },
   );
   await new Promise<void>((r) => proxy!.listen(httpsPort, "127.0.0.1", r));
+  previewFixture = await personalPreviewFixture({
+    appPort: developmentPort,
+    gatewayPort: previewGatewayPort,
+    tlsPort: previewTlsPort,
+    cert: await readFile(cert),
+    key: await readFile(key),
+  });
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
   await expect
@@ -404,6 +439,34 @@ try {
     "Fixture response: P015 continuation",
     { timeout: 30000 },
   );
+  await checkPersonalPreview(
+    page,
+    context,
+    `https://127.0.0.1:${previewTlsPort}`,
+    developmentPort,
+  );
+  await expect(
+    page.getByRole("button", {
+      name: "Stop background processes",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Stop background processes", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Development processes are available" }),
+  ).toHaveCount(0);
+  await expect
+    .poll(async () => {
+      try {
+        const response = await fetch(`http://127.0.0.1:${developmentPort}`);
+        return response.status;
+      } catch {
+        return 0;
+      }
+    })
+    .toBe(0);
   await page.screenshot({
     path: path.join(artifacts, "conversation-desktop.png"),
     fullPage: true,
@@ -457,6 +520,13 @@ try {
       { timeout: 30000 },
     )
     .toBe(200);
+  expect(
+    (
+      await context.request.get(`https://127.0.0.1:${previewTlsPort}`, {
+        headers: { Origin: `https://127.0.0.1:${previewTlsPort}` },
+      })
+    ).status(),
+  ).toBe(403);
   await page.reload();
   await expect(page.locator("body")).toContainText(
     "Fixture response: P015 continuation",
@@ -482,6 +552,8 @@ try {
           "root-self original-path write",
           "browser close continuation",
           "restart history",
+          "authenticated separate-origin personal preview, large asset and vite-hmr WebSocket",
+          "preview cookie stripping, foreign origin and restart grant denial",
           "desktop/mobile",
         ],
       },
@@ -494,6 +566,7 @@ try {
   );
 } finally {
   await browser?.close();
+  await previewFixture?.close();
   for (const p of [...children].reverse()) await stop(p);
   if (proxy) await new Promise<void>((r) => proxy!.close(() => r()));
   if (databaseCreated)

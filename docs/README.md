@@ -4,6 +4,7 @@ This directory describes available behavior, developer workflows, and completed 
 
 - [Developer workflow](developer/development.md): working on the repository now, command availability, and verification requirements.
 - [Frontend redesign delivery](reports/2026-09-13-frontend-redesign.md): completed P014 implementation, review and verification evidence.
+- [Personal VPS development delivery](reports/2026-09-14-personal-development.md): development environment, titles/replies, private preview and reviewed verification evidence.
 - [Personal VPS setup](developer/personal-vps.md): subscription/original-folder candidate commands and native trust limits.
 - [Personal VPS candidate evidence](reports/2026-09-13-personal-vps-candidate.md): three reviews, native/browser/critical results and remaining owner-configured deployment gates.
 - [Personal local experience](developer/local-personal.md): explicit local Codex account startup and its verification limits.

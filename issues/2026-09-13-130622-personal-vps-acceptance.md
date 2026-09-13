@@ -1,7 +1,7 @@
 # Personal VPS deployment acceptance is incomplete
 
 - Severity: High
-- Status: Blocked
+- Status: In progress
 - Owner: P015 implementation and verification
 - Recorded: 2026-09-13 13:06 UTC
 - Affected files: `infra/personal-vps/harbor-personal`, native runtime adapter/config, `tests/personal-vps/`, P015 deployment.
@@ -82,3 +82,13 @@ A complete official pinned native distribution was packaged and independently re
 ## 2026-09-13 owner confirms new-conversation recovery
 
 The owner confirmed tools work after opening a new Harbor conversation. The preceding response quoting the old helper path contained no fresh tool call. No further deployment change was required. See the [owner confirmation and evidence limits](../docs/reports/2026-09-13-personal-vps-candidate.md#2026-09-13-owner-confirms-tools-work-in-a-new-conversation). Old-conversation recovery and complete browser-disconnect/reopen acceptance remain unverified; the planned cross-release disposable-thread test was not run and its unused resources were cleaned.
+
+## 2026-09-14 complete development workflow
+
+Owner browser inspection confirms the task remains titled New conversation after substantial dialogue and its last visible checklist ends mid-sentence. Current source hardcodes command network denial and exclusion of temporary write roots, disables native sandbox escalation and does not package pnpm. Live SSH confirms the full-runtime release, separate harbor-personal UID, root-owned project and protected service filesystem. Historical model reports are not independent fresh tool acceptance.
+
+The owner approved [D012](../design/decisions/012-personal-vps-development.md), implementation on main, push and VPS deployment. P015 owns all remaining development environment, Git, preview, title, reply completeness and installed reconnect obligations through P015-07–10; severity remains High until the complete outcome passes. Root directs implementation with separate runtime, conversation and preview implementers, followed by independent review and candidate verification. No completion is claimed at this checkpoint.
+
+### Parent/child event investigation
+
+Read-only inspection of the owner-reported native history found that two latest persisted assistant item IDs were absent from the parent native transcript, whose linked subagent activity is being checked. This is a potential core lifecycle/projection blocker: child events must not finish the parent operation or replace its messages. The conversation owner is implementing thread-scoped event handling and an interleaved-child completion regression; no historical live data mutation has been made. Earlier passing ordinary/fixture development tests do not cover this newly identified boundary.

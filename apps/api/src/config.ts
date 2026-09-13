@@ -1,7 +1,15 @@
 import path from "node:path";
+import { personalPreviewConfig } from "./personal-preview-config.ts";
 import { realpathSync, statSync } from "node:fs";
 import { z } from "zod";
 const schema = z.object({
+  HARBOR_PERSONAL_PREVIEWS: z.string().default("[]"),
+  HARBOR_PERSONAL_PREVIEW_PORT: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .max(65535)
+    .default(3350),
   HARBOR_PERSONAL_VPS_MODE: z.literal("personal").optional(),
   HARBOR_PERSONAL_VPS_STATE_DIR: z.string().startsWith("/").optional(),
   HARBOR_PERSONAL_VPS_CODEX_HOME: z.string().startsWith("/").optional(),
@@ -152,6 +160,27 @@ export function config(env = process.env) {
         );
     }
   }
-  return { ...c, roots, models: c.HARBOR_MODELS.split(",") };
+  const personalPreviews = personalPreviewConfig(
+    c.HARBOR_PERSONAL_PREVIEWS,
+    c.HARBOR_ORIGIN,
+    [
+      c.HARBOR_PORT,
+      c.HARBOR_PREVIEW_PORT,
+      c.HARBOR_PERSONAL_PREVIEW_PORT,
+      Number(new URL(c.DATABASE_URL).port || 5432),
+    ],
+  );
+  if (
+    personalPreviews.length &&
+    !c.HARBOR_PERSONAL_VPS_MODE &&
+    !c.HARBOR_FIXTURE_MODE
+  )
+    throw Error("Personal preview endpoints require personal VPS mode");
+  if (
+    personalPreviews.length &&
+    c.HARBOR_PERSONAL_PREVIEW_PORT === c.HARBOR_PORT
+  )
+    throw Error("Personal preview gateway must have a separate listener");
+  return { ...c, roots, personalPreviews, models: c.HARBOR_MODELS.split(",") };
 }
 export type Config = ReturnType<typeof config>;

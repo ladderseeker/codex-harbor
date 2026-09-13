@@ -101,6 +101,8 @@ export const publicSchemas = {
     title: string,
     archived: { type: "boolean" },
     metadataRevision: { type: "integer", minimum: 0 },
+    backgroundUntil: { type: ["string", "null"], format: "date-time" },
+    backgroundStopRequested: { type: "boolean" },
     state: {
       enum: [
         "idle",
@@ -126,7 +128,7 @@ export const publicSchemas = {
   Message: object({
     id: uuid,
     operationId: { type: ["string", "null"] },
-    role: { enum: ["user", "assistant", "system"] },
+    role: { enum: ["user", "assistant", "system", "tool"] },
     text: string,
     status: string,
     createdAt: timestamp,
@@ -535,6 +537,12 @@ const paths: Record<string, any> = {
     get: read(object({ sessions: array(ref("Session")) })),
     post: mutation(
       z.toJSONSchema(sessionSchema),
+      object({ session: ref("Session") }),
+    ),
+  },
+  "/sessions/{id}/background-stop": {
+    post: mutation(
+      object({ generation: { type: "integer", minimum: 0 } }),
       object({ session: ref("Session") }),
     ),
   },

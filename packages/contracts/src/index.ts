@@ -51,6 +51,9 @@ export type SessionState =
 export interface Session {
   archived?: boolean;
   metadataRevision?: number;
+  generation?: number;
+  backgroundUntil?: string | null;
+  backgroundStopRequested?: boolean;
   id: string;
   projectId: string;
   workspaceId: string;
@@ -66,7 +69,7 @@ export interface Session {
 export interface Message {
   operationId?: string | null;
   id: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool";
   text: string;
   status: string;
   createdAt: string;

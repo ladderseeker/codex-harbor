@@ -43,7 +43,8 @@ function finish(threadId, turnId, text, status = "completed") {
   turn.status = status;
   if (text) {
     const itemId = randomUUID();
-    event("item/agentMessage/delta", { threadId, turnId, itemId, delta: text });
+    if (!text.includes("[completion-only]"))
+      event("item/agentMessage/delta", { threadId, turnId, itemId, delta: text.includes("[partial-final]") ? "Partial response" : text });
     turn.items.push({
       id: itemId,
       type: "agentMessage",
@@ -71,6 +72,14 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     const saved = pending.get(m.id);
     if (saved) {
       pending.delete(m.id);
+      if (saved.childRejectionParent) {
+        const parent = saved.childRejectionParent;
+        const text = m.error ? "Child approval rejected safely" : "UNSAFE CHILD APPROVAL";
+        const item = {id:randomUUID(),type:"agentMessage",text,phase:null,memoryCitation:null,delivery:null,questions:null};
+        parent.turn.items.push(item);
+        event("item/completed", {threadId:parent.threadId,turnId:parent.turn.id,item,startedAtMs:0,completedAtMs:0});
+        return;
+      }
       finish(
         saved.threadId,
         saved.turnId,
@@ -225,7 +234,31 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     persist();
     if (text.includes("[crash-before-ack]")) return process.exit(31);
     if (text.includes("[timeout]")) return;
-    result({ turn });
+    if (!text.includes("[child-thread]")) result({ turn });
+    if (text.includes("[child-thread]")) {
+      const childThread = randomUUID(), childTurn = randomUUID();
+      const childItem = {id:randomUUID(),type:"agentMessage",text:"CHILD MUST NOT APPEAR",phase:null,memoryCitation:null,delivery:null,questions:null};
+      // More than the parent mailbox count limit: foreign traffic is not charged.
+      for (let childEvent=0;childEvent<300;childEvent++)
+        event("item/agentMessage/delta", {threadId:childThread,turnId:childTurn,itemId:childItem.id,delta:childItem.text});
+      event("item/completed", {threadId:childThread,turnId:childTurn,item:childItem,startedAtMs:0,completedAtMs:0});
+      event("turn/completed", {threadId:childThread,turn:{id:childTurn,status:"completed",items:[childItem],itemsView:"full",error:null,startedAt:0,completedAt:0,durationMs:0}});
+      const requestId=randomUUID();
+      pending.set(requestId,{childRejectionParent:{threadId:p.threadId,turn}});
+      send({id:requestId,method:"item/commandExecution/requestApproval",params:{threadId:childThread,turnId:childTurn,itemId:randomUUID(),kind:"command",startedAtMs:0,environmentId:null,command:"touch forbidden-child-approval",cwd:process.cwd()}});
+      const parentItem={...childItem,id:randomUUID(),text:"Parent waiting after child"};
+      turn.items.push(parentItem);
+      event("item/completed", {threadId:p.threadId,turnId:turn.id,item:parentItem,startedAtMs:0,completedAtMs:0});
+      result({ turn });
+    }
+    if (text.includes("[command-result]")) {
+      const item = {type:"commandExecution", id:randomUUID(), pluginId:null, scriptPath:null, command:"pnpm test", cwd:process.cwd(), processId:null, source:"agent", status:"inProgress", commandActions:[], aggregatedOutput:null, exitCode:null, durationMs:null};
+      event("item/started", {threadId:p.threadId,turnId:turn.id,item,startedAtMs:0});
+      event("item/commandExecution/outputDelta", {threadId:p.threadId,turnId:turn.id,itemId:item.id,delta:"running tests\n"});
+      item.status="completed"; item.aggregatedOutput="Tests passed\n"; item.exitCode=0; item.durationMs=1;
+      turn.items.push(item);
+      event("item/completed", {threadId:p.threadId,turnId:turn.id,item,startedAtMs:0,completedAtMs:1});
+    }
     if (text.includes("[activation-completed]"))
       return setTimeout(
         () => finish(p.threadId, turn.id, "done", "completed"),
@@ -337,7 +370,9 @@ createInterface({ input: process.stdin }).on("line", (line) => {
               ? "<script>window.compromised=true</script>"
               : "Fixture response: " + text,
           ),
-        text.includes("[interrupt-crash]")
+        text.includes("[child-thread]")
+          ? 3000
+          : text.includes("[interrupt-crash]")
           ? 5000
           : text.includes("[delay]")
             ? 1500

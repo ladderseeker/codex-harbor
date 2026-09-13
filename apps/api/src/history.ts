@@ -149,7 +149,7 @@ export function historyRoutes(
           );
         const row = (
           await db.query(
-            "UPDATE sessions SET title=coalesce($2,title),archived=coalesce($3,archived),archived_at=CASE WHEN $3::boolean IS NULL THEN archived_at WHEN $3 THEN coalesce(archived_at,now()) ELSE NULL END,metadata_revision=metadata_revision+1 WHERE id=$1 RETURNING *",
+            "UPDATE sessions SET title=coalesce($2,title),title_source=CASE WHEN $2::text IS NULL THEN title_source ELSE 'manual' END,archived=coalesce($3,archived),archived_at=CASE WHEN $3::boolean IS NULL THEN archived_at WHEN $3 THEN coalesce(archived_at,now()) ELSE NULL END,metadata_revision=metadata_revision+1 WHERE id=$1 RETURNING *",
             [old.id, body.title ?? null, body.archived ?? null],
           )
         ).rows[0];

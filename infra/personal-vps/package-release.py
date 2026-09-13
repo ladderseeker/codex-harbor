@@ -18,11 +18,15 @@ installer = importlib.util.module_from_spec(spec)
 loader.exec_module(installer)
 
 
-def package(source, node, vendor, output):
+def package(source, node, vendor, output, pnpm_package, pnpm_binary):
     source, node, vendor, output = map(lambda p: Path(p).resolve(), (source, node, vendor, output))
     if output.exists():
         raise ValueError('Output exists; refusing overwrite')
     installer.validate_native_distribution(vendor, require_root=False)
+    pnpm_package, pnpm_binary = Path(pnpm_package).resolve(), Path(pnpm_binary).resolve()
+    pnpm_metadata = json.loads((pnpm_package / 'package.json').read_text())
+    if pnpm_metadata.get('name') != 'pnpm' or pnpm_metadata.get('version') != '12.3.4' or not (pnpm_package / 'dist').is_dir():
+        raise ValueError('Complete pinned pnpm 12.3.4 package required')
     with tempfile.TemporaryDirectory(prefix='harbor-package-version-') as temporary:
         home = Path(temporary)
         (home / 'codex').mkdir(mode=0o700)
@@ -31,6 +35,8 @@ def package(source, node, vendor, output):
             raise ValueError('Pinned Node 24.11.1 required')
         if subprocess.run([str(vendor / 'bin/codex'), '--version'], env=env, check=True, capture_output=True, text=True).stdout.strip() != 'codex-cli 0.153.4':
             raise ValueError('Pinned Codex 0.153.4 required')
+        if subprocess.run([str(pnpm_binary), '--version'], env=env, check=True, capture_output=True, text=True).stdout.strip() != '12.3.4':
+            raise ValueError('Pinned pnpm 12.3.4 native executable required')
     for name in ('apps/web/dist/index.html', 'node_modules', 'pnpm-lock.yaml'):
         if not (source / name).exists():
             raise ValueError('Built source with locked installed dependencies required')
@@ -55,6 +61,15 @@ def package(source, node, vendor, output):
     if (release / 'bin/node').exists():
         raise ValueError('Vendor unexpectedly contains Node')
     shutil.copy2(node, release / 'bin/node')
+    shutil.copytree(pnpm_package, release / 'toolchain/pnpm', symlinks=True)
+    shutil.copy2(pnpm_binary, release / 'toolchain/pnpm/pnpm-native')
+    (release / 'toolchain/pnpm/pnpm-native').chmod(0o755)
+    for command, arguments in (('pnpm', ''), ('pnpx', 'dlx ')):
+        wrapper = release / 'bin' / command
+        if wrapper.exists():
+            raise ValueError('Vendor unexpectedly contains ' + command)
+        wrapper.write_text('#!/bin/sh\nbase=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd) || exit 1\nexec "$base/toolchain/pnpm/pnpm-native" ' + arguments + '"$@"\n')
+        wrapper.chmod(0o755)
     files = []
     for path in sorted(release.rglob('*')):
         if path.is_symlink():
@@ -71,7 +86,7 @@ def package(source, node, vendor, output):
     base = subprocess.run(['git', '-C', str(source), 'rev-parse', 'HEAD'], check=True,
                           capture_output=True, text=True).stdout.strip()
     manifest = {'profile': 'personal-vps', 'baseRevision': base, 'node': '24.11.1',
-                'codex': '0.153.4', 'nativePackage': native, 'files': files,
+                'codex': '0.153.4', 'pnpm': '12.3.4', 'nativePackage': native, 'files': files,
                 'acceptance': 'Candidate only; real model tool/read/write and installed acceptance required'}
     (release / 'artifact.json').write_text(json.dumps(manifest, indent=2) + '\n')
     (release / 'artifact.json').chmod(0o644)
@@ -88,5 +103,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('source', 'node', 'vendor', 'output'):
         parser.add_argument('--' + name, required=True)
+    parser.add_argument('--pnpm-package', required=True)
+    parser.add_argument('--pnpm-binary', required=True)
     args = parser.parse_args()
-    package(args.source, args.node, args.vendor, args.output)
+    package(args.source, args.node, args.vendor, args.output, args.pnpm_package, args.pnpm_binary)

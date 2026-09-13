@@ -12,6 +12,7 @@ import { acceptConversationTurn } from "../../../packages/storage/src/turns.ts";
 import { effectiveSettings as requireEffectiveSettings } from "../../../packages/policy/src/models.ts";
 import { terminalStreams } from "./terminal-stream.ts";
 import { terminalRoutes } from "./terminals.ts";
+import { personalPreviewRoutes } from "./personal-previews.ts";
 import { previewRoutes } from "./previews.ts";
 import { startPreviewGateway } from "./preview-gateway.ts";
 import {
@@ -174,6 +175,7 @@ export async function buildServer(c: Config) {
       limit = login ? 30 : 200;
     const reserved =
       req.url.includes("/security/") ||
+      req.url.endsWith("/background-stop") ||
       req.url.endsWith("/cancel") ||
       /^\/api\/v1\/schedules\/[a-f0-9-]{36}\/pause$/.test(
         req.url.split("?")[0],
@@ -397,6 +399,7 @@ export async function buildServer(c: Config) {
       }
       const reserved =
         route === "/api/v1/previews/:id/stop" ||
+        route.endsWith("/background-stop") ||
         route.endsWith("/cancel") ||
         route.endsWith("/terminate") ||
         route.endsWith("/answer") ||
@@ -413,6 +416,7 @@ export async function buildServer(c: Config) {
       if (auth.get(req)!.kind === "token" && !reservedFileControl) {
         const reserve =
           route === "/api/v1/previews/:id/stop" ||
+          route.endsWith("/background-stop") ||
           route.endsWith("/cancel") ||
           route.endsWith("/answer") ||
           route.endsWith("/terminate");
@@ -435,6 +439,7 @@ export async function buildServer(c: Config) {
       await deploymentAdmission(
         db,
         route === "/api/v1/previews/:id/stop" ||
+          route.endsWith("/background-stop") ||
           route.endsWith("/cancel") ||
           route.endsWith("/terminate") ||
           reservedFileControl ||
@@ -448,8 +453,9 @@ export async function buildServer(c: Config) {
       if (!externalEffectsGranted.has(req) && !selfRevocations.has(req))
         await requireAuthority(db, auth.get(req)!.hash, c);
       if (route === "/api/v1/security/emergency-stop") return result;
-      const controlTarget =
-        route === "/api/v1/previews/:id/stop"
+      const controlTarget = route.endsWith("/background-stop")
+        ? "background-stop:" + req.params.id + ":" + req.body.generation
+        : route === "/api/v1/previews/:id/stop"
           ? "preview-stop:" + req.params.id + ":" + req.body.expectedGeneration
           : route.includes("/file-operations/") && route.endsWith("/inspect")
             ? "file-inspect:" + req.params.operationId
@@ -611,6 +617,7 @@ export async function buildServer(c: Config) {
   app.get("/api/v1/capabilities", async (req) => ({
     ...(c.HARBOR_LOCAL_MODE ? { local: true } : {}),
     ...(c.HARBOR_PERSONAL_VPS_MODE ? { personalVps: true } : {}),
+    personalPreviews: c.personalPreviews,
     projectBrowsing: projectBrowsingCapability(c),
     files: {
       read: !!(
@@ -902,7 +909,63 @@ export async function buildServer(c: Config) {
       return reply.code(202).send(result);
     },
   );
+  app.post<{ Params: { id: string } }>(
+    "/api/v1/sessions/:id/background-stop",
+    async (req) =>
+      command(req, async (db) => {
+        if (!c.HARBOR_PERSONAL_VPS_MODE)
+          throw new HarborError(
+            409,
+            "PERSONAL_VPS_FEATURE_UNAVAILABLE",
+            "Background development processes require the personal VPS profile",
+          );
+        const body = z
+          .object({ generation: z.number().int().nonnegative() })
+          .strict()
+          .parse(req.body);
+        await sessionWorkspace(db, req.params.id, true);
+        await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
+          req.params.id,
+        ]);
+        const current = await session(db, req.params.id);
+        if (Number(current.generation) !== body.generation)
+          throw new HarborError(
+            409,
+            "STALE_GENERATION",
+            "Runtime changed; refresh before stopping background processes",
+          );
+        if (
+          (
+            await db.query(
+              "SELECT 1 FROM operations WHERE session_id=$1 AND state IN ('queued','dispatching','running','waiting_approval','waiting_input') LIMIT 1",
+              [req.params.id],
+            )
+          ).rowCount
+        )
+          throw new HarborError(
+            409,
+            "TURN_ACTIVE",
+            "Stop or finish the active turn before stopping background processes",
+          );
+        if (current.background_until && !current.background_stop_requested) {
+          await db.query(
+            "UPDATE sessions SET background_stop_requested=true WHERE id=$1",
+            [req.params.id],
+          );
+          await event(db, req.params.id, "background.stop-requested", {
+            generation: body.generation,
+          });
+        }
+        return { session: publicRow(await session(db, req.params.id)) };
+      }),
+  );
   attachmentRoutes(app, pool, command);
+  await personalPreviewRoutes(app, {
+    pool,
+    c,
+    command,
+    actor: (req) => auth.get(req)!.hash,
+  });
   previewRoutes(app, { pool, c, command, actor: (req) => auth.get(req)!.hash });
   terminalRoutes(app, {
     pool,

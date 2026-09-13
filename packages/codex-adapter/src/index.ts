@@ -1,8 +1,15 @@
 import { type ChildProcessWithoutNullStreams } from "node:child_process";
+import {
+  developmentInstructions,
+  developmentEnvironment,
+  developmentWritableRoots,
+  type PersonalDevelopment,
+} from "./personal-development.js";
 import type { ProcessInspection } from "../../../infra/runner/processes.js";
 export type OwnedRuntimeProcess = ChildProcessWithoutNullStreams & {
   closeOwned?: () => Promise<void>;
   inspectOwned?: () => Promise<ProcessInspection>;
+  personalDevelopment?: PersonalDevelopment;
 };
 export const CODEX_VERSION = "0.153.4";
 export type RpcId = string | number;
@@ -512,6 +519,18 @@ export class CodexAdapter {
       approvalPolicy: this.approvalPolicy(),
       approvalsReviewer: "user",
       ephemeral: false,
+      ...(this.process.personalDevelopment
+        ? {
+            developerInstructions: developmentInstructions(
+              this.process.personalDevelopment,
+            ),
+            config: {
+              "shell_environment_policy.set": developmentEnvironment(
+                this.process.personalDevelopment,
+              ),
+            },
+          }
+        : {}),
     });
   }
   resumeThread(
@@ -527,6 +546,18 @@ export class CodexAdapter {
       sandbox: options.permissionProfile ?? "read-only",
       approvalPolicy: this.approvalPolicy(),
       approvalsReviewer: "user",
+      ...(this.process.personalDevelopment
+        ? {
+            developerInstructions: developmentInstructions(
+              this.process.personalDevelopment,
+            ),
+            config: {
+              "shell_environment_policy.set": developmentEnvironment(
+                this.process.personalDevelopment,
+              ),
+            },
+          }
+        : {}),
     });
   }
   readThread(threadId: string) {
@@ -548,6 +579,10 @@ export class CodexAdapter {
   }
   async startTurn(threadId: string, text: string, options: TurnOptions = {}) {
     this.conversationCapability();
+    const development = this.process.personalDevelopment;
+    const writableRoots = development
+      ? await developmentWritableRoots(development)
+      : this.workspaceRoots;
     const attachmentInput = (options.attachments ?? []).map((a) => {
       if (!/^[a-f0-9-]{36}$/.test(a.id) || a.path !== `/attachments/${a.id}`)
         throw Error("Invalid attachment reference");
@@ -571,10 +606,10 @@ export class CodexAdapter {
           options.permissionProfile === "workspace-write"
             ? {
                 type: "workspaceWrite",
-                writableRoots: this.workspaceRoots,
-                networkAccess: false,
-                excludeTmpdirEnvVar: true,
-                excludeSlashTmp: true,
+                writableRoots,
+                networkAccess: Boolean(development),
+                excludeTmpdirEnvVar: !development,
+                excludeSlashTmp: !development,
               }
             : { type: "readOnly", networkAccess: false },
       });
@@ -612,6 +647,18 @@ export class CodexAdapter {
     };
     return (this.withDispatch ? await this.withDispatch(send) : send())
       .response;
+  }
+  /** Fail closed for requests outside the active Harbor thread/turn. No approval is granted. */
+  rejectRequest(id: RpcId) {
+    if (!this.requests.has(id)) return;
+    this.send({
+      id,
+      error: {
+        code: -32000,
+        message: "Request is outside the active Harbor turn",
+      },
+    });
+    this.requests.delete(id);
   }
   async respond(
     id: RpcId,

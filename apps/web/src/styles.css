@@ -2886,3 +2886,18 @@ svg {
     padding: 5px 2px;
   }
 }
+
+.command-output {
+  border-top: 1px solid var(--edge);
+  color: var(--muted);
+}
+.command-output summary {
+  cursor: pointer;
+  padding: 12px 0;
+}
+.command-output pre {
+  font-family: monospace;
+  max-height: 360px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
