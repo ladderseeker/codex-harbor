@@ -3,6 +3,8 @@
 The architecture is the accepted implementation baseline. Implementation and verification are under way; no proposal is finished. The [proposal index](proposals/README.md) owns current feature status, dependencies, evidence and next actions. Decision (`Draft`, `Accepted`, `Superseded`) and delivery (`Planned`, `In progress`, `Implemented`, `Verified`) remain separate. Existing session authorization governs work; metadata does not create a universal approval gate.
 
 - [Architecture](architecture.md): system boundaries, identity, runtime/data contracts, local development, verification, self-development, and releases.
+- [Design tokens and UI guide](design-tokens.html): approved visual baseline, component rules, and workflow for extending the design consistently.
+- [Interface prototype](prototypes/README.md): standalone monochrome reference for the approved design before application implementation.
 - [D001 — Confined runtime egress](decisions/001-confined-runtime-egress.md): fixed gateway and isolated networks; Linux denials/connectivity passed, intermittent availability tracked.
 - [D002 — Registered mount authority](decisions/002-registered-mount-authority.md): trusted ancestry, disjoint projects, and descriptor-relative operations; local/Linux checks passed.
 - [D003 — Quota-backed project storage](decisions/003-quota-backed-project-storage.md): trusted XFS allocation, runner access, and persistent hard limits; actual Linux checks passed.

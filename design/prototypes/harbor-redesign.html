@@ -1,0 +1,1344 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Harbor — design preview</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --canvas: #fff;
+        --rail: #f5f5f5;
+        --selected: #e9e9e9;
+        --edge: #dedede;
+        --muted: #737373;
+        --ink: #191919;
+        --soft: #fafafa;
+        --rail-width: 260px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--ink);
+        font-size: 14px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--canvas);
+      }
+      button,
+      textarea,
+      select {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        cursor: pointer;
+        border: 0;
+        background: none;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      select:focus-visible,
+      summary:focus-visible {
+        outline: 2px solid #737373;
+        outline-offset: 3px;
+      }
+      button:disabled {
+        cursor: default;
+      }
+      svg {
+        width: 19px;
+        height: 19px;
+        stroke: currentColor;
+        stroke-width: 1.65;
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex: none;
+      }
+      button:hover {
+        background: #eaeaea;
+      }
+      button {
+        transition: background 0.12s;
+      }
+      .icon-button {
+        width: 30px;
+        height: 30px;
+        border-radius: 7px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        flex: none;
+      }
+      .app {
+        display: flex;
+        height: 100dvh;
+        min-height: 420px;
+      }
+      .sidebar {
+        width: var(--rail-width);
+        background: var(--rail);
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        padding: 21px 12px 14px;
+        overflow-y: auto;
+      }
+      .sidebar-resize {
+        width: 8px;
+        margin: 0 -4px;
+        position: relative;
+        z-index: 2;
+        flex: none;
+        cursor: col-resize;
+        touch-action: none;
+      }
+      .sidebar-resize::after {
+        content: "";
+        position: absolute;
+        inset: 0 3px;
+        background: transparent;
+      }
+      .sidebar-resize:hover::after,
+      .sidebar-resize:focus-visible::after,
+      .resizing .sidebar-resize::after {
+        background: #aaa;
+      }
+      .sidebar-resize:focus-visible {
+        outline: 2px solid #737373;
+        outline-offset: -2px;
+      }
+      .resizing,
+      .resizing * {
+        cursor: col-resize !important;
+        user-select: none !important;
+      }
+      .brand-row {
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        gap: 10px;
+        height: 31px;
+      }
+      .brand-mark {
+        width: 24px;
+        height: 25px;
+        stroke-width: 1.8;
+      }
+      .brand {
+        font-size: 20px;
+        font-weight: 650;
+        letter-spacing: -0.65px;
+      }
+      .brand-row .icon-button {
+        margin-left: auto;
+      }
+      .new-chat {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        gap: 11px;
+        text-align: left;
+        padding: 11px 12px;
+        margin-top: 27px;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+      .new-chat svg {
+        width: 18px;
+        height: 18px;
+      }
+      .shortcut {
+        margin-left: auto;
+        color: #8a8a8a;
+        font-size: 11px;
+      }
+      .project-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 10px;
+        margin: 29px 0 8px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .project {
+        margin-bottom: 8px;
+      }
+      .project-row {
+        display: flex;
+        align-items: center;
+        border-radius: 8px;
+        min-height: 37px;
+        padding-right: 5px;
+      }
+      .project-row:hover,
+      .project-row:focus-within {
+        background: #ededed;
+      }
+      .project-toggle {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 10px;
+        min-width: 0;
+        text-align: left;
+        flex: 1;
+        border-radius: 8px;
+        font-size: 13px;
+      }
+      .project-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .project-toggle svg {
+        width: 18px;
+        height: 18px;
+        color: #666;
+      }
+      .project-actions {
+        display: flex;
+        opacity: 0;
+      }
+      .project-row:hover .project-actions,
+      .project-row:focus-within .project-actions {
+        opacity: 1;
+      }
+      .project-actions .icon-button {
+        width: 25px;
+        height: 26px;
+      }
+      .project-actions svg {
+        width: 16px;
+        height: 16px;
+      }
+      .sessions {
+        padding: 3px 0 4px 24px;
+      }
+      .session-row {
+        display: flex;
+        align-items: center;
+        border-radius: 7px;
+        margin: 2px 0;
+        padding-right: 4px;
+      }
+      .session-row:hover,
+      .session-row:focus-within {
+        background: #ededed;
+      }
+      .session {
+        display: block;
+        flex: 1;
+        min-width: 0;
+        padding: 9px 12px;
+        border-radius: 7px;
+        text-align: left;
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #666;
+      }
+      .session-row.active {
+        background: var(--selected);
+        color: var(--ink);
+      }
+      .session-row.active .session {
+        color: var(--ink);
+      }
+      .session-rename {
+        opacity: 0;
+        width: 25px;
+        height: 26px;
+      }
+      .session-rename svg {
+        width: 14px;
+        height: 14px;
+      }
+      .session-row:hover .session-rename,
+      .session-row:focus-within .session-rename {
+        opacity: 1;
+      }
+      .sidebar-footer {
+        margin-top: auto;
+        padding: 24px 11px 0;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .preview-dot {
+        width: 6px;
+        height: 6px;
+        border: 1px solid #8b8b8b;
+        border-radius: 50%;
+      }
+      .main {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        flex-direction: column;
+        position: relative;
+      }
+      .topbar {
+        height: 65px;
+        flex: none;
+        display: flex;
+        align-items: center;
+        padding: 0 31px;
+        gap: 10px;
+      }
+      .breadcrumbs {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .breadcrumbs svg {
+        width: 16px;
+        height: 16px;
+      }
+      .breadcrumbs .slash {
+        color: #b4b4b4;
+      }
+      .breadcrumbs strong {
+        color: #333;
+        font-size: 13px;
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .topbar-actions {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .sample-label {
+        font-size: 10px;
+        color: var(--muted);
+        padding: 4px 7px;
+        border: 1px solid #e8e8e8;
+        border-radius: 5px;
+        white-space: nowrap;
+      }
+      .mobile-toggle {
+        display: none;
+      }
+      .scroll-area {
+        flex: 1;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+        padding: 26px 34px 20px;
+      }
+      .conversation {
+        max-width: 760px;
+        margin: 0 auto;
+        font-size: 15px;
+        line-height: 1.75;
+      }
+      .user-message {
+        display: flex;
+        justify-content: flex-end;
+        margin: 12px 0 32px;
+      }
+      .user-bubble {
+        background: #f1f1f1;
+        padding: 12px 18px;
+        border-radius: 18px 18px 4px 18px;
+        max-width: 85%;
+        font-size: 14px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .assistant-message {
+        padding: 0 1px;
+        overflow-wrap: anywhere;
+      }
+      .assistant-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        margin: 0 0 17px;
+      }
+      .assistant-label svg {
+        width: 17px;
+        height: 18px;
+      }
+      .assistant-message p {
+        margin: 0 0 17px;
+      }
+      .assistant-message h2 {
+        font-size: 17px;
+        letter-spacing: -0.25px;
+        font-weight: 600;
+        margin: 24px 0 9px;
+      }
+      .assistant-message ul {
+        padding-left: 21px;
+        margin: 6px 0 18px;
+      }
+      .assistant-message li {
+        padding-left: 3px;
+        margin: 6px 0;
+      }
+      .assistant-message strong {
+        font-weight: 600;
+      }
+      .assistant-message code {
+        font:
+          12px ui-monospace,
+          SFMono-Regular,
+          Consolas,
+          monospace;
+        background: #f2f2f2;
+        border-radius: 4px;
+        padding: 3px 5px;
+      }
+      .sample-details {
+        margin: 23px 0 18px;
+        border-top: 1px solid #ececec;
+        border-bottom: 1px solid #ececec;
+      }
+      .sample-details summary {
+        cursor: pointer;
+        list-style: none;
+        padding: 13px 0;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .sample-details summary svg {
+        width: 14px;
+        height: 14px;
+      }
+      .sample-details[open] summary svg {
+        transform: rotate(90deg);
+      }
+      .sample-details p {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0 0 14px;
+      }
+      .message-actions {
+        display: flex;
+        gap: 3px;
+        margin: 15px 0 10px;
+      }
+      .message-actions .icon-button {
+        width: 28px;
+        height: 28px;
+      }
+      .message-actions svg {
+        width: 15px;
+        height: 15px;
+      }
+      .composer-area {
+        padding: 15px 34px 18px;
+        background: #fff;
+        flex: none;
+      }
+      .composer-wrap {
+        max-width: 760px;
+        margin: auto;
+      }
+      .composer {
+        border: 1px solid #ddd;
+        border-radius: 18px;
+        padding: 14px 15px 10px;
+        background: white;
+        box-shadow: 0 3px 16px #00000005;
+      }
+      .composer:focus-within {
+        border-color: #adadad;
+        box-shadow: 0 3px 20px #00000007;
+      }
+      .composer textarea {
+        border: 0;
+        outline: 0;
+        resize: none;
+        display: block;
+        width: 100%;
+        height: 24px;
+        max-height: 160px;
+        min-height: 24px;
+        overflow-y: hidden;
+        line-height: 24px;
+        font-size: 14px;
+        background: transparent;
+        padding: 0 2px;
+      }
+      .composer textarea::placeholder {
+        color: #929292;
+      }
+      .composer-tools {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 12px;
+        min-width: 0;
+      }
+      .select-wrap {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        position: relative;
+      }
+      .select-wrap select {
+        max-width: 180px;
+        appearance: none;
+        border: 0;
+        padding: 5px 19px 5px 5px;
+        background: transparent;
+        font-size: 11px;
+        cursor: pointer;
+        border-radius: 5px;
+      }
+      .select-wrap:after {
+        content: "";
+        position: absolute;
+        right: 6px;
+        top: 10px;
+        width: 5px;
+        height: 5px;
+        border-right: 1px solid #888;
+        border-bottom: 1px solid #888;
+        transform: rotate(45deg);
+        pointer-events: none;
+      }
+      .select-wrap svg {
+        width: 14px;
+        height: 14px;
+        color: #737373;
+      }
+      .model-control {
+        margin-left: auto;
+      }
+      .send {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #191919;
+        color: white;
+        margin-left: 4px;
+        flex: none;
+      }
+      .send:hover {
+        background: #444;
+      }
+      .send:disabled {
+        background: #ececec;
+        color: #aaa;
+      }
+      .send svg {
+        width: 17px;
+        height: 17px;
+      }
+      .composer-note {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 10px 4px 0;
+        font-size: 10px;
+        color: #858585;
+      }
+      .empty {
+        min-height: 100%;
+        display: flex;
+        justify-content: center;
+        flex-direction: column;
+        max-width: 760px;
+        margin: auto;
+        padding-bottom: 60px;
+      }
+      .empty .brand-mark {
+        width: 34px;
+        height: 38px;
+        margin-bottom: 17px;
+        color: #333;
+      }
+      .empty h1 {
+        font-size: 27px;
+        letter-spacing: -0.8px;
+        font-weight: 550;
+        margin: 0 0 9px;
+      }
+      .empty p {
+        font-size: 14px;
+        color: var(--muted);
+        margin: 0;
+        line-height: 1.7;
+      }
+      .starter-list {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 28px;
+      }
+      .starter {
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+        padding: 9px 12px;
+        color: #666;
+        font-size: 12px;
+      }
+      .toast {
+        position: fixed;
+        bottom: 150px;
+        left: calc(50% + var(--rail-width) / 2);
+        transform: translateX(-50%);
+        padding: 10px 16px;
+        background: #252525;
+        color: white;
+        border-radius: 9px;
+        font-size: 12px;
+        box-shadow: 0 4px 20px #0002;
+        z-index: 30;
+        max-width: calc(100% - 30px);
+      }
+      .toast:empty {
+        display: none;
+      }
+      .menu {
+        position: absolute;
+        z-index: 20;
+        right: 27px;
+        top: 54px;
+        width: 170px;
+        border: 1px solid #e4e4e4;
+        border-radius: 10px;
+        background: white;
+        box-shadow: 0 8px 28px #0000000d;
+        padding: 5px;
+      }
+      .menu button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 9px;
+        border-radius: 6px;
+        font-size: 12px;
+      }
+      .backdrop {
+        display: none;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      @media (hover: none) {
+        .project-actions,
+        .session-rename {
+          opacity: 1;
+        }
+      }
+      @media (min-width: 1600px) {
+        .scroll-area {
+          padding-top: 55px;
+        }
+        .composer-area {
+          padding-bottom: 25px;
+        }
+      }
+      @media (max-width: 1000px) {
+        .topbar {
+          padding: 0 24px;
+        }
+        .scroll-area,
+        .composer-area {
+          padding-left: 24px;
+          padding-right: 24px;
+        }
+        .shortcut {
+          display: none;
+        }
+      }
+      @media (max-width: 700px) {
+        .sidebar-resize {
+          display: none;
+        }
+        .sidebar {
+          position: fixed;
+          inset: 0 auto 0 0;
+          width: 260px;
+          z-index: 40;
+          transform: translateX(-100%);
+          transition: transform 0.18s;
+        }
+        .sidebar.open {
+          transform: translateX(0);
+        }
+        .backdrop.open {
+          display: block;
+          position: fixed;
+          inset: 0;
+          background: #0003;
+          z-index: 35;
+        }
+        .mobile-toggle {
+          display: inline-flex;
+        }
+        .topbar {
+          height: 57px;
+          padding: 0 13px;
+          gap: 6px;
+        }
+        .breadcrumbs {
+          gap: 7px;
+        }
+        .breadcrumbs .project-crumb,
+        .breadcrumbs .slash {
+          display: none;
+        }
+        .topbar-actions {
+          gap: 3px;
+        }
+        .sample-label {
+          font-size: 9px;
+        }
+        .scroll-area {
+          padding: 16px 20px;
+        }
+        .conversation {
+          font-size: 14px;
+        }
+        .user-bubble {
+          max-width: 94%;
+        }
+        .composer-area {
+          padding: 10px 13px 14px;
+        }
+        .composer {
+          padding: 12px 12px 9px;
+        }
+        .composer-note {
+          font-size: 9px;
+        }
+        .composer-note span:last-child {
+          display: none;
+        }
+        .select-wrap select {
+          font-size: 10px;
+          max-width: 136px;
+        }
+        .effort-control {
+          display: none;
+        }
+        .composer-tools {
+          gap: 2px;
+        }
+        .empty h1 {
+          font-size: 25px;
+        }
+        .empty {
+          padding-bottom: 35px;
+        }
+        .toast {
+          left: 50%;
+        }
+        .assistant-message h2 {
+          font-size: 16px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          scroll-behavior: auto !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg
+      aria-hidden="true"
+      style="position: absolute; width: 0; height: 0; overflow: hidden"
+    >
+      <defs>
+        <symbol id="harbor" viewBox="0 0 24 26">
+          <path d="M6 20V9a6 6 0 0 1 12 0v11M2 24h20M10 20V10" />
+        </symbol>
+        <symbol id="folder" viewBox="0 0 24 24">
+          <path
+            d="M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z"
+          />
+          <path d="M3 9h18" />
+        </symbol>
+        <symbol id="compose" viewBox="0 0 24 24">
+          <path
+            d="M11 4H6a3 3 0 0 0-3 3v11a3 3 0 0 0 3 3h11a3 3 0 0 0 3-3v-5M16 3a2.1 2.1 0 0 1 3 3l-8 8-4 1 1-4Z"
+          />
+        </symbol>
+        <symbol id="plus" viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12h14" />
+        </symbol>
+        <symbol id="more" viewBox="0 0 24 24">
+          <circle cx="5" cy="12" r="1" />
+          <circle cx="12" cy="12" r="1" />
+          <circle cx="19" cy="12" r="1" />
+        </symbol>
+        <symbol id="arrow" viewBox="0 0 24 24">
+          <path d="m6 10 6-6 6 6M12 4v16" />
+        </symbol>
+        <symbol id="chevron" viewBox="0 0 24 24">
+          <path d="m9 5 7 7-7 7" />
+        </symbol>
+        <symbol id="copy" viewBox="0 0 24 24">
+          <rect x="8" y="8" width="12" height="13" rx="2" />
+          <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
+        </symbol>
+        <symbol id="shield" viewBox="0 0 24 24">
+          <path d="m12 3 8 4v6c0 5-8 8-8 8s-8-3-8-8V7Z" />
+          <path d="m8 12 3 3 5-6" />
+        </symbol>
+        <symbol id="panel" viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="16" rx="3" />
+          <path d="M9 4v16" />
+        </symbol>
+      </defs>
+    </svg>
+    <div class="app">
+      <div class="backdrop" id="backdrop"></div>
+      <aside class="sidebar" id="sidebar" aria-label="Projects and chats">
+        <div class="brand-row">
+          <svg class="brand-mark"><use href="#harbor" /></svg
+          ><span class="brand">Harbor</span
+          ><button
+            class="icon-button mobile-toggle"
+            id="closeSidebar"
+            aria-label="Close sidebar"
+          >
+            <svg><use href="#panel" /></svg>
+          </button>
+        </div>
+        <button class="new-chat" id="newChat">
+          <svg><use href="#compose" /></svg>New chat<span
+            class="shortcut"
+            aria-hidden="true"
+            >⌘ K</span
+          >
+        </button>
+        <div class="project-heading">
+          <span>Projects</span
+          ><button
+            class="icon-button"
+            id="addProject"
+            aria-label="Add project from a local folder"
+            title="Add local folder"
+          >
+            <svg><use href="#plus" /></svg>
+          </button>
+        </div>
+        <nav id="projects" aria-label="Projects"></nav>
+        <div class="sidebar-footer">
+          <span class="preview-dot"></span>Design preview · local only
+        </div>
+      </aside>
+      <div
+        class="sidebar-resize"
+        id="sidebarResize"
+        role="separator"
+        aria-label="Sidebar width"
+        aria-orientation="vertical"
+        aria-controls="sidebar"
+        aria-valuemin="220"
+        aria-valuemax="400"
+        aria-valuenow="260"
+        tabindex="0"
+        title="Drag to resize · Arrow keys to adjust"
+      ></div>
+      <main class="main">
+        <header class="topbar">
+          <button
+            class="icon-button mobile-toggle"
+            id="openSidebar"
+            aria-label="Open sidebar"
+          >
+            <svg><use href="#panel" /></svg>
+          </button>
+          <div class="breadcrumbs">
+            <svg class="project-crumb"><use href="#folder" /></svg
+            ><span class="project-crumb" id="projectCrumb">codex-harbor</span
+            ><span class="slash">/</span
+            ><strong id="chatTitle">A quieter workspace</strong>
+          </div>
+          <div class="topbar-actions">
+            <span class="sample-label">Prototype</span
+            ><button
+              class="icon-button"
+              id="chatMenuButton"
+              aria-label="Chat options"
+              aria-expanded="false"
+            >
+              <svg><use href="#more" /></svg>
+            </button>
+          </div>
+        </header>
+        <div class="menu" id="chatMenu" hidden>
+          <button id="clearChat">Clear this preview chat</button>
+        </div>
+        <div class="scroll-area" id="scrollArea">
+          <div
+            class="conversation"
+            id="conversation"
+            aria-label="Conversation"
+          ></div>
+        </div>
+        <div class="composer-area">
+          <div class="composer-wrap">
+            <form class="composer" id="composer">
+              <textarea
+                id="prompt"
+                rows="1"
+                aria-label="Message"
+                placeholder="Ask anything, or describe a task…"
+              ></textarea>
+              <div class="composer-tools">
+                <label class="select-wrap"
+                  ><svg><use href="#shield" /></svg
+                  ><select id="permissions" aria-label="Permissions">
+                    <option>Read only</option>
+                    <option>Workspace edits</option>
+                  </select></label
+                ><label class="select-wrap model-control"
+                  ><select id="model" aria-label="Model">
+                    <option>GPT-5.6-Sol</option>
+                    <option>GPT-6 Astra</option>
+                  </select></label
+                ><label class="select-wrap effort-control"
+                  ><select id="effort" aria-label="Reasoning effort">
+                    <option>Medium</option>
+                    <option>Low</option>
+                    <option>High</option>
+                  </select></label
+                ><button
+                  type="submit"
+                  class="send"
+                  id="send"
+                  aria-label="Send message"
+                  disabled
+                >
+                  <svg><use href="#arrow" /></svg>
+                </button>
+              </div>
+            </form>
+            <div class="composer-note">
+              <span>Preview messages stay in this tab.</span
+              ><span>Enter to send · Shift Enter for a new line</span>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+    <input type="file" id="folderInput" webkitdirectory multiple hidden />
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script>
+      "use strict";
+      const $ = (id) => document.getElementById(id);
+      const icon = (name) =>
+        `<svg aria-hidden="true"><use href="#${name}"/></svg>`;
+      const escapeHTML = (value) =>
+        String(value).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      let nextId = 10,
+        activeId = 1;
+      const projects = [
+        {
+          id: 1,
+          name: "codex-harbor",
+          open: true,
+          chats: [
+            { id: 1, title: "A quieter workspace", sample: true, messages: [] },
+            { id: 2, title: "Understand the project", messages: [] },
+            { id: 3, title: "Plan the next release", messages: [] },
+          ],
+        },
+        {
+          id: 2,
+          name: "personal-website",
+          open: false,
+          chats: [{ id: 4, title: "New chat", messages: [] }],
+        },
+        {
+          id: 3,
+          name: "notes",
+          open: false,
+          chats: [{ id: 5, title: "New chat", messages: [] }],
+        },
+      ];
+      function current() {
+        for (const project of projects) {
+          const chat = project.chats.find((c) => c.id === activeId);
+          if (chat) return { project, chat };
+        }
+      }
+      let toastTimer;
+      function notify(text) {
+        $("toast").textContent = text;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => ($("toast").textContent = ""), 3600);
+      }
+      const mobileQuery = window.matchMedia("(max-width:700px)");
+      const sidebarResize = $("sidebarResize");
+      let preferredSidebarWidth = 260;
+      let dragPointer = null;
+      let dragStartX = 0;
+      let dragStartWidth = 260;
+      function sidebarBounds() {
+        return { min: 220, max: Math.min(400, window.innerWidth - 440) };
+      }
+      function updateSidebarWidth() {
+        const { min, max } = sidebarBounds();
+        const width = mobileQuery.matches
+          ? preferredSidebarWidth
+          : Math.max(min, Math.min(max, preferredSidebarWidth));
+        document.documentElement.style.setProperty(
+          "--rail-width",
+          `${width}px`,
+        );
+        sidebarResize.setAttribute("aria-valuemax", String(Math.max(min, max)));
+        sidebarResize.setAttribute("aria-valuenow", String(Math.round(width)));
+        sidebarResize.setAttribute(
+          "aria-valuetext",
+          `${Math.round(width)} pixels`,
+        );
+      }
+      function finishSidebarResize() {
+        if (
+          dragPointer !== null &&
+          sidebarResize.hasPointerCapture(dragPointer)
+        )
+          sidebarResize.releasePointerCapture(dragPointer);
+        dragPointer = null;
+        document.body.classList.remove("resizing");
+      }
+      sidebarResize.addEventListener("pointerdown", (event) => {
+        if (mobileQuery.matches || event.button !== 0 || dragPointer !== null)
+          return;
+        event.preventDefault();
+        dragPointer = event.pointerId;
+        dragStartX = event.clientX;
+        dragStartWidth = $("sidebar").getBoundingClientRect().width;
+        sidebarResize.setPointerCapture(dragPointer);
+        sidebarResize.focus();
+        document.body.classList.add("resizing");
+      });
+      sidebarResize.addEventListener("pointermove", (event) => {
+        if (event.pointerId !== dragPointer) return;
+        const { min, max } = sidebarBounds();
+        preferredSidebarWidth = Math.max(
+          min,
+          Math.min(max, dragStartWidth + event.clientX - dragStartX),
+        );
+        updateSidebarWidth();
+        resize();
+      });
+      for (const event of ["pointerup", "pointercancel", "lostpointercapture"])
+        sidebarResize.addEventListener(event, finishSidebarResize);
+      window.addEventListener("blur", finishSidebarResize);
+      sidebarResize.addEventListener("keydown", (event) => {
+        if (mobileQuery.matches) return;
+        const { min, max } = sidebarBounds();
+        let width = $("sidebar").getBoundingClientRect().width;
+        if (event.key === "ArrowLeft") width -= 10;
+        else if (event.key === "ArrowRight") width += 10;
+        else if (event.key === "Home") width = min;
+        else if (event.key === "End") width = max;
+        else return;
+        event.preventDefault();
+        preferredSidebarWidth = Math.max(min, Math.min(max, width));
+        updateSidebarWidth();
+        resize();
+      });
+      window.addEventListener("resize", () => {
+        finishSidebarResize();
+        updateSidebarWidth();
+        resize();
+      });
+      function syncSidebar() {
+        const mobile = mobileQuery.matches,
+          open = $("sidebar").classList.contains("open");
+        $("sidebar").inert = mobile && !open;
+        $("sidebar").setAttribute("aria-hidden", String(mobile && !open));
+        document.querySelector("main").inert = mobile && open;
+      }
+      function closeSidebar() {
+        const restore =
+          mobileQuery.matches && $("sidebar").contains(document.activeElement);
+        $("sidebar").classList.remove("open");
+        $("backdrop").classList.remove("open");
+        syncSidebar();
+        if (restore) $("openSidebar").focus();
+      }
+      mobileQuery.addEventListener("change", () => {
+        const focusWasInSidebar =
+          $("sidebar").contains(document.activeElement) ||
+          document.activeElement === sidebarResize;
+        finishSidebarResize();
+        updateSidebarWidth();
+        $("sidebar").classList.remove("open");
+        $("backdrop").classList.remove("open");
+        syncSidebar();
+        if (mobileQuery.matches && focusWasInSidebar) $("openSidebar").focus();
+      });
+      function renderProjects() {
+        $("projects").innerHTML = projects
+          .map(
+            (p) =>
+              `<div class="project"><div class="project-row"><button class="project-toggle" data-toggle="${p.id}" aria-expanded="${p.open}" title="${escapeHTML(p.name)}">${icon("folder")}<span class="project-name">${escapeHTML(p.name)}</span></button><div class="project-actions"><button class="icon-button" data-new="${p.id}" aria-label="New chat in ${escapeHTML(p.name)}" title="New chat">${icon("compose")}</button></div></div>${p.open ? `<div class="sessions">${p.chats.map((c) => `<div class="session-row ${c.id === activeId ? "active" : ""}"><button class="session" ${c.id === activeId ? 'aria-current="page"' : ""} data-chat="${c.id}" title="${escapeHTML(c.title)}">${escapeHTML(c.title)}</button><button class="icon-button session-rename" data-rename="${c.id}" aria-label="Rename ${escapeHTML(c.title)}" title="Rename chat">${icon("compose")}</button></div>`).join("")}</div>` : ""}</div>`,
+          )
+          .join("");
+      }
+      const sampleHTML = `<div class="user-message"><div class="user-bubble">Let's make Harbor feel simpler. Where should we start?</div></div><article class="assistant-message"><div class="assistant-label">${icon("harbor")}Harbor</div><p>Start with the conversation. Everything else should make it easier to get back to your work.</p><h2>A little less interface. A lot more room.</h2><p>Keep projects and their chats together in the sidebar. Bring the everyday actions closer to where you need them, and give the conversation space to breathe.</p><ul><li><strong>One place to start.</strong> New chat is always within reach.</li><li><strong>Projects, kept together.</strong> Open a folder, pick up a chat, or start another.</li><li><strong>A composer that fits.</strong> One line to begin with. More room when you need it.</li></ul><p>White, gray, and black do the work here. Spacing creates the hierarchy; subtle shades show what’s selected.</p><details class="sample-details"><summary>${icon("chevron")}About this design preview</summary><p>This is a sample conversation for reviewing the design. Messages and projects exist only in this tab; no AI requests are made and no files are uploaded.</p></details><p>The result should feel familiar on the first visit, and quiet enough to use every day.</p><div class="message-actions"><button class="icon-button" data-copy aria-label="Copy response" title="Copy response">${icon("copy")}</button></div></article>`;
+      function renderChat() {
+        const { project, chat } = current();
+        $("projectCrumb").textContent = project.name;
+        $("chatTitle").textContent = chat.title;
+        const container = $("conversation");
+        if (!chat.sample && !chat.messages.length) {
+          container.className = "empty";
+          container.innerHTML = `<svg class="brand-mark" aria-hidden="true"><use href="#harbor"/></svg><h1>What are we working on?</h1><p>Start something new in ${escapeHTML(project.name)}.</p><div class="starter-list"><button class="starter" data-starter="Help me understand this project.">Understand this project</button><button class="starter" data-starter="Help me plan a change.">Plan a change</button><button class="starter" data-starter="Help me find and fix a bug.">Find a bug</button></div>`;
+        } else {
+          container.className = "conversation";
+          container.innerHTML =
+            (chat.sample ? sampleHTML : "") +
+            chat.messages
+              .map((m) =>
+                m.role === "user"
+                  ? `<div class="user-message"><div class="user-bubble">${escapeHTML(m.text)}</div></div>`
+                  : `<article class="assistant-message"><div class="assistant-label">${icon("harbor")}Harbor</div><p>${escapeHTML(m.text)}</p></article>`,
+              )
+              .join("");
+        }
+        renderProjects();
+      }
+      function newChat(projectId = current().project.id) {
+        const project = projects.find((p) => p.id === projectId);
+        const chat = { id: nextId++, title: "New chat", messages: [] };
+        project.chats.unshift(chat);
+        project.open = true;
+        activeId = chat.id;
+        $("prompt").value = "";
+        resize();
+        renderChat();
+        closeSidebar();
+        $("prompt").focus();
+      }
+      function resize() {
+        const input = $("prompt");
+        input.style.height = "24px";
+        input.style.height = Math.min(160, input.scrollHeight) + "px";
+        input.style.overflowY = input.scrollHeight > 160 ? "auto" : "hidden";
+        $("send").disabled = !input.value.trim();
+      }
+      $("projects").addEventListener("click", (event) => {
+        const toggle = event.target.closest("[data-toggle]"),
+          add = event.target.closest("[data-new]"),
+          chat = event.target.closest("[data-chat]"),
+          rename = event.target.closest("[data-rename]");
+        if (rename) {
+          const id = Number(rename.dataset.rename);
+          const targetChat = projects
+            .flatMap((p) => p.chats)
+            .find((c) => c.id === id);
+          const name = window.prompt("Rename chat", targetChat.title);
+          if (name?.trim()) {
+            targetChat.title = name.trim();
+            if (id === activeId) $("chatTitle").textContent = targetChat.title;
+            renderProjects();
+            document.querySelector(`[data-rename="${id}"]`).focus();
+          }
+          return;
+        }
+        if (toggle) {
+          const project = projects.find(
+            (p) => p.id === Number(toggle.dataset.toggle),
+          );
+          project.open = !project.open;
+          renderProjects();
+        }
+        if (add) newChat(Number(add.dataset.new));
+        if (chat) {
+          activeId = Number(chat.dataset.chat);
+          $("prompt").value = "";
+          resize();
+          renderChat();
+          $("scrollArea").scrollTop = 0;
+          closeSidebar();
+        }
+      });
+      $("newChat").onclick = () => newChat();
+      $("prompt").addEventListener("input", resize);
+      $("prompt").addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+          event.preventDefault();
+          if (!$("send").disabled) $("composer").requestSubmit();
+        }
+      });
+      $("composer").onsubmit = (event) => {
+        event.preventDefault();
+        const text = $("prompt").value.trim();
+        if (!text) return;
+        const { chat } = current();
+        if (!chat.sample && !chat.messages.length)
+          chat.title = text.length > 34 ? text.slice(0, 34) + "…" : text;
+        chat.messages.push(
+          { role: "user", text },
+          {
+            role: "assistant",
+            text: "Message added to this design preview. In Harbor, your conversation would continue here.",
+          },
+        );
+        $("prompt").value = "";
+        resize();
+        renderChat();
+        $("scrollArea").scrollTop = $("scrollArea").scrollHeight;
+        $("prompt").focus();
+      };
+      $("conversation").addEventListener("click", async (event) => {
+        const starter = event.target.closest("[data-starter]");
+        if (starter) {
+          $("prompt").value = starter.dataset.starter;
+          resize();
+          $("prompt").focus();
+        }
+        if (event.target.closest("[data-copy]")) {
+          const article = event.target.closest("article");
+          try {
+            await navigator.clipboard.writeText(
+              [...article.querySelectorAll("p,h2,li")]
+                .map((e) => e.textContent)
+                .join("\n"),
+            );
+            notify("Response copied");
+          } catch {
+            notify(
+              "Copy is unavailable in this browser context. Select the text to copy.",
+            );
+          }
+        }
+      });
+      function addFolder(name) {
+        $("prompt").value = "";
+        resize();
+        const existing = projects.find((p) => p.name === name);
+        if (existing) {
+          existing.open = true;
+          activeId = existing.chats[0].id;
+          renderChat();
+          notify("This project is already in your sidebar");
+          return;
+        }
+        const project = {
+          id: nextId++,
+          name,
+          open: true,
+          chats: [{ id: nextId++, title: "New chat", messages: [] }],
+        };
+        projects.push(project);
+        activeId = project.chats[0].id;
+        renderChat();
+        closeSidebar();
+        notify(
+          "Project added to this preview. No files were read or uploaded.",
+        );
+      }
+      $("addProject").onclick = async () => {
+        if ("showDirectoryPicker" in window) {
+          try {
+            const directory = await window.showDirectoryPicker({
+              mode: "read",
+            });
+            addFolder(directory.name);
+          } catch (error) {
+            if (error.name !== "AbortError") {
+              $("folderInput").click();
+            }
+          }
+        } else $("folderInput").click();
+      };
+      $("folderInput").onchange = (event) => {
+        const file = event.target.files[0];
+        if (file) addFolder(file.webkitRelativePath.split("/")[0]);
+        else notify("Choose a folder containing at least one file.");
+        event.target.value = "";
+      };
+      $("openSidebar").onclick = () => {
+        $("sidebar").classList.add("open");
+        $("backdrop").classList.add("open");
+        syncSidebar();
+        $("closeSidebar").focus();
+      };
+      $("closeSidebar").onclick = closeSidebar;
+      $("backdrop").onclick = closeSidebar;
+      function closeMenu() {
+        $("chatMenu").hidden = true;
+        $("chatMenuButton").setAttribute("aria-expanded", "false");
+      }
+      $("chatMenuButton").onclick = () => {
+        const open = $("chatMenu").hidden;
+        $("chatMenu").hidden = !open;
+        $("chatMenuButton").setAttribute("aria-expanded", String(open));
+        if (open) $("clearChat").focus();
+      };
+      $("clearChat").onclick = () => {
+        closeMenu();
+        const { chat } = current();
+        chat.sample = false;
+        chat.messages = [];
+        renderChat();
+        notify("Preview chat cleared");
+      };
+      document.addEventListener("click", (event) => {
+        if (
+          !event.target.closest("#chatMenu") &&
+          !event.target.closest("#chatMenuButton")
+        )
+          closeMenu();
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeMenu();
+          closeSidebar();
+        }
+        if (
+          (event.metaKey || event.ctrlKey) &&
+          event.key.toLowerCase() === "k"
+        ) {
+          event.preventDefault();
+          newChat();
+        }
+      });
+      for (const id of ["permissions", "model", "effort"])
+        $(id).onchange = () =>
+          notify(`${$(id).value} selected for this preview`);
+      renderChat();
+      syncSidebar();
+      updateSidebarWidth();
+    </script>
+  </body>
+</html>

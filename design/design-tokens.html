@@ -1,0 +1,1705 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Harbor — Interface design tokens</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --canvas: #fff;
+        --rail: #f5f5f5;
+        --selected: #e9e9e9;
+        --edge: #dedede;
+        --muted: #737373;
+        --ink: #191919;
+        --soft: #fafafa;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--ink);
+        font-size: 14px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 28px;
+      }
+      body {
+        margin: 0;
+        background: var(--canvas);
+      }
+      a {
+        color: inherit;
+        text-underline-offset: 4px;
+      }
+      button,
+      textarea {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      a:focus-visible,
+      button:focus-visible,
+      summary:focus-visible {
+        outline: 2px solid #737373;
+        outline-offset: 3px;
+      }
+      button {
+        transition: background 0.12s;
+      }
+      svg {
+        width: 19px;
+        height: 19px;
+        stroke: currentColor;
+        stroke-width: 1.65;
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex: none;
+      }
+      .skip {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        padding: 10px;
+        background: #fff;
+        z-index: 10;
+        transform: translateY(-150%);
+      }
+      .skip:focus {
+        transform: none;
+      }
+      .rail {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: 224px;
+        padding: 34px 24px;
+        background: var(--rail);
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid #ececec;
+        overflow: auto;
+      }
+      .wordmark {
+        font-size: 20px;
+        font-weight: 650;
+        letter-spacing: -0.65px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        text-decoration: none;
+      }
+      .wordmark svg {
+        height: 25px;
+        width: 24px;
+        stroke-width: 1.8;
+      }
+      .rail-label {
+        font-size: 11px;
+        color: #737373;
+        margin-top: 8px;
+      }
+      .nav {
+        display: grid;
+        gap: 4px;
+        margin-top: 50px;
+      }
+      .nav a {
+        display: flex;
+        gap: 13px;
+        text-decoration: none;
+        padding: 9px 10px;
+        border-radius: 7px;
+        font-size: 12px;
+        color: #666;
+      }
+      .nav a:hover {
+        background: #e9e9e9;
+        color: #191919;
+      }
+      .nav span {
+        font-size: 10px;
+        color: #858585;
+        width: 16px;
+      }
+      .rail-bottom {
+        margin-top: auto;
+        padding-top: 40px;
+        font-size: 11px;
+        line-height: 1.9;
+        color: #737373;
+      }
+      .rail-bottom a {
+        display: block;
+      }
+      main {
+        margin-left: 224px;
+        padding: 64px 64px 38px;
+        max-width: 1410px;
+      }
+      .eyebrow {
+        font-size: 10px;
+        letter-spacing: normal;
+        color: #737373;
+        font-weight: 600;
+      }
+      .hero {
+        max-width: 760px;
+        margin-bottom: 62px;
+      }
+      .hero h1 {
+        font-size: clamp(36px, 4.4vw, 58px);
+        font-weight: 550;
+        line-height: 1.07;
+        letter-spacing: -2.4px;
+        margin: 22px 0;
+      }
+      .hero .lead {
+        font-size: 18px;
+        color: #666;
+        line-height: 1.65;
+        max-width: 600px;
+      }
+      .palette-preview {
+        display: flex;
+        height: 28px;
+        overflow: hidden;
+        border: 1px solid #e5e5e5;
+        border-radius: 6px;
+        margin-top: 28px;
+        max-width: 440px;
+      }
+      .palette-preview span {
+        flex: 1;
+      }
+      .meta {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+        margin-top: 28px;
+        font-size: 11px;
+        color: #737373;
+      }
+      .status {
+        display: inline-flex;
+        gap: 7px;
+        align-items: center;
+      }
+      .status:before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        background: #191919;
+        border-radius: 50%;
+      }
+      .section {
+        padding: 36px 0 48px;
+        border-top: 1px solid #e5e5e5;
+        max-width: 1040px;
+      }
+      .section-header {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 23px;
+      }
+      .section-header span {
+        font-size: 11px;
+        color: #858585;
+      }
+      .section h2 {
+        font-size: 23px;
+        font-weight: 550;
+        letter-spacing: -0.6px;
+        margin: 0;
+      }
+      .section h3 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 24px 0 10px;
+      }
+      p,
+      li {
+        line-height: 1.8;
+        color: #555;
+      }
+      p {
+        margin: 0 0 16px;
+        max-width: 800px;
+      }
+      li {
+        padding-left: 3px;
+        margin: 8px 0;
+      }
+      ul {
+        padding-left: 20px;
+      }
+      code {
+        font:
+          12px ui-monospace,
+          SFMono-Regular,
+          Consolas,
+          monospace;
+        background: #f2f2f2;
+        border-radius: 4px;
+        padding: 2px 5px;
+        color: #333;
+        overflow-wrap: anywhere;
+      }
+      .intro-note {
+        padding: 22px 24px;
+        background: #fafafa;
+        border-radius: 10px;
+        margin-bottom: 24px;
+      }
+      .intro-note p:last-child {
+        margin-bottom: 0;
+      }
+      .table-wrap {
+        overflow: auto;
+        margin: 20px 0 24px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 12px;
+        text-align: left;
+      }
+      th {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.7px;
+        color: #737373;
+        font-weight: 500;
+        background: #fafafa;
+      }
+      td,
+      th {
+        padding: 12px 14px;
+        border-bottom: 1px solid #ececec;
+        vertical-align: top;
+        line-height: 1.6;
+      }
+      td:first-child {
+        color: #333;
+      }
+      td {
+        color: #666;
+      }
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 25px;
+      }
+      .swatch {
+        border: 1px solid #e5e5e5;
+        border-radius: 9px;
+        overflow: hidden;
+      }
+      .paint {
+        height: 78px;
+        border-bottom: 1px solid #ececec;
+      }
+      .swatch-info {
+        padding: 12px;
+        display: grid;
+        gap: 5px;
+      }
+      .swatch strong {
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .swatch small {
+        font-size: 10px;
+        color: #737373;
+      }
+      .swatch code {
+        font-size: 10px;
+        background: none;
+        padding: 0;
+      }
+      .specimen {
+        padding: 25px;
+        border: 1px solid #e5e5e5;
+        border-radius: 12px;
+        margin: 20px 0;
+        background: #fff;
+      }
+      .specimen-label {
+        font-size: 10px;
+        color: #737373;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 22px;
+      }
+      .type-row {
+        display: grid;
+        grid-template-columns: 145px 1fr;
+        align-items: baseline;
+        gap: 20px;
+        padding: 20px 0;
+        border-top: 1px solid #ececec;
+      }
+      .type-row:first-of-type {
+        border-top: 0;
+      }
+      .type-row small {
+        font-size: 11px;
+        color: #737373;
+      }
+      .measure-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin: 24px 0;
+      }
+      .measure {
+        padding: 18px 0;
+        border-top: 1px solid #191919;
+      }
+      .measure b {
+        font-size: 30px;
+        font-weight: 500;
+        letter-spacing: -1px;
+      }
+      .measure small {
+        display: block;
+        margin-top: 6px;
+        font-size: 11px;
+        color: #737373;
+      }
+      .spacing {
+        display: flex;
+        align-items: flex-end;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+      .space-sample {
+        display: grid;
+        gap: 10px;
+        font-size: 11px;
+        color: #737373;
+      }
+      .space-bar {
+        height: 24px;
+        background: #e9e9e9;
+        border-left: 1px solid #aaa;
+        border-right: 1px solid #aaa;
+      }
+      .shape-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+      }
+      .shape {
+        height: 98px;
+        border: 1px solid #ddd;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+      }
+      .shape-caption {
+        display: block;
+        font-size: 11px;
+        color: #737373;
+        margin-top: 12px;
+        line-height: 1.7;
+      }
+      .demo-grid {
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr);
+        gap: 28px;
+        align-items: start;
+      }
+      .demo-sidebar {
+        background: #f5f5f5;
+        padding: 12px;
+        border-radius: 8px;
+      }
+      .demo-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        color: #737373;
+        padding: 0 10px;
+        margin-bottom: 8px;
+      }
+      .icon-button {
+        border: 0;
+        background: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 7px;
+        color: #737373;
+        flex: none;
+      }
+      .icon-button:hover {
+        background: #eaeaea;
+      }
+      .project-row,
+      .chat-row {
+        display: flex;
+        align-items: center;
+        border-radius: 8px;
+        padding-right: 4px;
+      }
+      .project-row:hover,
+      .project-row:focus-within,
+      .chat-row:hover,
+      .chat-row:focus-within {
+        background: #ededed;
+      }
+      .project-toggle,
+      .chat-button {
+        border: 0;
+        background: none;
+        flex: 1;
+        min-width: 0;
+        text-align: left;
+        padding: 9px 10px;
+        border-radius: 8px;
+        display: flex;
+        gap: 9px;
+        align-items: center;
+        font-size: 13px;
+      }
+      .project-toggle svg {
+        width: 18px;
+        height: 18px;
+        color: #666;
+      }
+      .row-action {
+        opacity: 0;
+        width: 25px;
+        height: 26px;
+      }
+      .row-action svg {
+        width: 14px;
+        height: 14px;
+      }
+      .project-row:hover .row-action,
+      .project-row:focus-within .row-action,
+      .chat-row:hover .row-action,
+      .chat-row:focus-within .row-action {
+        opacity: 1;
+      }
+      .chat-list {
+        padding: 3px 0 4px 24px;
+      }
+      .chat-row {
+        border-radius: 7px;
+        margin: 2px 0;
+      }
+      .chat-row.selected {
+        background: #e9e9e9;
+      }
+      .chat-button {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 12px;
+        padding: 9px 12px;
+        color: #666;
+      }
+      .chat-row.selected .chat-button {
+        color: #191919;
+      }
+      .demo-composer {
+        border: 1px solid #ddd;
+        border-radius: 18px;
+        padding: 14px 15px 10px;
+        box-shadow: 0 3px 16px #00000005;
+      }
+      .demo-composer:focus-within {
+        border-color: #adadad;
+        box-shadow: 0 3px 20px #00000007;
+      }
+      .demo-composer textarea {
+        border: 0;
+        outline: 0;
+        resize: none;
+        width: 100%;
+        height: 24px;
+        min-height: 24px;
+        max-height: 160px;
+        line-height: 24px;
+        font-size: 14px;
+        display: block;
+        padding: 0 2px;
+        background: none;
+        overflow-y: hidden;
+      }
+      .demo-composer textarea::placeholder {
+        color: #929292;
+      }
+      .composer-tools {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 12px;
+      }
+      .composer-tools small {
+        font-size: 11px;
+        color: #737373;
+      }
+      .send {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #191919;
+        color: white;
+        border: 0;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        flex: none;
+      }
+      .send:hover {
+        background: #444;
+      }
+      .send:disabled {
+        background: #ececec;
+        color: #aaa;
+        cursor: default;
+      }
+      .send svg {
+        width: 17px;
+        height: 17px;
+      }
+      .demo-note {
+        font-size: 11px;
+        color: #737373;
+        margin-top: 12px;
+        line-height: 1.7;
+      }
+      .feedback {
+        font-size: 12px;
+        color: #555;
+        min-height: 24px;
+        margin-top: 14px;
+        overflow-wrap: anywhere;
+      }
+      .focus-example {
+        outline: 2px solid #737373;
+        outline-offset: 3px;
+        display: inline-flex;
+        padding: 7px 12px;
+        border-radius: 7px;
+        background: #f5f5f5;
+        font-size: 12px;
+        margin: 4px 0;
+      }
+      .footer {
+        border-top: 1px solid #e5e5e5;
+        padding-top: 24px;
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        font-size: 11px;
+        color: #737373;
+      }
+      .workflow {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+        margin: 24px 0;
+      }
+      .workflow b {
+        display: block;
+        font-size: 13px;
+        margin-bottom: 7px;
+      }
+      .workflow p {
+        font-size: 12px;
+      }
+      .workflow small {
+        display: block;
+        color: #858585;
+        margin-bottom: 13px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      @media (hover: none) {
+        .row-action {
+          opacity: 1;
+        }
+      }
+      @media (max-width: 1100px) {
+        main {
+          padding: 48px 36px;
+        }
+        .demo-grid {
+          grid-template-columns: 1fr;
+        }
+        .demo-sidebar {
+          max-width: 260px;
+        }
+        .swatches {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      @media (max-width: 760px) {
+        html {
+          scroll-padding-top: 18px;
+        }
+        .rail {
+          position: static;
+          width: auto;
+          padding: 22px 20px;
+          border-right: 0;
+          border-bottom: 1px solid #ececec;
+        }
+        .nav {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 2px;
+          margin-top: 18px;
+        }
+        .nav a {
+          padding: 7px 9px;
+        }
+        .nav span {
+          display: none;
+        }
+        .rail-bottom {
+          display: none;
+        }
+        .rail-label {
+          margin-top: 5px;
+        }
+        .hero {
+          margin-bottom: 38px;
+        }
+        .hero h1 {
+          letter-spacing: -1.5px;
+        }
+        .hero .lead {
+          font-size: 16px;
+        }
+        main {
+          margin: 0;
+          padding: 36px 20px;
+        }
+        .section {
+          padding: 28px 0 34px;
+        }
+        .section h2 {
+          font-size: 21px;
+        }
+        .swatches {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .measure-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .shape-grid,
+        .workflow {
+          grid-template-columns: 1fr;
+        }
+        .type-row {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+        .specimen {
+          padding: 18px;
+        }
+        .intro-note {
+          padding: 18px;
+        }
+        .footer {
+          flex-direction: column;
+        }
+        .meta {
+          flex-wrap: wrap;
+          gap: 10px 20px;
+        }
+        td,
+        th {
+          padding: 10px;
+        }
+        .shape-grid .shape {
+          height: 80px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          scroll-behavior: auto !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg
+      aria-hidden="true"
+      style="position: absolute; width: 0; height: 0; overflow: hidden"
+    >
+      <defs>
+        <symbol id="harbor" viewBox="0 0 24 26">
+          <path d="M6 20V9a6 6 0 0 1 12 0v11M2 24h20M10 20V10" />
+        </symbol>
+        <symbol id="folder" viewBox="0 0 24 24">
+          <path
+            d="M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7ZM3 9h18"
+          />
+        </symbol>
+        <symbol id="compose" viewBox="0 0 24 24">
+          <path
+            d="M11 4H6a3 3 0 0 0-3 3v11a3 3 0 0 0 3 3h11a3 3 0 0 0 3-3v-5M16 3a2.1 2.1 0 0 1 3 3l-8 8-4 1 1-4Z"
+          />
+        </symbol>
+        <symbol id="plus" viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12h14" />
+        </symbol>
+        <symbol id="arrow" viewBox="0 0 24 24">
+          <path d="m6 10 6-6 6 6M12 4v16" />
+        </symbol>
+      </defs></svg
+    ><a class="skip" href="#content">Skip to content</a>
+    <aside class="rail">
+      <a class="wordmark" href="#top"
+        ><svg aria-hidden="true"><use href="#harbor" /></svg>Harbor</a
+      >
+      <div class="rail-label">Interface guidelines / 01</div>
+      <nav class="nav" aria-label="Guide sections">
+        <a href="#principles"><span>01</span>Design direction and maintenance</a
+        ><a href="#palette"><span>02</span>Palette</a
+        ><a href="#type"><span>03</span>Typography</a
+        ><a href="#layout"><span>04</span>Layout and spacing</a
+        ><a href="#shape"><span>05</span>Shapes, edges, and icons</a
+        ><a href="#interaction"><span>06</span>Interaction and accessibility</a>
+      </nav>
+      <div class="rail-bottom">
+        Approved direction · 13 Sep 2026<a
+          href="prototypes/harbor-redesign.html"
+          >Open interface prototype ↗</a
+        ><a href="architecture.md">Architecture ↗</a>
+      </div>
+    </aside>
+    <main id="content">
+      <header class="hero" id="top">
+        <div class="eyebrow">Design reference</div>
+        <h1>Harbor design tokens</h1>
+        <p class="lead">
+          The visual language for Harbor. A restrained palette, purposeful
+          spacing, and room for the work that matters.
+        </p>
+        <div class="meta">
+          <span class="status">Approved visual direction</span
+          ><span>September 13, 2026</span><span>HTML token reference</span>
+        </div>
+        <a
+          class="palette-preview"
+          href="#palette"
+          aria-label="Explore the monochrome palette"
+        >
+          <span style="background: #fff"></span
+          ><span style="background: #fafafa"></span
+          ><span style="background: #f5f5f5"></span
+          ><span style="background: #e9e9e9"></span
+          ><span style="background: #dedede"></span
+          ><span style="background: #737373"></span
+          ><span style="background: #191919"></span>
+        </a>
+      </header>
+      <div class="intro-note">
+        <p>
+          Approved visual direction: 2026-09-13. This guide is the canonical
+          visual contract for future Harbor UI work. The
+          <a href="prototypes/harbor-redesign.html"
+            >standalone HTML prototype</a
+          >
+          demonstrates it; it is not the implemented application and its sample
+          interactions do not establish product capabilities.
+          <a href="architecture.md">Architecture</a> and the relevant
+          <a href="proposals/README.md">proposal</a> continue to own product
+          behavior and delivery gates.
+        </p>
+      </div>
+      <section class="section" id="principles">
+        <div class="section-header">
+          <span>01</span>
+          <h2>Design direction and maintenance</h2>
+        </div>
+        <div class="workflow">
+          <div>
+            <small>01 / Reuse</small><b>Start with a role.</b>
+            <p>
+              Use the existing palette, type, and component patterns. A new
+              literal should not become an accidental design decision.
+            </p>
+          </div>
+          <div>
+            <small>02 / Demonstrate</small><b>Make the change visible.</b>
+            <p>
+              Update this HTML guide and the standalone prototype together
+              before application implementation relies on the new pattern.
+            </p>
+          </div>
+          <div>
+            <small>03 / Verify</small><b>Check the whole interaction.</b>
+            <p>
+              Review responsive behavior, keyboard use, and pointer states.
+              Preserve product delivery and accessibility verification gates.
+            </p>
+          </div>
+        </div>
+        <p>
+          Use white, gray, and black, with spacing and subtle shade differences
+          separating regions. Keep the conversation prominent, the sidebar
+          familiar, and everyday actions close to their targets. Avoid
+          decorative color, heavy panels, oversized controls, and extra
+          navigation unrelated to the immediate workflow.
+        </p>
+        <p>
+          Reuse the tokens and component roles below in future UI work. Some
+          values are existing CSS custom properties; other names describe
+          semantic mappings to literals in the prototype. Do not assume every
+          documented token already exists as a variable or shared application
+          component. Add a semantic token only when an existing role cannot
+          express the need.
+        </p>
+        <p>
+          When changing this visual direction or adding a new design pattern,
+          update this guide and the standalone prototype in the same change
+          before relying on that design in application implementation. Do not
+          silently override the approved design. Follow the repository&#x27;s
+          design lifecycle for material contract changes; this guide does not
+          add an approval barrier to already authorized work.
+        </p>
+      </section>
+      <section class="section" id="palette">
+        <div class="section-header">
+          <span>02</span>
+          <h2>Palette</h2>
+        </div>
+        <div class="swatches">
+          <div class="swatch">
+            <div class="paint" style="background: #fff"></div>
+            <div class="swatch-info">
+              <strong>Canvas</strong><code>--canvas</code><small>#fff</small>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="paint" style="background: #f5f5f5"></div>
+            <div class="swatch-info">
+              <strong>Sidebar</strong><code>--rail</code><small>#f5f5f5</small>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="paint" style="background: #e9e9e9"></div>
+            <div class="swatch-info">
+              <strong>Selected chat</strong><code>--selected</code
+              ><small>#e9e9e9</small>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="paint" style="background: #dedede"></div>
+            <div class="swatch-info">
+              <strong>General edge</strong><code>--edge</code
+              ><small>#dedede</small>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="paint" style="background: #737373"></div>
+            <div class="swatch-info">
+              <strong>Secondary text</strong><code>--muted</code
+              ><small>#737373</small>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="paint" style="background: #191919"></div>
+            <div class="swatch-info">
+              <strong>Primary text</strong><code>--ink</code
+              ><small>#191919</small>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="paint" style="background: #fafafa"></div>
+            <div class="swatch-info">
+              <strong>Soft surface</strong><code>--soft</code
+              ><small>#fafafa</small>
+            </div>
+          </div>
+          <div class="swatch">
+            <div class="paint" style="background: #ededed"></div>
+            <div class="swatch-info">
+              <strong>Row hover</strong><code>literal</code
+              ><small>#ededed</small>
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Role</th>
+                <th scope="col">Current CSS property or component</th>
+                <th scope="col">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Canvas</td>
+                <td><code>--canvas</code></td>
+                <td><code>#fff</code></td>
+              </tr>
+              <tr>
+                <td>Sidebar surface</td>
+                <td><code>--rail</code></td>
+                <td><code>#f5f5f5</code></td>
+              </tr>
+              <tr>
+                <td>Selected chat</td>
+                <td><code>--selected</code></td>
+                <td><code>#e9e9e9</code></td>
+              </tr>
+              <tr>
+                <td>General edge</td>
+                <td><code>--edge</code></td>
+                <td><code>#dedede</code></td>
+              </tr>
+              <tr>
+                <td>Secondary text</td>
+                <td><code>--muted</code></td>
+                <td><code>#737373</code></td>
+              </tr>
+              <tr>
+                <td>Primary text</td>
+                <td><code>--ink</code></td>
+                <td><code>#191919</code></td>
+              </tr>
+              <tr>
+                <td>Soft surface</td>
+                <td><code>--soft</code></td>
+                <td><code>#fafafa</code></td>
+              </tr>
+              <tr>
+                <td>Button hover</td>
+                <td><code>button:hover</code></td>
+                <td><code>#eaeaea</code></td>
+              </tr>
+              <tr>
+                <td>Sidebar row hover/focus</td>
+                <td>Project/session rows</td>
+                <td><code>#ededed</code></td>
+              </tr>
+              <tr>
+                <td>User message surface</td>
+                <td><code>.user-bubble</code></td>
+                <td><code>#f1f1f1</code></td>
+              </tr>
+              <tr>
+                <td>Inline code surface</td>
+                <td>Assistant <code>code</code></td>
+                <td><code>#f2f2f2</code></td>
+              </tr>
+              <tr>
+                <td>Secondary row text/icons</td>
+                <td>Sessions/project icons</td>
+                <td><code>#666</code></td>
+              </tr>
+              <tr>
+                <td>Strong breadcrumb text</td>
+                <td>Breadcrumb <code>strong</code></td>
+                <td><code>#333</code></td>
+              </tr>
+              <tr>
+                <td>Composer placeholder</td>
+                <td>Textarea placeholder</td>
+                <td><code>#929292</code></td>
+              </tr>
+              <tr>
+                <td>Composer note</td>
+                <td><code>.composer-note</code></td>
+                <td><code>#858585</code></td>
+              </tr>
+              <tr>
+                <td>Composer border / focused border</td>
+                <td><code>.composer</code></td>
+                <td><code>#ddd</code> / <code>#adadad</code></td>
+              </tr>
+              <tr>
+                <td>Quiet divider</td>
+                <td><code>.sample-details</code></td>
+                <td><code>#ececec</code></td>
+              </tr>
+              <tr>
+                <td>Disabled send surface / icon</td>
+                <td><code>.send:disabled</code></td>
+                <td><code>#ececec</code> / <code>#aaa</code></td>
+              </tr>
+              <tr>
+                <td>Send surface / hover</td>
+                <td><code>.send</code></td>
+                <td><code>#191919</code> / <code>#444</code></td>
+              </tr>
+              <tr>
+                <td>Toast surface / text</td>
+                <td><code>.toast</code></td>
+                <td><code>#252525</code> / white</td>
+              </tr>
+              <tr>
+                <td>Resize indicator</td>
+                <td>Separator hover/focus/drag</td>
+                <td><code>#aaa</code></td>
+              </tr>
+              <tr>
+                <td>Keyboard outline</td>
+                <td><code>:focus-visible</code></td>
+                <td><code>#737373</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <code>--edge</code> and <code>--soft</code> are declared in the
+          prototype but not currently consumed. Remaining quiet details use
+          <code>#b4b4b4</code> for breadcrumb slashes, <code>#8a8a8a</code> for
+          shortcuts, <code>#8b8b8b</code> for the preview dot, and
+          <code>#888</code> for select chevrons. Preserve semantic hierarchy
+          when consolidating these literals into application tokens.
+        </p>
+      </section>
+      <section class="section" id="type">
+        <div class="section-header">
+          <span>03</span>
+          <h2>Typography</h2>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">
+            Type specimens · approved prototype sizes
+          </div>
+          <div class="type-row">
+            <small>Empty state / 27 · 550</small>
+            <div
+              style="font-size: 27px; font-weight: 550; letter-spacing: -0.8px"
+            >
+              What are we working on?
+            </div>
+          </div>
+          <div class="type-row">
+            <small>Brand / 20 · 650</small>
+            <div
+              style="font-size: 20px; font-weight: 650; letter-spacing: -0.65px"
+            >
+              Harbor
+            </div>
+          </div>
+          <div class="type-row">
+            <small>Section / 17 · 600</small>
+            <div
+              style="font-size: 17px; font-weight: 600; letter-spacing: -0.25px"
+            >
+              A quieter workspace.
+            </div>
+          </div>
+          <div class="type-row">
+            <small>Conversation / 15 · 1.75</small>
+            <div style="font-size: 15px; line-height: 1.75">
+              Keep the conversation at the center. Let spacing and subtle shades
+              create the hierarchy.
+            </div>
+          </div>
+          <div class="type-row">
+            <small>Project / 13</small>
+            <div style="font-size: 13px">codex-harbor</div>
+          </div>
+          <div class="type-row">
+            <small>Chat / 12</small>
+            <div style="font-size: 12px; color: #666">
+              Plan the next release
+            </div>
+          </div>
+          <div class="type-row">
+            <small>Code / 12 · monospace</small>
+            <div><code>--rail-width: 260px</code></div>
+          </div>
+        </div>
+        <ul>
+          <li>
+            System UI stack:
+            <code
+              >-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;,
+              sans-serif</code
+            >; base size <code>14px</code>.
+          </li>
+          <li>
+            Conversation: <code>15px</code>, line-height <code>1.75</code>;
+            mobile <code>14px</code>. User bubbles: <code>14px</code>,
+            line-height <code>1.6</code>.
+          </li>
+          <li>
+            Assistant section headings: <code>17px</code>, weight
+            <code>600</code>, letter-spacing <code>-0.25px</code>; mobile
+            <code>16px</code>.
+          </li>
+          <li>
+            Brand: <code>20px</code>, weight <code>650</code>, letter-spacing
+            <code>-0.65px</code>.
+          </li>
+          <li>
+            Empty-state heading: <code>27px</code>, weight <code>550</code>,
+            letter-spacing <code>-0.8px</code>; mobile <code>25px</code>.
+          </li>
+          <li>
+            Project rows and active breadcrumb title: <code>13px</code>;
+            breadcrumb title weight <code>500</code>.
+          </li>
+          <li>
+            Chat rows, project heading, assistant label, menus, and starter
+            buttons: <code>12px</code>. Assistant label weight <code>600</code>;
+            project heading weight <code>500</code>.
+          </li>
+          <li>
+            Composer input: <code>14px</code>, line-height <code>24px</code>;
+            selectors <code>11px</code> (<code>10px</code> on mobile).
+          </li>
+          <li>
+            Quiet footer: <code>11px</code>; composer notes
+            <code>10px</code> (<code>9px</code> on mobile). Prototype badge:
+            <code>10px</code> (<code>9px</code> on mobile).
+          </li>
+          <li>
+            Inline code:
+            <code>12px ui-monospace, SFMono-Regular, Consolas, monospace</code>.
+          </li>
+        </ul>
+        <p>
+          Use weight and whitespace before introducing larger type. These are
+          prototype sizes, not a claim of accessibility conformance.
+        </p>
+      </section>
+      <section class="section" id="layout">
+        <div class="section-header">
+          <span>04</span>
+          <h2>Layout and spacing</h2>
+        </div>
+        <div class="measure-grid">
+          <div class="measure">
+            <b>260</b><small>Default sidebar · px</small>
+          </div>
+          <div class="measure">
+            <b>760</b><small>Content maximum · px</small>
+          </div>
+          <div class="measure">
+            <b>24–160</b><small>Composer input · px</small>
+          </div>
+          <div class="measure">
+            <b>700</b><small>Mobile breakpoint · px</small>
+          </div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">
+            Spacing specimens · role-based, not a universal scale
+          </div>
+          <div class="spacing">
+            <div class="space-sample">
+              <div class="space-bar" style="width: 7px"></div>
+              <span>7px · tool gap</span>
+            </div>
+            <div class="space-sample">
+              <div class="space-bar" style="width: 12px"></div>
+              <span>12px · row inset</span>
+            </div>
+            <div class="space-sample">
+              <div class="space-bar" style="width: 18px"></div>
+              <span>18px · bubble inset</span>
+            </div>
+            <div class="space-sample">
+              <div class="space-bar" style="width: 24px"></div>
+              <span>24px · chat indent</span>
+            </div>
+            <div class="space-sample">
+              <div class="space-bar" style="width: 34px"></div>
+              <span>34px · content inset</span>
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Component role</th>
+                <th scope="col">Contract</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>App shell</td>
+                <td>
+                  Flex layout, <code>100dvh</code>; minimum height
+                  <code>420px</code>
+                </td>
+              </tr>
+              <tr>
+                <td>Desktop sidebar</td>
+                <td>
+                  Default <code>260px</code> (<code>--rail-width</code>);
+                  minimum <code>220px</code>; maximum <code>400px</code>
+                </td>
+              </tr>
+              <tr>
+                <td>Desktop viewport cap</td>
+                <td>
+                  Maximum is also <code>viewport width − 440px</code>,
+                  preserving room for the conversation
+                </td>
+              </tr>
+              <tr>
+                <td>Sidebar padding</td>
+                <td><code>21px 12px 14px</code></td>
+              </tr>
+              <tr>
+                <td>Topbar</td>
+                <td>
+                  Height <code>65px</code>; horizontal padding
+                  <code>31px</code>; gap <code>10px</code>
+                </td>
+              </tr>
+              <tr>
+                <td>Conversation and composer</td>
+                <td>
+                  Shared maximum width <code>760px</code>, centered in the main
+                  region
+                </td>
+              </tr>
+              <tr>
+                <td>Conversation region</td>
+                <td>
+                  Padding <code>26px 34px 20px</code>; scrolls independently
+                </td>
+              </tr>
+              <tr>
+                <td>Composer region</td>
+                <td>
+                  Padding <code>15px 34px 18px</code>; remains below the
+                  scrolling conversation
+                </td>
+              </tr>
+              <tr>
+                <td>Composer shell</td>
+                <td>
+                  Padding <code>14px 15px 10px</code>; toolbar gap
+                  <code>7px</code>, top margin <code>12px</code>
+                </td>
+              </tr>
+              <tr>
+                <td>Project row</td>
+                <td>
+                  Minimum height <code>37px</code>; toggle padding
+                  <code>9px 10px</code>, icon/text gap <code>9px</code>
+                </td>
+              </tr>
+              <tr>
+                <td>Chat indentation</td>
+                <td>
+                  Session group padding <code>3px 0 4px 24px</code>; chat button
+                  padding <code>9px 12px</code>
+                </td>
+              </tr>
+              <tr>
+                <td>User message</td>
+                <td>
+                  Margin <code>12px 0 32px</code>; bubble padding
+                  <code>12px 18px</code>, maximum width <code>85%</code>
+                </td>
+              </tr>
+              <tr>
+                <td>Assistant prose</td>
+                <td>
+                  Paragraph bottom margin <code>17px</code>; section heading
+                  margin <code>24px 0 9px</code>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          At widths up to <code>1000px</code>, topbar and content horizontal
+          padding become <code>24px</code>, and the new-chat shortcut hides. At
+          <code>1600px</code> and above, conversation top padding becomes
+          <code>55px</code> and composer bottom padding <code>25px</code>.
+        </p>
+        <p>
+          At <code>700px</code> and below, the sidebar is a fixed
+          <code>260px</code> overlay, closed by default, with a
+          <code>#0003</code> backdrop. Hide the resize handle. The topbar is
+          <code>57px</code> high with <code>13px</code> horizontal padding;
+          conversation padding is <code>16px 20px</code>; composer-region
+          padding is <code>10px 13px 14px</code>. User bubbles may occupy
+          <code>94%</code>. Hide the project breadcrumb, effort selector, and
+          secondary composer hint. Preserve the main controls and conversation
+          rather than compressing the desktop shell.
+        </p>
+      </section>
+      <section class="section" id="shape">
+        <div class="section-header">
+          <span>05</span>
+          <h2>Shapes, edges, and icons</h2>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Surface specimens</div>
+          <div class="shape-grid">
+            <div>
+              <div
+                class="shape"
+                style="border-radius: 8px; background: #f5f5f5; border: 0"
+              >
+                Project row
+              </div>
+              <span class="shape-caption">8px radius · shade separates</span>
+            </div>
+            <div>
+              <div
+                class="shape"
+                style="border-radius: 18px; box-shadow: 0 3px 16px #00000005"
+              >
+                Composer
+              </div>
+              <span class="shape-caption"
+                >18px radius · 1px #ddd<br /><code
+                  >0 3px 16px #00000005</code
+                ></span
+              >
+            </div>
+            <div>
+              <div
+                class="shape"
+                style="
+                  border-radius: 10px;
+                  border-color: #e4e4e4;
+                  box-shadow: 0 8px 28px #0000000d;
+                "
+              >
+                Menu
+              </div>
+              <span class="shape-caption"
+                >10px radius · 1px #e4e4e4<br /><code
+                  >0 8px 28px #0000000d</code
+                ></span
+              >
+            </div>
+          </div>
+        </div>
+        <ul>
+          <li>
+            Composer radius: <code>18px</code>; user bubble:
+            <code>18px 18px 4px 18px</code>.
+          </li>
+          <li>
+            Project rows, new chat, and starter buttons: <code>8px</code>; chat
+            rows and standard icon buttons: <code>7px</code>.
+          </li>
+          <li>
+            Menu: <code>10px</code> with <code>6px</code> item radii; toast:
+            <code>9px</code>; select and prototype badge: <code>5px</code>;
+            inline code: <code>4px</code>.
+          </li>
+          <li>
+            Borders are <code>1px</code>: composer <code>#ddd</code>, menus
+            <code>#e4e4e4</code>, starters <code>#e5e5e5</code>, badge
+            <code>#e8e8e8</code>, and quiet dividers <code>#ececec</code>.
+          </li>
+          <li>
+            Composer shadow: <code>0 3px 16px #00000005</code>; focused:
+            <code>0 3px 20px #00000007</code>.
+          </li>
+          <li>
+            Menu shadow: <code>0 8px 28px #0000000d</code>; toast shadow:
+            <code>0 4px 20px #0002</code>.
+          </li>
+          <li>
+            Icons use outline SVGs, <code>currentColor</code>, no fill, round
+            caps/joins, and default stroke width <code>1.65</code>.
+          </li>
+          <li>
+            Standard icons are <code>19px</code>; standard icon buttons are
+            <code>30px</code> square. Sidebar actions are <code>25×26px</code>;
+            rename glyphs are <code>14px</code>. Send is a
+            <code>30px</code> circle.
+          </li>
+        </ul>
+      </section>
+      <section class="section" id="interaction">
+        <div class="section-header">
+          <span>06</span>
+          <h2>Interaction and accessibility</h2>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">
+            Interactive specimens · local only, no backend
+          </div>
+          <div class="demo-grid">
+            <div>
+              <div class="demo-sidebar">
+                <div class="demo-heading">
+                  <span>Projects</span
+                  ><button
+                    class="icon-button"
+                    id="demoAdd"
+                    aria-label="Demonstrate add project"
+                  >
+                    <svg aria-hidden="true"><use href="#plus" /></svg>
+                  </button>
+                </div>
+                <div class="project-row">
+                  <button
+                    class="project-toggle"
+                    id="demoProject"
+                    aria-expanded="true"
+                    aria-controls="demoChats"
+                  >
+                    <svg aria-hidden="true"><use href="#folder" /></svg
+                    ><span>codex-harbor</span></button
+                  ><button
+                    class="icon-button row-action"
+                    id="demoNew"
+                    aria-label="New specimen chat"
+                    title="New chat"
+                  >
+                    <svg aria-hidden="true"><use href="#compose" /></svg>
+                  </button>
+                </div>
+                <div class="chat-list" id="demoChats"></div>
+              </div>
+              <div class="demo-note">
+                Hover or focus a chat to rename it. On touch, actions stay
+                visible. Renaming an inactive row keeps the current selection.
+              </div>
+            </div>
+            <div>
+              <form class="demo-composer" id="demoComposer">
+                <textarea
+                  id="demoPrompt"
+                  rows="1"
+                  aria-label="Specimen message"
+                  placeholder="Try a multiline message…"
+                ></textarea>
+                <div class="composer-tools">
+                  <small>Composer specimen</small
+                  ><button
+                    class="send"
+                    id="demoSend"
+                    aria-label="Send specimen message"
+                    disabled
+                  >
+                    <svg aria-hidden="true"><use href="#arrow" /></svg>
+                  </button>
+                </div>
+              </form>
+              <div class="demo-note">
+                24px → 160px, then internal scroll. Enter to send locally;
+                Shift+Enter for a new line.
+              </div>
+              <div
+                class="feedback"
+                id="demoStatus"
+                role="status"
+                aria-live="polite"
+              ></div>
+              <span class="focus-example">Focus outline specimen</span>
+              <div class="demo-note">
+                Static outline example · 2px #737373, 3px offset.<br /><a
+                  href="prototypes/harbor-redesign.html"
+                  >Try the full sidebar resize in the prototype →</a
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+        <ul>
+          <li>
+            The composer begins at one <code>24px</code> line, grows with
+            content to <code>160px</code>, then scrolls internally. It shrinks
+            when text is removed. Recalculate on sidebar and viewport resize.
+          </li>
+          <li>
+            Enter sends nonempty text; Shift+Enter inserts a line. Do not submit
+            during IME composition. Disabled send remains visually distinct.
+          </li>
+          <li>
+            Keep project creation beside the Projects heading. Reveal
+            new-session actions on project hover or keyboard focus; expose them
+            persistently on devices without hover.
+          </li>
+          <li>
+            Put Rename chat on each sidebar chat row, revealed on hover or
+            focus-within and always visible without hover. Rename the targeted
+            chat, including an inactive chat, without switching conversations or
+            clearing the draft. Preserve keyboard focus after updating its
+            label. The prototype uses a browser prompt.
+          </li>
+          <li>
+            The desktop sidebar edge is draggable. Use an <code>8px</code> hit
+            area overlapping the boundary by <code>4px</code>, with a subtle
+            indicator on hover, focus, and drag. Clamp displayed width to the
+            desktop bounds; retain the preferred width when the viewport
+            temporarily narrows.
+          </li>
+          <li>
+            Expose the edge as a focusable vertical separator controlling the
+            sidebar, with an accessible name and current/minimum/maximum values.
+            Arrow keys adjust by <code>10px</code>; Home/End select the current
+            bounds. Clean up drag state on pointer release, cancellation,
+            capture loss, window blur, and viewport changes.
+          </li>
+          <li>
+            Mobile sidebar opening makes the main region inert; closing makes
+            the hidden sidebar inert. Support the close button, backdrop, and
+            Escape; restore focus to the opener when appropriate. Switching
+            breakpoints must not strand focus in hidden controls.
+          </li>
+          <li>
+            Use accessible names for icon buttons,
+            <code>aria-expanded</code> for project disclosure,
+            <code>aria-current</code> for the selected chat, and a polite status
+            region for toast feedback. Center desktop toasts in the available
+            main region as sidebar width changes.
+          </li>
+          <li>
+            Keyboard focus uses a <code>2px</code> outline, generally offset
+            <code>3px</code>; the separator uses an inset outline. Composer
+            focus changes its border. Do not rely on hover alone to expose
+            actions.
+          </li>
+          <li>
+            Button background transitions use <code>0.12s</code>; mobile sidebar
+            movement uses <code>0.18s</code>. Respect
+            <code>prefers-reduced-motion</code> by disabling transitions and
+            smooth scrolling.
+          </li>
+        </ul>
+        <p>
+          Validate changed interactions with keyboard, pointer, touch/no-hover
+          behavior, long titles, multiline input, and desktop/mobile widths.
+          Prototype review is visual and interaction evidence; application
+          accessibility, end-to-end behavior, and backend integration require
+          their own verification.
+        </p>
+      </section>
+      <footer class="footer">
+        <span>Harbor / Interface design tokens</span
+        ><a href="../AGENTS.md">Repository design lifecycle ↗</a
+        ><a href="#top">Back to top ↑</a>
+      </footer>
+    </main>
+    <script>
+      "use strict";
+      const byId = (id) => document.getElementById(id);
+      let selectedChat = 1,
+        nextChat = 3;
+      const chats = [
+        { id: 1, title: "A quieter workspace" },
+        { id: 2, title: "Plan the next release" },
+      ];
+      const escapeText = (text) =>
+        String(text).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      function announce(text) {
+        byId("demoStatus").textContent = text;
+      }
+      function renderRows() {
+        byId("demoChats").innerHTML = chats
+          .map(
+            (chat) =>
+              `<div class="chat-row ${chat.id === selectedChat ? "selected" : ""}"><button class="chat-button" data-chat="${chat.id}" ${chat.id === selectedChat ? 'aria-current="true"' : ""} title="${escapeText(chat.title)}">${escapeText(chat.title)}</button><button class="icon-button row-action" data-rename="${chat.id}" aria-label="Rename ${escapeText(chat.title)}" title="Rename chat"><svg aria-hidden="true"><use href="#compose"/></svg></button></div>`,
+          )
+          .join("");
+      }
+      byId("demoChats").addEventListener("click", (event) => {
+        const rename = event.target.closest("[data-rename]");
+        const choose = event.target.closest("[data-chat]");
+        if (rename) {
+          const chat = chats.find(
+            (c) => c.id === Number(rename.dataset.rename),
+          );
+          const title = window.prompt("Rename chat", chat.title);
+          if (title?.trim()) {
+            chat.title = title.trim();
+            renderRows();
+            byId("demoChats")
+              .querySelector(`[data-rename="${chat.id}"]`)
+              .focus();
+            announce("Chat renamed. Current selection and draft preserved.");
+          }
+        } else if (choose) {
+          selectedChat = Number(choose.dataset.chat);
+          renderRows();
+          byId("demoChats")
+            .querySelector(`[data-chat="${selectedChat}"]`)
+            .focus();
+          announce(
+            "Selected " +
+              chats.find((c) => c.id === selectedChat).title +
+              ". This specimen has no conversation backend.",
+          );
+        }
+      });
+      byId("demoProject").onclick = () => {
+        const open = byId("demoChats").hidden;
+        byId("demoChats").hidden = !open;
+        byId("demoProject").setAttribute("aria-expanded", String(open));
+      };
+      byId("demoNew").onclick = () => {
+        const chat = { id: nextChat++, title: "New chat" };
+        chats.push(chat);
+        selectedChat = chat.id;
+        byId("demoChats").hidden = false;
+        byId("demoProject").setAttribute("aria-expanded", "true");
+        renderRows();
+        announce("New local specimen chat created.");
+      };
+      byId("demoAdd").onclick = () =>
+        announce(
+          "Add project opens the local folder picker in the interface prototype. This button demonstrates its placement only.",
+        );
+      const prompt = byId("demoPrompt");
+      function resizeComposer() {
+        prompt.style.height = "24px";
+        prompt.style.height = Math.min(160, prompt.scrollHeight) + "px";
+        prompt.style.overflowY = prompt.scrollHeight > 160 ? "auto" : "hidden";
+        byId("demoSend").disabled = !prompt.value.trim();
+      }
+      prompt.addEventListener("input", resizeComposer);
+      window.addEventListener("resize", resizeComposer);
+      prompt.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+          event.preventDefault();
+          if (prompt.value.trim()) byId("demoComposer").requestSubmit();
+        }
+      });
+      byId("demoComposer").onsubmit = (event) => {
+        event.preventDefault();
+        if (!prompt.value.trim()) return;
+        announce("Specimen message sent locally. No AI request was made.");
+        prompt.value = "";
+        resizeComposer();
+        prompt.focus();
+      };
+      renderRows();
+      resizeComposer();
+    </script>
+  </body>
+</html>

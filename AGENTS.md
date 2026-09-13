@@ -13,6 +13,13 @@
 - Select one complete user outcome at a time. An active proposal index is a discovery list, not authorization to implement every record concurrently. Fix shared critical defects when required by the selected outcome; do not start optional work merely because a required gate is unavailable.
 - Reuse valid evidence for unchanged boundaries and keep its tested revision and limits explicit. Run the relevant acceptance and critical regressions on changed code, review and fix actionable findings, then close only fully verified proposals. Record unavailable gates and deliver a reviewable candidate without inflating completion or repeatedly running unchanged suites.
 
+## Frontend design consistency
+
+- Before designing or changing Harbor UI, read [design/design-tokens.html](design/design-tokens.html) and inspect the [standalone interface prototype](design/prototypes/harbor-redesign.html). The HTML guide owns the approved visual tokens and interaction patterns; the prototype is their reviewable reference. Preserve the monochrome palette, spacing hierarchy, typography, compact composer, and sidebar behavior described there.
+- Reuse the existing tokens and patterns. Do not introduce page-specific colors, spacing systems, component styles, or alternate interaction patterns merely for convenience. Keep application styles aligned with the guide; the prototype is not a substitute for real application behavior or acceptance coverage.
+- When a new requirement needs a token, component, state, or pattern the guide does not cover, update the canonical guide and demonstrate it in the standalone prototype in the same change, before relying on it in application implementation. Extend existing semantics where possible, document the reason and usage, and reconcile contradictions instead of leaving competing designs. Follow existing user authorization; this workflow does not add a separate approval gate.
+- Review affected desktop/mobile layouts and hover, keyboard-focus, touch, and relevant empty/loading/error/disabled states. For visual or interaction changes, inspect the rendered prototype and check the changed interactions; for documentation-only changes, check consistency against the prototype, links, and whitespace. Keep the guide, prototype notes, and affected actual documentation current, with validation scoped to what was changed.
+
 ## Document ownership and lifecycle
 
 - Put product designs, architecture decisions, and feature proposals in `design/`. Put documentation for available user behavior, developer workflows, and completed reports in `docs/`. Track findings in `issues/`, including their archived history.
