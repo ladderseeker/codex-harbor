@@ -246,6 +246,67 @@ export async function p014({
   );
   await expect(input).toHaveValue("");
   await shot("conversation-desktop");
+  await input.fill("[markdown]");
+  await input.press("Enter");
+  const markdown = page.locator(".markdown-body").filter({
+    has: page.getByRole("heading", { name: "Markdown acceptance" }),
+  });
+  await expect(markdown.getByRole("table")).toBeVisible();
+  await expect(markdown.locator("pre code.language-markdown")).toContainText(
+    "const nested = true;",
+  );
+  await expect(
+    markdown.locator("pre code.language-markdown"),
+  ).not.toContainText("Finished Markdown");
+  await expect(page.getByText("Writing…", { exact: true })).toBeVisible();
+  await expect(markdown).toContainText("Finished Markdown.", {
+    timeout: 30000,
+  });
+  await expect(markdown.locator("pre code.language-markdown")).toHaveText(
+    "# Literal Markdown\n```js\nconst nested = true;\n```\n",
+  );
+  await expect(markdown.locator("pre code.language-mermaid")).toContainText(
+    "graph TD; A-->B",
+  );
+  await expect(markdown.locator(".markdown-align-right").last()).toHaveText(
+    "42",
+  );
+  expect(
+    await markdown
+      .locator(".markdown-align-right")
+      .last()
+      .evaluate((element) => getComputedStyle(element).textAlign),
+  ).toBe("right");
+  await expect(markdown.getByRole("checkbox").first()).toBeChecked();
+  await expect(markdown.getByRole("checkbox").first()).toBeDisabled();
+  await expect(
+    markdown.getByRole("link", { name: "Documentation", exact: true }),
+  ).toHaveAttribute("rel", "noopener noreferrer");
+  await expect(
+    markdown.locator("a").filter({ hasText: /^Unsafe$/ }),
+  ).not.toHaveAttribute("href");
+  await expect(markdown.locator("script, img")).toHaveCount(0);
+  expect(await page.evaluate(() => "markdownInjected" in window)).toBe(false);
+  await shot("markdown-desktop");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await shot("markdown-mobile");
+  expect(
+    await markdown
+      .getByRole("region", { name: "Markdown table" })
+      .evaluate((element) => element.scrollWidth > element.clientWidth),
+  ).toBe(true);
+  expect(
+    await markdown
+      .locator('pre[aria-label="text code block"]')
+      .evaluate((element) => element.scrollWidth > element.clientWidth),
+  ).toBe(true);
+
+  await markdown.getByRole("region", { name: "Markdown table" }).focus();
+  await expect(
+    markdown.getByRole("region", { name: "Markdown table" }),
+  ).toBeFocused();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
   const second = await startChat(
     page.getByRole("button", {
       name: "New conversation in Design project",
@@ -287,6 +348,7 @@ export async function p014({
   await expect(page.locator("body")).toContainText(
     "Fixture response: P014 multiline",
   );
+  await expect(markdown.getByRole("table")).toBeVisible();
   await expect(input).toHaveValue("");
   await page.locator(`[data-rename-focus="${first.id}"]`).click();
   await page

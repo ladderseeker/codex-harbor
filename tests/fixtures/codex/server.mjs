@@ -1,3 +1,4 @@
+import { markdownStart, markdownEnd } from "./markdown.mjs";
 const activating = new Set();
 const crashOnInterrupt = new Set();
 import { createInterface } from "node:readline";
@@ -37,13 +38,13 @@ const send = (value) => process.stdout.write(JSON.stringify(value) + "\n");
 const event = (method, params) => send({ method, params });
 let initialized = false;
 let authenticated = false;
-function finish(threadId, turnId, text, status = "completed") {
+function finish(threadId, turnId, text, status = "completed", streamedItemId) {
   const turn = threads.get(threadId)?.turns.find((t) => t.id === turnId);
   if (!turn || turn.status !== "inProgress") return;
   turn.status = status;
   if (text) {
-    const itemId = randomUUID();
-    if (!text.includes("[completion-only]"))
+    const itemId = streamedItemId ?? randomUUID();
+    if (!streamedItemId && !text.includes("[completion-only]"))
       event("item/agentMessage/delta", { threadId, turnId, itemId, delta: text.includes("[partial-final]") ? "Partial response" : text });
     turn.items.push({
       id: itemId,
@@ -358,6 +359,15 @@ createInterface({ input: process.stdin }).on("line", (line) => {
           }),
         text.includes("[ack-lock]") ? 100 : 30,
       );
+    }
+    if (text === "[markdown]") {
+      const itemId = randomUUID();
+      event("item/agentMessage/delta", { threadId: p.threadId, turnId: turn.id, itemId, delta: markdownStart });
+      timers.set(turn.id, setTimeout(() => {
+        event("item/agentMessage/delta", { threadId: p.threadId, turnId: turn.id, itemId, delta: markdownEnd });
+        finish(p.threadId, turn.id, markdownStart + markdownEnd, "completed", itemId);
+      }, 3000));
+      return;
     }
     timers.set(
       turn.id,

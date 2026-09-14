@@ -2,6 +2,8 @@
 
 P001–P008 and P011 are Accepted and Implemented, with mandatory verification and upstream follow-ups still open. P009, P010 and P012 are Accepted and In progress. P013 is Accepted and Implemented. P014 passed its scoped completion gate and is recorded in the archive. Design review, implementation, and verification are separate events. Follow the [proposal template](../proposal-template.md) and [canonical lifecycle rules](../../AGENTS.md#document-ownership-and-lifecycle) when changing status.
 
+The focused 14 September assistant Markdown correction is tracked in the [rendering report](../../docs/reports/2026-09-14-markdown-rendering.md), under P001. It does not expand the delivery queue or close broader proposal gates.
+
 ## Current delivery queue
 
 The owner selected [P015](015-personal-vps-workspace.md) on 13 September for the complete subscription/existing-folder VPS workflow under [D011](../decisions/011-personal-vps-workspace.md). It is Accepted and Implemented; source `13204d7` is deployed and the real installed development loop passed. Actual preview expiry/security and installed stop checks passed; the unavailable required rendered-prototype gate keeps verification open. On 14 September the owner selected D012's full development loop, titles, complete replies and private attached previews, with push and VPS deployment authorized.

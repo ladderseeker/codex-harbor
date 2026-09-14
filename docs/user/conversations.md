@@ -13,6 +13,12 @@ Drag the sidebar's right edge to widen or narrow it. Keyboard users can focus th
 
 The conversation shows streamed output and its current state. Closing the browser or restarting only the API does not cancel work owned by a healthy supervisor. Reopen Harbor and select the same conversation to see its persisted result. Reconnect may request a fresh snapshot when older replay events have expired; that does not restart the old request.
 
+## Formatted replies
+
+Assistant replies display Markdown headings, emphasis, links, lists, quotes, tables and code blocks while streaming and after reopening. Wide tables and code scroll within the reply. To show Markdown containing triple-backtick code fences, use a longer outer fence (four backticks) or a tilde fence. Incomplete formatting settles as more text arrives.
+
+Mermaid blocks display labeled source code in this version. Raw HTML is not executed, and image references display text instead of automatically loading remote images. User messages and tool output remain literal.
+
 ## Approvals, cancellation, and uncertainty
 
 Review each approval or input request before answering. Another tab may already have answered it; only the current, authorized answer is accepted. Requests expire and do not receive unattended approval when the browser is absent.

@@ -2901,3 +2901,136 @@ svg {
   overflow: auto;
   white-space: pre-wrap;
 }
+
+/* Conversation Markdown: the canonical guide's neutral reading surfaces. */
+.markdown-body {
+  white-space: normal;
+  min-width: 0;
+}
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+.markdown-body p {
+  margin: 0 0 17px;
+}
+.markdown-body :is(h1, h2, h3, h4, h5, h6) {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.25px;
+  line-height: 1.5;
+  margin: 24px 0 9px;
+}
+.markdown-body :is(ul, ol) {
+  padding-left: 24px;
+  margin: 6px 0 18px;
+}
+.markdown-body li {
+  margin: 6px 0;
+}
+.markdown-body li > :is(ul, ol) {
+  margin-bottom: 0;
+}
+.markdown-body strong {
+  font-weight: 600;
+}
+.markdown-body code {
+  font:
+    12px ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  background: #f2f2f2;
+  border-radius: 4px;
+  padding: 3px 5px;
+}
+.markdown-body pre {
+  max-width: 100%;
+  overflow: auto;
+  white-space: pre;
+  overflow-wrap: normal;
+  padding: 12px;
+  margin: 17px 0;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--soft);
+  line-height: 1.6;
+}
+.markdown-body pre code {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.markdown-body blockquote {
+  margin: 17px 0;
+  padding: 0 0 0 16px;
+  border-left: 3px solid var(--edge);
+  color: var(--muted);
+}
+.markdown-body a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.markdown-body a:hover {
+  color: var(--muted);
+}
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--edge);
+  margin: 24px 0;
+}
+.markdown-scroll {
+  max-width: 100%;
+  overflow: auto;
+  margin: 17px 0;
+}
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: inherit;
+}
+.markdown-body :is(th, td) {
+  border: 1px solid var(--edge);
+  padding: 8px 12px;
+  text-align: left;
+  min-width: 100px;
+}
+.markdown-body th {
+  background: var(--soft);
+  font-weight: 600;
+}
+.markdown-body .markdown-align-center {
+  text-align: center;
+}
+.markdown-body .markdown-align-right {
+  text-align: right;
+}
+.markdown-body .contains-task-list {
+  list-style: none;
+  padding-left: 0;
+}
+.markdown-body .task-list-item input {
+  width: auto;
+  margin-right: 8px;
+  accent-color: var(--ink);
+}
+@media (max-width: 700px) {
+  .markdown-body :is(h1, h2, h3, h4, h5, h6) {
+    font-size: 16px;
+  }
+}
+
+.markdown-code {
+  margin: 17px 0;
+}
+.markdown-code-label {
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+.markdown-code pre {
+  margin: 0;
+}

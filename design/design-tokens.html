@@ -1591,6 +1591,11 @@
           their own verification.
         </p>
       </section>
+      <section class="section" id="conversation-markdown">
+        <h2>Conversation Markdown</h2>
+        <p>Assistant messages render CommonMark and GFM: paragraphs, headings, emphasis, lists, disabled task checkboxes, quotations, links, rules, tables, inline code and fenced code. User input and command output stay literal. Accumulated streaming text is parsed again as delimiters arrive; unfinished fences remain code, and an outer four-backtick Markdown fence preserves an inner three-backtick example. Never execute raw HTML or automatically fetch image references; images appear as explicit links. Mermaid fences show a visible “Mermaid source” label and readable code in this release.</p>
+        <p>Reuse the 15px/1.75 conversation text (14px mobile), 17px/600 headings (16px mobile), 17px paragraph spacing and 12px monospace inline code with #f2f2f2 surface and 4px radius. Code blocks use the soft surface, 1px edge, 8px radius, 12px padding, and 1.6 line height. Language labels use 11px muted text and 6px separation. Tables use 1px edges and 8px × 12px cell padding with soft header backgrounds; GFM alignment is represented by CSS classes to respect the application CSP. Tables and code scroll internally and are keyboard focusable. Quotations use a 3px edge and 16px inset. Links are underlined, inherit ink, and use the existing focus outline and muted hover state. The standalone prototype includes desktop/mobile specimens for these patterns.</p>
+      </section>
       <section class="section" id="supporting-surfaces">
         <p>
           Personal VPS account settings reuse the account status and explanatory

@@ -2,6 +2,7 @@ import {
   PersonalPreviews,
   type PersonalPreviewEndpoint,
 } from "./PersonalPreviews.tsx";
+import { MarkdownMessage } from "./MarkdownMessage.tsx";
 import { Icon } from "./Icons.tsx";
 import { SidebarResize } from "./SidebarResize.tsx";
 import { Schedules } from "./Schedules.tsx";
@@ -1306,6 +1307,8 @@ export function App() {
                           256 KiB per conversation.
                         </small>
                       </details>
+                    ) : message.role === "assistant" ? (
+                      <MarkdownMessage text={message.text} />
                     ) : (
                       <div className="message-text">{message.text}</div>
                     )}
