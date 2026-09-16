@@ -1895,6 +1895,7 @@ export function App() {
       {workspaceManagerOpen && project && (
         <Modal
           title={`Workspaces in ${project.name}`}
+          returnFocus=".project-group:has(.project-button.selected) .project-more"
           failure={error}
           retry={
             pending
@@ -2117,28 +2118,25 @@ function Modal({
         const target = returnFocus
           ? document.querySelector<HTMLElement>(returnFocus)
           : opener;
-        if (
-          target?.isConnected &&
-          !target.closest("[inert]") &&
-          target.checkVisibility()
-        )
-          target.focus();
-        else {
-          const fallback =
-            document.querySelector<HTMLElement>(".project-button.selected") ??
-            document.querySelector<HTMLElement>(
-              "[aria-label='Open navigation']",
-            );
+        // Switching between dialogs can leave body as the apparent opener.
+        // Only finish restoration when a usable control actually receives focus.
+        if (document.querySelector("dialog[open]")) return;
+        const candidates = [
+          target,
+          document.querySelector<HTMLElement>(".project-button.selected"),
+          document.querySelector<HTMLElement>("[aria-label='Open navigation']"),
+        ];
+        for (const candidate of candidates) {
           if (
-            fallback &&
-            !fallback.closest("[inert]") &&
-            fallback.checkVisibility()
+            !candidate?.isConnected ||
+            candidate === document.body ||
+            candidate === document.documentElement ||
+            candidate.closest("[inert]") ||
+            !candidate.checkVisibility()
           )
-            fallback.focus();
-          else
-            document
-              .querySelector<HTMLElement>("[aria-label='Open navigation']")
-              ?.focus();
+            continue;
+          candidate.focus();
+          if (document.activeElement === candidate) break;
         }
       });
     };
