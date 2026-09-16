@@ -3071,7 +3071,7 @@ svg {
 }
 .action-menu[open] > summary {
   opacity: 1;
-  background: var(--hover);
+  background: var(--selected);
 }
 .action-menu-panel {
   position: fixed;
@@ -3098,7 +3098,7 @@ svg {
   font-size: 12px;
 }
 .action-menu-panel > button:hover {
-  background: var(--hover);
+  background: var(--selected);
 }
 .action-menu-panel > button[hidden] {
   display: none;
@@ -3147,7 +3147,7 @@ svg {
 }
 .message-actions [aria-pressed="true"] {
   color: var(--ink);
-  background: var(--hover);
+  background: var(--selected);
 }
 .copy-control {
   display: inline-flex;

@@ -283,6 +283,30 @@ export async function p014({
       .filter({ has: page.locator(".project-button.selected") }),
   ).toContainText("No matching conversations");
   await page.getByLabel("Search conversations", { exact: true }).fill("");
+  await expect(more).toBeVisible();
+  await more.click();
+  await page
+    .getByRole("button", { name: "Archive conversation", exact: true })
+    .click();
+  await expect(more).toHaveCount(0);
+  await page.locator(".history-filters select").selectOption("archived");
+  await expect(more).toBeVisible();
+  await more.click();
+  await page
+    .getByRole("button", { name: "Restore conversation", exact: true })
+    .click();
+  await expect(more).toHaveCount(0);
+  await page.locator(".history-filters select").selectOption("active");
+  await expect(more).toBeVisible();
+  const restored = await (
+    await context.request.get(origin + `/api/v1/sessions/${first.id}/snapshot`)
+  ).json();
+  expect(restored.session.archived).toBe(false);
+  expect(
+    restored.messages.some((message: { text: string }) =>
+      message.text.includes("P014 multiline"),
+    ),
+  ).toBe(true);
   await page
     .getByRole("button", { name: "Search and filters", exact: true })
     .click();
@@ -561,6 +585,7 @@ export async function p014({
     await shot(file + "-mobile");
     await page.keyboard.press("Escape");
     await expect(panel).not.toBeVisible();
+    await expect(open).toBeFocused();
     await page.setViewportSize({ width: 1440, height: 1000 });
   }
 }

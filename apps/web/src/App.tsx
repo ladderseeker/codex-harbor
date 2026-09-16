@@ -2117,14 +2117,24 @@ function Modal({
         const target = returnFocus
           ? document.querySelector<HTMLElement>(returnFocus)
           : opener;
-        if (target?.isConnected && target.checkVisibility()) target.focus();
+        if (
+          target?.isConnected &&
+          !target.closest("[inert]") &&
+          target.checkVisibility()
+        )
+          target.focus();
         else {
           const fallback =
             document.querySelector<HTMLElement>(".project-button.selected") ??
             document.querySelector<HTMLElement>(
               "[aria-label='Open navigation']",
             );
-          if (fallback?.checkVisibility()) fallback.focus();
+          if (
+            fallback &&
+            !fallback.closest("[inert]") &&
+            fallback.checkVisibility()
+          )
+            fallback.focus();
           else
             document
               .querySelector<HTMLElement>("[aria-label='Open navigation']")

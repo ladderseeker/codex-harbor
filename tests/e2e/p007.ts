@@ -139,7 +139,7 @@ export async function p007(h: Context) {
   await page
     .getByRole("button", { name: "Search and filters", exact: true })
     .click();
-  await page.getByLabel("Show", { exact: true }).selectOption("archived");
+  await page.locator(".history-filters select").selectOption("archived");
   await page.locator(".session-row.selected .session-rename").click();
   await page
     .getByRole("button", { name: "Restore conversation", exact: true })
@@ -147,7 +147,7 @@ export async function p007(h: Context) {
   await expect
     .poll(async () => (await snapshot(id)).session.archived)
     .toBe(false);
-  await page.getByLabel("Show", { exact: true }).selectOption("active");
+  await page.locator(".history-filters select").selectOption("active");
   await page
     .getByRole("button", { name: "Search and filters", exact: true })
     .click();
