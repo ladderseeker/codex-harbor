@@ -2,7 +2,7 @@
 
 P008 is Implemented, not Verified. Two feature review rounds and bounded module integration review have closed. Targeted DST end-to-end acceptance has passed; dedicated live-account and protected full restore/promotion evidence remain pending. The [proposal](../../design/proposals/008-scheduled-tasks.md) owns the full contract and delivery gates.
 
-Open **Schedules** under **Project tools** in the sidebar, choose a project, and create a schedule. Enter the prompt, model, effort and permission profile, then preview the next occurrences before activating it. The preview shows the requested local minute, timezone, UTC offset and actual UTC instant.
+Open **Schedules** below **New chat** in the sidebar in a managed installation, choose a project, and create a schedule. Enter the prompt, model, effort and permission profile, then preview the next occurrences before activating it. The preview shows the requested local minute, timezone, UTC offset and actual UTC instant.
 
 A schedule can run once or use five numeric cron fields: minute, hour, day of month, month and day of week. Recurring minutes skipped by daylight-saving changes do not run. A repeated local minute runs only at its first instant. A one-time minute that does not exist is rejected.
 

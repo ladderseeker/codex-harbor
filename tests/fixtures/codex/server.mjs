@@ -188,7 +188,10 @@ createInterface({ input: process.stdin }).on("line", (line) => {
             { reasoningEffort: "high", description: "High" },
           ],
         },
-      ],
+      ].flatMap((model) => process.env.HARBOR_FIXTURE_EXTENDED_MODELS === "1" ? [model, {
+        ...model, id: "gpt-6-astra", model: "gpt-6-astra", displayName: "GPT-6 Astra", isDefault: false,
+        supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"].map((reasoningEffort) => ({reasoningEffort, description: reasoningEffort})),
+      }] : [model]),
       nextCursor: null,
     });
   if (m.method === "account/login/start" && p.type === "apiKey") {
@@ -210,6 +213,8 @@ createInterface({ input: process.stdin }).on("line", (line) => {
         process.env.HARBOR_FIXTURE_TRACE_FILE,
         JSON.stringify({
           method: "turn/start",
+          model: p.model,
+          effort: p.effort,
           threadId: p.threadId,
           attachmentTypes: p.input.map((i) => i.type),
           attachmentPaths: p.input

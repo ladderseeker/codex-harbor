@@ -1,3 +1,4 @@
+import { reasoningEfforts } from "../../../packages/contracts/src/index.js";
 import {
   projectDirectoryRoutes,
   projectBrowsingCapability,
@@ -657,7 +658,9 @@ export async function buildServer(c: Config) {
         ),
         efforts: (m.supportedReasoningEfforts ?? [])
           .map((e: any) => e.reasoningEffort)
-          .filter((e: string) => ["low", "medium", "high"].includes(e)),
+          .filter((e: string) =>
+            (reasoningEfforts as readonly string[]).includes(e),
+          ),
       })),
     permissionProfiles:
       c.HARBOR_PERMISSION_CEILING === "workspace-write" &&

@@ -1,3 +1,4 @@
+import { reasoningEfforts } from "./index.js";
 const text = { type: "string" },
   uuid = { type: "string", format: "uuid" },
   positive = { type: "integer", minimum: 1 };
@@ -46,7 +47,7 @@ const config = object(
     sessionId: uuid,
     baseRevision: { ...text, pattern: "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
     model: { ...text, minLength: 1, maxLength: 100 },
-    effort: { enum: ["low", "medium", "high"] },
+    effort: { enum: reasoningEfforts },
     permissionProfile: { enum: ["read-only", "workspace-write"] },
     missedPolicy: { enum: ["skip", "catch_up"], default: "skip" },
     overlapPolicy: { const: "skip", default: "skip" },

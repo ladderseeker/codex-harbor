@@ -83,3 +83,19 @@ test("footnotes navigate within the document and have unique IDs in each reply",
   assert.match(html, /aria-label="Back to reference 1"/);
   assert.match(render("[external](https://example.com)"), /target="_blank"/);
 });
+
+test("code/source copy controls sit after the code region and never repeat on ordinary paragraphs", () => {
+  const html = render(
+    "First paragraph.\n\nSecond paragraph.\n\n```js\n  const x = 1;\n\n    x++;\n```\n\n````markdown\n# Heading\n```js\nx();\n```\n````",
+  );
+  assert.equal([...html.matchAll(/class="markdown-code-actions"/g)].length, 2);
+  assert.match(html, /<\/pre><div class="markdown-code-actions">/);
+  assert.match(html, /aria-label="Copy code"/);
+  assert.match(html, /aria-label="Copy Markdown source"/);
+  assert.match(html, /  const x = 1;\n\n    x\+\+;\n<\/code>/);
+  assert.equal(
+    [...render("Plain\n\nparagraph\n\n`inline code`").matchAll(/<button/g)]
+      .length,
+    0,
+  );
+});

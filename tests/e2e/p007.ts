@@ -73,6 +73,7 @@ export async function p007(h: Context) {
   );
   await page.goto(origin + "/?conversation=" + id);
   await page.locator(".session-row.selected .session-rename").click();
+  await page.getByRole("button", { name: "Rename", exact: true }).click();
   await page
     .getByLabel("Conversation title", { exact: true })
     .fill("P007 searchable ledger");
@@ -124,6 +125,7 @@ export async function p007(h: Context) {
     ),
   ).toBe(true);
   await page.reload();
+  await page.locator(".session-row.selected .session-rename").click();
   await page
     .getByRole("button", { name: "Archive conversation", exact: true })
     .click();
@@ -135,11 +137,20 @@ export async function p007(h: Context) {
     (await history("state=archived&q=P007%20searchable")).sessions[0].id,
   ).toBe(id);
   await page
+    .getByRole("button", { name: "Search and filters", exact: true })
+    .click();
+  await page.getByLabel("Show", { exact: true }).selectOption("archived");
+  await page.locator(".session-row.selected .session-rename").click();
+  await page
     .getByRole("button", { name: "Restore conversation", exact: true })
     .click();
   await expect
     .poll(async () => (await snapshot(id)).session.archived)
     .toBe(false);
+  await page.getByLabel("Show", { exact: true }).selectOption("active");
+  await page
+    .getByRole("button", { name: "Search and filters", exact: true })
+    .click();
   expect(await readFile(path.join(h.fixtureState, id + ".json"), "utf8")).toBe(
     originalNative,
   );
@@ -1248,8 +1259,10 @@ export async function p007(h: Context) {
     .locator(".project-group")
     .filter({ has: page.locator(".project-button.selected") })
     .getByRole("region", { name: "Conversation history" });
-  await activeHistory.locator(".history-filters summary").click();
-  await activeHistory
+  await page
+    .getByRole("button", { name: "Search and filters", exact: true })
+    .click();
+  await page
     .getByLabel("Search conversations", { exact: true })
     .fill("P007 searchable ledger");
   await expect(

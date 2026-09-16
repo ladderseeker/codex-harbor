@@ -1,3 +1,5 @@
+import { MessageActions } from "./MessageActions.tsx";
+import { completedAssistantResponses } from "./message-responses.ts";
 import {
   PersonalPreviews,
   type PersonalPreviewEndpoint,
@@ -12,7 +14,7 @@ import {
   AttachmentPreview,
 } from "./Attachments.tsx";
 import { Files } from "./Files.tsx";
-import { History, ConversationDetails } from "./History.tsx";
+import { History } from "./History.tsx";
 import { Recovery } from "./Recovery.tsx";
 import { Terminals } from "./Terminals.tsx";
 import { Previews } from "./Previews.tsx";
@@ -124,6 +126,21 @@ function State({ state }: { state: string }) {
 }
 
 export function App() {
+  useEffect(() => {
+    const closeMenus = (event: Event) => {
+      document
+        .querySelectorAll<HTMLDetailsElement>("details.action-menu[open]")
+        .forEach((menu) => {
+          if (!menu.contains(event.target as Node)) menu.open = false;
+        });
+    };
+    document.addEventListener("pointerdown", closeMenus);
+    document.addEventListener("focusin", closeMenus);
+    return () => {
+      document.removeEventListener("pointerdown", closeMenus);
+      document.removeEventListener("focusin", closeMenus);
+    };
+  }, []);
   const [identity, setIdentity] = useState<Identity>();
   const [projects, setProjects] = useState<Project[]>([]);
   const [roots, setRoots] = useState<Root[]>([]);
@@ -196,6 +213,11 @@ export function App() {
   const sendingRef = useRef(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [historyQuery, setHistoryQuery] = useState("");
+  const [historyFilter, setHistoryFilter] = useState("active");
+  const [projectDetailsOpen, setProjectDetailsOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [tokensOpen, setTokensOpen] = useState(false);
   const [replayGap, setReplayGap] = useState(false);
@@ -301,6 +323,24 @@ export function App() {
       sessions: sessionResult.sessions,
     };
   }, []);
+
+  useEffect(() => {
+    if (!identity) return;
+    let refreshing = false;
+    const refresh = async () => {
+      if (document.visibilityState !== "visible" || refreshing) return;
+      refreshing = true;
+      try {
+        await refreshLists();
+      } catch (failure) {
+        report(failure);
+      } finally {
+        refreshing = false;
+      }
+    };
+    const timer = window.setInterval(() => void refresh(), 10000);
+    return () => window.clearInterval(timer);
+  }, [identity, refreshLists, report]);
 
   const refreshSnapshot = useCallback(async (id: string) => {
     const result = await request<Snapshot>(
@@ -635,6 +675,10 @@ export function App() {
   );
   const active = !!current && busyStates.has(current.state);
   const uncertain = current?.state === "uncertain";
+  const responseTexts = completedAssistantResponses(
+    snapshot?.messages ?? [],
+    snapshot?.operations ?? [],
+  );
   const text = richDraft.draft.text;
   const settingsReady =
     capabilities?.account?.authenticated === true &&
@@ -675,7 +719,7 @@ export function App() {
             ) ?? available.find((item) => item.state === "ready"));
       if (!workspace) {
         setError(
-          "This project has no ready workspace. Open project tools to manage workspaces.",
+          "This project has no ready workspace. Open project details to manage workspaces.",
         );
         return;
       }
@@ -794,6 +838,15 @@ export function App() {
             Harbor
           </a>
           <button
+            className="icon-button rail-search"
+            aria-label="Search and filters"
+            title="Search and filters"
+            aria-expanded={searchOpen}
+            onClick={() => setSearchOpen((value) => !value)}
+          >
+            <Icon name="search" />
+          </button>
+          <button
             className="icon-button mobile-only"
             aria-label="Close navigation"
             onClick={closeNavigation}
@@ -816,6 +869,50 @@ export function App() {
           <Icon name="compose" />
           New chat
         </button>
+        {capabilities && !(capabilities.local || capabilities.personalVps) && (
+          <button
+            className="quiet-button"
+            onClick={() => setSchedulesOpen(true)}
+          >
+            Schedules
+          </button>
+        )}
+        {searchOpen && (
+          <section className="history-filters" aria-label="Search and filters">
+            <p className="field-help">
+              Search in {project?.name ?? "selected project"}
+            </p>
+            <label className="field">
+              Search conversations
+              <input
+                autoFocus
+                type="search"
+                value={historyQuery}
+                maxLength={120}
+                onChange={(event) => setHistoryQuery(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              Show
+              <select
+                value={historyFilter}
+                onChange={(event) => setHistoryFilter(event.target.value)}
+              >
+                <option value="active">Active conversations</option>
+                <option value="archived">Archived conversations</option>
+                <option value="all">All conversations</option>
+              </select>
+            </label>
+            <label className="archive-toggle">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(event) => setShowArchived(event.target.checked)}
+              />
+              Show archived projects
+            </label>
+          </section>
+        )}
         <div className="rail-heading">
           <h2>Projects</h2>
           <button
@@ -862,6 +959,18 @@ export function App() {
                     </span>
                   </button>
                   <button
+                    className="icon-button project-more"
+                    aria-label={`Project details for ${item.name}`}
+                    title="Project details"
+                    onClick={() => {
+                      setProjectId(item.id);
+                      if (current?.projectId !== item.id) selectSession("");
+                      setProjectDetailsOpen(true);
+                    }}
+                  >
+                    <Icon name="more" />
+                  </button>
+                  <button
                     className="icon-button project-new"
                     aria-label={`New conversation in ${item.name}`}
                     title="New chat"
@@ -876,8 +985,19 @@ export function App() {
                 {expandedProjects.has(item.id) && (
                   <History
                     projectId={item.id}
+                    query={item.id === projectId ? historyQuery : ""}
+                    filter={item.id === projectId ? historyFilter : "active"}
+                    viewStatus={(id) => {
+                      setProjectId(item.id);
+                      selectSession(id);
+                      setStatusOpen(true);
+                    }}
                     selectedId={selectedId}
-                    revision={JSON.stringify(sessions)}
+                    revision={JSON.stringify(
+                      sessions.filter(
+                        (session) => session.projectId === item.id,
+                      ),
+                    )}
                     select={(id) => {
                       setProjectId(item.id);
                       selectSession(id);
@@ -895,150 +1015,73 @@ export function App() {
             <p className="rail-empty">Add a project folder to begin.</p>
           )}
         </nav>
-        <details className="rail-tools">
-          <summary>Project tools</summary>{" "}
-          <button
-            className="quiet-button"
-            disabled={capabilities?.local || capabilities?.personalVps}
-            title={
-              capabilities?.local || capabilities?.personalVps
-                ? "Unavailable in this personal profile"
-                : undefined
+        <details
+          className="rail-footer action-menu settings-menu"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.currentTarget.open = false;
+              event.currentTarget.querySelector("summary")?.focus();
             }
-            onClick={() => setSchedulesOpen(true)}
+          }}
+          onClick={(event) => {
+            if ((event.target as HTMLElement).closest("button"))
+              event.currentTarget.open = false;
+          }}
+        >
+          <summary
+            className="icon-button"
+            aria-label="Settings"
+            title="Settings"
           >
-            Schedules
-          </button>
-          <label className="archive-toggle">
-            <input
-              type="checkbox"
-              checked={showArchived}
-              onChange={(event) => setShowArchived(event.target.checked)}
-            />
-            Show archived
-          </label>
-          {projectId && (
-            <div className="rail-workspaces">
-              <label>
-                New conversation workspace
-                <select
-                  aria-label="New conversation workspace"
-                  value={newWorkspaceId}
-                  onChange={(event) => setNewWorkspaceId(event.target.value)}
-                  disabled={blocked || !!project?.archivedAt}
-                >
-                  <option value="">Choose workspace</option>
-                  {workspaceData.workspaces
-                    .filter((workspace) => workspace.state !== "removed")
-                    .map((workspace) => (
-                      <option
-                        key={workspace.id}
-                        value={workspace.id}
-                        disabled={workspace.state !== "ready"}
-                      >
-                        {workspace.name} ({workspaceNames[workspace.kind]})
-                        {workspace.state !== "ready"
-                          ? ` — ${workspace.state}`
-                          : ""}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <button
-                className="quiet-button"
-                disabled={capabilities?.local || capabilities?.personalVps}
-                title={
-                  capabilities?.local || capabilities?.personalVps
-                    ? "Workspace management requires the managed installation"
-                    : undefined
-                }
-                onClick={() => setWorkspaceManagerOpen(true)}
-              >
-                Manage workspaces
-              </button>
-              <button
-                className="quiet-button"
-                disabled={!newWorkspaceId || !capabilities?.files?.read}
-                title={capabilities?.files?.reason ?? undefined}
-                onClick={() => setFilesOpen(true)}
-              >
-                Files and changes
-              </button>
-              <button
-                className="quiet-button"
-                disabled={
-                  !newWorkspaceId ||
-                  capabilities?.local ||
-                  capabilities?.personalVps
-                }
-                onClick={() => setTerminalWorkspace(newWorkspaceId)}
-              >
-                Open terminals
-              </button>
-              <button
-                className="quiet-button"
-                disabled={
-                  !newWorkspaceId ||
-                  capabilities?.local ||
-                  (capabilities?.personalVps &&
-                    !capabilities.personalPreviews?.length)
-                }
-                onClick={() => setPreviewWorkspace(newWorkspaceId)}
-              >
-                Project previews
-              </button>
-              {workspaceData.error && (
-                <p className="inline-error">{workspaceData.error}</p>
-              )}
-            </div>
-          )}
-        </details>
-        <details className="rail-footer">
-          <summary>Account &amp; settings</summary>
-          <button
-            className="account-button"
-            disabled={!identity || capabilities?.personalVps}
-            title={
-              capabilities?.personalVps
-                ? "API tokens are unavailable in this personal profile"
-                : undefined
-            }
-            onClick={() => setTokensOpen(true)}
-          >
-            API tokens
-          </button>
-          <button
-            className="account-button"
-            onClick={() => setAccountOpen(true)}
-            disabled={!identity}
-          >
-            Codex account{" "}
-            <span>
-              {capabilities?.account?.authenticated ? "Ready" : "Set up"}
-            </span>
-          </button>
-          <p>Work continues when you leave.</p>
-          <button
-            className="quiet-button danger-text"
-            onClick={() => setEmergencyOpen(true)}
-            disabled={!identity || stopped}
-          >
-            Emergency stop
-          </button>
-          <button
-            className="quiet-button"
-            onClick={() =>
-              void execute(
-                newIntent("/security/logout", {}, "Sign out"),
-                () => {
-                  location.assign("/auth/login");
-                },
-              )
-            }
-            disabled={!identity || sending}
-          >
-            Sign out
-          </button>
+            <Icon name="settings" />
+          </summary>
+          <div className="action-menu-panel">
+            <button
+              className="account-button"
+              hidden={capabilities?.personalVps}
+              disabled={!identity}
+              title={
+                capabilities?.personalVps
+                  ? "API tokens are unavailable in this personal profile"
+                  : undefined
+              }
+              onClick={() => setTokensOpen(true)}
+            >
+              API tokens
+            </button>
+            <button
+              className="account-button"
+              onClick={() => setAccountOpen(true)}
+              disabled={!identity}
+            >
+              Codex account{" "}
+              <span>
+                {capabilities?.account?.authenticated ? "Ready" : "Set up"}
+              </span>
+            </button>
+            <p>Work continues when you leave.</p>
+            <button
+              className="quiet-button danger-text"
+              onClick={() => setEmergencyOpen(true)}
+              disabled={!identity || stopped}
+            >
+              Emergency stop
+            </button>
+            <button
+              className="quiet-button"
+              onClick={() =>
+                void execute(
+                  newIntent("/security/logout", {}, "Sign out"),
+                  () => {
+                    location.assign("/auth/login");
+                  },
+                )
+              }
+              disabled={!identity || sending}
+            >
+              Sign out
+            </button>
+          </div>
         </details>
       </aside>
       <SidebarResize changed={updateSidebarWidth} />
@@ -1061,21 +1104,11 @@ export function App() {
             <p>{project?.name ?? "Your workspace"}</p>
             <h1>{current?.title ?? "Conversations"}</h1>
           </div>
-          <div className="header-status">
-            {current && <State state={current.state} />}
-            {current && (
-              <span
-                className={`connection connection-${connection}`}
-                role="status"
-              >
-                {connection === "live"
-                  ? "Connected"
-                  : connection === "connecting"
-                    ? "Connecting…"
-                    : "Reconnecting…"}
-              </span>
-            )}
-          </div>
+          {current && connection !== "live" && (
+            <span className="connection" role="status">
+              {connection === "connecting" ? "Connecting…" : "Reconnecting…"}
+            </span>
+          )}
         </header>
         {(error || pending) && (
           <div className="notice error" role="alert">
@@ -1170,6 +1203,18 @@ export function App() {
                 ? "Open a conversation from the sidebar, or start a new one. Your work and replies stay here when you return."
                 : "Choose a folder within an approved root. Harbor keeps your conversations with the project they belong to."}
             </p>
+            {model === "gpt-6-astra" &&
+              ["low", "medium", "high", "xhigh", "max"].some(
+                (level) =>
+                  !capabilities?.models
+                    .find((entry) => entry.id === model)
+                    ?.efforts.includes(level),
+              ) && (
+                <p className="field-help">
+                  Some GPT-6 Astra reasoning levels are unavailable in this
+                  runtime. Only supported levels are offered.
+                </p>
+              )}
             {!projects.length ? (
               <button
                 className="primary"
@@ -1231,32 +1276,6 @@ export function App() {
               aria-label="Conversation messages"
             >
               <div className="transcript-inner">
-                <details>
-                  <summary>Storage and limits</summary>
-                  <p>
-                    Conversation:{" "}
-                    {Math.ceil(
-                      (snapshot?.storage?.conversationBytes ?? 0) / 1024,
-                    )}{" "}
-                    KiB of{" "}
-                    {Math.ceil(
-                      (snapshot?.storage?.conversationLimitBytes ?? 2097152) /
-                        1024,
-                    )}{" "}
-                    KiB.
-                  </p>
-                  <p>
-                    {projectStorage.status === "known"
-                      ? `Project: ${Math.ceil(projectStorage.usedBytes! / 1048576)} MiB of ${Math.ceil(projectStorage.byteLimit! / 1048576)} MiB.`
-                      : "Project quota usage is unavailable."}
-                  </p>
-                </details>
-
-                <WorkspaceSummary
-                  workspace={boundWorkspace}
-                  sessionId={current.id}
-                  queued={current.state === "queued"}
-                />
                 {project?.archivedAt && (
                   <p className="writer-notice">
                     This project is archived. Source folders and conversation
@@ -1321,6 +1340,17 @@ export function App() {
                       .map((a) => (
                         <AttachmentPreview key={a.id} attachment={a} />
                       ))}
+                    {message.role === "user" && (
+                      <MessageActions text={message.text} />
+                    )}
+                    {message.role === "assistant" &&
+                      responseTexts.has(message.id) && (
+                        <MessageActions
+                          key={`${current.id}:${message.id}`}
+                          text={responseTexts.get(message.id)!}
+                          assistant
+                        />
+                      )}
                     {message.status === "streaming" && (
                       <span className="streaming-label">Writing…</span>
                     )}
@@ -1348,12 +1378,6 @@ export function App() {
                     }
                   />
                 ))}
-                <ConversationDetails
-                  key={`details:${current.id}`}
-                  session={current}
-                  disabled={blocked}
-                  execute={execute}
-                />
                 {uncertain &&
                   (capabilities?.local || capabilities?.personalVps) && (
                     <p className="state-explanation">
@@ -1377,37 +1401,6 @@ export function App() {
                       execute={execute}
                     />
                   )}
-                {current.backgroundUntil && !active && (
-                  <div className="state-explanation" role="status">
-                    <h2>Development processes are available</h2>
-                    <p>
-                      Your development server can stay available until{" "}
-                      {new Date(current.backgroundUntil).toLocaleTimeString()}.
-                      Continue here to keep working. Stop these processes before
-                      using this project in another conversation.
-                    </p>
-                    <button
-                      className="quiet-button"
-                      disabled={blocked || current.backgroundStopRequested}
-                      onClick={() =>
-                        void execute(
-                          newIntent(
-                            `/sessions/${current.id}/background-stop`,
-                            { generation: current.generation ?? 0 },
-                            "Stop background processes",
-                          ),
-                          async () => {
-                            await refreshSnapshot(current.id);
-                          },
-                        )
-                      }
-                    >
-                      {current.backgroundStopRequested
-                        ? "Stopping background processes…"
-                        : "Stop background processes"}
-                    </button>
-                  </div>
-                )}
                 {current.state === "interrupted" && (
                   <div className="state-explanation">
                     <h2>Work was interrupted</h2>
@@ -1574,8 +1567,9 @@ export function App() {
                           .find((item) => item.id === model)
                           ?.efforts.map((item) => (
                             <option key={item} value={item}>
-                              {item[0]?.toUpperCase()}
-                              {item.slice(1)}
+                              {item === "xhigh"
+                                ? "Extra High"
+                                : item[0]?.toUpperCase() + item.slice(1)}
                             </option>
                           ))}
                       </select>
@@ -1653,6 +1647,18 @@ export function App() {
                   )}
                 </div>
               </form>
+              {model === "gpt-6-astra" &&
+                ["low", "medium", "high", "xhigh", "max"].some(
+                  (level) =>
+                    !capabilities?.models
+                      .find((entry) => entry.id === model)
+                      ?.efforts.includes(level),
+                ) && (
+                  <p className="field-help">
+                    Some GPT-6 Astra reasoning levels are unavailable in this
+                    runtime. Only supported levels are offered.
+                  </p>
+                )}
               <div className="composer-help">
                 <span>
                   {active
@@ -1665,28 +1671,212 @@ export function App() {
                   Enter to send · Shift Enter for a new line
                 </span>
               </div>
-              {capabilities?.limits?.maxConversationBytes && (
-                <details className="storage-limits">
-                  <summary>Conversation limits</summary>
-                  <p>
-                    Conversation storage limit:{" "}
-                    {(
-                      capabilities.limits.maxConversationBytes / 1048576
-                    ).toFixed(0)}{" "}
-                    MiB.{" "}
-                    {capabilities.limits.replayEventLimit
-                      ? `The latest ${capabilities.limits.replayEventLimit.toLocaleString()} live updates are retained for replay.`
-                      : ""}{" "}
-                    {capabilities.limits.retryWindowHours
-                      ? `An unchanged request can be retried for ${capabilities.limits.retryWindowHours} hours.`
-                      : ""}
-                  </p>
-                </details>
-              )}
             </section>
           </>
         )}
       </main>
+      {projectDetailsOpen && project && (
+        <Modal
+          title={`Project details: ${project.name}`}
+          close={() => setProjectDetailsOpen(false)}
+        >
+          <p>{project.path ?? project.relativePath ?? project.name}</p>
+          {projectId && (
+            <div className="rail-workspaces">
+              <label>
+                New conversation workspace
+                <select
+                  aria-label="New conversation workspace"
+                  value={newWorkspaceId}
+                  onChange={(event) => setNewWorkspaceId(event.target.value)}
+                  disabled={blocked || !!project?.archivedAt}
+                >
+                  <option value="">Choose workspace</option>
+                  {workspaceData.workspaces
+                    .filter((workspace) => workspace.state !== "removed")
+                    .map((workspace) => (
+                      <option
+                        key={workspace.id}
+                        value={workspace.id}
+                        disabled={workspace.state !== "ready"}
+                      >
+                        {workspace.name} ({workspaceNames[workspace.kind]})
+                        {workspace.state !== "ready"
+                          ? ` — ${workspace.state}`
+                          : ""}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <button
+                className="quiet-button"
+                hidden={capabilities?.local || capabilities?.personalVps}
+                title={
+                  capabilities?.local || capabilities?.personalVps
+                    ? "Workspace management requires the managed installation"
+                    : undefined
+                }
+                onClick={() => {
+                  setProjectDetailsOpen(false);
+                  setWorkspaceManagerOpen(true);
+                }}
+              >
+                Manage workspaces
+              </button>
+              <button
+                className="quiet-button"
+                hidden={!capabilities?.files?.read}
+                disabled={!newWorkspaceId}
+                title={capabilities?.files?.reason ?? undefined}
+                onClick={() => {
+                  setProjectDetailsOpen(false);
+                  setFilesOpen(true);
+                }}
+              >
+                Files and changes
+              </button>
+              <button
+                className="quiet-button"
+                hidden={capabilities?.local || capabilities?.personalVps}
+                disabled={!newWorkspaceId}
+                onClick={() => {
+                  setProjectDetailsOpen(false);
+                  setTerminalWorkspace(newWorkspaceId);
+                }}
+              >
+                Open terminals
+              </button>
+              <button
+                className="quiet-button"
+                hidden={
+                  capabilities?.local ||
+                  (capabilities?.personalVps &&
+                    !capabilities.personalPreviews?.length)
+                }
+                disabled={!newWorkspaceId}
+                onClick={() => {
+                  setProjectDetailsOpen(false);
+                  setPreviewWorkspace(newWorkspaceId);
+                }}
+              >
+                Project previews
+              </button>
+              {workspaceData.error && (
+                <p className="inline-error">{workspaceData.error}</p>
+              )}
+            </div>
+          )}
+        </Modal>
+      )}
+      {statusOpen && current && (
+        <Modal
+          title="Conversation status"
+          returnFocus={`[data-rename-focus="${current.id}"]`}
+          close={() => setStatusOpen(false)}
+          failure={error}
+          retry={
+            pending
+              ? () => void execute(pending.intent, pending.complete)
+              : undefined
+          }
+        >
+          <h3>{current.title}</h3>
+          {current.backgroundUntil && (
+            <p>
+              Archiving this conversation also stops its retained background
+              processes. The conversation history is preserved.
+            </p>
+          )}
+          <State state={current.state} />
+          <p>
+            Connection:{" "}
+            {connection === "live"
+              ? "Connected"
+              : connection === "connecting"
+                ? "Connecting"
+                : "Reconnecting"}
+          </p>
+          <p>
+            {current.backgroundUntil
+              ? "This conversation retains runtime resources."
+              : boundWorkspace?.writerSessionId === current.id
+                ? "This conversation holds the workspace writer reservation."
+                : "No retained background runtime is reported. Workspace and process details are shown below."}
+          </p>
+          <details>
+            <summary>Storage and limits</summary>
+            <p>
+              Conversation:{" "}
+              {Math.ceil((snapshot?.storage?.conversationBytes ?? 0) / 1024)}{" "}
+              KiB of{" "}
+              {Math.ceil(
+                (snapshot?.storage?.conversationLimitBytes ?? 2097152) / 1024,
+              )}{" "}
+              KiB.
+            </p>
+            <p>
+              {projectStorage.status === "known"
+                ? `Project: ${Math.ceil(projectStorage.usedBytes! / 1048576)} MiB of ${Math.ceil(projectStorage.byteLimit! / 1048576)} MiB.`
+                : "Project quota usage is unavailable."}
+            </p>
+          </details>
+
+          <WorkspaceSummary
+            workspace={boundWorkspace}
+            sessionId={current.id}
+            queued={current.state === "queued"}
+          />
+          {current.backgroundUntil && !active && (
+            <div className="state-explanation" role="status">
+              <h2>Development processes are available</h2>
+              <p>
+                Your development server can stay available until{" "}
+                {new Date(current.backgroundUntil).toLocaleTimeString()}.
+                Continue here to keep working. Stop these processes before using
+                this project in another conversation.
+              </p>
+              <button
+                className="quiet-button"
+                disabled={blocked || current.backgroundStopRequested}
+                onClick={() =>
+                  void execute(
+                    newIntent(
+                      `/sessions/${current.id}/background-stop`,
+                      { generation: current.generation ?? 0 },
+                      "Stop background processes",
+                    ),
+                    async () => {
+                      await refreshSnapshot(current.id);
+                    },
+                  )
+                }
+              >
+                {current.backgroundStopRequested
+                  ? "Stopping background processes…"
+                  : "Stop background processes"}
+              </button>
+            </div>
+          )}
+          {capabilities?.limits?.maxConversationBytes && (
+            <details className="storage-limits">
+              <summary>Conversation limits</summary>
+              <p>
+                Conversation storage limit:{" "}
+                {(capabilities.limits.maxConversationBytes / 1048576).toFixed(
+                  0,
+                )}{" "}
+                MiB.{" "}
+                {capabilities.limits.replayEventLimit
+                  ? `The latest ${capabilities.limits.replayEventLimit.toLocaleString()} live updates are retained for replay.`
+                  : ""}{" "}
+                {capabilities.limits.retryWindowHours
+                  ? `An unchanged request can be retried for ${capabilities.limits.retryWindowHours} hours.`
+                  : ""}
+              </p>
+            </details>
+          )}
+        </Modal>
+      )}
       {filesOpen && identity && newWorkspaceId && (
         <Files
           key={newWorkspaceId}
@@ -1804,12 +1994,20 @@ export function App() {
           </Modal>
         )}
       {tokensOpen && identity && (
-        <Modal title="API tokens" close={() => setTokensOpen(false)}>
+        <Modal
+          returnFocus=".settings-menu > summary"
+          title="API tokens"
+          close={() => setTokensOpen(false)}
+        >
           <Tokens csrf={identity.csrfToken} projects={projects} />
         </Modal>
       )}
       {accountOpen && identity && (
-        <Modal title="Codex account" close={() => setAccountOpen(false)}>
+        <Modal
+          returnFocus=".settings-menu > summary"
+          title="Codex account"
+          close={() => setAccountOpen(false)}
+        >
           <Credentials
             csrfToken={identity.csrfToken}
             hasProjects={projects.length > 0}
@@ -1895,8 +2093,10 @@ function Modal({
   close,
   failure,
   retry,
+  returnFocus,
 }: {
   title: string;
+  returnFocus?: string;
   children: React.ReactNode;
   close: () => void;
   failure?: string;
@@ -1905,8 +2105,33 @@ function Modal({
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
+    const focused = document.activeElement as HTMLElement | null;
+    const opener =
+      focused
+        ?.closest("details.action-menu")
+        ?.querySelector<HTMLElement>("summary") ?? focused;
     dialog?.showModal();
-    return () => dialog?.close();
+    return () => {
+      dialog?.close();
+      requestAnimationFrame(() => {
+        const target = returnFocus
+          ? document.querySelector<HTMLElement>(returnFocus)
+          : opener;
+        if (target?.isConnected && target.checkVisibility()) target.focus();
+        else {
+          const fallback =
+            document.querySelector<HTMLElement>(".project-button.selected") ??
+            document.querySelector<HTMLElement>(
+              "[aria-label='Open navigation']",
+            );
+          if (fallback?.checkVisibility()) fallback.focus();
+          else
+            document
+              .querySelector<HTMLElement>("[aria-label='Open navigation']")
+              ?.focus();
+        }
+      });
+    };
   }, []);
   return (
     <dialog

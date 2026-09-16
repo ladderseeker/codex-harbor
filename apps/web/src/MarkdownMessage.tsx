@@ -1,6 +1,7 @@
 import { memo, useId, useMemo } from "react";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { CopyButton } from "./MessageActions.tsx";
 
 const components: Components = {
   table: ({ children }) => (
@@ -21,6 +22,12 @@ const components: Components = {
       code?.type === "element"
         ? String(code.properties.className ?? "").replace(/^language-/, "")
         : "";
+    const text =
+      code?.type === "element"
+        ? code.children
+            .map((child) => (child.type === "text" ? child.value : ""))
+            .join("")
+        : "";
     return (
       <div className="markdown-code">
         {language && (
@@ -34,6 +41,16 @@ const components: Components = {
         >
           {children}
         </pre>
+        <div className="markdown-code-actions">
+          <CopyButton
+            text={text}
+            label={
+              language === "markdown" || language === "md"
+                ? "Copy Markdown source"
+                : "Copy code"
+            }
+          />
+        </div>
       </div>
     );
   },

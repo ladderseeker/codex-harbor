@@ -1,3 +1,4 @@
+import type { ReasoningEffort } from "../../contracts/src/index.js";
 import { type ChildProcessWithoutNullStreams } from "node:child_process";
 import {
   developmentInstructions,
@@ -31,7 +32,7 @@ export type AttachmentInput = {
 export type TurnOptions = {
   attachments?: AttachmentInput[];
   model?: string;
-  effort?: "low" | "medium" | "high" | "xhigh";
+  effort?: ReasoningEffort;
   permissionProfile?: "read-only" | "workspace-write";
 };
 export class RuntimeUncertainError extends Error {

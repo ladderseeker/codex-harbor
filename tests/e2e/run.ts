@@ -88,7 +88,8 @@ const env = {
   HARBOR_PROJECT_ROOTS: JSON.stringify([
     { id: rootId, name: "Test root", path: path.join(dir, "project-roots") },
   ]),
-  HARBOR_MODELS: "fixture",
+  HARBOR_MODELS: designOnly ? "fixture,gpt-6-astra" : "fixture",
+  ...(designOnly ? { HARBOR_FIXTURE_EXTENDED_MODELS: "1" } : {}),
   HARBOR_CONTROL_SOCKET: path.join(dir, "control", "supervisor.sock"),
   HARBOR_CREDENTIAL_KEY_FILE: path.join(dir, "control", "key"),
   HARBOR_FIXTURE_INIT_DELAY_MS: "0",

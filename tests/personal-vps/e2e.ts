@@ -578,6 +578,8 @@ try {
   ).toBe(200);
   expect((await view(rawViewer)).status()).toBe(403);
   console.log("Personal preview actual viewer expiry passed");
+  await page.locator(".session-row.selected .session-rename").click();
+  await page.getByRole("button", { name: "View status", exact: true }).click();
   await expect(
     page.getByRole("button", {
       name: "Stop background processes",
@@ -608,6 +610,10 @@ try {
   expect(stoppedResponse.status()).toBe(403);
   expect(await stoppedResponse.text()).toContain("Preview unavailable");
   console.log("Personal preview stopped-server feedback passed");
+  await page
+    .getByRole("dialog", { name: "Conversation status", exact: true })
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
   await page.screenshot({
     path: path.join(artifacts, "conversation-desktop.png"),
     fullPage: true,

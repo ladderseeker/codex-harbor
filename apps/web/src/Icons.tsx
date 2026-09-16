@@ -1,9 +1,31 @@
 export function Icon({
   name,
 }: {
-  name: "folder" | "compose" | "plus" | "panel" | "more" | "harbor" | "arrow";
+  name:
+    | "folder"
+    | "compose"
+    | "plus"
+    | "panel"
+    | "more"
+    | "search"
+    | "settings"
+    | "copy"
+    | "check"
+    | "thumb-up"
+    | "thumb-down"
+    | "harbor"
+    | "arrow";
 }) {
   const paths = {
+    search: "M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z",
+    settings:
+      "M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1ZM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
+    copy: "M9 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3M5 8h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2Z",
+    check: "m5 12 4 4L19 6",
+    "thumb-up":
+      "M7 10v11H3V10ZM7 10l5-8c3 0 3 3 1 7h6a2 2 0 0 1 2 2l-2 8a2 2 0 0 1-2 2H7",
+    "thumb-down":
+      "M7 14V3H3v11ZM7 14l5 8c3 0 3-3 1-7h6a2 2 0 0 0 2-2l-2-8a2 2 0 0 0-2-2H7",
     folder:
       "M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7ZM3 9h18",
     compose:

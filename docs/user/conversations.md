@@ -9,15 +9,23 @@ The text-conversation foundation is implemented, with dedicated live-account acc
 3. Open **Codex account** when setup is needed. Credential entry requires the authenticated owner and a configured protected credential service. The application discovers available models after a project exists. The fixture instance accepts test data only.
 4. Choose **New chat**, or the new-conversation action beside a project, select an available model, reasoning effort, and permission profile, then enter your request. **Send** or Enter submits it; Shift+Enter adds a line. Ctrl/Command+Enter also submits. The composer starts at one line, grows with text, and scrolls after its height limit. The server enforces the configured permission ceiling.
 
-Drag the sidebar's right edge to widen or narrow it. Keyboard users can focus the divider and use arrow keys or Home/End. On small screens, **Open navigation** opens the project sidebar; Escape or the backdrop closes it. **Project tools** groups workspace and supporting tools. **Account & settings** contains account, API-token, sign-out and emergency controls.
+Drag the sidebar's right edge to widen or narrow it. Keyboard users can focus the divider and use arrow keys or Home/End. On small screens, **Open navigation** opens the project sidebar; Escape or the backdrop closes it. The ellipsis beside a project opens **Project details**, including workspace selection and supported tools. The bottom-right **Settings** gear contains account, available API-token, sign-out and emergency controls. Unsupported feature placeholders are omitted.
 
-The conversation shows streamed output and its current state. Closing the browser or restarting only the API does not cancel work owned by a healthy supervisor. Reopen Harbor and select the same conversation to see its persisted result. Reconnect may request a fresh snapshot when older replay events have expired; that does not restart the old request.
+The conversation shows streamed output and actionable errors or requests. Open its ellipsis menu and choose **View status** for detailed state, connection and resource information. Closing the browser or restarting only the API does not cancel work owned by a healthy supervisor. Reopen Harbor and select the same conversation to see its persisted result. Reconnect may request a fresh snapshot when older replay events have expired; that does not restart the old request.
 
 ## Formatted replies
 
 Assistant replies display Markdown headings, emphasis, links, lists, quotes, tables and code blocks while streaming and after reopening. Wide tables and code scroll within the reply. To show Markdown containing triple-backtick code fences, use a longer outer fence (four backticks) or a tilde fence. Incomplete formatting settles as more text arrives.
 
 Mermaid blocks display labeled source code in this version. Raw HTML is not executed, and image references display text instead of automatically loading remote images. User messages and tool output remain literal.
+
+## Copy and response actions
+
+Each user message has a copy button. A completed assistant turn has one toolbar beneath its final body: copy, like and dislike. Copy preserves the original Markdown for the complete response, excluding tool events, timestamps and interface labels. Code and literal Markdown source blocks have their own copy button at the bottom right, outside the content; code copy preserves whitespace without the outer fence or language label. A check appears after successful copying; failures show a short notice.
+
+Like and dislike only change the current page’s selection. They are mutually exclusive, clicking again clears the choice, and refreshing clears it. No feedback request, database record or analytics event is created.
+
+Reasoning options follow each model’s discovered runtime capabilities. GPT-6 Astra uses Low (`low`), Medium (`medium`), High (`high`), Extra High (`xhigh`) and Max (`max`) when available. Changing models updates the options; unavailable levels cannot be submitted.
 
 ## Approvals, cancellation, and uncertainty
 
@@ -37,7 +45,7 @@ If a submission loses its connection, use its retained retry action to submit th
 
 ## Storage visibility
 
-Open **Storage and limits** for persisted conversation usage and managed project quota information. Project usage is marked unavailable when the trusted storage service cannot inspect it. **Conversation limits** explains the server's current replay and retry bounds. Reaching an admission limit prevents new work; it does not grant permission to delete project files automatically.
+Open **View status** from the conversation ellipsis menu, then **Storage and limits**, for persisted conversation usage and managed project quota information. Project usage is marked unavailable when the trusted storage service cannot inspect it. **Conversation limits** explains the server's current replay and retry bounds. Reaching an admission limit prevents new work; it does not grant permission to delete project files automatically.
 
 Existing supporting tools retain their capability and installation requirements. The [proposal index](../../design/proposals/README.md) distinguishes implemented behavior from unfinished live-account, deployment, restore and deferred-feature obligations.
 
@@ -45,7 +53,7 @@ Existing supporting tools retain their capability and installation requirements.
 
 Harbor names an untitled conversation from the first substantive request, using a short excerpt. Greetings such as “你好” leave naming pending. Existing untouched default titles are populated when upgraded. A manual rename always wins, including a deliberate title of “New conversation”.
 
-Open **Search and filters** within a project's chat list to find a title or stored message text. **Show** switches between active, archived, and all conversations; **Load older conversations** fetches the next bounded page. Hover or focus a chat row to reveal its rename action; touch devices keep the action available. Edit **Conversation title** and choose **Save title**. Renaming checks the current revision so another tab's edit cannot be overwritten silently, and renaming an inactive chat preserves the active conversation and its draft.
+Choose the magnifier **Search and filters** at the top of the sidebar to find a title or stored message text within the selected project. **Show** switches between active, archived, and all conversations; **Load older conversations** fetches the next bounded page. Hover or focus a chat row to reveal its ellipsis menu; touch devices keep the menu available. Choose **Rename**, edit **Conversation title** and choose **Save title**. Renaming checks the current revision so another tab's edit cannot be overwritten silently, and renaming an inactive chat preserves the active conversation and its draft.
 
 **Archive conversation** changes list visibility without deleting messages, removing files, or changing native history. It does not interrupt an active turn. In the personal VPS profile, archiving also retires idle retained development processes and releases their workspace only after retirement is confirmed. Open a retained direct conversation link, or select archived history, then use **Restore conversation** to return it to the active list.
 
@@ -65,6 +73,6 @@ With **Edit project files**, the personal VPS profile permits the selected exist
 
 Command disclosures show the command, directory, output and final exit status. Output is bounded at 32 KiB per command and 256 KiB per conversation, with explicit truncation/omission notices. Assistant messages reconcile the final native response with streamed text. The permission selector is restored from the conversation when reopened.
 
-After a successful turn, **Development processes are available** shows a 30-minute retention period. Continuing the same conversation renews it; its workspace stays reserved, so other conversations cannot write there concurrently. Use **Stop background processes** when finished to end the owned runtime and release that reservation. Closing the browser does not stop it. At most four personal runtime contexts are retained or active simultaneously.
+After a successful turn, a green dot indicates retained runtime resources or a confirmed workspace reservation. It does not mean connected or generating. Open **View status** for the retention deadline and resource details; an uncolored dot makes no claim that resources are free. **Development processes are available** in this dialog shows a 30-minute retention period. Continuing the same conversation renews it; its workspace stays reserved, so other conversations cannot write there concurrently. Use **Stop background processes** in the ellipsis menu or status dialog when finished to end the owned runtime and release that reservation. Closing the browser does not stop it. At most four personal runtime contexts are retained or active simultaneously.
 
 Use [personal development previews](previews.md#personal-vps-development-preview) to view a server after the task completes. A graceful supervisor shutdown retires retained work. An abrupt crash or unconfirmed stop shows uncertainty and preserves the workspace fence; use SSH recovery rather than assuming the processes are absent or replaying work. Standalone terminal UI and managed uncertain-work recovery remain unavailable in the personal profile.

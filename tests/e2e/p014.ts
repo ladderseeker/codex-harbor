@@ -1,3 +1,5 @@
+import { messageActions } from "./message-actions.ts";
+import { openProjectTools } from "./navigation.ts";
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 import { mkdir, symlink, rm } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
@@ -246,6 +248,45 @@ export async function p014({
   );
   await expect(input).toHaveValue("");
   await shot("conversation-desktop");
+  await expect(page.locator(".transcript")).not.toContainText(
+    "Storage and limits",
+  );
+  await expect(page.locator(".conversation-header")).not.toContainText(
+    "Connected",
+  );
+  await expect(page.getByText("Project tools", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Search and filters", exact: true }),
+  ).toHaveCount(1);
+  const more = page.locator(`[data-rename-focus="${first.id}"]`);
+  await more.focus();
+  await more.press("Enter");
+  await page.getByRole("button", { name: "View status", exact: true }).click();
+  const status = page.getByRole("dialog", {
+    name: "Conversation status",
+    exact: true,
+  });
+  await expect(status).toContainText("Storage and limits");
+  await status
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
+  await expect(more).toBeFocused();
+  await page
+    .getByRole("button", { name: "Search and filters", exact: true })
+    .click();
+  await page
+    .getByLabel("Search conversations", { exact: true })
+    .fill("no matching title p016");
+  await expect(
+    page
+      .locator(".project-group")
+      .filter({ has: page.locator(".project-button.selected") }),
+  ).toContainText("No matching conversations");
+  await page.getByLabel("Search conversations", { exact: true }).fill("");
+  await page
+    .getByRole("button", { name: "Search and filters", exact: true })
+    .click();
+
   await input.fill("[markdown]");
   await input.press("Enter");
   const markdown = page.locator(".markdown-body").filter({
@@ -307,6 +348,56 @@ export async function p014({
   ).toBeFocused();
   await page.setViewportSize({ width: 1440, height: 1000 });
 
+  await messageActions(page);
+  await page.getByLabel("Model", { exact: true }).selectOption("gpt-6-astra");
+  await expect(
+    page.getByLabel("Effort", { exact: true }).locator("option"),
+  ).toHaveText(["Low", "Medium", "High", "Extra High", "Max"]);
+  for (const level of ["xhigh", "max"]) {
+    await page.getByLabel("Effort", { exact: true }).selectOption(level);
+    await input.fill(`P016 reasoning ${level}`);
+    await input.press("Enter");
+    await expect(
+      page
+        .getByRole("article", { name: "Codex message" })
+        .filter({ hasText: `Fixture response: P016 reasoning ${level}` }),
+    ).toBeVisible({ timeout: 30000 });
+    const saved = await (
+      await context.request.get(
+        origin + `/api/v1/sessions/${first.id}/snapshot`,
+      )
+    ).json();
+    expect(saved.session.effort).toBe(level);
+    expect(saved.session.model).toBe("gpt-6-astra");
+  }
+  await page.getByLabel("Model", { exact: true }).selectOption("fixture");
+  await expect(
+    page.getByLabel("Effort", { exact: true }).locator("option"),
+  ).toHaveText(["Low", "Medium", "High"]);
+  await expect(page.getByLabel("Effort", { exact: true })).toHaveValue(
+    "medium",
+  );
+  const currentIdentity = await (
+    await context.request.get(origin + "/api/v1/me")
+  ).json();
+  const denied = await context.request.post(
+    origin + `/api/v1/sessions/${first.id}/turns`,
+    {
+      headers: {
+        Origin: origin,
+        "X-CSRF-Token": currentIdentity.csrfToken,
+        "Idempotency-Key": `${Date.now()}:${randomUUID()}`,
+      },
+      data: {
+        text: "unsupported effort must not run",
+        model: "fixture",
+        effort: "max",
+        permissionProfile: "read-only",
+      },
+    },
+  );
+  expect(denied.status()).toBe(403);
+  expect((await denied.json()).error.code).toBe("EFFORT_DENIED");
   const second = await startChat(
     page.getByRole("button", {
       name: "New conversation in Design project",
@@ -322,6 +413,7 @@ export async function p014({
   const hostileTitle =
     '<img src=x onerror="window.p014Injected=true"> Design renamed';
   await page.locator(`[data-rename-focus="${first.id}"]`).click();
+  await page.getByRole("button", { name: "Rename", exact: true }).click();
   const renameDialog = page.locator(".sidebar-rename");
   await renameDialog
     .getByLabel("Conversation title", { exact: true })
@@ -351,6 +443,7 @@ export async function p014({
   await expect(markdown.getByRole("table")).toBeVisible();
   await expect(input).toHaveValue("");
   await page.locator(`[data-rename-focus="${first.id}"]`).click();
+  await page.getByRole("button", { name: "Rename", exact: true }).click();
   await page
     .getByLabel("Conversation title", { exact: true })
     .fill("Design active renamed");
@@ -449,13 +542,8 @@ export async function p014({
     ["API tokens", "API tokens", "tokens"],
     ["Manage workspaces", "Workspaces in Design project", "workspaces"],
   ]) {
-    const group = page.locator(
-      button === "Manage workspaces"
-        ? "details.rail-tools"
-        : "details.rail-footer",
-    );
-    if (!(await group.evaluate((e) => (e as HTMLDetailsElement).open)))
-      await group.locator("summary").click();
+    if (button === "Manage workspaces") await openProjectTools(page);
+    else await page.locator("details.rail-footer > summary").click();
     await page
       .getByRole("button", {
         name: button === "Codex account" ? /^Codex account/ : button,

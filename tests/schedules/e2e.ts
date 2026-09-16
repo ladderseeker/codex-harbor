@@ -173,7 +173,7 @@ export async function scheduleE2e(options: {
     ),
   ).toBe(1);
   const page = context.pages().at(-1)!;
-  await openProjectTools(page);
+  await openProjectTools(page, "schedules");
   await page.getByRole("button", { name: "Schedules", exact: true }).click();
   await page
     .getByRole("button", { name: "Create schedule", exact: true })

@@ -266,3 +266,38 @@ test("P005 adapter emits exact scoped localImage and rejects caller paths", asyn
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test("P016 distinct Extra High and Max values reach the runtime unchanged", async () => {
+  const home = await mkdtemp(join(tmpdir(), "harbor-efforts-"));
+  const trace = join(home, "trace.jsonl");
+  const adapter = new CodexAdapter(
+    spawn(process.execPath, ["tests/fixtures/codex/server.mjs"], {
+      stdio: "pipe",
+      env: { PATH: process.env.PATH, HARBOR_FIXTURE_TRACE_FILE: trace },
+    }),
+  );
+  try {
+    await adapter.initialize();
+    for (const effort of ["xhigh", "max"] as const) {
+      const { thread } = await adapter.startThread({ cwd: home });
+      await adapter.startTurn(thread.id, "test", {
+        model: "gpt-6-astra",
+        effort,
+      });
+    }
+    const requests = (await readFile(trace, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    assert.deepEqual(
+      requests.map(({ model, effort }) => ({ model, effort })),
+      [
+        { model: "gpt-6-astra", effort: "xhigh" },
+        { model: "gpt-6-astra", effort: "max" },
+      ],
+    );
+  } finally {
+    adapter.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});

@@ -1477,7 +1477,7 @@
                 <div class="chat-list" id="demoChats"></div>
               </div>
               <div class="demo-note">
-                Hover or focus a chat to rename it. On touch, actions stay
+                Hover or focus a chat for its action menu. On touch, actions stay
                 visible. Renaming an inactive row keeps the current selection.
               </div>
             </div>
@@ -1591,6 +1591,35 @@
           their own verification.
         </p>
       </section>
+      <section class="section" id="conversation-actions">
+        <h2>Conversation actions and resource status · 15 September 2026</h2>
+        <p>Keep the white/gray/black foundation. The sole semantic color extension is
+          <code>--resource-active: #27834a</code>, used only for a 6px circular
+          resource-occupation mark. It means confirmed retained runtime or workspace
+          reservation, not connection health or generation. Supply accessible text
+          and a tooltip; a neutral mark must not claim confirmed idle when unknown.
+          Status details describe ownership and release behavior.</p>
+        <p>Search uses a top sidebar magnifier and an explicitly labelled current-project
+          input with existing filters. Conversation and project ellipsis buttons use
+          the existing 19px stroke icon system and 30px targets (36px on touch).
+          Menus reuse 10px radii, 6px item radii, neutral edges and existing menu shadow.
+          Open with click, Enter or Space; Escape closes and restores focus. Never
+          require hover on touch. Settings open from the bottom-right gear; no
+          configuration actions in a toast. Dialogs reuse the supporting-surface rules.</p>
+        <p>Every user message has a copy action. A completed assistant turn has one
+          left-aligned toolbar beneath the final body, ordered copy, like, dislike.
+          Copy uses original Markdown for the full turn, excluding tools and interface
+          labels. Reactions use aria-pressed, are mutually exclusive and toggleable;
+          their state is temporary and has no backend or analytics effects.</p>
+        <p>Code and literal Markdown blocks place copy in a bottom-right toolbar outside
+          their scroll area; use 6px separation and the existing muted icon-button
+          treatment. Keep identical placement on mobile. Copy code without fences or
+          language labels and preserve whitespace. Ordinary paragraphs have no separate
+          copy action. Hover and keyboard focus expose a short tooltip; successful
+          clipboard completion briefly shows a check, then restores the icon. Failures
+          show a brief accessible notice and never a success state. Selected reactions
+          use neutral selected background and ink. No counts or feedback forms.</p>
+      </section>
       <section class="section" id="conversation-markdown">
         <h2>Conversation Markdown</h2>
         <p>Assistant messages render CommonMark and GFM: paragraphs, headings, emphasis, lists, disabled task checkboxes, quotations, links, rules, tables, inline code and fenced code. User input and command output stay literal. Accumulated streaming text is parsed again as delimiters arrive; unfinished fences remain code, and an outer four-backtick Markdown fence preserves an inner three-backtick example. Never execute raw HTML or automatically fetch image references; images appear as explicit links. Mermaid fences show a visible “Mermaid source” label and readable code in this release.</p>
@@ -1601,7 +1630,7 @@
           Personal VPS account settings reuse the account status and explanatory
           text pattern: show subscription readiness, explain the trusted SSH
           sign-in step, and omit the API-key form. Unsupported personal-profile
-          tools remain disabled with a reason. Folder browsing stays within
+          tools have no visible entry; capability information remains in project details. Folder browsing stays within
           approved server roots.
         </p>
         <div class="section-header">
@@ -1619,19 +1648,21 @@
           palette.
         </p>
         <p>
-          P014 extends the approved direction to existing application workflows.
-          Keep the default rail focused on New chat and projects. Put
-          search/archive filters in a history disclosure, project tools in a
-          contextual disclosure, and account/security tools in a footer
-          disclosure. Command execution uses the same quiet disclosure: show running/result state, command, working directory, output and exit status in a wrapping monospace region. Limit each command to 32 KiB and conversation diagnostics to 256 KiB, with visible limit notices; final assistant text stays separate. Personal development runtime retention uses the existing state explanation pattern: show the expiry time, explain that the workspace remains reserved for this conversation, and expose Stop background processes with a disabled stopping state. Every existing capability remains reachable; unavailable
-          controls retain a reason.
+          P016 refines P014 with one current-project search/filter entry at the
+          top of the sidebar, contextual project details and a bottom-right
+          settings gear. Session ellipsis menus contain existing actions and
+          on-demand status. Do not show unavailable placeholder features.
+          Storage, environment, workspace, connection and retention details live
+          in their corresponding dialogs. Keep actionable failures and approvals
+          visible in the conversation. Command output remains a quiet disclosure
+          bounded to 32 KiB per command and 256 KiB per conversation.
         </p>
         <div class="specimen">
           <div class="specimen-label">
             Secondary surface reference · visual specimen
           </div>
           <details>
-            <summary>Project tools</summary>
+            <summary>Project details · supported capabilities</summary>
             <p>
               Workspace selection · Files and changes · Workspaces · Terminals ·
               Previews · Scheduled work

@@ -1,3 +1,4 @@
+import { reasoningEffortSchema } from "../../contracts/src/index.js";
 import { z } from "zod";
 const bytes = (maximum: number) =>
   z
@@ -32,7 +33,7 @@ export const scheduleConfigSchema = z
       .regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)
       .optional(),
     model: bytes(100),
-    effort: z.enum(["low", "medium", "high"]),
+    effort: reasoningEffortSchema,
     permissionProfile: z.enum(["read-only", "workspace-write"]),
     missedPolicy: z.enum(["skip", "catch_up"]).default("skip"),
     overlapPolicy: z.literal("skip").default("skip"),

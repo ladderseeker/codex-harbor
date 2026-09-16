@@ -60,7 +60,7 @@ export async function scheduleDstE2e(o: {
     200,
   );
   await page.reload();
-  await openProjectTools(page);
+  await openProjectTools(page, "schedules");
   await page.getByRole("button", { name: "Schedules", exact: true }).click();
   await page
     .getByRole("button", { name: "Create schedule", exact: true })

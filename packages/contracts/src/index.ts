@@ -1,4 +1,13 @@
 import { z } from "zod";
+export const reasoningEfforts = [
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
+export const reasoningEffortSchema = z.enum(reasoningEfforts);
+export type ReasoningEffort = z.infer<typeof reasoningEffortSchema>;
 export const permissionSchema = z.enum(["read-only", "workspace-write"]);
 export type PermissionProfile = z.infer<typeof permissionSchema>;
 export const turnSchema = z
@@ -13,7 +22,7 @@ export const turnSchema = z
         "Input exceeds byte limit",
       ),
     model: z.string().min(1).max(100),
-    effort: z.enum(["low", "medium", "high"]),
+    effort: reasoningEffortSchema,
     permissionProfile: permissionSchema,
     attachmentIds: z.array(z.uuid()).max(4).default([]),
     draftRevision: z.number().int().nonnegative().optional(),
@@ -33,7 +42,7 @@ export const sessionSchema = z
     workspaceId: z.uuid().optional(),
     title: z.string().trim().min(1).max(100).default("New conversation"),
     model: z.string().min(1).max(100),
-    effort: z.enum(["low", "medium", "high"]).default("medium"),
+    effort: reasoningEffortSchema.default("medium"),
     permissionProfile: permissionSchema.default("read-only"),
   })
   .strict();

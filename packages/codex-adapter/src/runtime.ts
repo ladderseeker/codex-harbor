@@ -100,6 +100,8 @@ function fixtureProcess(config: RuntimeConfig) {
         HARBOR_FIXTURE_MODE: "private-test",
         HARBOR_FIXTURE_WORKSPACE: config.workspacePath,
         HARBOR_FIXTURE_INIT_DELAY_MS: process.env.HARBOR_FIXTURE_INIT_DELAY_MS,
+        HARBOR_FIXTURE_EXTENDED_MODELS:
+          process.env.HARBOR_FIXTURE_EXTENDED_MODELS,
         HARBOR_FIXTURE_TRACE_FILE: process.env.HARBOR_FIXTURE_TRACE_FILE,
         HARBOR_FIXTURE_STATE_FILE: process.env.HARBOR_FIXTURE_STATE_DIR
           ? join(
