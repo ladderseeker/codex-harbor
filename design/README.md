@@ -1,6 +1,6 @@
 # Harbor design
 
-The architecture is the accepted implementation baseline. P014 completed the scoped frontend redesign; [P016](proposals/016-conversation-first-interface.md) is the selected conversation-first refinement; broader implementation and verification remain under way. The [proposal index](proposals/README.md) owns current feature status, dependencies, evidence and next actions. Decision (`Draft`, `Accepted`, `Superseded`) and delivery (`Planned`, `In progress`, `Implemented`, `Verified`) remain separate. Existing session authorization governs work; metadata does not create a universal approval gate.
+The architecture is the accepted implementation baseline. P014 completed the scoped frontend redesign; [P016](proposals/archive/016-conversation-first-interface.md) completed the conversation-first refinement; broader implementation and verification remain under way. The [proposal index](proposals/README.md) owns current feature status, dependencies, evidence and next actions. Decision (`Draft`, `Accepted`, `Superseded`) and delivery (`Planned`, `In progress`, `Implemented`, `Verified`) remain separate. Existing session authorization governs work; metadata does not create a universal approval gate.
 
 - [Architecture](architecture.md): system boundaries, identity, runtime/data contracts, local development, verification, self-development, and releases.
 - [Design tokens and UI guide](design-tokens.html): approved visual baseline, component rules, and workflow for extending the design consistently.

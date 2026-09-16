@@ -6,7 +6,7 @@ The focused 14 September assistant Markdown correction is tracked in the [render
 
 ## Current delivery queue
 
-On 15 September the owner selected [P016](016-conversation-first-interface.md), a complete conversation-first UI refinement including content copy, temporary reactions and accurate runtime reasoning choices, with implementation, push and deployment authorized.
+On 15 September the owner selected [P016](archive/016-conversation-first-interface.md), a complete conversation-first UI refinement including content copy, temporary reactions and accurate runtime reasoning choices, now verified, deployed and archived as Completed.
 
 The owner selected [P015](015-personal-vps-workspace.md) on 13 September for the complete subscription/existing-folder VPS workflow under [D011](../decisions/011-personal-vps-workspace.md). It is Accepted and Implemented; source `13204d7` is deployed and the real installed development loop passed. Actual preview expiry/security and installed stop checks passed; the unavailable required rendered-prototype gate keeps verification open. On 14 September the owner selected D012's full development loop, titles, complete replies and private attached previews, with push and VPS deployment authorized.
 
@@ -32,7 +32,6 @@ An independently verifiable feature may rely on its declared dependencies. Imple
 
 | ID | Complete outcome | Decision | Delivery | Direct dependencies | Acceptance IDs / specialist lanes |
 | --- | --- | --- | --- | --- | --- |
-| [P016](016-conversation-first-interface.md) | Read, navigate and act on conversations in a quiet, accurate interface | Accepted | Implemented | Implemented P001/P003/P007/P014/P015 boundaries | P016-01–06; UI acceptance/review passed, final regression and deployment underway |
 | [P015](015-personal-vps-workspace.md) | Use subscription Codex on an existing VPS folder through persistent authenticated Harbor | Accepted | Implemented | P001, P003, P007, P013 implemented boundaries | P015-01–10; source `13204d7` deployed with real development/preview/continuation evidence; preview-security/expiry and installed stop passed; required rendered-prototype verification remains |
 | [P013](013-personal-local-experience.md) | Sign in and try a real Codex conversation on a personal computer | Accepted | Implemented | P001, P003 implemented boundaries | [Local/native review and owner trial passed](../../docs/reports/2026-09-13-personal-local-experience.md); critical regression passed under P014; final lifecycle reconciliation remains |
 | [P001](001-secure-persistent-conversations.md) | Sign in and conduct a protected Codex conversation that survives browser closure | Accepted | Implemented | None | P001-01–08; contracts/E2E/Linux passed, live and medium follow-ups pending |

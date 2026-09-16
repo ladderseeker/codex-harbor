@@ -4,11 +4,12 @@
 
 - Proposal ID: P016
 - Decision: Accepted, 2026-09-15 under the owner's explicit implementation, push and deployment request.
-- Delivery: Implemented
+- Delivery: Verified
+- Archive disposition: Completed, 2026-09-16
 - User outcome: Read and continue conversations in a quiet interface, find existing controls in contextual menus, copy original content, and choose the runtime's supported reasoning effort accurately.
-- Next action: Finish final critical/runtime regression and identified candidate deployment; scoped UI acceptance and three review rounds passed.
+- Closing outcome: P016-01–06 passed; final source `180bdabc2e4400fa612421c0d23d3392b63547e1` is deployed with installed browser/runtime acceptance.
 
-The owner's final instruction to implement supersedes the quoted requirement document's earlier Markdown-only scope. The [architecture](../architecture.md) retains authorization, runtime and persistence ownership. This proposal owns the bounded interface extension to [P014](archive/014-consistent-frontend.md), alongside existing P001/P003/P007/P015 behavior.
+The owner's final instruction to implement supersedes the quoted requirement document's earlier Markdown-only scope. The [architecture](../../architecture.md) retains authorization, runtime and persistence ownership. This proposal owns the bounded interface extension to [P014](014-consistent-frontend.md), alongside existing P001/P003/P007/P015 behavior.
 
 ## Scope and prerequisites
 
@@ -18,7 +19,7 @@ Include unified current-project search/filter, contextual project and conversati
 
 ## Source issues
 
-None transferred. Existing upstream release and restore obligations remain with their owners in the [issue index](../../issues/README.md).
+None transferred. Existing upstream release and restore obligations remain with their owners in the [issue index](../../../issues/README.md).
 
 ## User and API flows
 
@@ -40,7 +41,7 @@ Existing owner authentication, CSRF, server authorization and permission ceiling
 
 ## Implementation approach
 
-Extend the [canonical guide](../design-tokens.html) and [standalone prototype](../prototypes/harbor-redesign.html) for search, menus, semantic resource green and message toolbars. Reuse existing neutral surfaces, type, spacing, icons, dialogs, focus restoration and mobile touch patterns. Move existing functionality into these surfaces, add reusable clipboard/reaction components, and remove the hardcoded effort narrowing while preserving runtime validation.
+Extend the [canonical guide](../../design-tokens.html) and [standalone prototype](../../prototypes/harbor-redesign.html) for search, menus, semantic resource green and message toolbars. Reuse existing neutral surfaces, type, spacing, icons, dialogs, focus restoration and mobile touch patterns. Move existing functionality into these surfaces, add reusable clipboard/reaction components, and remove the hardcoded effort narrowing while preserving runtime validation.
 
 ## Verification and acceptance criteria
 
@@ -59,8 +60,8 @@ Use the existing personal VPS immutable package workflow and complete pinned nat
 
 ## Review record and remaining issues
 
-The [delivery report](../../docs/reports/2026-09-15-conversation-interface.md) records current checks and review findings. Root coordinates UI, message actions and model capability implementers and a separate independent reviewer. Unavailable required gates must remain recorded; no completion claim from build or screenshots alone.
+The [delivery report](../../../docs/reports/2026-09-15-conversation-interface.md) records current checks and review findings. Root coordinates UI, message actions and model capability implementers and a separate independent reviewer. Unavailable required gates must remain recorded; no completion claim from build or screenshots alone.
 
 ## Closing record
 
-Pending complete acceptance and deployment evidence.
+Completed 2026-09-16. The linked delivery report records source/artifact digests, commands, environments, results, three independent review rounds, the final bounded focus correction, installed acceptance, recovery checkpoint and unchanged upstream limitations. Current behavior is documented in the user guides and developer workflow.
