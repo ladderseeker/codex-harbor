@@ -1,8 +1,8 @@
 # P023 query-recency correction
 
-The owner clarified that only sending a query changes sidebar recency; opening a session must preserve its position. [P023](../../design/proposals/023-sidebar-and-transcript-refinement.md#query-recency-correction--20-september-2026) reopens at clean baseline `c74f88ec067ea7d7c171d4dcea24e23f72178c19`. Prior UI and correction reviews remain historical in their reports. The owner’s existing commit, push and deployment authorization continues.
+The owner clarified that only sending a query changes sidebar recency; opening a session must preserve its position. [P023](../../design/proposals/archive/023-sidebar-and-transcript-refinement.md#query-recency-correction--20-september-2026) reopens at clean baseline `c74f88ec067ea7d7c171d4dcea24e23f72178c19`. Prior UI and correction reviews remain historical in their reports. The owner’s existing commit, push and deployment authorization continues.
 
-Implementation and verification are in progress. Main owns planning, combined gates and deployment. A fresh Medium-effort implementer owns the ten-file fence; new independent design/provenance reviews follow the green gate. Private evidence is retained under `.test-runs/p023-query-recency-20260920/`.
+The correction is implemented, locally and Linux tested, committed, pushed and deployed; both independent review rounds are clear. Main owns planning, combined gates and deployment. A fresh Medium-effort implementer completed the ten-file fence; fresh independent design/provenance reviewers cleared both rounds. Private evidence is retained under `.test-runs/p023-query-recency-20260920/`.
 
 ## Source and deployment prerequisites
 
@@ -14,7 +14,7 @@ Strict-host-key SSH returned `root` and `srv1464935`. The fresh preflight identi
 
 Main's `prototype02` check passed desktop and touch interactions against the unchanged prototype file identified in `prototype-evidence.json`: viewing another conversation and typing a draft preserve all ten loaded positions; sending moves only that conversation first, and later viewing another leaves the order intact. Main inspected desktop and settled touch screenshots. The initial `prototype01` behavior assertions also passed, but its touch screenshot caught the sidebar animation; the second capture polls settled geometry. Both runs remain retained. These are prototype-only results while application tests were still being edited, not final application-source acceptance.
 
-## Local verification in progress
+## Local verification history
 
 Build/check and all 39 unit tests passed at frozen source `17a8da4f3ff6a2c3b1e6c8c0f4ef168ef7c688bd1ed48d8d6f37455be735c46d` (1,093 files). `impl-unit01` failed because sandbox restrictions denied a required local listener; the identical command with scoped permissions passed as `impl-unit02`. Main verified their raw-log hashes and unchanged start/end identities.
 
@@ -33,3 +33,29 @@ The final ten-file implementation inventory and diff are retained in `review-imp
 ## Independent review — round one
 
 Fresh Medium-effort design and provenance reviewers independently cleared the ten-file implementation and local gate without actionable findings. Both verified final `1783cf6…bc69`, Q1–Q3 coverage, current contracts, actual prototype/application artifacts, and the exact four-line design-test delta supporting green Critical-02 reuse. Provenance independently reconstructed the 1,093-file digests, matched all final gate/raw-log/result identities and verified the unchanged deployment helpers plus the single exact predecessor-hash change. Main accepts both assessments. Review messages record these assessments; complete raw review-session exports are unavailable. Linux candidate and installed acceptance remain pending.
+
+## Committed Linux candidate
+
+The reviewed implementation and plan were committed and pushed as `1464bb6fae3a340c4f7f437b2f2239d698ae6fa0`; origin/main acknowledged the push and the checkout was clean. All seven uploaded input hashes match, including bundle SHA256 `2a1f326d4adc73db1e1067c1fa6cd563d2ea559e7827b3cc6f1dd3f5a26dd508` and upload archive SHA256 `9830aa35d5795b150d27b701ee1e6c744c30f0e4ae5c87efb03ee5d4a75c760e`. The fresh candidate uses `/var/lib/harbor-dev-20260914/p023-1464bb6fae3a340c4f7f437b2f2239d698ae6fa0`; the reviewed nonroot locked build/test/package workflow is running. No installed release has changed in this cycle yet.
+
+The fresh nonroot Linux locked build and 39 unit tests passed. The packaged release has manifest SHA256 `6761b3df921fb4670e378ab6a58522b32a6b77bbbac985000cfeb2ef9e54d3fc`; its 244,805,081-byte archive has SHA256 `300aa38633840a7c3038635e29d5eb851d250e7cbd16c7de15088938b115896d` and 14,221 manifest files. The full before/after source/package equality verifier and isolated Linux design lane are running against this identified package.
+
+## Linux acceptance and installed release
+
+Linux candidate verification and the isolated real-stack design lane passed at exact final source `1783cf6…bc69` (`harbor-e2e-a48c3564fe`). Complete source/package equality receipts match before and after acceptance. The retained `linux-evidence02.tar` has SHA256 `b5b3e86f2bc833bc87bc877593b13b8c47dcd6cf4d564c097a93b425d5909f32`; its 29 regular files, extracted under `linux-evidence01/`, include the full package manifest, raw build/test logs, source receipts, result and screenshots. Main checked every retrieved hash and inspected the actual Linux desktop screenshot. `linux-verification-record.json` binds the evidence, package and committed source. No new native/runtime/isolation certification is claimed.
+
+The first staging and evidence-fetch SSH connections closed with exit 255 before their commands ran. The failed receipts and zero-byte first evidence archive remain retained. A strict read-only check confirmed the candidate release had not been staged. Sequential Stage-02 and Collect-02 then succeeded without overwriting an existing release or changing safeguards.
+
+Promotion-01 passed after drain and a matched backup, preserving one preview. The current release is `/opt/harbor-personal/releases/p023-1464bb6fae3a`, revision `1464bb6fae3a340c4f7f437b2f2239d698ae6fa0`, manifest `6761b3df921fb4670e378ab6a58522b32a6b77bbbac985000cfeb2ef9e54d3fc`. The prior `/opt/harbor-personal/releases/p023-a94f4c1f8bed` and matched backup `/var/lib/harbor-personal-backups/p023-1464bb6fae3a-20260920` remain available. No migration was introduced; existing SSH recovery and restore limits remain unchanged, and this run did not perform a restore drill.
+
+Installed-01 passed: API PID 3943489 and supervisor PID 3943488 execute from the new release, with no predecessor processes. HTTPS `/health` returns 200; anonymous `/`, `/index.html`, `/api/v1/me`, `/api/v1/projects` and both actual assets return 401. The deployed assets are `/assets/index-BnXMP3XU.js` and `/assets/index-DL-aHLP7.css`.
+
+Main reloaded the previously approved disposable P023 UI acceptance conversation in Chrome. Its authenticated page loaded those exact assets, its existing transcript and one selected history row, with an empty composer. Reselecting that row preserved the URL and visible state. No query was submitted and no live project content changed. An optional direct browser navigation to a filtered history API URL was blocked by Chrome (`ERR_BLOCKED_BY_CLIENT`); it yielded no API evidence, was not bypassed, and the tab returned to the loaded canary page. The single-row installed observation is limited presentation/identity evidence; multi-session ordering, accepted sends, persistence and cursor behavior are established by the real-stack local and Linux gates. `installed-ui-observation.json` records the observations and limits; a complete raw CUA trace/export is unavailable.
+
+Both independent reviewers now assess the closing evidence in round two. Application source remains unchanged from round one. Downloads/previews and earlier unrelated gate limitations remain open in their existing records.
+
+## Independent closing review and completion
+
+Round two is clear in both roles, with no actionable findings. The design reviewer checked the unchanged ten-file implementation, Linux screenshots and real-stack result, artifact equality, staging/promotion safeguards and installed presentation limits. The provenance reviewer independently verified bundle/upload/package/evidence hashes, all 29 retrieved files, before/after equality, successful deployment receipts and raw logs, installed identity/auth results, and unchanged final source. The failed first evidence fetch has its zero-byte archive and summary record rather than a dedicated command receipt; no success claim depends on that failed attempt. Complete raw CUA and review-session exports remain unavailable.
+
+Main accepts both clear assessments: Q1–Q4 and every scoped gate are complete, with no unresolved in-scope finding. P023 is marked Implemented and archived as Completed under the same ID/filename; inbound/outbound links and metadata are repaired. The closing documentation check passes for 162 Markdown files, with explicit archived-file newline/whitespace checks. The documentation-only closing commit and push follow the already deployed application commit; they change no application artifact and require no redeployment. Both rounds are complete within the three-round cap. The historical reports and unrelated open obligations remain unchanged apart from proposal links.

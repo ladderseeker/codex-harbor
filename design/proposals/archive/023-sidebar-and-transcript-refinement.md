@@ -3,7 +3,9 @@
 ## Metadata
 
 - ID: P023
-- Status: Accepted
+- Status: Implemented
+- Archive disposition: Completed
+- Completed: 2026-09-20, including the query-recency clarification
 - Prior completion: 2026-09-20; initial UI and owner-review corrections preserved below
 - Reopened: 2026-09-20 after owner clarified that only sent queries change sidebar recency
 - Created: 2026-09-20
@@ -13,17 +15,17 @@
 - Baseline: Initial delivery used `58c8accfea66ef2852b86bbea7e9b614674aad55`; the first owner-review correction started from clean `4b438a954c0db071b9e2ccd8cb9839da02dcfe15`; the current query-recency correction starts from clean `c74f88ec067ea7d7c171d4dcea24e23f72178c19`.
 - Dependencies: Existing authenticated history cursor API, Markdown renderer, message records and dialog focus handling are implemented at baseline. Node 24.11.1 and pnpm 12.3.4 are available; Docker and SSH require scoped sandbox access. All required gates must pass before completion.
 - Source issues: Owner screenshots/request; no existing issue transferred.
-- Design references: [Architecture](../architecture.md), [interface](../systems/006-interface.md), [conversations](../systems/001-conversations-and-access.md), [profiles](../systems/004-deployment-and-profiles.md), [visual guide](../design-tokens.html), [prototype](../prototypes/harbor-redesign.html).
+- Design references: [Architecture](../../architecture.md), [interface](../../systems/006-interface.md), [conversations](../../systems/001-conversations-and-access.md), [profiles](../../systems/004-deployment-and-profiles.md), [visual guide](../../design-tokens.html), [prototype](../../prototypes/harbor-redesign.html).
 - Exact file fence: [Query-recency ownership](#query-recency-ownership-and-gates); earlier fences are retained as history.
 - Acceptance IDs: Current query-recency correction P023-Q1–P023-Q4; prior P023-01–P023-07 and P023-R1–P023-R5 are historical.
 
-Earlier plans and closing records below preserve the completed deliveries. The [query-recency correction](#query-recency-correction--20-september-2026) governs the currently reopened scope, fence and gate; it supersedes the earlier selected-first recency contract.
+Earlier plans and closing records below preserve the completed deliveries. The [query-recency correction](#query-recency-correction--20-september-2026) governs the completed correction scope, fence and gate; it supersedes the earlier selected-first recency contract.
 
 ## Problem, outcome and exclusions
 
 Long sidebar histories, inline search filters, faint ellipsis controls and centered action text make navigation cumbersome. User copy occupies the bubble, code copy sits below the block without syntax coloring, and each command contributes a full message heading and vertical spacing even while collapsed.
 
-Deliver one cohesive navigation and reading improvement. Report downloads/browser previews are a separate resource-delivery outcome retained in [the follow-up issue](../../issues/2026-09-20-120000-conversation-report-downloads.md): personal VPS currently excludes the managed file API. Do not expose arbitrary model paths as download links. New conversation drafts, capacity, approval delivery and native naming remain with P018–P022 and are excluded. No runtime protocol, execution policy, API authority, schema or migration changes.
+Deliver one cohesive navigation and reading improvement. Report downloads/browser previews are a separate resource-delivery outcome retained in [the follow-up issue](../../../issues/2026-09-20-120000-conversation-report-downloads.md): personal VPS currently excludes the managed file API. Do not expose arbitrary model paths as download links. New conversation drafts, capacity, approval delivery and native naming remain with P018–P022 and are excluded. No runtime protocol, execution policy, API authority, schema or migration changes.
 
 ## Dependencies and current design
 
@@ -99,7 +101,7 @@ Main owns proposal, follow-up issue, combined evidence and deployment. The imple
 
 ## Rollout and recovery
 
-Follow [personal VPS deployment](../../docs/developer/personal-vps.md) and inspect installed configuration/identity first. Reuse the reviewed fixed candidate packaging/staging/promotion approach only after reading its scripts. Build outside live/source projects under a disposable nonroot builder. Preserve complete runtime layout, site writable-path drop-ins, proxy, credentials and state. No migration expected; compare migration inventories before switching. Drain active operations, retain a root-private matched database/native/config/unit checkpoint and exact predecessor. Promotion must identify tested source/artifact and successful services/assets. A failed readiness check leaves the candidate unpromoted or uses the documented compatible predecessor recovery; never restore over new work silently. SSH remains the recovery route. The owner already authorized commit, push and deployment.
+Follow [personal VPS deployment](../../../docs/developer/personal-vps.md) and inspect installed configuration/identity first. Reuse the reviewed fixed candidate packaging/staging/promotion approach only after reading its scripts. Build outside live/source projects under a disposable nonroot builder. Preserve complete runtime layout, site writable-path drop-ins, proxy, credentials and state. No migration expected; compare migration inventories before switching. Drain active operations, retain a root-private matched database/native/config/unit checkpoint and exact predecessor. Promotion must identify tested source/artifact and successful services/assets. A failed readiness check leaves the candidate unpromoted or uses the documented compatible predecessor recovery; never restore over new work silently. SSH remains the recovery route. The owner already authorized commit, push and deployment.
 
 ## Review and findings
 
@@ -113,9 +115,9 @@ Completed on 20 September 2026. P023-01–P023-07 passed: five-item history and 
 
 Implementation was committed and pushed as `814ad3d83ffe1291fd7ffb3e003923db2ffa7ee3`, followed by reviewed Escape corrections in `606d6cc75baa3a3713269472d5784f1d9ee522e6`. Final source digest: `e970832b7281cb3241bc2a3202c2cbca0a6ae7bb0f0454e7048790f954abdc57`. Local build/check, all 39 unit tests, real design and full critical E2E passed; the fresh Linux locked build/unit/design gate and complete before/after package verification passed. Final deployed release is `/opt/harbor-personal/releases/p023-606d6cc75baa`, manifest SHA256 `1af0c3fd1d8f5433c56ad9262fdb1e1b6cf4c3267fa094d9155eda7cb4ae251f`, with a matched private backup and predecessor retained.
 
-Installed service/executable identity, HTTPS/auth denial, signed-in browser Escape and presentation checks passed. After explicit owner approval, a disposable project conversation read and edited only its canary file; its retained runtime was stopped. Three independent review rounds are clear. The [delivery report](../../docs/reports/2026-09-20-sidebar-and-transcript.md) records commands, identities, failed attempts, review dispositions and evidence limits. The proposal was drafted and accepted under the owner's implementation authorization on this same date.
+Installed service/executable identity, HTTPS/auth denial, signed-in browser Escape and presentation checks passed. After explicit owner approval, a disposable project conversation read and edited only its canary file; its retained runtime was stopped. Three independent review rounds are clear. The [delivery report](../../../docs/reports/2026-09-20-sidebar-and-transcript.md) records commands, identities, failed attempts, review dispositions and evidence limits. The proposal was drafted and accepted under the owner's implementation authorization on this same date.
 
-[Report downloads and safe browser previews](../../issues/2026-09-20-120000-conversation-report-downloads.md) remain a separate capability. This completion does not close historical runtime-isolation or protected restore obligations. The documentation closing commit follows the installed application commit; it does not change the deployed artifact.
+[Report downloads and safe browser previews](../../../issues/2026-09-20-120000-conversation-report-downloads.md) remain a separate capability. This completion does not close historical runtime-isolation or protected restore obligations. The documentation closing commit follows the installed application commit; it does not change the deployed artifact.
 
 ## Owner review correction cycle — 20 September 2026
 
@@ -160,7 +162,7 @@ Update current interface/guide/prototype contracts before application use. Rende
 
 After green local gates, start fresh-context design and provenance reviewers. Main adjudicates and the same implementer fixes within this cycle's three-round cap. Build and test a fresh immutable Linux package from the reviewed committed source, verify full source/package equality before and after acceptance, stage it, drain and checkpoint the installed predecessor, and promote with service/executable/HTTPS/auth checks. Use the already owner-approved disposable P023 UI acceptance conversation for read-only installed presentation checks; no new project registration or model turn is required. The promotion verifier must explicitly allow the reviewed `apps/api/src/history.ts` byte change by exact predecessor/candidate hashes while retaining equality checks for every other backend/runtime/migration input. Earlier live canary/native evidence at `606d6cc` is reused for unchanged execution boundaries, with its limits explicit.
 
-The [owner-review report](../../docs/reports/2026-09-20-sidebar-owner-review.md) will record this correction cycle separately. Keep the original report and initial closing record historical; restore Implemented/Completed only after all five correction acceptance IDs, mandatory gates, reviews and deployment pass, then archive the same proposal filename and repair links.
+The [owner-review report](../../../docs/reports/2026-09-20-sidebar-owner-review.md) will record this correction cycle separately. Keep the original report and initial closing record historical; restore Implemented/Completed only after all five correction acceptance IDs, mandatory gates, reviews and deployment pass, then archive the same proposal filename and repair links.
 
 ### Correction reviews
 
@@ -172,7 +174,7 @@ Round three cleared the final documentation-only archive, metadata and link chan
 
 All R1–R5 implementation and local/Linux gates are complete. Application commit `a94f4c1f8bed550efe010caf346a66db5c45b123` is pushed and deployed as `/opt/harbor-personal/releases/p023-a94f4c1f8bed`, manifest `e153ca89e91d4abc203e161d56fd6cddf9a0fbe1c07cf81c2976d1292a9cbc7d`. Final source is `8afe1f6e2eb260a4cd71d121c0f4f7b75e87c9a064c680dbc46d99896f7eaa79`; all 39 unit tests, build/check and final design pass locally, and the Linux locked build/unit/design and full unchanged-input verification pass. The green critical02 source and exact visual-only reuse delta remain explicitly recorded. Main verified installed service/binary/auth identity and read-only UI on the previously approved disposable conversation. The matched private backup and exact prior release are retained.
 
-The [owner-review report](../../docs/reports/2026-09-20-sidebar-owner-review.md) records evidence, failed attempts, review dispositions and limits. Both independent review roles cleared completion in round two. Main restored Implemented/Completed and archived this proposal under the same ID/filename, preserving the initial delivery history and repairing inbound links. The documentation closing commit follows the deployed application commit and changes no application or built assets. Downloads/previews and the earlier unexplained credential-test 409 remain separate open obligations.
+The [owner-review report](../../../docs/reports/2026-09-20-sidebar-owner-review.md) records evidence, failed attempts, review dispositions and limits. Both independent review roles cleared completion in round two. Main restored Implemented/Completed and archived this proposal under the same ID/filename, preserving the initial delivery history and repairing inbound links. The documentation closing commit follows the deployed application commit and changes no application or built assets. Downloads/previews and the earlier unexplained credential-test 409 remain separate open obligations.
 
 ## Query-recency correction — 20 September 2026
 
@@ -197,8 +199,20 @@ Main owns this proposal at active/archive paths, inbound links in both P023 repo
 
 **P023-Q4:** After green gates, start separate fresh-context design/provenance reviewers, at most three rounds for this newly clarified correction. Build/test a fresh immutable Linux candidate, verify full source/package equality, drain and back up the predecessor, promote and check installed identity/auth plus read-only browser ordering. Reuse the previously approved disposable conversation for installed reads; no new model turn required. Existing reviewed deployment helpers may be reused after hashes/source inspection, updating only the exact predecessor history-file hash in the bounded promotion verifier. Retain prior release and matched backup; SSH recovery and restore limits remain unchanged.
 
-Completion requires Q1–Q4 and both independent reviews. Record results in the [query-recency report](../../docs/reports/2026-09-20-query-recency.md), then restore Implemented/Completed and archive the same proposal with repaired links. Downloads/previews and prior unrelated gate limitations remain outside scope.
+Completion requires Q1–Q4 and both independent reviews. Record results in the [query-recency report](../../../docs/reports/2026-09-20-query-recency.md), then restore Implemented/Completed and archive the same proposal with repaired links. Downloads/previews and prior unrelated gate limitations remain outside scope.
 
 ### Query-recency review progress
 
 Round one is clear in both fresh independent roles. Final source `1783cf6d1341ef8cc1433326aedee38b359ead3fc5ff97f3f66887772752bc69` passed build/check, 39 unit tests and design E2E. Both reviewers accepted the identified Critical-02 result and exact four-line design-test-only reuse delta. Q1–Q3 and the local portion of Q4 are complete; the Linux candidate, deployment and independent closing review remain pending.
+
+### Query-recency closing record — 20 September 2026
+
+Q1–Q3, Linux acceptance and installed verification are complete. Application commit `1464bb6fae3a340c4f7f437b2f2239d698ae6fa0` is pushed and deployed as `/opt/harbor-personal/releases/p023-1464bb6fae3a`, manifest `6761b3df921fb4670e378ab6a58522b32a6b77bbbac985000cfeb2ef9e54d3fc`. Final source is `1783cf6d1341ef8cc1433326aedee38b359ead3fc5ff97f3f66887772752bc69`. Local build/check/unit/design and the identified unchanged-boundary critical gate pass; Linux locked build/unit/design and complete source/package equality pass. Main verified installed process/artifact/HTTPS/auth identity and the exact assets loaded in the approved single-session canary. That read-only observation does not independently prove multi-session order; real-stack local/Linux gates cover it. No new live model turn was submitted. The previous release and matched private backup are retained.
+
+The [query-recency report](../../../docs/reports/2026-09-20-query-recency.md) records all failed attempts, receipts, evidence identities and limits, including the optional browser API navigation that returned no evidence. Round-two independent closing review is pending; the proposal remains Accepted until both roles clear Q4 and completion. Subsequent archive, status, link and review-disposition edits will be documentation only and require no application redeployment.
+
+### Query-recency completion review
+
+Round two is clear in both independent roles. Design and provenance each verified the final Linux/artifact/installed evidence, unchanged reviewed implementation and honestly bounded browser observation. Main accepts both assessments; Q1–Q4 and all scoped gates are complete without actionable findings. The failed evidence-fetch attempt has no dedicated command receipt and supplies no passing evidence; its retained zero-byte archive and the successful independently hashed retrieval are distinguished in the report. No new native/runtime/isolation or restore certification is claimed.
+
+Main restored Implemented/Completed and archived this proposal under the same filename, preserving earlier cycles and repairing links. Final metadata, review dispositions and link repairs are documentation only, validated by the 162-file documentation gate and explicit archived-file whitespace/newline checks. The authorized closing commit/push does not replace the deployed application artifact. Stop after these two clear review rounds; no further in-scope work remains.

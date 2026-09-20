@@ -3,7 +3,7 @@
 - Created: 2026-09-20
 - Severity: Product capability gap
 - Owner: Awaiting owner selection of a resource-delivery proposal
-- Source: Owner UI request; separated from [P023](../design/proposals/023-sidebar-and-transcript-refinement.md).
+- Source: Owner UI request; separated from [P023](../design/proposals/archive/023-sidebar-and-transcript-refinement.md).
 
 The owner wants generated report files attached in a conversation, downloadable on click, particularly Markdown and HTML. Assess a browser preview if it can be safely delivered with the same bounded outcome; a complete file explorer is not required.
 
