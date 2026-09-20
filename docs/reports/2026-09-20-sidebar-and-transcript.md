@@ -4,7 +4,7 @@ Completed and deployed on 20 September 2026. Final application commit `606d6cc75
 
 ## Scope and authorization
 
-[P023](../../design/proposals/archive/023-sidebar-and-transcript-refinement.md) selects five-item history pages, modal current-project search, aligned discoverable actions, outside-bubble user copy, code headers/syntax coloring and compact collapsed command activity. The owner explicitly authorized implementation, commit, push and VPS deployment for final review afterward. Downloadable Markdown/HTML reports remain a separate [resource-delivery issue](../../issues/2026-09-20-120000-conversation-report-downloads.md).
+[P023](../../design/proposals/023-sidebar-and-transcript-refinement.md) selects five-item history pages, modal current-project search, aligned discoverable actions, outside-bubble user copy, code headers/syntax coloring and compact collapsed command activity. The owner explicitly authorized implementation, commit, push and VPS deployment for final review afterward. Downloadable Markdown/HTML reports remain a separate [resource-delivery issue](../../issues/2026-09-20-120000-conversation-report-downloads.md).
 
 Baseline: `58c8accfea66ef2852b86bbea7e9b614674aad55`, clean `main` checkout. No stash was created. Main owns planning, evidence and deployment; `ui_implementer` is a fresh-context GPT-6 Astra High worker with the exact proposal fence. Independent design and provenance reviews started after the application gate passed; their rounds and dispositions follow below.
 

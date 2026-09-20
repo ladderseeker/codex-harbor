@@ -2,7 +2,7 @@
 
 ## Scope and authorization
 
-[P023](../../design/proposals/archive/023-sidebar-and-transcript-refinement.md#owner-review-correction-cycle--20-september-2026) reopened after the owner reviewed the first deployment. This cycle covers aligned history states and trailing sidebar controls, removal of two redundant settings labels, display-only user-message thumb icons, and selected-first recent-update session ordering. The owner explicitly authorized implementation, commit, push and VPS deployment.
+[P023](../../design/proposals/023-sidebar-and-transcript-refinement.md#owner-review-correction-cycle--20-september-2026) reopened after the owner reviewed the first deployment. This cycle covers aligned history states and trailing sidebar controls, removal of two redundant settings labels, display-only user-message thumb icons, and selected-first recent-update session ordering. The owner explicitly authorized implementation, commit, push and VPS deployment.
 
 Baseline `4b438a954c0db071b9e2ccd8cb9839da02dcfe15` was clean across staged, unstaged and untracked files. No stash was created. The [initial delivery report](2026-09-20-sidebar-and-transcript.md) preserves its earlier gates and three rounds; those are not new checks for this correction. Main owns planning/evidence/deployment and uses a fresh-context Medium-effort implementer plus independent reviewers for this bounded UI correction.
 
@@ -95,3 +95,7 @@ Both reviewers cleared the final documentation-only archive and link changes wit
 ## Closing scope and limitations
 
 R1–R5 are implemented and deployed, with local and immutable Linux verification. Report downloads/previews remain separately tracked by the original P023 follow-up; no runtime/isolation/restore gate is newly claimed. The historical credential no-op 409 remains open and unexplained. All scoped findings and completion gates are clear. The documentation closing commit and push follow the already deployed application commit; no further application deployment is needed for those documentation changes.
+
+## Query-recency clarification — 20 September 2026
+
+The owner subsequently clarified that only sending a query should move a conversation; merely opening it must preserve its position. P023 reopened for this narrower correction, superseding this report's selected-first/event-update behavior while preserving its evidence as historical. The [query-recency report](2026-09-20-query-recency.md) owns the new implementation, gates, reviews and deployment.

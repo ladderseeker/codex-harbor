@@ -26,7 +26,7 @@ export function historyRoutes(
         projectId: z.uuid().optional(),
         limit: z.coerce.number().int().min(1).max(50).default(20),
         cursor: z.string().max(1024).optional(),
-        order: z.enum(["created", "updated"]).default("created"),
+        order: z.enum(["created", "updated", "queried"]).default("created"),
         selectedId: z.uuid().optional(),
       })
       .strict()
@@ -63,7 +63,7 @@ export function historyRoutes(
             .strict()
             .parse(value);
           before = { timestamp: parsed.createdAt, id: parsed.id, priority: 0 };
-        } else {
+        } else if (query.order === "updated") {
           const parsed = z
             .object({
               filter: z.literal(filter),
@@ -78,6 +78,16 @@ export function historyRoutes(
             id: parsed.id,
             priority: parsed.priority,
           };
+        } else {
+          const parsed = z
+            .object({
+              filter: z.literal(filter),
+              queriedAt: z.iso.datetime(),
+              id: z.uuid(),
+            })
+            .strict()
+            .parse(value);
+          before = { timestamp: parsed.queriedAt, id: parsed.id, priority: 0 };
         }
       } catch {
         throw new HarborError(
@@ -89,17 +99,25 @@ export function historyRoutes(
     }
     return transaction(pool, async (db) => {
       await db.query("SET LOCAL statement_timeout='2s'");
-      const recent = query.order === "updated";
-      const timestamp = recent ? "s.updated_at" : "s.created_at";
-      const priority = recent
+      const updated = query.order === "updated";
+      const queried = query.order === "queried";
+      const timestamp = queried
+        ? "coalesce(latest_query.created_at,s.created_at)"
+        : updated
+          ? "s.updated_at"
+          : "s.created_at";
+      const priority = updated
         ? "CASE WHEN s.id=$7::uuid THEN 1 ELSE 0 END"
         : "0";
-      const keyset = recent
+      const keyset = updated
         ? `(${priority},${timestamp},s.id)<($8::int,$4::timestamptz,$5::uuid)`
-        : "(s.created_at,s.id)<($4::timestamptz,$5::uuid)";
+        : `(${timestamp},s.id)<($4::timestamptz,$5::uuid)`;
+      const queryTime = queried
+        ? " LEFT JOIN LATERAL (SELECT m.created_at FROM messages m WHERE m.session_id=s.id AND m.role='user' ORDER BY m.created_at DESC,m.id DESC LIMIT 1) latest_query ON true"
+        : "";
       const rows = (
         await db.query(
-          `SELECT s.*,${priority} AS cursor_priority,to_char(${timestamp} AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp,left(coalesce((SELECT m.text FROM messages m WHERE m.session_id=s.id AND ($1='' OR strpos(lower(m.text),lower($1))>0) ORDER BY m.created_at,m.id LIMIT 1),''),240) AS snippet FROM sessions s WHERE ($2='all' OR s.archived=($2='archived')) AND ($3::uuid IS NULL OR s.project_id=$3) AND ($1='' OR strpos(lower(s.title),lower($1))>0 OR EXISTS(SELECT 1 FROM messages m WHERE m.session_id=s.id AND strpos(lower(m.text),lower($1))>0)) AND ($4::timestamptz IS NULL OR ${keyset}) ORDER BY ${recent ? "cursor_priority DESC," : ""}${timestamp} DESC,s.id DESC LIMIT $6`,
+          `SELECT s.*,${priority} AS cursor_priority,to_char(${timestamp} AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp,left(coalesce((SELECT m.text FROM messages m WHERE m.session_id=s.id AND ($1='' OR strpos(lower(m.text),lower($1))>0) ORDER BY m.created_at,m.id LIMIT 1),''),240) AS snippet FROM sessions s${queryTime} WHERE ($2='all' OR s.archived=($2='archived')) AND ($3::uuid IS NULL OR s.project_id=$3) AND ($1='' OR strpos(lower(s.title),lower($1))>0 OR EXISTS(SELECT 1 FROM messages m WHERE m.session_id=s.id AND strpos(lower(m.text),lower($1))>0)) AND ($4::timestamptz IS NULL OR ${keyset}) ORDER BY ${updated ? "cursor_priority DESC," : ""}${timestamp} DESC,s.id DESC LIMIT $6`,
           [
             query.q,
             query.state,
@@ -107,7 +125,7 @@ export function historyRoutes(
             before?.timestamp ?? null,
             before?.id ?? null,
             query.limit + 1,
-            ...(recent
+            ...(updated
               ? [query.selectedId ?? null, before?.priority ?? null]
               : []),
           ],
@@ -125,12 +143,14 @@ export function historyRoutes(
             ? Buffer.from(
                 JSON.stringify({
                   filter,
-                  ...(recent
+                  ...(updated
                     ? {
                         updatedAt: last.cursor_timestamp,
                         priority: last.cursor_priority,
                       }
-                    : { createdAt: last.cursor_timestamp }),
+                    : queried
+                      ? { queriedAt: last.cursor_timestamp }
+                      : { createdAt: last.cursor_timestamp }),
                   id: last.id,
                 }),
               ).toString("base64url")

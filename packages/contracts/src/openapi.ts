@@ -389,9 +389,12 @@ const paths: Record<string, any> = {
         {
           in: "query",
           name: "order",
-          schema: { enum: ["created", "updated"], default: "created" },
+          schema: {
+            enum: ["created", "updated", "queried"],
+            default: "created",
+          },
           description:
-            "Created order is immutable. Updated order sorts by selected priority, durable updated_at descending and ID descending.",
+            "Created order is immutable. Updated order sorts by selected priority, durable updated_at descending and ID descending. Queried order sorts by the latest durable user-message time, falling back to session creation time, then ID descending.",
         },
         {
           in: "query",
@@ -410,7 +413,7 @@ const paths: Record<string, any> = {
           name: "cursor",
           schema: string,
           description:
-            "Opaque cursor bound to filters, order and selectedId. Changed identity requires a new first page. Default created cursors remain compatible; updated cursors retain exact timestamp and selected priority. Updated traversal is not a snapshot.",
+            "Opaque cursor bound to filters and order, plus selectedId for updated order. Changed identity requires a new first page. Default created cursors remain compatible; updated cursors retain exact timestamp and selected priority; queried cursors retain exact user-query timestamp. Recent traversal is not a snapshot.",
         },
       ],
     },

@@ -1476,7 +1476,7 @@
           chats: [{ id: 5, title: "New chat", messages: [] }],
         },
       ];
-      for (const project of projects) project.chats.forEach((chat, index) => {chat.updatedAt = projects.length * 100 - index;});
+      for (const project of projects) project.chats.forEach((chat, index) => {chat.createdAt = projects.length * 100 - index;});
       function current() {
         for (const project of projects) {
           const chat = project.chats.find((c) => c.id === activeId);
@@ -1599,7 +1599,7 @@
       function renderProjects() {
         $("projects").innerHTML = projects
           .map((p) => {
-            const activeChats = p.chats.filter(c => !c.archived).sort((a,b) => Number(b.id === activeId) - Number(a.id === activeId) || b.updatedAt - a.updatedAt || b.id - a.id);
+            const activeChats = p.chats.filter(c => !c.archived).sort((a,b) => (b.queriedAt ?? b.createdAt) - (a.queriedAt ?? a.createdAt) || b.id - a.id);
             const chats = ["loading", "empty"].includes(historyState) ? [] : activeChats.slice(0, p.depth || 5);
             return `<div class="project"><div class="project-row"><button class="project-toggle" data-toggle="${p.id}" aria-expanded="${p.open}" title="${escapeHTML(p.name)}">${icon("folder")}<span class="project-name">${escapeHTML(p.name)}</span></button><div class="project-actions"><button class="icon-button" data-new="${p.id}" aria-label="New chat in ${escapeHTML(p.name)}" title="New chat">${icon("compose")}</button><button class="icon-button" data-project="${p.id}" aria-label="Project details for ${escapeHTML(p.name)}" title="Project details">${icon("more")}</button></div></div>${p.open ? `<div class="sessions">${chats.map((c) => `<div class="session-row ${c.id === activeId ? "active" : ""}"><button class="session" ${c.id === activeId ? 'aria-current="page"' : ""} data-chat="${c.id}" title="${escapeHTML(c.title)}"><span class="resource-dot ${c.occupied ? "occupied" : ""}" role="img" aria-label="${c.occupied ? "Runtime resources retained" : "No retained runtime resources"}" title="${c.occupied ? "Runtime resources retained" : "No retained runtime resources"}"></span><span class="session-title">${escapeHTML(c.title)}</span></button><button class="icon-button session-rename" data-options="${c.id}" aria-label="More actions for ${escapeHTML(c.title)}" title="More actions">${icon("more")}</button></div>`).join("") || (historyState === 'loading' ? '' : '<p class="history-state">No matching conversations</p>')}${["loading", "loading-more"].includes(historyState) ? '<p class="history-state" role="status">Loading conversations…</p>' : historyState === "error" ? '<div class="history-state" role="alert"><p>History unavailable</p><button data-history-retry>Retry history</button></div>' : ""}${!["empty", "loading"].includes(historyState) && activeChats.length > chats.length ? `<button ${historyState === "loading-more" ? "disabled" : ""} class="history-more" data-more="${p.id}">Show more</button>` : ''}</div>` : ""}</div>`;
           })
@@ -1665,7 +1665,7 @@ Checks passed</pre></details><section class="markdown-body" aria-label="Markdown
       }
       function newChat(projectId = current().project.id) {
         const project = projects.find((p) => p.id === projectId);
-        const chat = { id: nextId++, title: "New chat", messages: [], updatedAt: Date.now() };
+        const chat = { id: nextId++, title: "New chat", messages: [], createdAt: Date.now() };
         project.chats.unshift(chat);
         project.open = true;
         activeId = chat.id;
@@ -1730,7 +1730,7 @@ Checks passed</pre></details><section class="markdown-body" aria-label="Markdown
         const { chat } = current();
         if (!chat.sample && !chat.messages.length)
           chat.title = text.length > 34 ? text.slice(0, 34) + "…" : text;
-        chat.updatedAt = Date.now();
+        chat.queriedAt = Date.now();
         chat.messages.push(
           { role: "user", text },
           {

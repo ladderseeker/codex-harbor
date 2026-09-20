@@ -30,7 +30,7 @@ export function History({
   const q = query,
     state = filter;
   const baseIdentity = `${projectId}:${state}:${q}:${searchResults}`;
-  const identity = `${baseIdentity}:${searchResults ? "" : selectedId}`;
+  const identity = baseIdentity;
   const [rowsIdentity, setRowsIdentity] = useState(baseIdentity);
   const [pageIdentity, setPageIdentity] = useState("");
   const [rows, setRows] = useState<(Session & { snippet: string })[]>([]),
@@ -72,8 +72,7 @@ export function History({
     try {
       const query = new URLSearchParams({ projectId, q, state, limit: "5" });
       if (!searchResults) {
-        query.set("order", "updated");
-        if (selectedId) query.set("selectedId", selectedId);
+        query.set("order", "queried");
       }
       if (next) query.set("cursor", next);
       let result = await request<{
@@ -165,12 +164,7 @@ export function History({
     return () => window.clearInterval(timer);
   }, []);
   const visibleRows = rowsIdentity === baseIdentity ? rows : [];
-  const displayRows = searchResults
-    ? visibleRows
-    : [
-        ...visibleRows.filter((row) => row.id === selectedId),
-        ...visibleRows.filter((row) => row.id !== selectedId),
-      ];
+  const displayRows = visibleRows;
   const currentPage = pageIdentity === identity;
   return (
     <section

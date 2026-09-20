@@ -161,11 +161,11 @@ export async function p023({
   await page.unroute("**/api/v1/history?*");
   await expect(rows).toHaveText(
     [
-      "P023 history 00",
       "P023 history 11",
       "P023 history 10",
       "P023 history 09",
       "P023 history 08",
+      "P023 history 07",
     ],
     { useInnerText: true },
   );
@@ -247,10 +247,10 @@ export async function p023({
   });
   await expect(rows).toHaveCount(10);
   expect(new Set(await rows.allTextContents()).size).toBe(10);
-  await expect(rows.nth(0)).toHaveText("P023 history 00", {
+  await expect(rows.nth(0)).toHaveText("P023 history 11", {
     useInnerText: true,
   });
-  await expect(rows.nth(1)).toHaveText("P023 renamed newest", {
+  await expect(rows.nth(9)).toHaveText("P023 renamed newest", {
     useInnerText: true,
   });
   await expect(input).toHaveValue("P023 unsent draft");
@@ -260,43 +260,11 @@ export async function p023({
     origin + `/api/v1/sessions/${ids[10]}/snapshot`,
   );
   const selectedTimestamp = (await selectedBefore.json()).session.updatedAt;
-  let releaseOldPage!: () => void;
-  let observedOldPage!: () => void;
-  let finishedOldPage!: () => void;
-  const oldPageFinished = new Promise<void>((resolve) => {
-    finishedOldPage = resolve;
-  });
-  const oldPageGate = new Promise<void>((resolve) => {
-    releaseOldPage = resolve;
-  });
-  const oldPageObserved = new Promise<void>((resolve) => {
-    observedOldPage = resolve;
-  });
-  await page.route("**/api/v1/history?*", async (route) => {
-    const url = new URL(route.request().url());
-    if (
-      url.searchParams.get("selectedId") === ids[0] &&
-      url.searchParams.has("cursor")
-    ) {
-      const response = await route.fetch();
-      observedOldPage();
-      await oldPageGate;
-      await route.fulfill({ response });
-      finishedOldPage();
-    } else await route.continue();
-  });
-  await more.click();
-  await oldPageObserved;
+  const orderBeforeSelection = await rows.allInnerTexts();
   await rows.filter({ hasText: "P023 history 10" }).click();
-  await expect(rows.first()).toHaveText("P023 history 10", {
-    useInnerText: true,
-  });
+  await expect(rows).toHaveText(orderBeforeSelection, { useInnerText: true });
   await expect(rows).toHaveCount(10);
   await expect(rail.locator(".history")).toHaveAttribute("aria-busy", "false");
-  releaseOldPage();
-  await oldPageFinished;
-  await page.unroute("**/api/v1/history?*");
-  await expect(rows).toHaveCount(10);
   await input.fill("P023 second draft");
   await expect(rows.filter({ hasText: "P023 history 00" })).toHaveCount(0);
   await page
@@ -311,9 +279,8 @@ export async function p023({
     .fill("P023 history 00");
   await selectionSearch.locator(".conversation-link").click();
   await expect(selectionSearch).toHaveCount(0);
-  await expect(rows.first()).toHaveText("P023 history 00", {
-    useInnerText: true,
-  });
+  await expect(rows).toHaveText(orderBeforeSelection, { useInnerText: true });
+  await expect(rows.filter({ hasText: "P023 history 00" })).toHaveCount(0);
   await expect(rows).toHaveCount(10);
   await expect(input).toHaveValue("P023 unsent draft");
   const selectedAfter = await context.request.get(
@@ -367,8 +334,7 @@ export async function p023({
         "/api/v1/history?" +
         new URLSearchParams({
           projectId,
-          order: "updated",
-          selectedId: ids[0],
+          order: "queried",
           limit: "50",
         }),
     )
@@ -697,14 +663,25 @@ export async function p023({
     const touchRail = touch
       .locator(".project-group")
       .filter({ has: touch.locator(".project-button.selected") });
+    const touchRows = touchRail.locator(".conversation-link");
+    const touchOrder = await touchRows.allInnerTexts();
+    await touchRows.nth(1).tap();
+    await touch
+      .getByRole("button", { name: "Open navigation", exact: true })
+      .tap();
+    await expect(touchRows).toHaveText(touchOrder, { useInnerText: true });
     await alignedMenus(touchRail);
     await alignedText(
       touchRail.locator(".conversation-link").first(),
       touchRail.getByRole("button", { name: "Show more", exact: true }),
     );
+    await touchRows.first().tap();
     await expect(
       touch.locator(".message-user .decorative-reaction").last(),
     ).toHaveCSS("min-width", "36px");
+    await touch
+      .getByRole("button", { name: "Open navigation", exact: true })
+      .tap();
     await touch
       .getByRole("button", { name: "Search and filters", exact: true })
       .tap();
@@ -782,10 +759,26 @@ async function precisionHistory({
       title: `P023 precision ${i}`,
     });
     await db.query(
-      "UPDATE sessions SET created_at='2026-01-01T00:00:00.123456Z', updated_at=$2::timestamptz WHERE id=$1",
+      "UPDATE sessions SET created_at='2026-01-01T00:00:00.123456Z',updated_at=$2::timestamptz WHERE id=$1",
+      [created.session.id, `2026-02-01T00:00:00.00000${i}Z`],
+    );
+  }
+  // One no-query row exercises the creation-time fallback. The others use
+  // exact durable user-message times; assistant/tool rows must not affect it.
+  for (const [index, timestamp] of [
+    [1, "2026-01-01T00:00:00.123400Z"],
+    [2, "2026-01-01T00:00:00.123457Z"],
+    [3, "2026-01-01T00:00:00.123457Z"],
+  ] as const) {
+    await db.query(
+      "INSERT INTO messages(id,session_id,role,text,status,created_at) VALUES($1,$2,'user',$3,'complete',$4::timestamptz),($5,$2,'assistant','later assistant output','complete','2026-03-01T00:00:00Z'),($6,$2,'tool','later tool output','complete','2026-04-01T00:00:00Z')",
       [
-        created.session.id,
-        `2026-01-01T00:00:00.${["123400", "123456", "123457", "123457"][i]}Z`,
+        randomUUID(),
+        precisionIds[index],
+        `P023 precision query ${index}`,
+        timestamp,
+        randomUUID(),
+        randomUUID(),
       ],
     );
   }
@@ -796,19 +789,20 @@ async function precisionHistory({
   const base = {
     projectId,
     q: "P023 precision",
-    order: "updated",
-    selectedId: precisionIds[0],
+    order: "queried",
     limit: "1",
   };
   const first = await (await get(base)).json();
-  expect(first.sessions.map((s: { id: string }) => s.id)).toEqual([
-    precisionIds[0],
-  ]);
+  const tied = [precisionIds[2], precisionIds[3]].sort().reverse();
+  expect(first.sessions.map((s: { id: string }) => s.id)).toEqual([tied[0]]);
+  expect(first.sessions[0]).not.toHaveProperty("cursor_timestamp");
+  expect(first.sessions[0]).not.toHaveProperty("cursor_priority");
+  expect(first.sessions[0]).not.toHaveProperty("queriedAt");
   const cursor = JSON.parse(
     Buffer.from(first.nextCursor, "base64url").toString(),
   );
-  expect(cursor.updatedAt).toBe("2026-01-01T00:00:00.123400Z");
-  expect(cursor.priority).toBe(1);
+  expect(Object.keys(cursor).sort()).toEqual(["filter", "id", "queriedAt"]);
+  expect(cursor.queriedAt).toBe("2026-01-01T00:00:00.123457Z");
   const seen = [first.sessions[0].id];
   let next = first.nextCursor;
   while (next) {
@@ -818,17 +812,13 @@ async function precisionHistory({
     seen.push(...page.sessions.map((s: { id: string }) => s.id));
     next = page.nextCursor;
   }
-  expect(seen).toEqual([
-    precisionIds[0],
-    ...[precisionIds[2], precisionIds[3]].sort().reverse(),
-    precisionIds[1],
-  ]);
+  expect(seen).toEqual([...tied, precisionIds[0], precisionIds[1]]);
   const mismatches: Record<string, string>[] = [
-    { selectedId: precisionIds[1] },
     { state: "all" },
     { q: "different" },
     { projectId: randomUUID() },
-    { order: "created", selectedId: "" },
+    { order: "created" },
+    { order: "updated" },
   ];
   for (const changed of mismatches) {
     const values: Record<string, string> = {
@@ -836,9 +826,11 @@ async function precisionHistory({
       ...changed,
       cursor: first.nextCursor,
     };
-    if (!values.selectedId) delete values.selectedId;
     expect((await get(values)).status()).toBe(400);
   }
+  expect((await get({ ...base, selectedId: precisionIds[0] })).status()).toBe(
+    400,
+  );
   expect((await get({ projectId, selectedId: precisionIds[0] })).status()).toBe(
     400,
   );
@@ -861,6 +853,55 @@ async function precisionHistory({
   }
   expect(createdSeen).toEqual([...precisionIds].sort().reverse());
   expect((await get({ ...base, cursor: legacy.nextCursor })).status()).toBe(
+    400,
+  );
+  // Preserve the prior updated cursor and selected-priority contract.
+  const updatedBase = {
+    projectId,
+    q: "P023 precision",
+    order: "updated",
+    selectedId: precisionIds[1],
+    limit: "1",
+  };
+  const updated = await (await get(updatedBase)).json();
+  expect(updated.sessions[0].id).toBe(precisionIds[1]);
+  expect(
+    Object.keys(
+      JSON.parse(Buffer.from(updated.nextCursor, "base64url").toString()),
+    ).sort(),
+  ).toEqual(["filter", "id", "priority", "updatedAt"]);
+  const updatedSeen = [updated.sessions[0].id];
+  next = updated.nextCursor;
+  while (next) {
+    const response = await get({ ...updatedBase, cursor: next });
+    expect(response.status()).toBe(200);
+    const page = await response.json();
+    updatedSeen.push(...page.sessions.map((s: { id: string }) => s.id));
+    next = page.nextCursor;
+  }
+  expect(updatedSeen).toEqual([
+    precisionIds[1],
+    precisionIds[3],
+    precisionIds[2],
+    precisionIds[0],
+  ]);
+  const updatedMismatches: Record<string, string>[] = [
+    { selectedId: precisionIds[2] },
+    { state: "all" },
+    { q: "different" },
+    { projectId: randomUUID() },
+    { order: "created", selectedId: "" },
+  ];
+  for (const changed of updatedMismatches) {
+    const values: Record<string, string> = {
+      ...updatedBase,
+      ...changed,
+      cursor: updated.nextCursor,
+    };
+    if (!values.selectedId) delete values.selectedId;
+    expect((await get(values)).status()).toBe(400);
+  }
+  expect((await get({ ...base, cursor: updated.nextCursor })).status()).toBe(
     400,
   );
   const allProjects = await (
@@ -887,10 +928,119 @@ async function precisionHistory({
   ).json();
   await command(`/sessions/${precisionIds[0]}/metadata`, {
     expectedRevision: snapshot.session.metadataRevision,
+    title: "P023 precision fallback renamed",
+  });
+  const afterMetadata = await (await get({ ...base, limit: "50" })).json();
+  expect(afterMetadata.sessions.map((s: { id: string }) => s.id)).toEqual(seen);
+  const renamed = await (
+    await context.request.get(
+      origin + `/api/v1/sessions/${precisionIds[0]}/snapshot`,
+    )
+  ).json();
+  await command(`/sessions/${precisionIds[0]}/metadata`, {
+    expectedRevision: renamed.session.metadataRevision,
     archived: true,
   });
   const archived = await (await get({ ...base, limit: "50" })).json();
   expect(archived.sessions.map((s: { id: string }) => s.id)).not.toContain(
     precisionIds[0],
   );
+
+  // Exercise admission rather than manufacturing the decisive query: the
+  // accepted request reorders once, its exact-key replay adds no query, and a
+  // rejected request leaves the newer no-query conversation unchanged.
+  const acceptedOld = await command("/sessions", {
+    projectId,
+    model: "fixture",
+    effort: "medium",
+    permissionProfile: "read-only",
+  });
+  await command(`/sessions/${acceptedOld.session.id}/metadata`, {
+    expectedRevision: acceptedOld.session.metadataRevision,
+    title: "P023 admission older",
+  });
+  const rejectedNew = await command("/sessions", {
+    projectId,
+    model: "fixture",
+    effort: "medium",
+    permissionProfile: "read-only",
+  });
+  await command(`/sessions/${rejectedNew.session.id}/metadata`, {
+    expectedRevision: rejectedNew.session.metadataRevision,
+    title: "P023 admission newer",
+  });
+  const admissionBase = {
+    projectId,
+    q: "P023 admission",
+    order: "queried",
+    limit: "10",
+  };
+  expect(
+    (await (await get(admissionBase)).json()).sessions.map(
+      (s: { id: string }) => s.id,
+    ),
+  ).toEqual([rejectedNew.session.id, acceptedOld.session.id]);
+  const identity = await (
+    await context.request.get(origin + "/api/v1/me")
+  ).json();
+  const turn = async (id: string, key: string, effort = "medium") =>
+    context.request.post(origin + `/api/v1/sessions/${id}/turns`, {
+      headers: {
+        Origin: origin,
+        "X-CSRF-Token": identity.csrfToken,
+        "Idempotency-Key": key,
+      },
+      data: {
+        text: "P023 accepted durable query",
+        model: "fixture",
+        effort,
+        permissionProfile: "read-only",
+      },
+    });
+  const acceptedKey = `${Date.now()}:${randomUUID()}`;
+  expect((await turn(acceptedOld.session.id, acceptedKey)).status()).toBe(202);
+  expect((await turn(acceptedOld.session.id, acceptedKey)).status()).toBe(202);
+  expect(
+    (
+      await turn(rejectedNew.session.id, `${Date.now()}:${randomUUID()}`, "max")
+    ).status(),
+  ).toBe(403);
+  expect(
+    (
+      await db.query(
+        "SELECT session_id,count(*)::int AS count FROM messages WHERE session_id=ANY($1::uuid[]) AND role='user' GROUP BY session_id",
+        [[acceptedOld.session.id, rejectedNew.session.id]],
+      )
+    ).rows,
+  ).toEqual([{ session_id: acceptedOld.session.id, count: 1 }]);
+  expect(
+    (await (await get(admissionBase)).json()).sessions.map(
+      (s: { id: string }) => s.id,
+    ),
+  ).toEqual([acceptedOld.session.id, rejectedNew.session.id]);
+  await expect
+    .poll(
+      async () =>
+        (
+          await db.query("SELECT state FROM sessions WHERE id=$1", [
+            acceptedOld.session.id,
+          ])
+        ).rows[0].state,
+      { timeout: 30000 },
+    )
+    .toBe("succeeded");
+  expect(
+    (await (await get(admissionBase)).json()).sessions.map(
+      (s: { id: string }) => s.id,
+    ),
+  ).toEqual([acceptedOld.session.id, rejectedNew.session.id]);
+  for (const id of [acceptedOld.session.id, rejectedNew.session.id]) {
+    const current = await (
+      await context.request.get(origin + `/api/v1/sessions/${id}/snapshot`)
+    ).json();
+    await command(`/sessions/${id}/metadata`, {
+      expectedRevision: current.session.metadataRevision,
+      archived: true,
+    });
+  }
 }
