@@ -1,6 +1,6 @@
 # P023 query-recency correction
 
-The owner clarified that only sending a query changes sidebar recency; opening a session must preserve its position. [P023](../../design/proposals/023-sidebar-and-transcript-refinement.md#query-recency-correction--20-september-2026) reopens at clean baseline `c74f88ec067ea7d7c171d4dcea24e23f72178c19`. Prior UI and correction reviews remain historical in their reports. The owner’s existing commit, push and deployment authorization continues.
+The owner clarified that only sending a query changes sidebar recency; opening a session must preserve its position. [P023](../../design/proposals/archive/023-sidebar-and-transcript-refinement.md#query-recency-correction--20-september-2026) reopens at clean baseline `c74f88ec067ea7d7c171d4dcea24e23f72178c19`. Prior UI and correction reviews remain historical in their reports. The owner’s existing commit, push and deployment authorization continues.
 
 The correction is implemented, locally and Linux tested, committed, pushed and deployed; both independent review rounds are clear. Main owns planning, combined gates and deployment. A fresh Medium-effort implementer completed the ten-file fence; fresh independent design/provenance reviewers cleared both rounds. Private evidence is retained under `.test-runs/p023-query-recency-20260920/`.
 
