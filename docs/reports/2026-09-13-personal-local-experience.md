@@ -2,7 +2,7 @@
 
 ## Delivered outcome
 
-The owner can start a private Harbor instance, authenticate with an independent official Codex account home, create a local project and conduct a real conversation. The current user instance completed official device login and an authenticated Harbor browser conversation using GPT-5.6-Sol. Its visible final response was “你好，我确认正在通过 Harbor 与你对话。” No file or tool operation was requested in that turn. The service remains running for the owner with a read-only ceiling; account state and local project data persist separately from ordinary Codex state.
+The owner can start a private Harbor instance, authenticate with an independent official Codex account home, create a local project and conduct a real conversation. The current user instance completed official device login and an authenticated Harbor browser conversation using GPT-5.6-Sol. Its visible final response, translated into English, was “Hello, I confirm that I am talking with you through Harbor.” No file or tool operation was requested in that turn. The service remains running for the owner with a read-only ceiling; account state and local project data persist separately from ordinary Codex state.
 
 [P013](../../design/proposals/archive/013-personal-local-experience.md) is Implemented, not Verified. The [critical regression gate](../../issues/archive/2026-09-13-143001-local-critical-regression-gate.md) remains open. Existing Linux/deployment and dedicated live-account proposal obligations are not satisfied by this personal trial.
 
@@ -44,3 +44,7 @@ The historical open-gate statement above is superseded by the [resolved critical
 ## Navigation and ownership addendum — 20 September 2026
 
 P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.
+
+## Language clarification — 20 September 2026
+
+The quoted reply above is now an English translation, not literal runtime text. This language-only edit preserves all historical results and source identities. No application checks were rerun.

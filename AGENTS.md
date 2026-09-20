@@ -6,7 +6,7 @@
 - Read [architecture](design/architecture.md), the relevant [subsystem designs](design/systems/README.md), [workflow](design/workflow.md), selected proposal and [developer guide](docs/developer/development.md) before implementation. Resolve contradictory contracts explicitly.
 - Discover existing records in [proposals](design/proposals/README.md), [issues](issues/README.md) and their archive folders before creating work. Folder listings provide discovery; do not create manual priority queues or per-record status tables.
 - Current requirements belong in design documents; proposals are bounded execution plans. [D013](design/decisions/013-evidence-based-delivery-workflow.md) owns the workflow change and one-time legacy reconciliation. Archived plans and reports preserve history, not competing specifications.
-- Write repository rules, role briefs and proposal/design governance text in English.
+- English is the default language for all authored repository content, including documentation, proposals, designs, issues, reports, role briefs, code comments, and developer-facing or user-facing prose, unless the owner explicitly requests another language. Conversation in Chinese does not change the repository's output language. Preserve functional multilingual input/test data and machine-significant identifiers; language cleanup must not change behavior.
 
 ## Delivery and delegation
 
@@ -33,6 +33,19 @@
 - Account for each temporary stash's owner, base, purpose and integration. Reconcile staged, unstaged and untracked contents before delivery; remove only the specific reconciled stash and retain a named recovery reference when useful. Never clear unrelated stashes.
 - Keep stable installation, source and candidate resources separate. Never edit live binaries, configuration, credentials or production data through a coding runner. No host Docker socket, privileged Docker-in-Docker, host administration or arbitrary launcher flags.
 - Candidate build/test authority uses trusted fixed templates and disposable resources. Promotion needs identified tested artifacts, drain or explicit interruption, backup before migrations, documented rollback/restore limits and an SSH recovery path. Existing authorization governs promotion; prepare the reviewable candidate before any needed approval.
+
+## VPS SSH handoff
+
+- The current Hostinger VPS uses local SSH alias `harbor-vps`: host `187.77.140.226`, port `22`, user `root`, expected hostname `srv1464935`. The Harbor site is <https://harbor.seekworld.tech/>. These are deployment-specific connection details, not application defaults.
+- On the owner's Mac, `~/.ssh/config` defines the alias with `IdentityFile ~/.ssh/harbor_vps`, `IdentitiesOnly yes`, `AddKeysToAgent yes`, `UseKeychain yes`, and `ForwardAgent no`. The owner loaded the key with `ssh-add --apple-use-keychain ~/.ssh/harbor_vps`. Keep passwords, passphrases, and private-key contents out of this repository, chat, and logs. The alias, key, and agent state are local prerequisites; they are not automatically available on another machine or in every new session.
+- When a new session needs VPS access, begin with this read-only connectivity check:
+
+  ```sh
+  ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'whoami; hostname'
+  ```
+
+  On 2026-09-14, this returned `root` and `srv1464935` without a password prompt after scoped network escalation. This verifies SSH connectivity only, not deployment readiness. If the sandbox blocks SSH, use the scoped network approval mechanism; do not disable host-key checking or other safeguards. If the key is locked or unavailable, have the owner unlock or configure it locally.
+- For diagnosis and deployment, inspect the actual installed configuration, services, and artifact identity, then follow [the deployment workflow and SSH recovery documentation](docs/developer/deployment.md). Preserve the source/candidate/live boundaries above and follow existing user authorization; access as `root` does not authorize unrelated server changes. This handoff adds no separate approval gate and does not waive any deployment verification or release blocker.
 
 ## Verification and evidence
 

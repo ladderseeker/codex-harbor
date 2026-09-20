@@ -55,7 +55,7 @@ Existing supporting tools retain their capability and installation requirements.
 
 ## Search and organize history
 
-Harbor names an untitled conversation from the first substantive request, using a short excerpt. Greetings such as “你好” leave naming pending. Existing untouched default titles are populated when upgraded. A manual rename always wins, including a deliberate title of “New conversation”.
+Harbor names an untitled conversation from the first substantive request, using a short excerpt. Greetings such as “Hello” leave naming pending. Existing untouched default titles are populated when upgraded. A manual rename always wins, including a deliberate title of “New conversation”.
 
 Choose the magnifier **Search and filters** at the top of the sidebar to find a title or stored message text within the selected project. **Show** switches between active, archived, and all conversations; **Load older conversations** fetches the next bounded page. Hover or focus a chat row to reveal its ellipsis menu; touch devices keep the menu available. Choose **Rename**, edit **Conversation title** and choose **Save title**. Renaming checks the current revision so another tab's edit cannot be overwritten silently, and renaming an inactive chat preserves the active conversation and its draft.
 

@@ -6,7 +6,7 @@ This is the canonical repository collaboration and record-lifecycle contract ado
 
 The [architecture](architecture.md) owns shared system invariants. Numbered [subsystem designs](systems/README.md) own current feature contracts, source ownership and explicit unavailable boundaries. The [HTML guide](design-tokens.html) owns visual tokens and interaction patterns; the [prototype](prototypes/harbor-redesign.html) demonstrates them. Numbered decisions explain significant choices and supersession. Resolve contradictions in the canonical design before relying on a changed contract.
 
-Proposals describe a bounded change against named designs. One proposal can change multiple subsystems, and one subsystem can evolve through multiple proposals. Keep each current requirement in one design location and link to it; archived plans and reports are historical evidence. User/developer docs under `docs/` describe available behavior and procedures. Findings belong in `issues/`. Write repository rules, role briefs and proposal/design governance text in English.
+Proposals describe a bounded change against named designs. One proposal can change multiple subsystems, and one subsystem can evolve through multiple proposals. Keep each current requirement in one design location and link to it; archived plans and reports are historical evidence. User/developer docs under `docs/` describe available behavior and procedures. Findings belong in `issues/`. All authored repository content follows the [language policy in AGENTS.md](../AGENTS.md#start-here).
 
 New proposals use exactly these states:
 
