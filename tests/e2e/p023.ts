@@ -29,6 +29,31 @@ async function alignedText(title: Locator, status: Locator) {
     .poll(async () => Math.abs((await textX(title)) - (await textX(status))))
     .toBeLessThan(0.6);
 }
+type RowGeometry = { x: number; y: number; width: number; height: number };
+async function rowGeometry(rows: Locator): Promise<RowGeometry[]> {
+  return rows.evaluateAll((elements) =>
+    elements.map((element) => {
+      const { x, y, width, height } = element.getBoundingClientRect();
+      return { x, y, width, height };
+    }),
+  );
+}
+async function expectSameRowGeometry(rows: Locator, expected: RowGeometry[]) {
+  await expect
+    .poll(async () => {
+      const actual = await rowGeometry(rows);
+      if (actual.length !== expected.length) return Number.POSITIVE_INFINITY;
+      return Math.max(
+        0,
+        ...actual.flatMap((rect, index) =>
+          (Object.keys(rect) as (keyof RowGeometry)[]).map((key) =>
+            Math.abs(rect[key] - expected[index][key]),
+          ),
+        ),
+      );
+    })
+    .toBeLessThan(0.6);
+}
 async function alignedMenus(rail: Locator) {
   await expect(rail.locator(".project-more svg")).toHaveCSS("width", "16px");
   await expect(rail.locator(".session-rename svg").first()).toHaveCSS(
@@ -151,11 +176,11 @@ export async function p023({
     .locator(".project-group")
     .filter({ has: page.locator(".project-button.selected") });
   const rows = rail.locator(".conversation-link");
-  const loading = rail
-    .getByRole("status")
-    .filter({ hasText: "Loading conversations" });
-  await expect(loading).toBeVisible();
-  const initialLoadingX = await textX(loading);
+  await expect(rail.locator(".history")).toHaveAttribute("aria-busy", "true");
+  await expect(
+    rail.getByText("Loading conversations…", { exact: true }),
+  ).toHaveCount(0);
+  await expect(rows).toHaveCount(0);
   releaseInitial();
   await expect(rows).toHaveCount(5);
   await page.unroute("**/api/v1/history?*");
@@ -174,7 +199,6 @@ export async function p023({
     .locator("span")
     .filter({ hasText: "P023" })
     .first();
-  expect(Math.abs(initialLoadingX - (await textX(title)))).toBeLessThan(0.6);
   const more = rail.getByRole("button", { name: "Show more", exact: true });
   const separator = page.getByRole("separator", {
     name: "Sidebar width",
@@ -223,12 +247,31 @@ export async function p023({
       await pageGate;
     await route.continue();
   });
+  const pageRows = await rowGeometry(rows);
   await rail.getByRole("button", { name: "Show more", exact: true }).click();
   await expect(
     rail.getByRole("button", { name: "Show more", exact: true }),
   ).toBeDisabled();
-  await alignedText(title, loading);
+  await expect(rail.locator(".history")).toHaveAttribute("aria-busy", "true");
+  await expect(
+    rail.getByText("Loading conversations…", { exact: true }),
+  ).toHaveCount(0);
+  await expect(rows).toHaveText(
+    [
+      "P023 history 11",
+      "P023 history 10",
+      "P023 history 09",
+      "P023 history 08",
+      "P023 history 07",
+    ],
+    { useInnerText: true },
+  );
+  await expectSameRowGeometry(rows, pageRows);
   await alignedText(title, more);
+  await page.screenshot({
+    path: path.join(artifacts, "p023-history-loading-desktop.png"),
+    fullPage: true,
+  });
   releasePage();
   await expect(rows).toHaveCount(10);
   await page.unroute("**/api/v1/history?*");
@@ -664,6 +707,50 @@ export async function p023({
       .locator(".project-group")
       .filter({ has: touch.locator(".project-button.selected") });
     const touchRows = touchRail.locator(".conversation-link");
+    let releaseTouchPage!: () => void;
+    let observeTouchPage!: () => void;
+    const touchPageGate = new Promise<void>((resolve) => {
+      releaseTouchPage = resolve;
+    });
+    const touchPageObserved = new Promise<void>((resolve) => {
+      observeTouchPage = resolve;
+    });
+    await touch.route("**/api/v1/history?*", async (route) => {
+      if (new URL(route.request().url()).searchParams.has("cursor")) {
+        observeTouchPage();
+        await touchPageGate;
+      }
+      await route.continue();
+    });
+    const touchMore = touchRail.getByRole("button", {
+      name: "Show more",
+      exact: true,
+    });
+    await touchMore.scrollIntoViewIfNeeded();
+    await touch.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    const touchPageRows = await rowGeometry(touchRows);
+    await touchMore.tap();
+    await touchPageObserved;
+    await expect(touchRail.locator(".history")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    await expect(
+      touchRail.getByText("Loading conversations…", { exact: true }),
+    ).toHaveCount(0);
+    await expectSameRowGeometry(touchRows, touchPageRows);
+    await touch.screenshot({
+      path: path.join(artifacts, "p023-history-loading-touch.png"),
+      fullPage: true,
+    });
+    releaseTouchPage();
+    await expect(touchRows).toHaveCount(10);
+    await touch.unroute("**/api/v1/history?*");
     const touchOrder = await touchRows.allInnerTexts();
     await touchRows.nth(1).tap();
     await touch

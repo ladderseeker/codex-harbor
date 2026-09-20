@@ -186,7 +186,7 @@ export function History({
           </button>
         </div>
       )}
-      {loading && (
+      {searchResults && loading && (
         <p className="rail-empty" role="status">
           Loading conversations…
         </p>
