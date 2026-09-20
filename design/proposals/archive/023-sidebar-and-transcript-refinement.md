@@ -3,7 +3,9 @@
 ## Metadata
 
 - ID: P023
-- Status: Accepted
+- Status: Implemented
+- Archive disposition: Completed
+- Archived: 2026-09-20
 - Created: 2026-09-20
 - Owner: Main conversation, with a fresh-context implementer and independent design/provenance reviewers.
 - Outcome: Navigate recent conversations and read replies with compact, aligned controls and progressively disclosed detail.
@@ -11,7 +13,7 @@
 - Baseline: `58c8accfea66ef2852b86bbea7e9b614674aad55`; clean main checkout inspected before edits.
 - Dependencies: Existing authenticated history cursor API, Markdown renderer, message records and dialog focus handling are implemented at baseline. Node 24.11.1 and pnpm 12.3.4 are available; Docker and SSH require scoped sandbox access. All required gates must pass before completion.
 - Source issues: Owner screenshots/request; no existing issue transferred.
-- Design references: [Architecture](../architecture.md), [interface](../systems/006-interface.md), [conversations](../systems/001-conversations-and-access.md), [profiles](../systems/004-deployment-and-profiles.md), [visual guide](../design-tokens.html), [prototype](../prototypes/harbor-redesign.html).
+- Design references: [Architecture](../../architecture.md), [interface](../../systems/006-interface.md), [conversations](../../systems/001-conversations-and-access.md), [profiles](../../systems/004-deployment-and-profiles.md), [visual guide](../../design-tokens.html), [prototype](../../prototypes/harbor-redesign.html).
 - Exact file fence: [Below](#exact-file-fence).
 - Acceptance IDs: P023-01–P023-07.
 
@@ -19,7 +21,7 @@
 
 Long sidebar histories, inline search filters, faint ellipsis controls and centered action text make navigation cumbersome. User copy occupies the bubble, code copy sits below the block without syntax coloring, and each command contributes a full message heading and vertical spacing even while collapsed.
 
-Deliver one cohesive navigation and reading improvement. Report downloads/browser previews are a separate resource-delivery outcome retained in [the follow-up issue](../../issues/2026-09-20-120000-conversation-report-downloads.md): personal VPS currently excludes the managed file API. Do not expose arbitrary model paths as download links. New conversation drafts, capacity, approval delivery and native naming remain with P018–P022 and are excluded. No runtime protocol, execution policy, API authority, schema or migration changes.
+Deliver one cohesive navigation and reading improvement. Report downloads/browser previews are a separate resource-delivery outcome retained in [the follow-up issue](../../../issues/2026-09-20-120000-conversation-report-downloads.md): personal VPS currently excludes the managed file API. Do not expose arbitrary model paths as download links. New conversation drafts, capacity, approval delivery and native naming remain with P018–P022 and are excluded. No runtime protocol, execution policy, API authority, schema or migration changes.
 
 ## Dependencies and current design
 
@@ -95,14 +97,20 @@ Main owns proposal, follow-up issue, combined evidence and deployment. The imple
 
 ## Rollout and recovery
 
-Follow [personal VPS deployment](../../docs/developer/personal-vps.md) and inspect installed configuration/identity first. Reuse the reviewed fixed candidate packaging/staging/promotion approach only after reading its scripts. Build outside live/source projects under a disposable nonroot builder. Preserve complete runtime layout, site writable-path drop-ins, proxy, credentials and state. No migration expected; compare migration inventories before switching. Drain active operations, retain a root-private matched database/native/config/unit checkpoint and exact predecessor. Promotion must identify tested source/artifact and successful services/assets. A failed readiness check leaves the candidate unpromoted or uses the documented compatible predecessor recovery; never restore over new work silently. SSH remains the recovery route. The owner already authorized commit, push and deployment.
+Follow [personal VPS deployment](../../../docs/developer/personal-vps.md) and inspect installed configuration/identity first. Reuse the reviewed fixed candidate packaging/staging/promotion approach only after reading its scripts. Build outside live/source projects under a disposable nonroot builder. Preserve complete runtime layout, site writable-path drop-ins, proxy, credentials and state. No migration expected; compare migration inventories before switching. Drain active operations, retain a root-private matched database/native/config/unit checkpoint and exact predecessor. Promotion must identify tested source/artifact and successful services/assets. A failed readiness check leaves the candidate unpromoted or uses the documented compatible predecessor recovery; never restore over new work silently. SSH remains the recovery route. The owner already authorized commit, push and deployment.
 
 ## Review and findings
 
-Pending green combined gate. Fresh-context design and provenance reviews are required, at most three rounds; main adjudicates and sends fixes to the original implementer. Record review messages as review evidence, not a complete exported session transcript.
+Three independent review rounds completed. Round one cleared design and required complete candidate source/package linkage evidence; the same implementer added the reviewed verifier and actual Linux receipts passed. Installed acceptance exposed first-Escape dismissal, corrected and rechecked in round two; that design review also found nested-menu Escape propagation, fixed by the same implementer and verified before deployment. Round three cleared final candidate, installed evidence and closing claims. No scoped findings remain. Reviewer messages are review evidence, not complete exported session transcripts.
 
 Before the independent review gate, main inspected the first rendered prototype and required a compact search layout instead of stacked form fields and individually outlined results. The owner reference and existing P023 interaction scope support this presentation correction; it adds no API or product scope. The implementer updates guide/prototype/application together and reruns affected visual/application checks.
 
 ## Closing record
 
-Pending implementation, gates, review, identified commit/push and installed verification. The proposal was drafted and settled as Accepted within the owner's implementation authorization on 20 September 2026. Do not mark Implemented until every scoped acceptance passes.
+Completed on 20 September 2026. P023-01–P023-07 passed: five-item history and load-more, current-project modal search, aligned discoverable actions, outside-bubble copy, labeled highlighted code, compact folded commands and neutral surfaces. Current interface design, guide/prototype and user/developer docs are aligned.
+
+Implementation was committed and pushed as `814ad3d83ffe1291fd7ffb3e003923db2ffa7ee3`, followed by reviewed Escape corrections in `606d6cc75baa3a3713269472d5784f1d9ee522e6`. Final source digest: `e970832b7281cb3241bc2a3202c2cbca0a6ae7bb0f0454e7048790f954abdc57`. Local build/check, all 39 unit tests, real design and full critical E2E passed; the fresh Linux locked build/unit/design gate and complete before/after package verification passed. Final deployed release is `/opt/harbor-personal/releases/p023-606d6cc75baa`, manifest SHA256 `1af0c3fd1d8f5433c56ad9262fdb1e1b6cf4c3267fa094d9155eda7cb4ae251f`, with a matched private backup and predecessor retained.
+
+Installed service/executable identity, HTTPS/auth denial, signed-in browser Escape and presentation checks passed. After explicit owner approval, a disposable project conversation read and edited only its canary file; its retained runtime was stopped. Three independent review rounds are clear. The [delivery report](../../../docs/reports/2026-09-20-sidebar-and-transcript.md) records commands, identities, failed attempts, review dispositions and evidence limits. The proposal was drafted and accepted under the owner's implementation authorization on this same date.
+
+[Report downloads and safe browser previews](../../../issues/2026-09-20-120000-conversation-report-downloads.md) remain a separate capability. This completion does not close historical runtime-isolation or protected restore obligations. The documentation closing commit follows the installed application commit; it does not change the deployed artifact.
