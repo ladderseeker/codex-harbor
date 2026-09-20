@@ -2,13 +2,13 @@
 
 ## Scope and authorization
 
-[P023](../../design/proposals/023-sidebar-and-transcript-refinement.md#owner-review-correction-cycle--20-september-2026) reopened after the owner reviewed the first deployment. This cycle covers aligned history states and trailing sidebar controls, removal of two redundant settings labels, display-only user-message thumb icons, and selected-first recent-update session ordering. The owner explicitly authorized implementation, commit, push and VPS deployment.
+[P023](../../design/proposals/archive/023-sidebar-and-transcript-refinement.md#owner-review-correction-cycle--20-september-2026) reopened after the owner reviewed the first deployment. This cycle covers aligned history states and trailing sidebar controls, removal of two redundant settings labels, display-only user-message thumb icons, and selected-first recent-update session ordering. The owner explicitly authorized implementation, commit, push and VPS deployment.
 
 Baseline `4b438a954c0db071b9e2ccd8cb9839da02dcfe15` was clean across staged, unstaged and untracked files. No stash was created. The [initial delivery report](2026-09-20-sidebar-and-transcript.md) preserves its earlier gates and three rounds; those are not new checks for this correction. Main owns planning/evidence/deployment and uses a fresh-context Medium-effort implementer plus independent reviewers for this bounded UI correction.
 
 ## Verification and release record
 
-Implementation, local gates and independent round-one reviews are complete; Linux candidate verification and deployment are pending. Private evidence is retained separately under `.test-runs/p023-owner-review-20260920/`. Earlier script and runtime evidence may cover unchanged boundaries only with identified source and limits. Report downloads, schema changes and runtime-policy work remain excluded. R5 extends only the history read-query mode, as detailed below.
+Completed and deployed on 20 September 2026. All five correction acceptance IDs, local/Linux gates and both independent review roles are clear. Private evidence is retained separately under `.test-runs/p023-owner-review-20260920/`. Earlier script and runtime evidence may cover unchanged boundaries only with identified source and limits. Report downloads, schema changes and runtime-policy work remain excluded. R5 extends only the history read-query mode, as detailed below.
 
 ## Deployment prerequisites
 
@@ -63,3 +63,35 @@ Design-04 passed on the final `8afe1…aa79` source, with identical start/end id
 Fresh Medium-effort design and provenance reviewers separately cleared the local candidate with no actionable findings. Design inspected R1–R5 contracts/source/tests and actual rendered artifacts. Provenance recomputed final and pre-glyph source digests, checked all 15 implementation files, the 20-entry review inventory, seven helpers, all 35 receipt/log hashes and the visual manifest. Both accepted critical02 reuse for the exact four-file visual/test delta and independently passed documentation/whitespace checks. They did not edit files or run infrastructure/live gates. Their messages record these assessments; complete raw review-session exports are unavailable.
 
 Main accepts both reviews and proceeds under the owner's existing commit/push/deploy authorization. The Linux candidate, installed acceptance and final closure remain a separate review step.
+
+## Linux candidate
+
+Implementation and reviewed plan were committed and pushed as `a94f4c1f8bed550efe010caf346a66db5c45b123`. Origin/main acknowledges that revision and the source checkout was clean. The Git bundle SHA256 is `4c21f863d18156820a7952e13fc6690f4cc32c481963f6fc320931f78fe95ef6`; all eight uploaded input hashes match locally. The push completed after a slow SSH connection; no retry, credential change or host-key relaxation was needed.
+
+The fresh nonroot Linux locked install/build and 39 unit tests passed. Package manifest SHA256 is `e153ca89e91d4abc203e161d56fd6cddf9a0fbe1c07cf81c2976d1292a9cbc7d`; archive SHA256 is `dce8086070737c02d5804e6868bb9929bc37d1d34b244d5f11a3f040f93db62d` (244,807,067 bytes, 14,221 manifest files). The fixed Linux browser/API/PostgreSQL/supervisor lane passed at identical final source digest, and the complete before/after source/package verification receipts are byte-identical. This is not yet an installed-release claim.
+
+Main retrieved the bounded logs, full manifest and fixture screenshots as evidence archive SHA256 `7db58c91b642a3b8c054f911726c2448308b0fcd77f95290c1f2d3323dd212e0`. Local extraction rejects nonregular/escaping/oversize entries. Main rechecked the manifest, source revision, package linkage, exact start/end source, and final Linux desktop screenshot. The real-stack instance is `harbor-e2e-0b20ee9946`; `linux-verification-record.json` identifies all retrieved file hashes. The tested package was staged as `/opt/harbor-personal/releases/p023-a94f4c1f8bed`, with full content/root-ownership verification.
+
+## Promotion and installed acceptance
+
+The reviewed promotion helper verified the exact predecessor, candidate history-file hash, unchanged remaining API/runtime/migration/native inputs and complete staged artifact. It drained admission/work, retained matched private backup `/var/lib/harbor-personal-backups/p023-a94f4c1f8bed-20260920`, preserved site drop-ins and the configured preview, and promoted `/opt/harbor-personal/releases/p023-a94f4c1f8bed`. The prior `p023-606d6cc75baa` release remains available. Recovery requires stopping writers and assessing subsequent work before any matched restore; no automatic database rollback is implied.
+
+Installed verification passes: API/supervisor processes execute the new release's Node binary, no process executes the prior release, HTTPS health returns 200, and anonymous root/index/API/actual JS/CSS requests all return 401. The signed-in Chrome page loads exactly the JS/CSS asset names identified by this installed check.
+
+Main's read-only installed UI check reused the previously approved disposable conversation. Add-project, project ellipsis and session ellipsis target/glyph centers are all x=229. Settings contains only Codex account, Emergency stop and Sign out. User Copy remains the sole button; two aria-hidden, nonfocusable 30×30 decorative spans match the answer icons. The outside-bubble row changes opacity from 0 at rest to 1 on hover. The displayed page shows neutral surfaces, folded existing commands and code headers. No new model turn, project, file mutation or credential action occurred. This single-row live check does not replace the local/Linux multi-page ordering tests.
+
+`remote-stage01.json`, `remote-promote01.json`, `remote-installed01.json`, and `installed-ui-observation.json` retain the narrower evidence. CUA observations/displayed screenshot are not a complete exported browser session; that raw export remains unavailable. An initial DOM probe used a nonexistent root selector and failed before returning measurements; the corrected read succeeded. No computed-white claim is drawn from transparent root/body elements, and no installed clipboard-byte claim is made.
+
+## Independent review — round two
+
+Both reviewers cleared the completed Linux candidate, promotion, installed evidence and closing claims without actionable findings. Design confirmed the unchanged implementation and inspected the Linux screenshot. Provenance independently matched all eight uploaded input hashes, the evidence archive and all 29 extracted artifact hashes, complete before/after linkage receipts, packaged implementation, manifest and installed identities. Both passed documentation/whitespace checks and accepted the explicitly limited installed browser observations. Neither edited source nor reran infrastructure gates. Main accepts both assessments.
+
+Main restored P023 to Implemented/Completed and moved the same proposal into the archive, preserving initial history and repairing inbound/outbound links. The closing changes are documentation only; the tested and deployed application remains commit `a94f4c1f8bed550efe010caf346a66db5c45b123`.
+
+## Independent review — round three
+
+Both reviewers cleared the final documentation-only archive and link changes with no findings. They matched all four closing document hashes and verified metadata, preserved history, artifact claims and limitations against round-two evidence. Documentation validation passed for 161 files, together with diff whitespace and explicit new-file whitespace/final-newline checks. Main accepts these assessments; this correction cycle closes within its three-round cap. No application changes or infrastructure reruns followed deployment.
+
+## Closing scope and limitations
+
+R1–R5 are implemented and deployed, with local and immutable Linux verification. Report downloads/previews remain separately tracked by the original P023 follow-up; no runtime/isolation/restore gate is newly claimed. The historical credential no-op 409 remains open and unexplained. All scoped findings and completion gates are clear. The documentation closing commit and push follow the already deployed application commit; no further application deployment is needed for those documentation changes.
