@@ -160,7 +160,7 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 10px;
+        padding: 0 4px 0 10px;
         margin: 29px 0 8px;
         color: var(--muted);
         font-size: 12px;
@@ -174,7 +174,7 @@
         align-items: center;
         border-radius: 8px;
         min-height: 37px;
-        padding-right: 5px;
+        padding-right: 4px;
       }
       .project-row:hover,
       .project-row:focus-within {
@@ -257,8 +257,8 @@
         height: 30px;
       }
       .session-rename svg {
-        width: 14px;
-        height: 14px;
+        width: 16px;
+        height: 16px;
       }
       .session-row:hover .session-rename,
       .session-row:focus-within .session-rename {
@@ -1124,6 +1124,15 @@
       .search-results {display:grid; gap:4px; max-height:45vh; overflow:auto;}
       .search-results button,.history-more {text-align:left; justify-content:flex-start;}
 
+      .sessions .history-more,.sessions .history-state {margin:4px 0; padding:6px 0 6px 22px; font-size:12px; color:var(--muted);}
+      .sessions .history-state p {margin:0;}
+      .sessions .history-state button {padding:6px 0;}
+      .session {gap:6px;} .resource-dot {width:4px;height:4px;}
+      .message-actions {gap:4px;align-items:center;}
+      .message-actions .icon-button {display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:6px;box-sizing:border-box;}
+      .message-actions svg {width:16px;height:16px;}
+      .decorative-reaction {pointer-events:none;}
+      @media (hover:none),(pointer:coarse),(max-width:700px) {.message-actions .icon-button,.project-actions .icon-button,.session-rename,.project-heading .icon-button {min-width:36px;min-height:36px;}}
       .prototype-dialog.search-dialog {width:min(600px,calc(100% - 32px)); padding:16px;}
       .search-dialog .example-heading {position:absolute; top:16px; right:16px; padding:0; margin:0; border:0;}
       .search-dialog .example-heading h2,.sr-only {position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;}
@@ -1467,6 +1476,7 @@
           chats: [{ id: 5, title: "New chat", messages: [] }],
         },
       ];
+      for (const project of projects) project.chats.forEach((chat, index) => {chat.updatedAt = projects.length * 100 - index;});
       function current() {
         for (const project of projects) {
           const chat = project.chats.find((c) => c.id === activeId);
@@ -1585,15 +1595,22 @@
       let search = "",
         archiveFilter = "active",
         filterProject = 1;
+      let historyState = "ready";
       function renderProjects() {
         $("projects").innerHTML = projects
           .map((p) => {
-            const activeChats = p.chats.filter(c => !c.archived);
-            const chats = activeChats.slice(0, p.depth || 5);
-            return `<div class="project"><div class="project-row"><button class="project-toggle" data-toggle="${p.id}" aria-expanded="${p.open}" title="${escapeHTML(p.name)}">${icon("folder")}<span class="project-name">${escapeHTML(p.name)}</span></button><div class="project-actions"><button class="icon-button" data-project="${p.id}" aria-label="Project details for ${escapeHTML(p.name)}" title="Project details">${icon("more")}</button><button class="icon-button" data-new="${p.id}" aria-label="New chat in ${escapeHTML(p.name)}" title="New chat">${icon("compose")}</button></div></div>${p.open ? `<div class="sessions">${chats.map((c) => `<div class="session-row ${c.id === activeId ? "active" : ""}"><button class="session" ${c.id === activeId ? 'aria-current="page"' : ""} data-chat="${c.id}" title="${escapeHTML(c.title)}"><span class="resource-dot ${c.occupied ? "occupied" : ""}" role="img" aria-label="${c.occupied ? "Runtime resources retained" : "No retained runtime resources"}" title="${c.occupied ? "Runtime resources retained" : "No retained runtime resources"}"></span><span class="session-title">${escapeHTML(c.title)}</span></button><button class="icon-button session-rename" data-options="${c.id}" aria-label="More actions for ${escapeHTML(c.title)}" title="More actions">${icon("more")}</button></div>`).join("") || '<p class="sample-label">No matching chats</p>'}${activeChats.length > chats.length ? `<button class="history-more" data-more="${p.id}">Show more</button>` : ''}</div>` : ""}</div>`;
+            const activeChats = p.chats.filter(c => !c.archived).sort((a,b) => Number(b.id === activeId) - Number(a.id === activeId) || b.updatedAt - a.updatedAt || b.id - a.id);
+            const chats = ["loading", "empty"].includes(historyState) ? [] : activeChats.slice(0, p.depth || 5);
+            return `<div class="project"><div class="project-row"><button class="project-toggle" data-toggle="${p.id}" aria-expanded="${p.open}" title="${escapeHTML(p.name)}">${icon("folder")}<span class="project-name">${escapeHTML(p.name)}</span></button><div class="project-actions"><button class="icon-button" data-new="${p.id}" aria-label="New chat in ${escapeHTML(p.name)}" title="New chat">${icon("compose")}</button><button class="icon-button" data-project="${p.id}" aria-label="Project details for ${escapeHTML(p.name)}" title="Project details">${icon("more")}</button></div></div>${p.open ? `<div class="sessions">${chats.map((c) => `<div class="session-row ${c.id === activeId ? "active" : ""}"><button class="session" ${c.id === activeId ? 'aria-current="page"' : ""} data-chat="${c.id}" title="${escapeHTML(c.title)}"><span class="resource-dot ${c.occupied ? "occupied" : ""}" role="img" aria-label="${c.occupied ? "Runtime resources retained" : "No retained runtime resources"}" title="${c.occupied ? "Runtime resources retained" : "No retained runtime resources"}"></span><span class="session-title">${escapeHTML(c.title)}</span></button><button class="icon-button session-rename" data-options="${c.id}" aria-label="More actions for ${escapeHTML(c.title)}" title="More actions">${icon("more")}</button></div>`).join("") || (historyState === 'loading' ? '' : '<p class="history-state">No matching conversations</p>')}${["loading", "loading-more"].includes(historyState) ? '<p class="history-state" role="status">Loading conversations…</p>' : historyState === "error" ? '<div class="history-state" role="alert"><p>History unavailable</p><button data-history-retry>Retry history</button></div>' : ""}${!["empty", "loading"].includes(historyState) && activeChats.length > chats.length ? `<button ${historyState === "loading-more" ? "disabled" : ""} class="history-more" data-more="${p.id}">Show more</button>` : ''}</div>` : ""}</div>`;
           })
           .join("");
       }
+      const historySpecimen = document.createElement("label");
+      historySpecimen.className = "sample-label";
+      historySpecimen.innerHTML = 'History specimen <select aria-label="History specimen"><option value="ready">Ready</option><option value="loading">First load</option><option value="loading-more">Loading more</option><option value="empty">Empty</option><option value="error">Error and retry</option></select>';
+      $("projects").before(historySpecimen);
+      historySpecimen.querySelector("select").onchange = event => {historyState = event.target.value; renderProjects();};
+      $("projects").addEventListener("click", event => {if(event.target.closest("[data-history-retry]")) {historyState = "ready";historySpecimen.querySelector("select").value = "ready";renderProjects();}});
       const sampleUser =
         "Let's make Harbor feel simpler. Where should we start?";
       const sampleSource =
@@ -1612,7 +1629,7 @@
         return `<button class="icon-button" data-copy="${key}" aria-label="${label}" title="${label}">${icon("copy")}</button>`;
       }
       function messageActions(key, text, assistant = false) {
-        return `<div class="message-actions" role="group" aria-label="${assistant ? "Response actions" : "Message actions"}">${copyButton(key, text, assistant ? "Copy response" : "Copy message")}${assistant ? ["up", "down"].map((vote) => `<button class="icon-button" data-vote="${vote}" data-response="${key}" aria-label="${vote === "up" ? "Like" : "Dislike"} response" title="${vote === "up" ? "Like" : "Dislike"} response" aria-pressed="${votes.get(key) === vote}">${icon("thumb-" + vote)}</button>`).join("") : ""}</div>`;
+        return `<div class="message-actions" role="group" aria-label="${assistant ? "Response actions" : "Message actions"}">${copyButton(key, text, assistant ? "Copy response" : "Copy message")}${assistant ? ["up", "down"].map((vote) => `<button class="icon-button" data-vote="${vote}" data-response="${key}" aria-label="${vote === "up" ? "Like" : "Dislike"} response" title="${vote === "up" ? "Like" : "Dislike"} response" aria-pressed="${votes.get(key) === vote}">${icon("thumb-" + vote)}</button>`).join("") : ["up", "down"].map(vote => `<span class="icon-button decorative-reaction" aria-hidden="true">${icon("thumb-" + vote)}</span>`).join("")}</div>`;
       }
       function sampleHTML() {
         return `<div class="user-message"><div class="user-bubble">${escapeHTML(sampleUser)}</div>${messageActions("sample-user", sampleUser)}</div><article class="assistant-message"><div class="assistant-label">${icon("harbor")}Harbor</div><p>Start with the conversation. Everything else should make it easier to get back to your work.</p><h2>A little less interface. A lot more room.</h2><p>Keep projects and their chats together in the sidebar. Bring everyday actions closer to where you need them.</p><ul><li><strong>One place to start.</strong> New chat is always within reach.</li><li><strong>Projects, kept together.</strong> Open a folder, pick up a chat, or start another.</li><li><strong>A composer that fits.</strong> One line to begin with. More room when you need it.</li></ul><details class="conversation-activity"><summary>3 commands · Completed</summary><pre>pwd
@@ -1648,7 +1665,7 @@ Checks passed</pre></details><section class="markdown-body" aria-label="Markdown
       }
       function newChat(projectId = current().project.id) {
         const project = projects.find((p) => p.id === projectId);
-        const chat = { id: nextId++, title: "New chat", messages: [] };
+        const chat = { id: nextId++, title: "New chat", messages: [], updatedAt: Date.now() };
         project.chats.unshift(chat);
         project.open = true;
         activeId = chat.id;
@@ -1713,6 +1730,7 @@ Checks passed</pre></details><section class="markdown-body" aria-label="Markdown
         const { chat } = current();
         if (!chat.sample && !chat.messages.length)
           chat.title = text.length > 34 ? text.slice(0, 34) + "…" : text;
+        chat.updatedAt = Date.now();
         chat.messages.push(
           { role: "user", text },
           {
@@ -2043,7 +2061,7 @@ Checks passed</pre></details><section class="markdown-body" aria-label="Markdown
       $("settingsButton").onclick = () => {
         showDialog(
           "Settings",
-          `<div class="action-list"><button id="accountSettings">${icon("settings")}Account settings</button><button id="previewSettings">${icon("search")}About this preview</button></div>`,
+          `<div class="action-list"><button id="accountSettings">${icon("settings")}Codex account</button><button id="previewSettings">${icon("search")}About this preview</button></div>`,
         );
         $("accountSettings").onclick = () =>
           showDialog(

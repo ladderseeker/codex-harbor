@@ -2035,7 +2035,7 @@ svg {
 }
 .rail-heading {
   margin: 29px 0 8px;
-  padding: 0 10px;
+  padding: 0 4px 0 10px;
 }
 .rail-heading h2 {
   font-size: 12px;
@@ -2051,7 +2051,7 @@ svg {
 .project-row {
   display: flex;
   align-items: center;
-  padding-right: 5px;
+  padding-right: 4px;
   border-radius: 8px;
 }
 .project-row:hover,
@@ -2092,8 +2092,8 @@ svg {
   height: 16px;
 }
 .session-rename svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 .project-row:hover .project-new,
 .project-row:focus-within .project-new,
@@ -3238,6 +3238,9 @@ svg {
   margin-left: auto;
 }
 .session-rename {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   opacity: 1;
   color: var(--muted);
   width: 30px;
@@ -3310,6 +3313,7 @@ svg {
   .message-actions .icon-button,
   .copy-control .icon-button,
   .project-more,
+  .rail-heading .icon-button,
   .session-rename {
     min-width: 36px;
     min-height: 36px;
@@ -3444,4 +3448,27 @@ svg {
   .search-dialog .search-scope-row select {
     max-width: 160px;
   }
+}
+
+/* Sidebar status text shares the title inset; modal results keep their own layout. */
+.sidebar .history {
+  --history-title-inset: 46px;
+}
+.sidebar .history > .rail-empty,
+.sidebar .history > .history-more {
+  padding-left: var(--history-title-inset);
+}
+.sidebar .history > .history-error {
+  padding-left: var(--history-title-inset);
+}
+.sidebar .history-error > button {
+  padding-left: 0;
+  border-left: 0;
+}
+.message-actions .decorative-reaction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  pointer-events: none;
 }

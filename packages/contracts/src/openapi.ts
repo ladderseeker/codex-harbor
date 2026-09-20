@@ -388,6 +388,20 @@ const paths: Record<string, any> = {
         { in: "query", name: "projectId", schema: uuid },
         {
           in: "query",
+          name: "order",
+          schema: { enum: ["created", "updated"], default: "created" },
+          description:
+            "Created order is immutable. Updated order sorts by selected priority, durable updated_at descending and ID descending.",
+        },
+        {
+          in: "query",
+          name: "selectedId",
+          schema: uuid,
+          description:
+            "Only valid with order=updated. Pins this session first only when it matches all filters; counts within the page limit.",
+        },
+        {
+          in: "query",
           name: "limit",
           schema: { type: "integer", minimum: 1, maximum: 50, default: 20 },
         },
@@ -396,7 +410,7 @@ const paths: Record<string, any> = {
           name: "cursor",
           schema: string,
           description:
-            "Opaque immutable-order cursor bound to filters; changed filters require a new first page.",
+            "Opaque cursor bound to filters, order and selectedId. Changed identity requires a new first page. Default created cursors remain compatible; updated cursors retain exact timestamp and selected priority. Updated traversal is not a snapshot.",
         },
       ],
     },

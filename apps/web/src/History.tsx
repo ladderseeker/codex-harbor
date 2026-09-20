@@ -29,6 +29,10 @@ export function History({
 }) {
   const q = query,
     state = filter;
+  const baseIdentity = `${projectId}:${state}:${q}:${searchResults}`;
+  const identity = `${baseIdentity}:${searchResults ? "" : selectedId}`;
+  const [rowsIdentity, setRowsIdentity] = useState(baseIdentity);
+  const [pageIdentity, setPageIdentity] = useState("");
   const [rows, setRows] = useState<(Session & { snippet: string })[]>([]),
     [cursor, setCursor] = useState<string | null>(null),
     [error, setError] = useState(""),
@@ -67,6 +71,10 @@ export function History({
     failedLoad.current = { next, refresh };
     try {
       const query = new URLSearchParams({ projectId, q, state, limit: "5" });
+      if (!searchResults) {
+        query.set("order", "updated");
+        if (selectedId) query.set("selectedId", selectedId);
+      }
       if (next) query.set("cursor", next);
       let result = await request<{
         sessions: (Session & { snippet: string })[];
@@ -99,6 +107,8 @@ export function History({
         rowCount.current = unique.length;
         return unique;
       });
+      setRowsIdentity(baseIdentity);
+      setPageIdentity(identity);
       setCursor(result.nextCursor);
       setError("");
     } catch (e) {
@@ -108,11 +118,18 @@ export function History({
       if (epoch.current === requestEpoch) setLoading(false);
     }
   }
-  const identity = `${projectId}:${state}:${q}`;
   const lastIdentity = useRef(identity);
+  const lastBaseIdentity = useRef(baseIdentity);
   useEffect(() => {
-    const changed = lastIdentity.current !== identity;
+    const changed = lastBaseIdentity.current !== baseIdentity;
+    const selectionChanged = lastIdentity.current !== identity;
     lastIdentity.current = identity;
+    lastBaseIdentity.current = baseIdentity;
+    if (selectionChanged) {
+      setCursor(null);
+      setError("");
+      failedLoad.current = { refresh: !changed };
+    }
     if (changed) {
       setRows([]);
       rowCount.current = 0;
@@ -125,7 +142,7 @@ export function History({
       clearTimeout(timer);
       epoch.current++;
     };
-  }, [q, state, projectId, revision]);
+  }, [identity, revision]);
   // The acknowledged mutation also refreshes /sessions. That revision can
   // supersede this component's read, so restore only after current rows commit.
   useEffect(() => {
@@ -147,6 +164,14 @@ export function History({
     const timer = window.setInterval(() => refreshRef.current(), 15000);
     return () => window.clearInterval(timer);
   }, []);
+  const visibleRows = rowsIdentity === baseIdentity ? rows : [];
+  const displayRows = searchResults
+    ? visibleRows
+    : [
+        ...visibleRows.filter((row) => row.id === selectedId),
+        ...visibleRows.filter((row) => row.id !== selectedId),
+      ];
+  const currentPage = pageIdentity === identity;
   return (
     <section
       ref={focusScope}
@@ -154,8 +179,8 @@ export function History({
       aria-label="Conversation history"
       aria-busy={loading}
     >
-      {error && (
-        <div role="alert">
+      {error && lastIdentity.current === identity && (
+        <div className="history-error" role="alert">
           <p>{error}</p>
           <button
             disabled={loading}
@@ -173,7 +198,7 @@ export function History({
         </p>
       )}
       <div className="conversation-list">
-        {rows.map((s) => (
+        {displayRows.map((s) => (
           <div
             key={s.id}
             className={`session-row ${selectedId === s.id ? "selected" : ""}`}
@@ -383,10 +408,10 @@ export function History({
           </div>
         </form>
       )}
-      {!rows.length && !loading && (
+      {!displayRows.length && !loading && (
         <p className="rail-empty">No matching conversations</p>
       )}
-      {cursor && (
+      {cursor && currentPage && (
         <button
           className="history-more"
           disabled={loading}

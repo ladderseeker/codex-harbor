@@ -1005,6 +1005,17 @@ export function App() {
                     </span>
                   </button>
                   <button
+                    className="icon-button project-new"
+                    aria-label={`New conversation in ${item.name}`}
+                    title="New chat"
+                    disabled={
+                      blocked || creating || !settingsReady || !!item.archivedAt
+                    }
+                    onClick={() => void newSession(item.id)}
+                  >
+                    <Icon name="compose" />
+                  </button>
+                  <button
                     className="icon-button project-more"
                     aria-label={`Project details for ${item.name}`}
                     title="Project details"
@@ -1015,17 +1026,6 @@ export function App() {
                     }}
                   >
                     <Icon name="more" />
-                  </button>
-                  <button
-                    className="icon-button project-new"
-                    aria-label={`New conversation in ${item.name}`}
-                    title="New chat"
-                    disabled={
-                      blocked || creating || !settingsReady || !!item.archivedAt
-                    }
-                    onClick={() => void newSession(item.id)}
-                  >
-                    <Icon name="compose" />
                   </button>
                 </div>
                 {expandedProjects.has(item.id) && (
@@ -1101,11 +1101,8 @@ export function App() {
             >
               <Icon name="settings" />
               Codex account{" "}
-              <span>
-                {capabilities?.account?.authenticated ? "Ready" : "Set up"}
-              </span>
+              {!capabilities?.account?.authenticated && <span>Set up</span>}
             </button>
-            <p>Work continues when you leave.</p>
             <button
               className="quiet-button danger-text"
               onClick={() => setEmergencyOpen(true)}

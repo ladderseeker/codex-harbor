@@ -26,26 +26,59 @@ export function historyRoutes(
         projectId: z.uuid().optional(),
         limit: z.coerce.number().int().min(1).max(50).default(20),
         cursor: z.string().max(1024).optional(),
+        order: z.enum(["created", "updated"]).default("created"),
+        selectedId: z.uuid().optional(),
       })
       .strict()
+      .refine((q) => q.order === "updated" || q.selectedId === undefined, {
+        message: "selectedId requires updated order",
+      })
       .parse(req.query);
     const filter = digest(
-      JSON.stringify([query.q, query.state, query.projectId ?? null]),
+      JSON.stringify(
+        query.order === "created"
+          ? [query.q, query.state, query.projectId ?? null]
+          : [
+              query.q,
+              query.state,
+              query.projectId ?? null,
+              query.order,
+              query.selectedId ?? null,
+            ],
+      ),
     );
-    let before: { createdAt: string; id: string } | undefined;
+    let before: { timestamp: string; id: string; priority: number } | undefined;
     if (query.cursor) {
       try {
-        const parsed = z
-          .object({
-            filter: z.literal(filter),
-            createdAt: z.iso.datetime(),
-            id: z.uuid(),
-          })
-          .strict()
-          .parse(
-            JSON.parse(Buffer.from(query.cursor, "base64url").toString("utf8")),
-          );
-        before = parsed;
+        const value = JSON.parse(
+          Buffer.from(query.cursor, "base64url").toString("utf8"),
+        );
+        if (query.order === "created") {
+          const parsed = z
+            .object({
+              filter: z.literal(filter),
+              createdAt: z.iso.datetime(),
+              id: z.uuid(),
+            })
+            .strict()
+            .parse(value);
+          before = { timestamp: parsed.createdAt, id: parsed.id, priority: 0 };
+        } else {
+          const parsed = z
+            .object({
+              filter: z.literal(filter),
+              updatedAt: z.iso.datetime(),
+              id: z.uuid(),
+              priority: z.union([z.literal(0), z.literal(1)]),
+            })
+            .strict()
+            .parse(value);
+          before = {
+            timestamp: parsed.updatedAt,
+            id: parsed.id,
+            priority: parsed.priority,
+          };
+        }
       } catch {
         throw new HarborError(
           400,
@@ -56,31 +89,48 @@ export function historyRoutes(
     }
     return transaction(pool, async (db) => {
       await db.query("SET LOCAL statement_timeout='2s'");
+      const recent = query.order === "updated";
+      const timestamp = recent ? "s.updated_at" : "s.created_at";
+      const priority = recent
+        ? "CASE WHEN s.id=$7::uuid THEN 1 ELSE 0 END"
+        : "0";
+      const keyset = recent
+        ? `(${priority},${timestamp},s.id)<($8::int,$4::timestamptz,$5::uuid)`
+        : "(s.created_at,s.id)<($4::timestamptz,$5::uuid)";
       const rows = (
         await db.query(
-          `SELECT s.*,to_char(s.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,left(coalesce((SELECT m.text FROM messages m WHERE m.session_id=s.id AND ($1='' OR strpos(lower(m.text),lower($1))>0) ORDER BY m.created_at,m.id LIMIT 1),''),240) AS snippet FROM sessions s WHERE ($2='all' OR s.archived=($2='archived')) AND ($3::uuid IS NULL OR s.project_id=$3) AND ($1='' OR strpos(lower(s.title),lower($1))>0 OR EXISTS(SELECT 1 FROM messages m WHERE m.session_id=s.id AND strpos(lower(m.text),lower($1))>0)) AND ($4::timestamptz IS NULL OR (s.created_at,s.id)<($4::timestamptz,$5::uuid)) ORDER BY s.created_at DESC,s.id DESC LIMIT $6`,
+          `SELECT s.*,${priority} AS cursor_priority,to_char(${timestamp} AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp,left(coalesce((SELECT m.text FROM messages m WHERE m.session_id=s.id AND ($1='' OR strpos(lower(m.text),lower($1))>0) ORDER BY m.created_at,m.id LIMIT 1),''),240) AS snippet FROM sessions s WHERE ($2='all' OR s.archived=($2='archived')) AND ($3::uuid IS NULL OR s.project_id=$3) AND ($1='' OR strpos(lower(s.title),lower($1))>0 OR EXISTS(SELECT 1 FROM messages m WHERE m.session_id=s.id AND strpos(lower(m.text),lower($1))>0)) AND ($4::timestamptz IS NULL OR ${keyset}) ORDER BY ${recent ? "cursor_priority DESC," : ""}${timestamp} DESC,s.id DESC LIMIT $6`,
           [
             query.q,
             query.state,
             query.projectId ?? null,
-            before?.createdAt ?? null,
+            before?.timestamp ?? null,
             before?.id ?? null,
             query.limit + 1,
+            ...(recent
+              ? [query.selectedId ?? null, before?.priority ?? null]
+              : []),
           ],
         )
       ).rows;
       const page = rows.slice(0, query.limit),
         last = page.at(-1);
       return {
-        sessions: page.map(({ cursor_created_at: _, ...row }) =>
-          publicRow(row),
+        sessions: page.map(
+          ({ cursor_timestamp: _, cursor_priority: __, ...row }) =>
+            publicRow(row),
         ),
         nextCursor:
           rows.length > query.limit && last
             ? Buffer.from(
                 JSON.stringify({
                   filter,
-                  createdAt: last.cursor_created_at,
+                  ...(recent
+                    ? {
+                        updatedAt: last.cursor_timestamp,
+                        priority: last.cursor_priority,
+                      }
+                    : { createdAt: last.cursor_timestamp }),
                   id: last.id,
                 }),
               ).toString("base64url")

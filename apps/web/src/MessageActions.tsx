@@ -83,7 +83,7 @@ export function MessageActions({
         text={text}
         label={assistant ? "Copy response" : "Copy message"}
       />
-      {assistant && (
+      {assistant ? (
         <>
           <button
             type="button"
@@ -105,6 +105,15 @@ export function MessageActions({
           >
             <Icon name="thumb-down" />
           </button>
+        </>
+      ) : (
+        <>
+          <span className="icon-button decorative-reaction" aria-hidden="true">
+            <Icon name="thumb-up" />
+          </span>
+          <span className="icon-button decorative-reaction" aria-hidden="true">
+            <Icon name="thumb-down" />
+          </span>
         </>
       )}
     </div>

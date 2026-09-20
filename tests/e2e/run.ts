@@ -439,7 +439,12 @@ try {
         rootId,
         rootPath: path.join(dir, "project-roots"),
       });
-      await p023({ page, context, origin, artifacts });
+      const designDb = new pg.Pool({ connectionString: env.DATABASE_URL });
+      try {
+        await p023({ page, context, origin, artifacts, db: designDb });
+      } finally {
+        await designDb.end();
+      }
       await writeFile(
         path.join(artifacts, "result.json"),
         JSON.stringify(

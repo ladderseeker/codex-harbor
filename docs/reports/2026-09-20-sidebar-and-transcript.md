@@ -4,7 +4,7 @@ Completed and deployed on 20 September 2026. Final application commit `606d6cc75
 
 ## Scope and authorization
 
-[P023](../../design/proposals/archive/023-sidebar-and-transcript-refinement.md) selects five-item history pages, modal current-project search, aligned discoverable actions, outside-bubble user copy, code headers/syntax coloring and compact collapsed command activity. The owner explicitly authorized implementation, commit, push and VPS deployment for final review afterward. Downloadable Markdown/HTML reports remain a separate [resource-delivery issue](../../issues/2026-09-20-120000-conversation-report-downloads.md).
+[P023](../../design/proposals/023-sidebar-and-transcript-refinement.md) selects five-item history pages, modal current-project search, aligned discoverable actions, outside-bubble user copy, code headers/syntax coloring and compact collapsed command activity. The owner explicitly authorized implementation, commit, push and VPS deployment for final review afterward. Downloadable Markdown/HTML reports remain a separate [resource-delivery issue](../../issues/2026-09-20-120000-conversation-report-downloads.md).
 
 Baseline: `58c8accfea66ef2852b86bbea7e9b614674aad55`, clean `main` checkout. No stash was created. Main owns planning, evidence and deployment; `ui_implementer` is a fresh-context GPT-6 Astra High worker with the exact proposal fence. Independent design and provenance reviews started after the application gate passed; their rounds and dispositions follow below.
 
@@ -105,3 +105,7 @@ The final installed nested-menu check focused Rename without invoking it: first 
 ## Limits and follow-up
 
 No runtime protocol, sandbox, network policy, API authorization or schema change is selected. The earlier P016 installed runtime evidence remains historical at `180bdabc…547e1`; the current change does not recertify managed Linux confinement or protected off-host restore. Existing [live and release obligations](../../issues/) remain unchanged. Report downloads and safe browser previews are explicitly deferred to their linked issue, not counted as delivered.
+
+## Owner review follow-up — 20 September 2026
+
+After this delivery, the owner requested narrower alignment, settings-copy and user-action presentation corrections. P023 was reopened, preserving the completion and evidence above as historical facts. The separate [owner-review correction report](2026-09-20-sidebar-owner-review.md) owns new commands, artifacts, review rounds and redeployment evidence. The initial three review rounds are not reused as independent approval of those changes.

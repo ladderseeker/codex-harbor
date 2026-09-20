@@ -1140,10 +1140,25 @@ export async function p007(h: Context) {
         "SELECT (SELECT count(*) FROM intents) AS intents,(SELECT count(*) FROM audits) AS audits",
       )
     ).rows[0];
-    for (let i = 0; i < 3; i++)
-      expect(
-        (await command("/security/runtime-credentials/remove", {})).status(),
-      ).toBe(200);
+    for (let i = 0; i < 3; i++) {
+      const response = await command(
+        "/security/runtime-credentials/remove",
+        {},
+      );
+      if (response.status() !== 200) {
+        const body = await response.json().catch(() => ({}));
+        const code =
+          typeof body?.error?.code === "string" &&
+          /^[A-Z0-9_]{1,80}$/.test(body.error.code)
+            ? body.error.code
+            : "UNAVAILABLE";
+        await writeFile(
+          path.join(h.artifacts, "p007-removal-failure.json"),
+          JSON.stringify({ index: i, status: response.status(), code }) + "\n",
+        );
+      }
+      expect(response.status()).toBe(200);
+    }
     expect(
       (
         await db.query(
