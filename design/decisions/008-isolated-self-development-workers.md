@@ -1,10 +1,14 @@
 # D008 — Confined workers for Harbor self-development
 
+## Current ownership — 20 September 2026
+
+The [current subsystem designs](../systems/) apply this decision alongside architecture; [D013](013-evidence-based-delivery-workflow.md) and the [workflow](../workflow.md) now govern execution and record lifecycle. Proposal references below identify historical plans, not active work owners. Unfinished evidence remains in the [issue inbox](../../issues/), and future work receives a newly selected proposal. The dated decision rationale and technical constraints below are preserved.
+
 - Decision: Accepted
 - Delivery: In progress
 - Scheduling update: [D009](009-common-use-release.md) defers P010 implementation on 2026-09-13. This worker/isolation contract remains accepted and its unfinished gates remain required when work resumes.
 - Recorded: 2026-09-08
-- Scope: [P010](../proposals/010-self-development.md), refining the [architecture's trusted build/test broker](../architecture.md#developing-harbor-through-harbor)
+- Scope: [P010](../proposals/archive/010-self-development.md), refining the [architecture's trusted build/test broker](../architecture.md#developing-harbor-through-harbor)
 - Supersedes: None. This selects a concrete worker boundary; it does not grant candidate code the stable supervisor's authority.
 
 ## Context and choice

@@ -1,10 +1,20 @@
 # Attachment draft sequence intermittently fails to reach its expected state
 
+- Severity: Medium; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: Medium
 - Status: Open
 - Owner: Regression maintainer
+
 - Affected files: `tests/e2e/p005.ts`, `apps/web/src/Attachments.tsx`, draft-loading and attachment request boundaries; production cause unestablished
-- Acceptance: [P005-01/05](../design/proposals/005-attachments-and-rich-input.md#independent-acceptance), critical regression gate
+- Acceptance: [P005-01/05](../design/proposals/archive/005-attachments-and-rich-input.md#independent-acceptance), critical regression gate
 
 ## Evidence and impact — 8 September 2026
 

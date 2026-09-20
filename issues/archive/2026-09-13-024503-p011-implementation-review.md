@@ -6,7 +6,7 @@
 - Archived: 2026-09-13
 - Owner: P011
 - Affected files: `apps/api/src/previews.ts`, `apps/api/src/server.ts`, `apps/supervisor/src/previews.ts`
-- Acceptance: [P011-01/05](../../design/proposals/011-private-project-previews.md#independent-acceptance)
+- Acceptance: [P011-01/05](../../design/proposals/archive/011-private-project-previews.md#independent-acceptance)
 
 ## Independent review — 13 September 2026
 
@@ -40,3 +40,7 @@ Actual supported Linux run `c591ca08c4` subsequently passed the same focused cor
 Corrections `ea88544` are integrated in main `0822992`; the final Linux evidence is recorded in `5820e5e`. Main inspected the cumulative source identity and exact Linux result/readiness/fault artifacts and accepted the implementation after the two independent review rounds above. The stop path retains all three physical attempts, and captured accepted execution reaches readiness after source revocation while fresh viewer/action checks still deny revoked authority.
 
 The [main acceptance report](../../docs/reports/2026-09-08-p011-development.md#main-acceptance--13-september-2026) records full digests, commands, environments, result hashes and cleanup. This closes both scoped findings and their integration. Documentation links and whitespace are checked with the move; protected fresh-host restore and upstream live-account verification remain mandatory proposal gates and are not closed by this issue.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

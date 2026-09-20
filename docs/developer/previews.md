@@ -1,5 +1,9 @@
 # Preview development and installation
 
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
 P011 is implemented on main. Its current implementation and evidence are recorded in the [development report](../reports/2026-09-08-p011-development.md#main-acceptance--13-september-2026); the [user guide](../user/previews.md) describes the interface. Two independent review rounds, corrective local/Linux lifecycle and cumulative critical checks passed. Protected fresh-host restore and applicable upstream verification remain open.
 
 The API owns preview metadata, scoped PAT management, owner-browser opening tickets and the separate HTTP gateway. The supervisor owns native execution, exact writer/reader reservations and the private relay broker. Codex protocol calls remain behind the adapter. Preview-purpose transports accept the fixed non-PTY package command and zero-byte identity probes, with no conversation, model or account mutation capability.

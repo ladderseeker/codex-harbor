@@ -1,6 +1,6 @@
 # P008 scheduling development checkpoint — 8 September 2026
 
-[P008](../../design/proposals/008-scheduled-tasks.md) is **Accepted / Implemented**, not Verified. Two feature review rounds and bounded module integration review have closed at integration commit `9f3b414`. The dated checkpoints below retain their original scope. The targeted DST follow-up below has passed; dedicated live-account and protected full restore/promotion evidence remain pending. The acceptance mapping preserves the historical evidence boundary.
+[P008](../../design/proposals/archive/008-scheduled-tasks.md) is **Accepted / Implemented**, not Verified. Two feature review rounds and bounded module integration review have closed at integration commit `9f3b414`. The dated checkpoints below retain their original scope. The targeted DST follow-up below has passed; dedicated live-account and protected full restore/promotion evidence remain pending. The acceptance mapping preserves the historical evidence boundary.
 
 ## Implemented checkpoint
 
@@ -88,3 +88,7 @@ The separate actual Linux metadata bridge checks fresh-instance paused/revoked a
 During the second New York 01:30 instant, the test restarts the supervisor, waits for its actual planner pass, checks the persisted next due time is the following day and requires unchanged original occurrence/turn IDs. This closes the missing real-stack DST scope in the mapping above; earlier UTC clock-jump coverage remains separate. Evidence is `.test-runs/harbor-e2e-caa98775a7/{result.json,dst-cases.json,dst-preview.png}`. `pnpm check` passed at the same code; the owned fresh stack was cleaned by the normal harness.
 
 Three preliminary runs failed test assumptions: project/session creation returns200, the cron label includes help text, and an idle planner updates `last_planned_at` rather than its due-work `last_observed_at`. Their logs remain retained. Corrections changed only test contract/locator/observation logic. No production code, runtime adapter or isolation boundary changed; no broad regression rerun is claimed for this test-only addition. Independent bounded source and matching-artifact review closed with no actionable finding. Live-account and protected full restore/promotion gates remain unverified.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.

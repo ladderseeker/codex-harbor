@@ -63,3 +63,7 @@ The [P013 critical regression issue](../../issues/archive/2026-09-13-143001-loca
 ## Completion
 
 P014-01–06 passed within the declared UI/local-folder scope. Three implementation review rounds plus one bounded acceptance-test correction review have no unresolved critical findings. The independent delivery-document review corrected schema wording and historical issue labeling; links, consistency, whitespace and final source checks passed before commit. P014 is archived as Completed; its commit contains this report and current guide/prototype/user documentation. Existing unrelated proposal obligations remain visible in the active indexes.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.

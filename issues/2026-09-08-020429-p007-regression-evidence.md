@@ -1,11 +1,21 @@
 # Preserve the history regression's original failure
 
+- Severity: Medium; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: Medium
 - Status: Open
 - Owner: Regression maintainer; independent runtime reviewer
+
 - Recorded: 2026-09-08
 - Affected files: tests/e2e/p007.ts, credential-cleanup assertions
-- Acceptance: [P007](../design/proposals/007-session-history-and-recovery.md#independent-acceptance), critical regression gate
+- Acceptance: [P007](../design/proposals/archive/007-session-history-and-recovery.md#independent-acceptance), critical regression gate
 
 ## Evidence and impact
 

@@ -8,7 +8,7 @@ This change implements the owner's requested proposal and issue management workf
 
 Preserving the rationale for significant decisions and linking replacements follows [Microsoft's ADR guidance](https://learn.microsoft.com/en-us/azure/well-architected/architect-role/architecture-decision-record). [GitHub's issue closure guidance](https://docs.github.com/en/issues/tracking-your-work-with-issues/administering-issues/closing-an-issue) distinguishes completion from other reasons to close an issue. Harbor's explicit `Transferred` disposition is a repository workflow choice: the issue record leaves the standalone queue while receiving proposals continue to track the work.
 
-The [runtime compatibility finding](../../issues/archive/2026-09-07-073831-codex-runtime-compatibility.md) was archived as Transferred to P001 and P009, preserving their separate local-runtime and target-host gates. Its medium-severity risk and both evidence parts remain pending. This organizational change does not advance any of the 12 Draft/Planned proposals or establish runtime compatibility, implementation, or deployment readiness.
+The [runtime compatibility finding](../../issues/2026-09-07-073831-codex-runtime-compatibility.md) was archived as Transferred to P001 and P009, preserving their separate local-runtime and target-host gates. Its medium-severity risk and both evidence parts remain pending. This organizational change does not advance any of the 12 Draft/Planned proposals or establish runtime compatibility, implementation, or deployment readiness.
 
 ## Source and verification
 
@@ -21,3 +21,7 @@ The coordinating agent used a temporary Python standard-library validator outsid
 Independent review round 1 checked completion evidence, mandatory gates, complete and partial transfers, multiple owners, reopening, supersession, current indexes, and preserved historical evidence. It found no actionable issues, so the review cycle stopped after that round under the repository rule. The coordinator then finalized this report and checked its links and recorded evidence.
 
 No application, E2E, live-runtime, or Linux isolation tests were run or claimed for this documentation-only change. The transferred compatibility finding remains an implementation/release gate; archiving has not resolved it.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.

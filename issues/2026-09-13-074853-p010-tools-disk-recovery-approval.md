@@ -1,10 +1,22 @@
 # Private tools-disk recovery requires explicit authorization
 
+- Severity: Medium; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: Medium
 - Status: Blocked
 - Owner: Repository maintainer; P010 verification infrastructure
+
+Complete deferred outcome and acceptance are tracked in [2026-09-20-000003-self-development-acceptance.md](2026-09-20-000003-self-development-acceptance.md); this record retains its individual finding and correction evidence.
+
 - Affected resources: C's obsolete sealed tools disk and certificate, local recovery storage and capacity for the next candidate base
-- Acceptance: [P010-01/03/07](../design/proposals/010-self-development.md#independent-acceptance); this infrastructure record does not replace the feature's mandatory checks
+- Acceptance: [P010-01/03/07](../design/proposals/archive/010-self-development.md#independent-acceptance); this infrastructure record does not replace the feature's mandatory checks
 - Related evidence: [Interrupted-work recovery](../docs/reports/2026-09-13-interrupted-work-recovery.md#private-tools-disk-recovery-rejection--13-september-2026)
 
 ## Observation — 13 September 2026

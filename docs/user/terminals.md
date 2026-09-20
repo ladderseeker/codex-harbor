@@ -1,5 +1,9 @@
 # Workspace terminals
 
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
 Choose a project and workspace, then **Open terminals**. Select read-only or workspace-write permissions and choose **New terminal**. No model account is required. The shell starts in the selected workspace inside a dedicated confined runner; network access is disabled. Workspace-write permits changes to that checkout and its managed Git metadata. Read-only prevents those changes. Neither profile exposes the host shell or administrator services.
 
 Select **Take control** before typing. Other tabs can view the same output; taking control deliberately replaces the previous controller. The panel shows who can type, the immutable permission profile, and termination status. Expand **Network disabled · lifetime and reservation** or the secondary controls for connection and lifetime information. Multiline paste is previewed before it is sent. Terminal output cannot set the browser clipboard, open links automatically, or create application HTML.
@@ -12,6 +16,6 @@ Output is a bounded tail, retained for at most 24 hours and 2 MiB. After an uncl
 
 API clients need explicit `terminal:read`, `terminal:control`, and/or `terminal:terminate` token scopes and a grant for the selected project. Controlling a writable terminal additionally requires the workspace-write ceiling. Termination has its own scope so a limited client can stop a writable terminal without receiving write access. Existing API tokens gain no terminal permissions automatically. The authenticated OpenAPI document describes the HTTP routes and versioned WebSocket messages; browser requests retain the normal Origin and CSRF requirements.
 
-The [P006 proposal](../../design/proposals/006-persistent-terminal.md) and its linked evidence track remaining verification gates. A backup does not preserve a live PTY; portable promotion/restore integration is owned by [P009](../../design/proposals/009-portable-deployment-and-restore.md).
+The [P006 proposal](../../design/systems/002-workspaces-and-resources.md) and its linked evidence track remaining verification gates. A backup does not preserve a live PTY; portable promotion/restore integration is owned by [P009](../../design/systems/004-deployment-and-profiles.md).
 
 During administrator maintenance, new terminals and typing/control requests are paused. Already queued terminals remain queued; viewing and explicit termination remain available until the application shuts down. A restored terminal retains its history but never restarts its shell or replays input. Old controller messages are invalid, and unresolved ownership requires explicit destination termination or administrator recovery.

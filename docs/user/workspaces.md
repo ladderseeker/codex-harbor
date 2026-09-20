@@ -1,5 +1,9 @@
 # Projects and workspaces
 
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
 Choose a project in the sidebar, open its ellipsis **Project details**, then **Manage workspaces**. Each project keeps its original **Local** workspace. A **Git Worktree** starts from an explicit committed revision and excludes Local's uncommitted changes. **Copy** creates an independent snapshot of a non-Git folder after your acknowledgement.
 
 Choose **New conversation workspace** before creating a conversation. That conversation keeps its workspace permanently; its sidebar entry identifies the selection. Conversations in different workspaces can run concurrently. Conversations sharing one workspace queue until its previous runtime and background processes have stopped.

@@ -1,11 +1,21 @@
 # Common-use live history and restart acceptance is incomplete
 
+- Severity: High; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: High
 - Status: Blocked
-- Recorded: 2026-09-13 11:03:15 Asia/Shanghai
 - Owner: P007 live verification; main coordinates the common-use release
+
+- Recorded: 2026-09-13 11:03:15 Asia/Shanghai
 - Affected files: `tests/live/run.ts`, `tests/workspaces/live.ts`, P007 live acceptance and current release documentation
-- Acceptance: [P007-07](../design/proposals/007-session-history-and-recovery.md#independent-acceptance), with the relevant inherited [P001-08](../design/proposals/001-secure-persistent-conversations.md#independent-acceptance) real-runtime boundary
+- Acceptance: [P007-07](../design/proposals/archive/007-session-history-and-recovery.md#independent-acceptance), with the relevant inherited [P001-08](../design/proposals/archive/001-secure-persistent-conversations.md#independent-acceptance) real-runtime boundary
 
 ## Initial audit — root `2d88e99`, 13 September 2026
 

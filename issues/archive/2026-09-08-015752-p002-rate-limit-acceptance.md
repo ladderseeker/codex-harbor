@@ -7,7 +7,7 @@
 - Owner: P006 regression implementer; independent runtime reviewer; main-agent integration
 - Recorded: 2026-09-08
 - Affected files: tests/e2e/p002.ts
-- Acceptance: [P002-06](../../design/proposals/002-programmatic-api-access.md#independent-acceptance), critical regression gate
+- Acceptance: [P002-06](../../design/proposals/archive/002-programmatic-api-access.md#independent-acceptance), critical regression gate
 
 ## Evidence and impact
 
@@ -29,3 +29,7 @@ The separate reviewer found no actionable defect in the test-only correction: co
 Test commit `75f023061f9af8cf5238b6621223c084eefaa9e2`, included in reviewed P006 handoff `f033824b495c1b42fe2c6fd9e9d94bac8db8db3f`, preserves the production policy and makes the request/count/deadline contract explicit. Independent review closed with no actionable finding. Full critical `pnpm test:e2e` passed as `harbor-e2e-211efe006b` on Node 24.11.1, Codex 0.153.4 and Chromium 1194, with identical start/end source `1f83957bf23aa55479a6a05679ff9e6bdf8fb03f5437b97d2ad120e13dfc1204`, 876 files. Its retained rate result is 195 successful reads and five retryable 429s in 372 ms. Full check passed before execution. Root imported the exact reviewed test bytes.
 
 The [terminal integration report](../../docs/reports/2026-09-08-p006-development.md#final-reviewed-branch-handoff) preserves the test-only deltas and failed checkpoints. This closes the unreliable rate assertion, not a production defect or a retrospective explanation of the uninstrumented historical failure. The separate P007 observation remains open with improved diagnostics.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

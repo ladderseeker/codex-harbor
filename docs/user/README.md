@@ -1,6 +1,10 @@
 # User guides
 
-Harbor's conversation, attachment, API-token, workspace and history/recovery features are implemented with required verification gates still open. These guides describe the available interface; the [proposal index](../../design/proposals/README.md) and [issue index](../../issues/README.md) show remaining delivery gates.
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
+Harbor's conversation, attachment, API-token, workspace and history/recovery features are implemented with required verification gates still open. These guides describe the available interface; the [current designs](../../design/systems/) and [issue inbox](../../issues/) distinguish available behavior from remaining delivery gates.
 
 - [Conversations and account setup](conversations.md): owner login, project selection, text requests, approvals, cancellation, storage visibility, searchable history, archival and explicit uncertainty recovery.
 - [Attachments and saved drafts](attachments.md): select, drop, paste, upload recovery, supported files and limits.

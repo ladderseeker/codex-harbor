@@ -1,8 +1,33 @@
 # P012 — Managed skills and MCP
 
+- Record status: Finished
+- Archive disposition: Baseline reconciled
+- Reconciled: 2026-09-20 under [D013](../../decisions/013-evidence-based-delivery-workflow.md)
+- Inspected source: `008227355bd05cb27dc13f4fbb585ef709b474b0`
+- Baseline classification: Deferred partial work; managed extensions are unavailable on inspected main.
+- Current design: [Subsystem contract](../../systems/005-development-and-extensions.md)
+
+## Reconciled baseline
+
+Current main has no extension API/UI/package or extension migration. The historical isolated `codex/p012-extensions` checkpoint `e160dba…` and its reviewed publication/correction evidence remain recorded in the handoff and source issues. The account-free upstream protocol spike does not establish complete Harbor or model-backed behavior. Historical branch/worktree availability is unverified in this checkout.
+
+[Historical evidence](../../../docs/reports/2026-09-13-common-use-delivery.md#deferred-work-and-recovery) retains its original commands, artifacts, review rounds and limitations. This documentation migration ran no application, account, isolation, restore or deployment check. Finished describes reconciliation of this legacy record; it does not establish completion of its original plan.
+
+## Unresolved obligation ownership
+
+- **P012-01–06 complete deferred integration and acceptance; all profile/source/configuration/revision/disable/recovery/rollout sections** → [2026-09-20-000004-managed-extensions-acceptance.md](../../../issues/2026-09-20-000004-managed-extensions-acceptance.md).
+- **P012-04/05 protected restore and module coverage dependency** → [2026-09-07-231526-p009-backup-transfer-approval.md](../../../issues/2026-09-07-231526-p009-backup-transfer-approval.md).
+- **P012-06 real skill invocation and model-directed MCP call** → [2026-09-07-171225-live-runtime-credentials.md](../../../issues/2026-09-07-171225-live-runtime-credentials.md).
+
+These issues are in the inbox awaiting owner selection. Future execution requires a new cohesive proposal; this archived ID is historical lineage, not an active work owner. Original acceptance identifiers below remain stable evidence references.
+
+## Historical plan and evidence
+
+The following original plan, states and dated notes are preserved as non-normative history. Later dated evidence may supersede an earlier checkpoint; current requirements live in the subsystem design above. Historical statements about active queues, permissions, available worktrees or pending gates describe their original context and grant no present execution authority.
+
 - Decision: Accepted
 - Delivery: In progress
-- Queue: Deferred on 2026-09-13 under [D009](../decisions/009-common-use-release.md). Preserve implementation and findings; resume this outcome individually after the common-use release when needed. The [handoff](../../docs/reports/2026-09-13-common-use-delivery.md#deferred-work-and-recovery) records its branch and evidence. The shared conversation acknowledgement correction is owned by the current common-use release and does not require merging P012.
+- Queue: Deferred on 2026-09-13 under [D009](../../decisions/009-common-use-release.md). Preserve implementation and findings; resume this outcome individually after the common-use release when needed. The [handoff](../../../docs/reports/2026-09-13-common-use-delivery.md#deferred-work-and-recovery) records its branch and evidence. The shared conversation acknowledgement correction is owned by the current common-use release and does not require merging P012.
 - Dependencies: [P003](003-parallel-project-workspaces.md)
 - Outcome: The owner configures a trusted skill or MCP service for a project, invokes it in a conversation, and can disable its future use.
 - Design updated: 2026-09-08; one independent design review and focused correction check closed under the owner's authorized direction. The pinned account-free capability spike passed; it is not Harbor implementation or Linux/live evidence.
@@ -17,12 +42,12 @@ P004's editor, P006's terminal, schedules, previews and deployment UI are not pr
 
 ## Source issues
 
-- [Restored command replay](../../issues/2026-09-13-060202-p012-restored-command-replay.md): Medium, In progress. The isolated historical-key correction passed actual PostgreSQL replay/collection/fresh-request checks and independent module round 2. P012-04/05 retain main integration and actual installed/managed acceptance obligations; the original prefix-owner finding remains qualified as source-only with no new effect demonstrated.
+- [Restored command replay](../../../issues/2026-09-13-060202-p012-restored-command-replay.md): Medium, In progress. The isolated historical-key correction passed actual PostgreSQL replay/collection/fresh-request checks and independent module round 2. P012-04/05 retain main integration and actual installed/managed acceptance obligations; the original prefix-owner finding remains qualified as source-only with no new effect demonstrated.
 
-- [P012 implementation review](../../issues/2026-09-13-042641-p012-implementation-review.md): Medium, In progress. Four corrections passed matching seeded application regressions and independent round 2. A later exact-source managed Linux run passed actual publication, queued rejection with zero native sends and physical UI removal; main inspected complete trust details and controls on desktop/mobile. The record maps each part to P012 acceptance; main integration and current final regressions remain pending, with complete feature acceptance separately required.
-- [Native acknowledgement deadlock](../../issues/archive/2026-09-13-022009-native-acknowledgement-deadlock.md): High, Resolved on 2026-09-13. The shared correction is now integrated independently of P012 and passed actual ordinary approval contention and the current core regression suite. P012's own feature, native and main-integration acceptance remains deferred and is not established by that shared fix.
-- [Dedicated live-test credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md): High, blocked. P012-06 requires a real model-backed skill invocation and MCP-using turn. Account-free protocol checks cover separate non-model compatibility only.
-- [P009 backup-transfer authorization](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, blocked for dependent deployed restore evidence. P012-04/05 include extension-state restoration when P009 is present; local registry tests do not satisfy its protected A-to-B checkpoint gate. Other implementation and verification continue.
+- [P012 implementation review](../../../issues/2026-09-13-042641-p012-implementation-review.md): Medium, In progress. Four corrections passed matching seeded application regressions and independent round 2. A later exact-source managed Linux run passed actual publication, queued rejection with zero native sends and physical UI removal; main inspected complete trust details and controls on desktop/mobile. The record maps each part to P012 acceptance; main integration and current final regressions remain pending, with complete feature acceptance separately required.
+- [Native acknowledgement deadlock](../../../issues/archive/2026-09-13-022009-native-acknowledgement-deadlock.md): High, Resolved on 2026-09-13. The shared correction is now integrated independently of P012 and passed actual ordinary approval contention and the current core regression suite. P012's own feature, native and main-integration acceptance remains deferred and is not established by that shared fix.
+- [Dedicated live-test credentials](../../../issues/2026-09-07-171225-live-runtime-credentials.md): High, blocked. P012-06 requires a real model-backed skill invocation and MCP-using turn. Account-free protocol checks cover separate non-model compatibility only.
+- [P009 backup-transfer authorization](../../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, blocked for dependent deployed restore evidence. P012-04/05 include extension-state restoration when P009 is present; local registry tests do not satisfy its protected A-to-B checkpoint gate. Other implementation and verification continue.
 
 ## Owner and API flow
 
@@ -79,7 +104,7 @@ Use two P003 projects, Local and a derived workspace, synthetic skills with supp
 
 Implementation started on 2026-09-08 in an isolated worktree based on the reviewed module checkpoint `77b2ad5`. Initial work maps immutable extension storage, fixed account-free probes, effective-configuration checks and conversation integration to the accepted contract. This records started work, not an available endpoint or completed acceptance.
 
-Implement contracts/storage and fixed publication/launcher changes together with supervisor lifecycle, conversation/approval integration and responsive UI. Extend `pnpm test:e2e`, `pnpm test:contract`, `pnpm test:live` and `pnpm test:isolation` with owned cases; run check/build and critical regressions under the [shared verification contract](README.md#shared-verification-contract). No command becomes available merely because this design names it.
+Implement contracts/storage and fixed publication/launcher changes together with supervisor lifecycle, conversation/approval integration and responsive UI. Extend `pnpm test:e2e`, `pnpm test:contract`, `pnpm test:live` and `pnpm test:isolation` with owned cases; run check/build and critical regressions under the [shared verification contract](../../workflow.md#implementation-and-verification-gate). No command becomes available merely because this design names it.
 
 Add a coordinated additive migration and register extension rows, manifests/bundles, durable results and historical runtime/configuration references with P009. Restore invalidates source generation authority and disables extensions pending exact bundle validation and explicit destination enablement. Old tools/probes never replay. Probe homes are disposable; conversation native homes retain history under D006's credential rules. Rollback needs compatible schema and module registry: older releases must refuse unsupported extension state instead of starting partial configuration. Source directories remain intact when profiles are disabled or unavailable.
 
@@ -87,6 +112,6 @@ Publish the actual capability matrix and tested usage/recovery instructions on d
 
 ## Protocol evidence and sources
 
-On 2026-09-08 local time, a fresh Node 24.11.1/macOS ARM64 process using real Codex 0.153.4 and `experimentalApi: false` passed extra-root skill discovery, native skill disable, thread-scoped MCP status, a direct tool call and standard form elicitation. It made zero model requests and used no personal native home or credentials. The [capability report](../../docs/reports/2026-09-08-p012-protocol-spike.md) records identity and limits.
+On 2026-09-08 local time, a fresh Node 24.11.1/macOS ARM64 process using real Codex 0.153.4 and `experimentalApi: false` passed extra-root skill discovery, native skill disable, thread-scoped MCP status, a direct tool call and standard form elicitation. It made zero model requests and used no personal native home or credentials. The [capability report](../../../docs/reports/2026-09-08-p012-protocol-spike.md) records identity and limits.
 
 Generated 0.153.4 types own the adapter contract. In this pin, `skills/list` has `cwds` and `forceReload`; the newer documentation's `perCwdExtraUserRoots` is absent, so use verified `skills/extraRoots/set`. Official documentation describes explicit skill input and MCP calls/elicitation; pinned configuration types provide instruction/bundled controls and the STDIO server shape. These sources establish upstream fields, not Harbor enforcement. [App-server reference](https://learn.chatgpt.com/docs/app-server), [pinned protocol methods](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/app-server-protocol/src/protocol/common.rs), [pinned skill configuration](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/config/src/skills_config.rs), [pinned MCP configuration](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/config/src/mcp_types.rs).

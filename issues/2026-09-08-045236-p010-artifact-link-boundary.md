@@ -1,10 +1,22 @@
 # Candidate static verifier accepts a parent-directory link
 
+- Severity: Medium; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: Medium
 - Status: In progress
 - Owner: P010 implementer; independent verifier review
+
+Complete deferred outcome and acceptance are tracked in [2026-09-20-000003-self-development-acceptance.md](2026-09-20-000003-self-development-acceptance.md); this record retains its individual finding and correction evidence.
+
 - Affected files: `infra/self/verify_artifact.py`, candidate archive verification tests
-- Acceptance: [P010](../design/proposals/010-self-development.md#independent-acceptance), outside-worker artifact validation
+- Acceptance: [P010](../design/proposals/archive/010-self-development.md#independent-acceptance), outside-worker artifact validation
 
 ## Evidence — 8 September 2026
 

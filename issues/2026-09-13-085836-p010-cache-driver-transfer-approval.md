@@ -1,10 +1,22 @@
 # P010 corrected cache-driver transfer requires authorization
 
+- Severity: Medium; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: Medium
 - Status: Blocked
 - Owner: P010 verification infrastructure / main agent
+
+Complete deferred outcome and acceptance are tracked in [2026-09-20-000003-self-development-acceptance.md](2026-09-20-000003-self-development-acceptance.md); this record retains its individual finding and correction evidence.
+
 - Affected files: `tests/self/cache-warm-linux.py`, `tests/self/cache_docker.py`, the isolated merged public-cache preparation and its retained transfer receipts
-- Receiving proposal: [P010](../design/proposals/010-self-development.md), P010-01/03/07
+- Receiving proposal: [P010](../design/proposals/archive/010-self-development.md), P010-01/03/07
 - Related evidence: [Recovery report addendum](../docs/reports/2026-09-13-interrupted-work-recovery.md#corrected-cache-source-transfer-rejection--13-september-2026)
 - Next action: finish unaffected implementation and review; obtain authorization for the exact corrective-source payload and existing local-VM destination before resubmission. No transfer retry or alternative execution has occurred.
 

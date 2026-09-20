@@ -6,7 +6,7 @@
 - Archived: 2026-09-08
 - Owner: P008 implementer; independent feature reviewer
 - Affected files: `packages/schedules/`, `apps/supervisor/src/main.ts`, scheduling routes, `tests/schedules/`
-- Acceptance: [P008-01–06](../../design/proposals/008-scheduled-tasks.md#independent-acceptance), critical regression gate
+- Acceptance: [P008-01–06](../../design/proposals/archive/008-scheduled-tasks.md#independent-acceptance), critical regression gate
 
 ## Independent review findings — 8 September 2026
 
@@ -35,3 +35,7 @@ This resolution closes the five source findings, not complete P008 verification.
 ## Subsequent acceptance follow-up — 8 September 2026
 
 The separately recorded P008-02 gap is closed by reviewed real-stack run `caa98775a7` at source `18682c08…cef0a3` /999, integrated in root `717ca45`. The [schedule report](../../docs/reports/2026-09-08-p008-development.md#targeted-p008-02-dst-follow-up--8-september-2026) records the four timezone cases and exact identities. Live-account and protected full restore gates remain unverified.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

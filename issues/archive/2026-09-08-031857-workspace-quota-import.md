@@ -6,7 +6,7 @@
 - Archived: 2026-09-08
 - Owner: P003/P009; installed-module integration implementer
 - Affected files: `infra/storage/workspace-paths.py`, `infra/storage/quota.py`, supported Linux workspace/file acceptance
-- Acceptance: [P003-01–06](../../design/proposals/003-parallel-project-workspaces.md#independent-acceptance) where the fixed workspace helper is used; [P009-01](../../design/proposals/009-portable-deployment-and-restore.md#independent-acceptance) and installed P004 file inspection
+- Acceptance: [P003-01–06](../../design/proposals/archive/003-parallel-project-workspaces.md#independent-acceptance) where the fixed workspace helper is used; [P009-01](../../design/proposals/archive/009-portable-deployment-and-restore.md#independent-acceptance) and installed P004 file inspection
 
 ## Evidence — 8 September 2026
 
@@ -29,3 +29,7 @@ The guarded module import is included in reviewed module checkpoint `77b2ad5`, r
 Actual `pnpm test:isolation --workspaces` passed at that exact source in `xfs-25f78396-daf3-43bb-86dd-06db9585a177`, including first Local-to-worktree creation and strict supplied-common identity denials. Complete managed file application run `harbor-files-44ad9cde66` passed at `5ab432bd979d419a2a6112a4efd568422b198713fd22ddf1afe6cd4ca8ca763e` /961; only the installed test driver differed from the same production bytes. Ubuntu/Linux XFS, real Harbor UI/API/PostgreSQL/supervisor and the fixed helper were used; external OIDC/Codex were fixtures in that application lane.
 
 Immutable artifact `8c11ca945b654d27fe1f787db0ef5b56ce3d269a88fe3883167d3820c8848f22` then passed complete installed ordinary and deliberate-response-loss lanes `61563bc3` and `cff10b97` with a fresh external Chromium client and Node 24.11.1 Harbor. Both explicitly reused the owned installation after documented fixture resets; earlier failed attempts remain preserved. Check/build and matching host critical `5ddd82e4c7`, workspace `fc670a1dba` and terminal `6b1cb43f5f` suites passed. Two module source/correction rounds and final independent result review found no remaining actionable finding in this import correction. The [module report](../../docs/reports/2026-09-08-installed-module-integration.md) records exact identities and limitations; these results do not establish protected filesystem restore or live-account acceptance.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

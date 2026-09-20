@@ -1,0 +1,89 @@
+# P009 — Portable deployment and restore
+
+- Record status: Finished
+- Archive disposition: Baseline reconciled
+- Reconciled: 2026-09-20 under [D013](../../decisions/013-evidence-based-delivery-workflow.md)
+- Inspected source: `008227355bd05cb27dc13f4fbb585ef709b474b0`
+- Baseline classification: Partial managed deployment outcome; full install-to-restore acceptance is unfinished.
+- Current design: [Subsystem contract](../../systems/004-deployment-and-profiles.md)
+
+## Reconciled baseline
+
+Artifact/install/admin, backup/restore/promotion tooling and module registration exist in `infra/deploy/`, `packages/storage/src/deployment*.ts` and migrations 009/016. Recorded installed HTTPS/UID/socket, account-free native and administrator recovery checks cover identified historical artifacts. The reboot check had zero conversations. Full conversation reboot, protected A-to-B restore/faults, promotion/rollback and deployed account acceptance were not established.
+
+[Historical evidence](../../../docs/reports/2026-09-08-p009-development.md) retains its original commands, artifacts, review rounds and limitations. This documentation migration ran no application, account, isolation, restore or deployment check. Finished describes reconciliation of this legacy record; it does not establish completion of its original plan.
+
+## Unresolved obligation ownership
+
+- **P009-01–07 complete managed installation/release acceptance, including -03 conversation reboot and -05 restore failure paths; capability/upgrade limits** → [2026-09-07-073831-codex-runtime-compatibility.md](../../../issues/2026-09-07-073831-codex-runtime-compatibility.md).
+- **P009-04/05 protected snapshot integrity and A-to-B restore/faults, plus checkpoint-dependent P009-06 promotion/rollback** → [2026-09-07-231526-p009-backup-transfer-approval.md](../../../issues/2026-09-07-231526-p009-backup-transfer-approval.md).
+- **P009-01/07 bounded deployed account conversation and history** → [2026-09-07-171225-live-runtime-credentials.md](../../../issues/2026-09-07-171225-live-runtime-credentials.md).
+- **P009-02/07 actual target-host gateway reliability** → [2026-09-07-185228-linux-gateway-availability.md](../../../issues/2026-09-07-185228-linux-gateway-availability.md).
+
+These issues are in the inbox awaiting owner selection. Future execution requires a new cohesive proposal; this archived ID is historical lineage, not an active work owner. Original acceptance identifiers below remain stable evidence references.
+
+## Historical plan and evidence
+
+The following original plan, states and dated notes are preserved as non-normative history. Later dated evidence may supersede an earlier checkpoint; current requirements live in the subsystem design above. Historical statements about active queues, permissions, available worktrees or pending gates describe their original context and grant no present execution authority.
+
+- Decision: Accepted
+- Delivery: In progress
+- Dependencies: [P001](001-secure-persistent-conversations.md), [P007](007-session-history-and-recovery.md)
+- Outcome: The owner installs a working Harbor on a compatible Linux VPS, updates it deliberately, and recovers its data on a fresh compatible host.
+
+## Scope and operator flow
+
+Provide versioned images/artifacts, Compose configuration, prerequisite checks, HTTPS/owner setup, private service networks, startup supervision, health checks, backup/restore tooling, release manifests, and an out-of-band SSH recovery runbook. Use the same portable commands/configuration contract across providers. Hostinger is an example deployment, not a dependency.
+
+Cover all delivered module state through a backup registry: PostgreSQL, native Codex state, project roots/worktrees, attachments if delivered, and required protected configuration. Later data-owning features extend the registry and restore assertions in their own changes. This feature does not depend on terminal/file-editor/scheduler UI. Unimplemented module entries are absent, not fake empty backups.
+
+## Source issues
+
+- [Resume readiness](../../../issues/archive/2026-09-08-044008-p009-resume-readiness.md): Medium, Resolved. Root `b387b46` holds maintenance through bounded readiness. One independent source/evidence review, 26 Python contracts and four Linux component cases passed; the historical installed-artifact qualification and preserved uncertainty remain explicit.
+- [Created workspace validation identity](../../../issues/archive/2026-09-08-035221-workspace-validation-identity.md): High, Resolved across P003/P008. Shared caller/common validation, actual managed/installed acceptance and the corresponding P008 worker handoff are integrated in `e1b754a`; independent review and Linux metadata bridge evidence passed with their explicit scope limits.
+- [Workspace quota import](../../../issues/archive/2026-09-08-031857-workspace-quota-import.md): High, Resolved. Guarded loading passed actual Linux workspace/full file and installed ordinary/fault acceptance on reviewed production `f13afc57…ad1d27`; the separate managed identity handoff remains tracked.
+- [Installed web assets](../../../issues/archive/2026-09-08-031032-p009-installed-web-assets.md): High, Resolved. Immutable artifact `8c11ca94…84f22` includes the actual served assets and passed authenticated ordinary/fault Monaco/xterm outcomes. Independent review preserves reused-fixture and earlier failed-attempt qualifications.
+- [P009 implementation review](../../../issues/archive/2026-09-08-005028-p009-implementation-review.md): High, Resolved on 2026-09-08. Two baseline rounds and the separate enrollment/SSH correction review closed with available local/Linux evidence. Installed administrator recovery and inventory checks passed; later-module integration and blocked protected transfer/live gates remain separate obligations.
+
+- [Codex runtime compatibility finding](../../../issues/2026-09-07-073831-codex-runtime-compatibility.md): Medium severity; transferred on 2026-09-07, not resolved. P009 owns target-host kernel/container prerequisites, deployed account/runtime capabilities, real isolation, and release/restore readiness. These map to **P009-01/02/04/06/07**, the [Release and recovery contract](#release-and-recovery-contract), and [Delivery and verification](#delivery-and-verification).
+- Evidence is partial. The [deployment report](../../../docs/reports/2026-09-08-p009-development.md) records installed service/UID/reboot and account-free native confinement checks on identified artifacts. Full deployed conversation history, live-account, checkpoint/restore and release gates remain pending. Publish supported, unsupported, and experimental capabilities with measured prerequisites, versions, limitations, and tested rollback/restore compatibility. Re-run applicable checks before upgrades under the [architecture's compatibility boundary](../../architecture.md#official-foundation-and-compatibility-boundary) and [release rules](../../architecture.md#release-retention-and-rollback-rules); later delivered features extend this evidence through their own acceptance.
+- [P001](001-secure-persistent-conversations.md#source-issues) owns the local runtime/Linux baseline. Its evidence does not replace the target-host checks. Missing P009 evidence blocks this proposal's verification and deployment-readiness claims. Update the source issue's P009 evidence when verified; resolve the transfer only after both owners' mapped obligations pass.
+- [Linux gateway availability](../../../issues/2026-09-07-185228-linux-gateway-availability.md): Medium, active and Open. A second disposable VM reproduced aggregate DNS failures and a reset before TLS establishment in five of twenty unauthenticated probes; the other fifteen returned the expected 401. P009-02/07 must measure the target host's approved-endpoint connectivity while preserving routing/TLS/address-denial policy. The [diagnostic report](../../../docs/reports/2026-09-07-gateway-transport-diagnostic.md) records the observed stages and unresolved network cause; this is an active ownership link, not archival transfer or resolution.
+- [Unregistered project allocation](../../../issues/archive/2026-09-07-205511-unregistered-project-allocation.md): Medium, Resolved on 2026-09-08. Actual installed COMMIT-loss inventory detection and explicit same-inode recovery passed on artifact `6dd02dba…b9dc8`; unknown-slot preservation and independent focused review closed the bounded finding. Allocation remains non-atomic; complete protected backup/restore and later module registry gates remain P009 obligations.
+- [Backup transfer authorization](../../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, active and Blocked. Automatic approval review rejected the generated private-state/secret payload transfer from disposable A to the owned B SFTP repository. P009-04/05 and checkpoint-dependent P009-06 require exact user authorization followed by actual encrypted backup/restore evidence. Continue available implementation/review and other checks; no local/redacted fixture closes this gate.
+
+## Release and recovery contract
+
+[D006 — Portable releases and a fenced host restore](../../decisions/006-portable-release-and-restore.md) owns the accepted packaging, service privilege, backup consistency/encryption, module registry, destination rebinding and administrator-operation decisions. Implement that contract with the [architecture's migration/draining/rollback rules](../../architecture.md#release-retention-and-rollback-rules). The initial profile retains a trusted root supervisor and separate root storage service, with an unprivileged API and private dependencies; installer packaging must not claim a privilege separation absent from the launcher implementation.
+
+P009 delivers the complete operator outcome using D006's immutable packages and pinned Restic checkpoint. Restoration uses a new disabled instance, explicit authority revocation, credential re-encryption and validated filesystem rebinding before activation. Installed module registry coverage includes the delivered P001–P008 and P011 state; adding those entries does not make undelivered modules dependencies. Show the recovery point, uncertain work and possible lost writes. Implementation is In progress; the [operator guide](../../../docs/developer/deployment.md) identifies available commands and their tested limits. Independent destination enrollment and bounded administrator recovery are implemented and reviewed. Remaining later-module integration, complete administrator acceptance and blocked restore/live gates prevent completion.
+
+## Independent acceptance
+
+Provision isolated Linux environments A and B using P001/P007 plus synthetic state for delivered modules. No real production database or owner projects are test fixtures.
+
+1. **P009-01:** Install from the documented package on a fresh compatible host, authenticate, and complete a conversation through browser and API. Assert actual dependency/health readiness.
+2. **P009-02:** Probe unauthenticated public routes and direct internal ports; attempt to start with missing sandbox prerequisites or fixture/public configuration. Assert denial/fail-closed startup.
+3. **P009-03:** Reboot the isolated test host and verify service startup, preserved history, and honest interrupted/uncertain states with no automatic repeated turn.
+4. **P009-04:** Back up A, verify full data integrity and registry coverage, restore into B with changed filesystem identities, and exercise restored projects/history and delivered module state. Assert old cookies/PATs and receipt retries are denied, model ciphertext is rebound safely, uncertainty remains explicit, and admission stays disabled until validation with no contact with A's runtime.
+5. **P009-05:** Corrupt/incompletely copy a backup, omit a required module or decryption key, interrupt restore, and simulate disk pressure. Assert explicit failure never replaces a healthy installation or enables execution, with recovery instructions and bounded owned cleanup.
+6. **P009-06:** Promote a tested compatible candidate, then exercise rollback; separately test a schema-incompatible downgrade. Assert the latter is refused or follows a deliberate documented restore/forward-repair path.
+7. **P009-07:** Complete real pinned-Codex/account and Linux isolation checks on the deployed profile, and demonstrate administrative recovery with Harbor unavailable.
+
+## Delivery and verification
+
+Use planned build/check/E2E, contract/live, and isolation lanes. Host reboot/restore scenarios run only in explicitly disposable VMs/VPS fixtures identified in the manifest. Record provider-independent prerequisites and measured resource use, not an unsupported claim to run on every VPS or OS. Follow [shared evidence rules](../../workflow.md#implementation-and-verification-gate).
+
+Add usable installation, operations, update, backup, and recovery guides under `docs/` with tested commands. Release packaging must remain independently testable before P010 self-development exists. Missing fresh-host restore or real isolation evidence keeps this delivery unverified.
+
+## Implementation record
+
+- 2026-09-08 cumulative module checkpoint: root `2bdb5ef` includes reviewed `77b2ad5` with file/terminal registry coverage, bounded maintenance, exact retirement and local restored-authority reconciliation. The [module report](../../../docs/reports/2026-09-08-installed-module-integration.md) records matching application and Linux evidence plus the fresh installed UI failures and subsequent corrections. The bounded resume correction is subsequently integrated and resolved above; final installed browser evidence, protected restore/promotion and live gates remain open.
+
+- 2026-09-07: Started isolated implementation from the integrated P001–P003 baseline `d4f9e96`, under the owner's roadmap authorization. Incorporate the reviewed P007 integration and delivered attachment module before final registry/restore checks. Disposable Linux A/B prerequisite setup and the pinned Restic download are preparation, not completed P009 acceptance. Migration 009 is reserved for this feature.
+
+- 2026-09-07 development checkpoint: a fresh production-mode package using the delivered P005/P007 schema started root storage/supervisor, an unprivileged API and private Unix-socket PostgreSQL. Actual HTTPS owner login and API project creation passed on the dedicated Linux/XFS fixture; unrelated/runner UIDs were denied private sockets, API could not read model keys/projects or replace socket entries, and incorrect SCRAM authentication failed. The installed runtime artifact was `f7490e28eec65a338e920aff83f944a45af986643dfa544991a528cff5d17ecd`; a subsequent administrator-only cold-start readiness correction was used for incomplete-install recovery. This is partial evidence, not a final immutable candidate or complete P009 acceptance. Restore/promotion implementation, independent review and mandatory live/transfer gates remain outstanding.
+
+- 2026-09-08 reviewed feature handoff: two independent review rounds closed after six High corrections and the registry/real-Restic metadata correction. Source `b6599ab31a6b4690b54a9bd0632f3c668e98ebb88b2905f1f7f82066327a4289` /893 passed Node 24 `pnpm check` and full critical E2E `harbor-e2e-d47ae72678` with matching start/end source. Seventeen local Python contracts and the isolated public Restic 0.19.1 CLI metadata contract passed. See the [development report](../../../docs/reports/2026-09-08-p009-development.md) for exact historical installed artifacts, review scope and limitations. Delivery stays In progress: the protected transfer, fresh-host restore/promotion and dedicated live-account gates remain unverified; no blocked action was retried.
+
+- 2026-09-08 required follow-up: separate restored-host future-backup enrollment, fixed exclusive SSH trust, actual allocation inventory reconciliation and exact administrator stale-lock recovery passed their bounded independent review and available local/Linux checks. Source `6d3a9c13c7c4f967fed64e542651b0235f3662598b8edeaf9d0af6962ff31b34` /900 and precise source-CLI versus installed-artifact evidence are recorded in the development report. No protected transfer or SFTP repository initialization occurred; remaining mandatory gates keep delivery In progress.

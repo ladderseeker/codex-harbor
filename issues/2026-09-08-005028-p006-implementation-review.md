@@ -1,11 +1,21 @@
 # Correct terminal dispatch and restart findings
 
+- Severity: High; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: High
 - Status: Blocked
 - Owner: P006 implementer; independent reviewer and main-agent integration
+
 - Recorded: 2026-09-08
 - Affected files: apps/web/src/Terminals.tsx; packages/terminals/src/store.ts; apps/api/src/terminal-stream.ts; apps/supervisor/src/terminals.ts, in the P006 implementation worktree
-- Acceptance: [P006-02–06](../design/proposals/006-persistent-terminal.md#independent-acceptance)
+- Acceptance: [P006-02–06](../design/proposals/archive/006-persistent-terminal.md#independent-acceptance)
 
 ## Round 1 evidence
 
@@ -57,4 +67,8 @@ The correction subsequently passed focused real-stack `harbor-e2e-5e4cbbc6b2` on
 
 Root `04ab86b` includes the reviewed final file/terminal deployment integration. Exact production `f13afc57…ad1d27` passed the recorded host suites and managed Linux checks; immutable artifact `8c11ca94…84f22` passed both ordinary installed browser use and deliberate save-response-loss recovery, actual native PTY/background retirement, inventory and a fresh local synthetic database rebind. Two bounded module review rounds closed, with no remaining actionable source finding in that scope. The [final module report](../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure) distinguishes artifact/source/test-driver identity, reused-fixture qualifications and earlier failed attempts.
 
-Shared writer, nonce, registry, service/image, drain and local restored-authority implementation obligations are now delivered. The proposal is Implemented. This issue remains active and Blocked specifically for its required fresh-host protected filesystem restore/authority evidence under [P009-04](../design/proposals/009-portable-deployment-and-restore.md#independent-acceptance) and the [blocked backup-transfer prerequisite](2026-09-07-231526-p009-backup-transfer-approval.md). The local clone explicitly reports no filesystem restore and cannot close that remaining obligation. No original finding, gate or failed result is silently discarded; append the required fresh-host evidence before resolution/archival.
+Shared writer, nonce, registry, service/image, drain and local restored-authority implementation obligations are now delivered. The proposal is Implemented. This issue remains active and Blocked specifically for its required fresh-host protected filesystem restore/authority evidence under [P009-04](../design/proposals/archive/009-portable-deployment-and-restore.md#independent-acceptance) and the [blocked backup-transfer prerequisite](2026-09-07-231526-p009-backup-transfer-approval.md). The local clone explicitly reports no filesystem restore and cannot close that remaining obligation. No original finding, gate or failed result is silently discarded; append the required fresh-host evidence before resolution/archival.
+
+## Retained acceptance ownership — 20 September 2026
+
+The remaining obligation is the P006 cleanup/restore contract under P009-04: protected fresh-host terminal state and history, invalidated controller/input authority, old processes stopped and no input replay/source-host contact. Earlier actual account-free PTY, Linux and installed module passes retain their scope; no new account requirement is inferred for command/exec itself.

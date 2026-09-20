@@ -32,3 +32,7 @@ The four resolver failures occurred around the resolver's existing four-second b
 ## Disposition
 
 Keep the issue open as a measured environment limitation and carry it into P009 target-host verification. Compare the intended deployment host using bounded, secret-free stage diagnostics. Do not weaken routing, address denial, certificate validation, or tunnel restrictions, and do not retry ambiguously delivered model work to obtain a passing result. No application source or production policy changed in this investigation.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.

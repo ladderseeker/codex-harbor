@@ -1,5 +1,9 @@
 # Private project previews
 
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
 Private project previews are implemented in the main source branch. See the [delivery report](../reports/2026-09-08-p011-development.md#main-acceptance--13-september-2026) for independent review, tested sources and remaining deployment verification.
 
 Select a registered workspace, then open **Project previews**. Save a name, an existing package script, an application port, and a permission profile. The application must already have its dependencies and listen on the supplied `PORT` on loopback. Harbor runs the package script inside a dedicated confined runner; it does not install dependencies or accept a host command or upstream URL.
@@ -12,7 +16,7 @@ The panel shows readiness, launch settings, process logs and cleanup status. Log
 
 If retirement is uncertain, Harbor retains the reservation. Review the warning and explicitly acknowledge the unresolved attempt before retrying retirement. It does not automatically replay the package script. Restarting the supervisor invalidates old access and requires a deliberate new start after retirement. Emergency stop and deployment drain also revoke access and retire execution.
 
-An administrator must enable the separate preview hostname and TLS profile. If it is unavailable, contact the installation administrator; changing the application port cannot expose an arbitrary VPS service. The [developer guide](../developer/previews.md) explains configuration and verification. Exact protocol, capacity and authority contracts remain in [P011](../../design/proposals/011-private-project-previews.md) and [D007](../../design/decisions/007-confined-project-preview-origins.md).
+An administrator must enable the separate preview hostname and TLS profile. If it is unavailable, contact the installation administrator; changing the application port cannot expose an arbitrary VPS service. The [developer guide](../developer/previews.md) explains configuration and verification. Exact protocol, capacity and authority contracts remain in [P011](../../design/systems/002-workspaces-and-resources.md) and [D007](../../design/decisions/007-confined-project-preview-origins.md).
 
 ## Personal VPS development preview
 

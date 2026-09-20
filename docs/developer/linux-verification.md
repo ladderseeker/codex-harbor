@@ -1,5 +1,9 @@
 # Linux execution verification
 
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
 The full `pnpm test:isolation` lane exercises the supported local Linux launcher and real XFS project quotas. It is separate from deterministic browser E2E and authenticated `pnpm test:live`. A Docker Desktop run without the XFS profile returns an unverified result even when its namespace and network probes pass.
 
 Use a disposable Linux VM with no personal project mounts, account state, or production services. The current verification environment uses Ubuntu 24.04, Linux 6.8, Node 24.11.1, pnpm 12.3.4, Docker Engine 29.1.3, Compose 2.40.3, and xfsprogs 6.6.0. The lane also requires Python 3, a C compiler, `iproute2`, and the repository's installed dependencies and frontend build. The launcher and Docker daemon must run on the same Linux host.
@@ -61,7 +65,7 @@ The isolated fixture selects the fixed authenticated DNS-over-HTTPS profile for 
 
 ## Evidence and cleanup
 
-Record the source digest, image digests, host/kernel/tool versions, command, exit status, and actual assertions. Failed setup or unavailable prerequisites cannot establish the full profile. Keep the [active proposal](../../design/proposals/001-secure-persistent-conversations.md) and [issue index](../../issues/README.md) consistent with the result.
+Record the source digest, image digests, host/kernel/tool versions, command, exit status, and actual assertions. Failed setup or unavailable prerequisites cannot establish the full profile. Keep the [current subsystem design](../../design/systems/001-conversations-and-access.md) and [issue index](../../issues/README.md) consistent with the result.
 
 The harness removes its own services, containers, quotas, and directories. If cleanup cannot be confirmed, it fails and retains a private run manifest under the configured control directory. Use that manifest to inspect and clean only the named resources before rerunning or discarding the VM. Do not broadly prune Docker resources or delete a mounted filesystem to hide a failed test.
 

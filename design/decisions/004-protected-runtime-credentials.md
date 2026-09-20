@@ -1,8 +1,12 @@
 # D004 — Bootstrap runtime capabilities and credentials through the supervisor
 
+## Current ownership — 20 September 2026
+
+The [current subsystem designs](../systems/) apply this decision alongside architecture; [D013](013-evidence-based-delivery-workflow.md) and the [workflow](../workflow.md) now govern execution and record lifecycle. Proposal references below identify historical plans, not active work owners. Unfinished evidence remains in the [issue inbox](../../issues/), and future work receives a newly selected proposal. The dated decision rationale and technical constraints below are preserved.
+
 - Decision: Accepted
 - Recorded: 2026-09-07
-- Scope: [P001](../proposals/001-secure-persistent-conversations.md)
+- Scope: [P001](../proposals/archive/001-secure-persistent-conversations.md)
 - Supersedes: None; this defines the initial owner credential onboarding mechanism
 - Delivery evidence: [Implemented and reviewed; fixture E2E/native cleanup passed](../../docs/reports/2026-09-07-p001-foundation.md), live-account verification pending
 

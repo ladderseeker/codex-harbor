@@ -4,7 +4,7 @@
 - Status: Resolved
 - Archive disposition: Resolved
 - Archived: 2026-09-07
-- Owner: [P003](../../design/proposals/003-parallel-project-workspaces.md)
+- Owner: [P003](../../design/proposals/archive/003-parallel-project-workspaces.md)
 - Recorded: 2026-09-07
 - Affected files: infra/storage/workspace-client.ts; infra/storage/workspace-service.ts; infra/storage/workspace-paths.py; apps/api/src/workspace-routes.ts
 - Acceptance: P003-03/04/05/06 and the inherited supervisor availability and durable storage-operation guarantees
@@ -48,3 +48,7 @@ The historical pending dispositions above are superseded by this closure. Review
 Node 24.11.1 passed a clean build, types/formatting/documentation, 30 combined workspace/integration/contracts, complete P001/P002 E2E `harbor-e2e-b7d6b45d2a`, P003 E2E `harbor-workspaces-c273fcb089`, and actual supported Linux `p003-integrated-linux-result.json`; application and Linux source digests match at both ends. The [implementation report](../../docs/reports/2026-09-07-p003-workspaces.md) records commands, environment, image identities, two feature review rounds plus integration review, and meaningful evidence limits.
 
 All findings owned by this review issue are resolved. P003 remains active and unverified because dedicated real-account parallel-turn evidence is unavailable. The separate authority issue retains P007 integration ownership, and P009 retains host deployment/restore obligations. Archiving this review does not close those gates.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

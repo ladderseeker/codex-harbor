@@ -1,8 +1,18 @@
 # Persistent verification-host SSH recovery requires authorization
 
+- Severity: Medium; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: Medium
 - Status: Blocked
 - Owner: Repository maintainer; verification infrastructure
+
 - Affected resources: The four owned Linux verification VMs, their missing host-side Lima configuration/key files, and persistent local recovery material
 - Related evidence: [Interrupted-work recovery](../docs/reports/2026-09-13-interrupted-work-recovery.md)
 

@@ -1,11 +1,21 @@
 # Personal VPS deployment acceptance is incomplete
 
+- Severity: High; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: High
 - Status: Blocked
 - Owner: P015 implementation and verification
+
 - Recorded: 2026-09-13 13:06 UTC
 - Affected files: `infra/personal-vps/harbor-personal`, native runtime adapter/config, `tests/personal-vps/`, P015 deployment.
-- Gate: [P015-01–06](../design/proposals/015-personal-vps-workspace.md#verification-and-acceptance-criteria) and [P015-07–10](../design/proposals/015-personal-vps-workspace.md#complete-development-acceptance).
+- Gate: [P015-01–06](../design/proposals/archive/015-personal-vps-workspace.md#verification-and-acceptance-criteria) and [P015-07–10](../design/proposals/archive/015-personal-vps-workspace.md#complete-development-acceptance).
 
 ## Current status — 14 September 2026
 
@@ -104,3 +114,7 @@ Read-only inspection of the owner-reported native history found that two latest 
 ### 14 September parent/child correction and installed stop evidence
 
 The routing correction is implemented at `13204d7`; the 300-child-event, early-parent-output and rejected foreign approval regression passed, followed by real installed child review and parent final-text comparison. The parent completed after its child and retained its own complete final response. Same-conversation continuation reused the retained runtime; explicit **Stop background processes** removed the process, closed port 3100 and released both session and workspace background ownership. See the [current report](../docs/reports/2026-09-14-personal-development.md#installed-browser-development-acceptance) for exact identities and evidence. These defects are corrected; this record stays active for its remaining verification gate.
+
+## Retained acceptance ownership — 20 September 2026
+
+Current retained gap is the required rendered-prototype verification under P015-06/10. The 14 September report records passed actual application/native/installed development, stop, ticket/viewer expiry, logout revocation and mobile preview checks. Do not reinterpret historical packaging/account/ACL checkpoints as still-open current findings or substitute actual application rendering for the required prototype check.

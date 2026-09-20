@@ -1,15 +1,17 @@
 # Documentation
 
-This directory describes available behavior, developer workflows, and completed reports. The [proposal index](../design/proposals/README.md) distinguishes implemented behavior, current verification evidence and finished delivery.
+This directory describes available behavior, developer procedures and dated reports. The [subsystem designs](../design/systems/README.md) distinguish current source, deferred boundaries and remaining evidence obligations; the [delivery workflow](../design/workflow.md) governs changes. Reports retain their historical tested scope and are not fresh execution evidence. Discover plans and findings through the [proposal directory](../design/proposals/README.md) and [issue inbox](../issues/README.md).
 
-- [Developer workflow](developer/development.md): working on the repository now, command availability, and verification requirements.
+- [Developer workflow](developer/development.md): working on the repository now, command availability, and verification prerequisites.
+- [Implementer](developer/agents/implementer.md), [design reviewer](developer/agents/design-reviewer.md) and [provenance reviewer](developer/agents/provenance-reviewer.md): plain repository role briefs.
+- [Workflow migration report](reports/2026-09-20-workflow-migration.md): documentation migration scope, observed checks, independent reviews and evidence limits.
 - [Frontend redesign delivery](reports/2026-09-13-frontend-redesign.md): completed P014 implementation, review and verification evidence.
 - [Personal VPS development delivery](reports/2026-09-14-personal-development.md): development environment, titles/replies, private preview and reviewed verification evidence.
 - [Personal VPS setup](developer/personal-vps.md): subscription/original-folder candidate commands and native trust limits.
 - [Personal VPS candidate evidence](reports/2026-09-13-personal-vps-candidate.md): three reviews, native/browser/critical results and remaining owner-configured deployment gates.
 - [Personal local experience](developer/local-personal.md): explicit local Codex account startup and its verification limits.
-- [Personal local delivery](reports/2026-09-13-personal-local-experience.md): reviewed local/native checks, real owner conversation and the open critical regression gate.
-- [Common-use delivery and deferred work](reports/2026-09-13-common-use-delivery.md): reduced release scope, current verification limits, preserved P010/P012 branches and resumption handoff.
+- [Personal local delivery](reports/2026-09-13-personal-local-experience.md): reviewed local/native checks, real owner conversation and the dated addendum recording the later critical-regression pass.
+- [Common-use delivery and deferred work](reports/2026-09-13-common-use-delivery.md): historical reduced release scope, qualified verification and P010/P012 branch handoff; inspect current availability before reuse.
 - [Common-use conversation acknowledgement](reports/2026-09-13-common-use-acknowledgement.md): narrow shared correction, PostgreSQL contention coverage and exact current check/review evidence.
 - [P007 live-history test driver](reports/2026-09-13-p007-live-history-driver.md): reviewed bounded native history/restart command and no-model checks; authenticated execution remains blocked.
 - [Files and changes](developer/files.md): reviewed editor, file and Git behavior, Linux requirements and integration limits.
@@ -28,11 +30,11 @@ This directory describes available behavior, developer workflows, and completed 
 - [P008 scheduling evidence](reports/2026-09-08-p008-development.md): two feature reviews, qualified schedule/critical results, module integration and reviewed real-stack DST follow-up; live/restore gates remain explicit.
 - [Programmatic API](developer/programmatic-api.md): bearer authentication, current scopes, streaming, and safe retries.
 - [User guides](user/README.md): available conversation and account controls, with current verification limits.
-- [Design index](../design/README.md): the target architecture, feature proposals, and acceptance criteria.
+- [Design index](../design/README.md): current architecture, subsystem contracts, decisions and bounded plans.
 - [Repository instructions](../AGENTS.md): document ownership, implementation rules, and independent review.
-- [Issue index](../issues/README.md): active findings, work transferred to proposals, and archived records.
+- [Issue index](../issues/README.md): concrete findings, ownership and recheck routes, with archive navigation.
 - [Expanded design review](reports/2026-09-07-design-review.md): completed independent review rounds, documentation checks, and remaining runtime validation.
-- [Proposal and issue lifecycle review](reports/2026-09-07-proposal-issue-lifecycle.md): lifecycle rules, archive migration, and documentation verification.
+- [Proposal and issue lifecycle review](reports/2026-09-07-proposal-issue-lifecycle.md): historical lifecycle migration and documentation checks; D013 and the current workflow supersede those rules.
 - [Integration stash reconciliation](reports/2026-09-08-stash-reconciliation.md): accounting for temporary P004/P009 snapshots and their recoverable cleanup.
 - [Interrupted-work recovery](reports/2026-09-13-interrupted-work-recovery.md): restored persistent worktrees, recovered preview corrections/evidence, missing drafts with explicit owners, and the blocked test-host SSH recovery.
 - [P010 command diagnostics](reports/2026-09-13-p010-command-diagnostics.md): qualified failed guest attempts, bounded diagnostic/framing corrections, focused contracts and independent review; complete candidate acceptance remains pending.
@@ -48,4 +50,4 @@ This directory describes available behavior, developer workflows, and completed 
 - [P011 headless capability spike](reports/2026-09-08-p011-protocol-spike.md): historical account-free exact command identity acknowledgement and termination prerequisite; application and Linux evidence are recorded separately below.
 - [P011 implementation and review](reports/2026-09-08-p011-development.md): main acceptance after two review rounds, actual private preview UI/API, Linux and installed checkpoints, recovered evidence and cumulative critical checks; protected/fresh-host restore and upstream gates remain explicit. See the current [preview guide](user/previews.md) and [developer setup](developer/previews.md).
 
-Add user documentation when the corresponding features work. Add reports for completed investigations or verification, including the revision and environment checked. Keep future feature specifications in `design/`, and unresolved findings in `issues/`.
+Add user documentation when the corresponding behavior works. Reports identify the inspected source/environment, actual commands/results, accessible evidence and limitations. Current requirements and bounded change plans belong in `design/`; concrete unresolved findings belong in `issues/`. Keep unavailable historical artifacts and raw session logs explicitly unavailable.

@@ -1,6 +1,10 @@
 # Schedule API and verification
 
-P008 is Implemented, not Verified. Feature and bounded module integration reviews have closed; Targeted DST end-to-end acceptance has passed; dedicated live-account and protected full restore/promotion evidence remain pending. The [user guide](../user/schedules.md) describes the implemented interface, while [P008](../../design/proposals/008-scheduled-tasks.md) retains full acceptance, dependency and live-account obligations. The real Linux metadata rebind check establishes the fixed administrator bridge, not a full filesystem restore or installed release.
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
+Scheduled execution is implemented, with mandatory live-account and protected restore evidence still open. Feature and bounded module integration reviews have closed; Targeted DST end-to-end acceptance has passed; dedicated live-account and protected full restore/promotion evidence remain pending. The [user guide](../user/schedules.md) describes the implemented interface, while [the scheduling design](../../design/systems/003-scheduled-execution.md) defines current behavior and links the inbox obligations. The real Linux metadata rebind check establishes the fixed administrator bridge, not a full filesystem restore or installed release.
 
 The versioned `/api/v1/openapi.json` document declares request/response schemas, path parameters and token scopes. Cookie mutations require exact Origin and X-CSRF-Token. Cookie-free bearer calls use explicit project grants and the following scopes:
 

@@ -1,7 +1,11 @@
 # D011 — Personal VPS access to existing projects
 
+## Current ownership — 20 September 2026
+
+The [current subsystem designs](../systems/) apply this decision alongside architecture; [D013](013-evidence-based-delivery-workflow.md) and the [workflow](../workflow.md) now govern execution and record lifecycle. Proposal references below identify historical plans, not active work owners. Unfinished evidence remains in the [issue inbox](../../issues/), and future work receives a newly selected proposal. The dated decision rationale and technical constraints below are preserved.
+
 - Decision: Accepted within the owner's 2026-09-13 instruction to propose and implement the analyzed VPS workflow; implementation details remain subject to independent review.
-- Owner: [P015](../proposals/015-personal-vps-workspace.md).
+- Owner: [P015](../proposals/archive/015-personal-vps-workspace.md).
 - Amends: [architecture](../architecture.md#local-first-development-and-portable-environments), [D009](009-common-use-release.md) delivery priority and [D010](010-personal-local-experience.md)'s native-only-local restriction, solely for the explicitly selected personal VPS profile. D001–D006 remain the managed deployment contract.
 
 ## Context and alternatives

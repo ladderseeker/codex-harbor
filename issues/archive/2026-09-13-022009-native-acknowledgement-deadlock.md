@@ -5,7 +5,7 @@
 - Archive disposition: Resolved, 2026-09-13
 - Owner: Common-use release; shared P001 lifecycle correction extracted from P012
 - Affected files: `apps/supervisor/src/main.ts`, native request fixtures and shared turn acceptance coverage
-- Acceptance: [P001-03/07](../../design/proposals/001-secure-persistent-conversations.md#independent-acceptance) and [P012-01/04](../../design/proposals/012-managed-skills-and-mcp.md#independent-acceptance)
+- Acceptance: [P001-03/07](../../design/proposals/archive/001-secure-persistent-conversations.md#independent-acceptance) and [P012-01/04](../../design/proposals/archive/012-managed-skills-and-mcp.md#independent-acceptance)
 
 ## Evidence and impact — 8 September 2026
 
@@ -32,3 +32,7 @@ On macOS with Node 24.11.1, the actual Harbor browser/API/PostgreSQL/supervisor 
 Three current extraction/harness review rounds completed: initial review, bounded connection/rollback cleanup correction, and the final real-session setup correction. A separate narrow review accepted the deterministic clock fix in an existing policy test. Build/check, 11 integration tests and 20 pinned no-account Codex 0.153.4 contracts passed on the explicitly mapped predecessor sources; final type/format and critical acceptance passed on the digest above. Production acknowledgement bytes were unchanged through those test-only refinements.
 
 This resolves the shared lock-order defect and its main integration obligation. P012's complete feature integration remains deferred; no extension feature or live/Linux/installed acceptance is inferred from the ordinary approval case. P001's live-account gate and P009's release/recovery gates remain open. The earlier failed observations and isolated evidence above remain historical facts.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

@@ -1,5 +1,29 @@
 # P004 — Files and change review
 
+- Record status: Finished
+- Archive disposition: Baseline reconciled
+- Reconciled: 2026-09-20 under [D013](../../decisions/013-evidence-based-delivery-workflow.md)
+- Inspected source: `008227355bd05cb27dc13f4fbb585ef709b474b0`
+- Baseline classification: Implemented file/Git baseline; protected fresh-host restore remains unverified.
+- Current design: [Subsystem contract](../../systems/002-workspaces-and-resources.md)
+
+## Reconciled baseline
+
+The file editor, revision writes, downloads, Git review/actions, durable receipts and uncertainty inspection exist in `apps/api/src/files.ts`, `apps/supervisor/src/files.ts`, `packages/files/src/`, `apps/web/src/Files.tsx`, `FileEditor.tsx` and migration 010. Feature and module reports record reviewed host/Linux and installed ordinary/fault outcomes. The final installed runs reused owned fixtures; local database rebinding was not a protected filesystem restore.
+
+[Historical evidence](../../../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure) retains its original commands, artifacts, review rounds and limitations. This documentation migration ran no application, account, isolation, restore or deployment check. Finished describes reconciliation of this legacy record; it does not establish completion of its original plan.
+
+## Unresolved obligation ownership
+
+- **Delivery/registry contract and bounded persistence: P009-04 protected fresh-host file/receipt restore, revoked old effect/retry authority and no replay** → [2026-09-08-012652-p004-implementation-review.md](../../../issues/2026-09-08-012652-p004-implementation-review.md).
+- **Inherited runtime/live/deployment limits** → [2026-09-07-073831-codex-runtime-compatibility.md](../../../issues/2026-09-07-073831-codex-runtime-compatibility.md).
+
+These issues are in the inbox awaiting owner selection. Future execution requires a new cohesive proposal; this archived ID is historical lineage, not an active work owner. Original acceptance identifiers below remain stable evidence references.
+
+## Historical plan and evidence
+
+The following original plan, states and dated notes are preserved as non-normative history. Later dated evidence may supersede an earlier checkpoint; current requirements live in the subsystem design above. Historical statements about active queues, permissions, available worktrees or pending gates describe their original context and grant no present execution authority.
+
 - Decision: Accepted
 - Delivery: Implemented
 - Dependencies: [P003](003-parallel-project-workspaces.md)
@@ -7,8 +31,8 @@
 
 ## Source issues
 
-- [Created workspace validation identity](../../issues/archive/2026-09-08-035221-workspace-validation-identity.md): High, Resolved across P003/P008/P009. Shared caller/common validation and the corresponding P008 worker correction are integrated in `e1b754a`; actual managed file/Git, installed module and scheduling evidence passed with independent review.
-- [P004 implementation review](../../issues/2026-09-08-012652-p004-implementation-review.md): High, Blocked for required fresh-host protected restore/authority evidence under P009-04. Two feature rounds and module source/evidence review closed the code corrections and installed writer/inventory/drain/local rebind scope.
+- [Created workspace validation identity](../../../issues/archive/2026-09-08-035221-workspace-validation-identity.md): High, Resolved across P003/P008/P009. Shared caller/common validation and the corresponding P008 worker correction are integrated in `e1b754a`; actual managed file/Git, installed module and scheduling evidence passed with independent review.
+- [P004 implementation review](../../../issues/2026-09-08-012652-p004-implementation-review.md): High, Blocked for required fresh-host protected restore/authority evidence under P009-04. Two feature rounds and module source/evidence review closed the code corrections and installed writer/inventory/drain/local rebind scope.
 
 ## Scope and user/API flow
 
@@ -18,7 +42,7 @@ Changing a file does not automatically stage, commit, push, or publish it. Hoste
 
 ## Contracts and security
 
-The workspace service owns file operations and uses project-relative paths or opaque file references. Resolve access using the [filesystem boundary](../architecture.md#execution-and-filesystem-isolation), including race-resistant operations and actual mount confinement. File saves carry an expected content revision and fail on a stale revision rather than overwriting newer contents silently.
+The workspace service owns file operations and uses project-relative paths or opaque file references. Resolve access using the [filesystem boundary](../../architecture.md#execution-and-filesystem-isolation), including race-resistant operations and actual mount confinement. File saves carry an expected content revision and fail on a stale revision rather than overwriting newer contents silently.
 
 Revision checks coordinate Harbor editor writes; arbitrary shell writes can still race unless covered by the actual operation's locking/confinement strategy. Use workspace admission for managed Git mutations, structured argv instead of interpolated shell command text, and idempotency for consequential actions. Git hooks are executable project code and must remain in the runner boundary. Record the resulting commit/object identity so uncertain command delivery is reconciled rather than replayed blindly.
 
@@ -37,13 +61,13 @@ Seed delivered P003 with a small Git fixture containing text, binary, large, Uni
 
 ## Delivery and verification
 
-Run planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, and `pnpm test:isolation`; use real Codex contract/live lanes if reuse of its filesystem APIs changes adapter behavior. Follow [shared fixture/evidence rules](README.md#shared-verification-contract). Successful screen rendering alone is insufficient: assert actual file and Git outcomes.
+Run planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, and `pnpm test:isolation`; use real Codex contract/live lanes if reuse of its filesystem APIs changes adapter behavior. Follow [shared fixture/evidence rules](../../workflow.md#implementation-and-verification-gate). Successful screen rendering alone is insufficient: assert actual file and Git outcomes.
 
 Persist only necessary revision/audit metadata; never duplicate all repository contents into the application database. Extend backup registration for any new durable state and test it when the deployment feature exists. Rollback preserves files and commits already changed; it cannot undo them merely by changing the Harbor binary. Add actual file/Git usage documentation and independent-review evidence before verification.
 
 ## Recorded implementation design — 7 September 2026
 
-This amendment concretizes the authorized outcome. Implementation starts against the independently reviewed P003/P002/P007 baseline; endpoint and editor completion still require the acceptance evidence below. P003’s [D005 decision](../decisions/005-managed-project-workspaces.md) remains the authority for trusted checkout/common mounts, the managed Git profile and workspace writer ownership. The following contracts extend its fixed helper and durable receipt mechanisms rather than granting the API host filesystem or command execution access.
+This amendment concretizes the authorized outcome. Implementation starts against the independently reviewed P003/P002/P007 baseline; endpoint and editor completion still require the acceptance evidence below. P003’s [D005 decision](../../decisions/005-managed-project-workspaces.md) remains the authority for trusted checkout/common mounts, the managed Git profile and workspace writer ownership. The following contracts extend its fixed helper and durable receipt mechanisms rather than granting the API host filesystem or command execution access.
 
 ### Workspace view and editor
 
@@ -148,10 +172,10 @@ Uncertainty blocks admission as well as dispatch. When a file effect becomes unc
 
 Archived registered workspaces remain available for authorized bounded inspection and downloads; new file/Git mutations require the ready, unarchived state. Removing, failed or unavailable workspaces are not file-access aliases.
 
-Candidate verification and pending independent review are recorded in the [8 September report](../../docs/reports/2026-09-08-p004-files.md).
+Candidate verification and pending independent review are recorded in the [8 September report](../../../docs/reports/2026-09-08-p004-files.md).
 
 - 8 September 2026: The complete managed-XFS file outcome and critical Node 24 regressions pass at `324022da4ddc36128348a01427cba6028a2bd44bb176848f9b47a34d56d37fa2` (882 files). Two independent implementation review rounds closed after draft, byte/mode and receipt-parent durability corrections. P006/P009 integration and inherited verification gates remain explicit in the report; this is not Verified or archived.
 
-- 8 September 2026 cumulative integration: root `2bdb5ef` includes reviewed module checkpoint `77b2ad5`, source `f13afc57f3956a7b457e567da02f1bb00ad214405c52c7a3d28f2d5c94ad1d27` /961 files. The installed registry, private file IPC, maintenance dispatch fence and local restore-authority changes are implemented. Exact-source critical/workspace/terminal suites and actual Linux workspace validation passed; complete managed-XFS file acceptance passed with a test-driver-only delta. Final installed browser evidence and release gates remain open in the [module report](../../docs/reports/2026-09-08-installed-module-integration.md).
+- 8 September 2026 cumulative integration: root `2bdb5ef` includes reviewed module checkpoint `77b2ad5`, source `f13afc57f3956a7b457e567da02f1bb00ad214405c52c7a3d28f2d5c94ad1d27` /961 files. The installed registry, private file IPC, maintenance dispatch fence and local restore-authority changes are implemented. Exact-source critical/workspace/terminal suites and actual Linux workspace validation passed; complete managed-XFS file acceptance passed with a test-driver-only delta. Final installed browser evidence and release gates remain open in the [module report](../../../docs/reports/2026-09-08-installed-module-integration.md).
 
-- 2026-09-08 delivery checkpoint: final installed ordinary and response-loss lanes on immutable `8c11ca94…84f22` passed, with independent module source/evidence review and the full recorded host/Linux regression map. Root `04ab86b` includes the final report/test handoff. Scoped behavior is Implemented; mandatory fresh-host protected restore and inherited live/release gates remain open, so the proposal stays active and is not Verified. See the [final module evidence](../../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure).
+- 2026-09-08 delivery checkpoint: final installed ordinary and response-loss lanes on immutable `8c11ca94…84f22` passed, with independent module source/evidence review and the full recorded host/Linux regression map. Root `04ab86b` includes the final report/test handoff. Scoped behavior is Implemented; mandatory fresh-host protected restore and inherited live/release gates remain open, so the proposal stays active and is not Verified. See the [final module evidence](../../../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure).

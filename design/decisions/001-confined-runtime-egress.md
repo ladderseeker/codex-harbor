@@ -1,8 +1,12 @@
 # D001 — Route model access through a fixed trusted gateway
 
+## Current ownership — 20 September 2026
+
+The [current subsystem designs](../systems/) apply this decision alongside architecture; [D013](013-evidence-based-delivery-workflow.md) and the [workflow](../workflow.md) now govern execution and record lifecycle. Proposal references below identify historical plans, not active work owners. Unfinished evidence remains in the [issue inbox](../../issues/), and future work receives a newly selected proposal. The dated decision rationale and technical constraints below are preserved.
+
 - Decision: Accepted
 - Recorded: 2026-09-07
-- Scope: [P001](../proposals/001-secure-persistent-conversations.md), extending the [execution boundary](../architecture.md#execution-and-filesystem-isolation)
+- Scope: [P001](../proposals/archive/001-secure-persistent-conversations.md), extending the [execution boundary](../architecture.md#execution-and-filesystem-isolation)
 - Supersedes: The initial CONNECT implementation of this decision, rejected during independent review on 2026-09-07
 - Delivery evidence: [Implemented; actual Linux denials/connectivity passed](../../docs/reports/2026-09-07-p001-foundation.md), with intermittent availability tracked separately
 

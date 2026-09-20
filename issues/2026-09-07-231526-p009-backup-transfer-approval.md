@@ -1,9 +1,19 @@
 # Automatic approval review blocks the P009 test backup transfer
 
+- Severity: High; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: High
 - Status: Blocked
+- Owner: [P009](../design/proposals/archive/009-portable-deployment-and-restore.md#source-issues)
+
 - Recorded: 2026-09-07 23:15:26 Asia/Shanghai
-- Owner: [P009](../design/proposals/009-portable-deployment-and-restore.md#source-issues)
 - Category: Verification authorization prerequisite
 - Affected: P009-04/05 encrypted off-host backup and fresh-host restore; P009-06 promotion/rollback paths that require that verified checkpoint; candidate `infra/deploy/harborctl` and backup implementation
 
@@ -28,3 +38,7 @@ Do not rerun, reroute or indirectly execute the rejected transfer without the re
 Before requesting the remaining approval, finish the implementation and available checks so the user can review a concrete tested command, source/artifact identity, complete payload classes and exact owned destination. Refresh the payload inventory if later test state changes. Explain that the approval requirement comes from automatic approval review, not an invented project lifecycle gate. Approval, if provided, authorizes only the stated transfer scope; it is not a passing backup or restore result.
 
 Once authorized, run the bounded encrypted backup, full Restic data check, fresh disabled B restore and applicable promotion/rollback acceptance. Record exact source/artifact/snapshot identities, commands, environment, results, independent review and limitations before resolving this issue. Until then, P009 remains unverified and any dependent deployment/self-development verification requiring a complete checkpoint remains blocked.
+
+## Retained acceptance ownership — 20 September 2026
+
+The retained full protected checkpoint obligations include P009-04/05 and checkpoint-dependent P009-06; P003 project/workspace/native history and P005 blobs/references/publication must be included in registry coverage. P004 restores file/receipt history with revoked effect/inspection/retry authority; P006 retains terminal history while invalidating controller/input and never relaunching/replaying bytes; P008 restores paused schedules, revoked grants, blocked stale jobs and original uncertain provenance; P011 restores inactive previews with revoked tickets/grants and no source-host contact. Deferred P010-06 and its job/artifact/report restore contract, plus P012-04/05 disabled extension state and historical command authority, remain separate incomplete outcomes. Local synthetic metadata rebinding and installed component checks do not establish this protected filesystem outcome.

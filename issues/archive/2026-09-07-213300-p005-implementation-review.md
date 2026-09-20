@@ -4,7 +4,7 @@
 - Status: Resolved
 - Archive disposition: Resolved
 - Archived: 2026-09-07
-- Owner: [P005](../../design/proposals/005-attachments-and-rich-input.md)
+- Owner: [P005](../../design/proposals/archive/005-attachments-and-rich-input.md)
 - Recorded: 2026-09-07
 - Affected files: packages/attachments/src/store.ts; packages/attachments/src/media.ts; apps/web/src/Attachments.tsx
 - Acceptance: P005-02/04/05
@@ -46,3 +46,7 @@ On macOS arm64 with explicitly selected Node 24.11.1, pnpm 12.3.4, PostgreSQL 17
 The [integration report](../../docs/reports/2026-09-07-p005-integration.md) identifies each source/checkpoint, review and limitation. A one-off visibility timeout without a captured failure page was recorded in a separate [acceptance diagnostic finding](2026-09-07-224419-p005-reload-visibility.md); no production fix is claimed for that unexplained failure. The mandatory dedicated live-account response gate remains blocked, so resolving this review does not make P005 Verified or completed. Earlier sections retain intermediate state and evidence.
 
 On 2026-09-08, the separate diagnostic finding was resolved after a new captured reproduction identified test-request pressure. A test-only correction passed a matching-source full Node 24 regression and independent review. The earlier uncaptured failure remains unattributed; its historical evidence is unchanged.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

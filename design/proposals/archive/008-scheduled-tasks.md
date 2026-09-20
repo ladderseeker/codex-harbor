@@ -1,5 +1,29 @@
 # P008 — Scheduled tasks
 
+- Record status: Finished
+- Archive disposition: Baseline reconciled
+- Reconciled: 2026-09-20 under [D013](../../decisions/013-evidence-based-delivery-workflow.md)
+- Inspected source: `008227355bd05cb27dc13f4fbb585ef709b474b0`
+- Baseline classification: Implemented scheduling baseline; live occurrence and protected restore remain unverified.
+- Current design: [Subsystem contract](../../systems/003-scheduled-execution.md)
+
+## Reconciled baseline
+
+Schedule grants/occurrences, overlap/missed policies, attention, DST and module handling exist in `packages/schedules/src/`, `apps/api/src/schedules.ts`, `apps/web/src/Schedules.tsx` and migration 013. The development report records reviewed `ce8ad284…58a9e` and the subsequent real-stack DST follow-up. Local metadata rebind does not establish protected host restore.
+
+[Historical evidence](../../../docs/reports/2026-09-08-p008-development.md) retains its original commands, artifacts, review rounds and limitations. This documentation migration ran no application, account, isolation, restore or deployment check. Finished describes reconciliation of this legacy record; it does not establish completion of its original plan.
+
+## Unresolved obligation ownership
+
+- **P008-07 real unattended occurrence with API/UI result and history** → [2026-09-07-171225-live-runtime-credentials.md](../../../issues/2026-09-07-171225-live-runtime-credentials.md).
+- **Backup/recovery contract: protected P009-04/05 restore of paused schedules, revoked grants, nondispatchable old jobs and uncertain provenance** → [2026-09-07-231526-p009-backup-transfer-approval.md](../../../issues/2026-09-07-231526-p009-backup-transfer-approval.md).
+
+These issues are in the inbox awaiting owner selection. Future execution requires a new cohesive proposal; this archived ID is historical lineage, not an active work owner. Original acceptance identifiers below remain stable evidence references.
+
+## Historical plan and evidence
+
+The following original plan, states and dated notes are preserved as non-normative history. Later dated evidence may supersede an earlier checkpoint; current requirements live in the subsystem design above. Historical statements about active queues, permissions, available worktrees or pending gates describe their original context and grant no present execution authority.
+
 - Decision: Accepted
 - Delivery: Implemented
 - Dependencies: [P003](003-parallel-project-workspaces.md), [P007](007-session-history-and-recovery.md)
@@ -79,10 +103,10 @@ Prepared on 7 September 2026 against main `fa65f6a` and delivered P003/P007/P005
 
 ## Source issues
 
-- [P008 implementation review](../../issues/archive/2026-09-08-044007-p008-implementation-review.md): High, Resolved. Five source corrections and P009 module integration are committed in `9f3b414` and root `e1b754a`. Two feature rounds and bounded integration review closed with qualified feature/critical/Linux metadata evidence. Subsequent P008-02 real-stack DST coverage and its bounded review passed; the separate P005 regression observation remains Open.
-- [Created workspace validation identity](../../issues/archive/2026-09-08-035221-workspace-validation-identity.md): High, Resolved with P003/P009. Both workers preserve the complete captured identity through strict managed validation; actual Linux copy, shared Git/file and installed acceptance passed with independently reviewed evidence and committed integration.
-- [Dedicated live credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md): High, active and Blocked. P008-07 requires a bounded real-account unattended occurrence; fixture scheduling, non-model contracts and inherited isolation do not close that gate.
-- [P009 backup transfer authorization](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, active and Blocked in P009. When deployment integration is present, protected off-host restore coverage for P008's registry/state inherits the blocked checkpoint prerequisite. P008 implementation and unaffected local acceptance continue.
+- [P008 implementation review](../../../issues/archive/2026-09-08-044007-p008-implementation-review.md): High, Resolved. Five source corrections and P009 module integration are committed in `9f3b414` and root `e1b754a`. Two feature rounds and bounded integration review closed with qualified feature/critical/Linux metadata evidence. Subsequent P008-02 real-stack DST coverage and its bounded review passed; the separate P005 regression observation remains Open.
+- [Created workspace validation identity](../../../issues/archive/2026-09-08-035221-workspace-validation-identity.md): High, Resolved with P003/P009. Both workers preserve the complete captured identity through strict managed validation; actual Linux copy, shared Git/file and installed acceptance passed with independently reviewed evidence and committed integration.
+- [Dedicated live credentials](../../../issues/2026-09-07-171225-live-runtime-credentials.md): High, active and Blocked. P008-07 requires a bounded real-account unattended occurrence; fixture scheduling, non-model contracts and inherited isolation do not close that gate.
+- [P009 backup transfer authorization](../../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, active and Blocked in P009. When deployment integration is present, protected off-host restore coverage for P008's registry/state inherits the blocked checkpoint prerequisite. P008 implementation and unaffected local acceptance continue.
 
 ## Independent acceptance
 
@@ -98,7 +122,7 @@ Use P003/P007 fixtures with a controllable scheduler time source and real Postgr
 
 ## Delivery and verification
 
-Use planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, and relevant live/contract/isolation lanes. Record scheduler clock/seed, timezone database/runtime versions, occurrence keys, and failure-injection points under the [shared verification contract](README.md#shared-verification-contract).
+Use planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, and relevant live/contract/isolation lanes. Record scheduler clock/seed, timezone database/runtime versions, occurrence keys, and failure-injection points under the [shared verification contract](../../workflow.md#implementation-and-verification-gate).
 
 Add schedule/occurrence migrations and backup registration; exercise restore integration when P009 is present. Restored schedules initially remain paused until recovery establishes missed/uncertain state. Document recurrence, overlap, approval, and downtime semantics as implemented. Verify the complete feature and its independent review before changing delivery status.
 
@@ -115,7 +139,7 @@ Add schedule/occurrence migrations and backup registration; exercise restore int
 
 ### Expanded implementation evidence — 8 September 2026
 
-The [development checkpoint](../../docs/reports/2026-09-08-p008-development.md) records current real application, managed-XFS, authority/fault/capacity evidence and preserved failures. Delivery remains In progress: independent feature review, installed-module/restore and migration013-after016 integration, final cumulative evidence and the dedicated live-account gate are not waived.
+The [development checkpoint](../../../docs/reports/2026-09-08-p008-development.md) records current real application, managed-XFS, authority/fault/capacity evidence and preserved failures. Delivery remains In progress: independent feature review, installed-module/restore and migration013-after016 integration, final cumulative evidence and the dedicated live-account gate are not waived.
 
 - Round 1 correction decisions (8 September 2026): resolve and retain a standalone Git OID during the occurrence admission transaction, with the project/source row locks and idle-writer check held; preparation requires that OID and cannot replace it with a later HEAD. A manual run-now with an already busy source rejects before creating its occurrence/grant; recurring busy slots keep the overlap policy. Material edits require current manage and execute authority and the effective profile (including standalone write ceiling), even though edits pause rather than activate. Pause controls key the latest grant frontier, including one-shot grants; an exact older key still returns its original outcome. Periodic maintenance prunes expired control receipts before bounded age pruning, even for idle paused schedules. Emergency stop atomically pauses schedules and revokes all future grants while preserving original occurrence/native outcomes. These corrections await matching regression evidence and independent recheck.
 
@@ -129,7 +153,7 @@ Acceptance includes a fresh full schema and a real PostgreSQL upgrade from the e
 
 ### Reviewed integrated implementation — 8 September 2026
 
-The complete scheduling implementation and fixed P009 registry/maintenance/rebind integration exist at final source `ce8ad2847e116ac6f6f059198bd9bbaf1564fc74edfc09bdf78113fe72858a9e` (998 files). Two feature review rounds and one bounded integration review closed with no remaining actionable scoped finding. Node24 checks/build,11 integration tests,18 pinned native contracts, full schedule feature and critical application regression passed at the qualified checkpoints in the [development report](../../docs/reports/2026-09-08-p008-development.md). Actual PostgreSQL fresh/lower-ID upgrade, exact predecessor compatibility and Linux source administrator metadata-rebind checks passed. The final test-only diagnostic/bridge deltas and earlier attachment observations remain explicitly qualified.
+The complete scheduling implementation and fixed P009 registry/maintenance/rebind integration exist at final source `ce8ad2847e116ac6f6f059198bd9bbaf1564fc74edfc09bdf78113fe72858a9e` (998 files). Two feature review rounds and one bounded integration review closed with no remaining actionable scoped finding. Node24 checks/build,11 integration tests,18 pinned native contracts, full schedule feature and critical application regression passed at the qualified checkpoints in the [development report](../../../docs/reports/2026-09-08-p008-development.md). Actual PostgreSQL fresh/lower-ID upgrade, exact predecessor compatibility and Linux source administrator metadata-rebind checks passed. The final test-only diagnostic/bridge deltas and earlier attachment observations remain explicitly qualified.
 
 Delivery is Implemented, not Verified: dedicated live-account P008-07 and protected full filesystem restore/promotion evidence remain unavailable. The targeted real-stack DST follow-up passed as recorded below; local metadata rebind retains its narrower scope. This proposal stays active.
 
@@ -137,9 +161,9 @@ Root integration `e1b754a` passed Node 24.11.1 `pnpm check` (88 documents, types
 
 ### Acceptance evidence audit — 8 September 2026
 
-The expanded fixture-backed real-stack run `9cefdbb8f5` retains a stale intermediate scope label in its historical artifact. The [report mapping](../../docs/reports/2026-09-08-p008-development.md#acceptance-evidence-audit--8-september-2026) distinguishes its actual assertions from the gaps found at that checkpoint. The audit identified missing non-UTC API/UI preview and persisted DST occurrence coverage despite passing evaluator tests. The targeted follow-up below covers New York nonexistent and repeated minutes, Lord Howe's non-hour transition and Apia's skipped day under the unchanged policies. No historical result is relabeled as complete acceptance.
+The expanded fixture-backed real-stack run `9cefdbb8f5` retains a stale intermediate scope label in its historical artifact. The [report mapping](../../../docs/reports/2026-09-08-p008-development.md#acceptance-evidence-audit--8-september-2026) distinguishes its actual assertions from the gaps found at that checkpoint. The audit identified missing non-UTC API/UI preview and persisted DST occurrence coverage despite passing evaluator tests. The targeted follow-up below covers New York nonexistent and repeated minutes, Lord Howe's non-hour transition and Apia's skipped day under the unchanged policies. No historical result is relabeled as complete acceptance.
 
 
-The targeted P008-02 follow-up now passes real browser/API/supervisor gap/fold/non-hour/skipped-day preview and persisted identity assertions, including second-fold supervisor restart: Node24 run `caa98775a7`, exact `18682c08…cef0a3` /999. The [dated report](../../docs/reports/2026-09-08-p008-development.md#targeted-p008-02-dst-follow-up--8-september-2026) records exact times, unchanged production source, preliminary test corrections and closed bounded independent source/evidence review with no actionable finding. The original intermediate-labeled artifacts remain unchanged; live-account and protected restore/promotion gates remain open.
+The targeted P008-02 follow-up now passes real browser/API/supervisor gap/fold/non-hour/skipped-day preview and persisted identity assertions, including second-fold supervisor restart: Node24 run `caa98775a7`, exact `18682c08…cef0a3` /999. The [dated report](../../../docs/reports/2026-09-08-p008-development.md#targeted-p008-02-dst-follow-up--8-september-2026) records exact times, unchanged production source, preliminary test corrections and closed bounded independent source/evidence review with no actionable finding. The original intermediate-labeled artifacts remain unchanged; live-account and protected restore/promotion gates remain open.
 
 Root `717ca45` integrates that test-only follow-up. Combined source `a35d22ebce04bf10f74c16f5f3f694f89fe0d38475c18885e8a166292d6f9a22` /1001 passed Node 24.11.1 `pnpm check`, including 88 documents, types, OpenAPI and formatting. Production remains unchanged from the prior root scheduling merge.

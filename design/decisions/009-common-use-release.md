@@ -1,5 +1,11 @@
 # D009 — Finish a common-use release before expanding the roadmap
 
+## Current ownership — 20 September 2026
+
+The [current subsystem designs](../systems/) apply this decision alongside architecture; [D013](013-evidence-based-delivery-workflow.md) and the [workflow](../workflow.md) now govern execution and record lifecycle. Proposal references below identify historical plans, not active work owners. Unfinished evidence remains in the [issue inbox](../../issues/), and future work receives a newly selected proposal. The dated decision rationale and technical constraints below are preserved.
+
+D013 supersedes this decision’s ongoing common-use queue, automatic resumption of old proposal records and requirement to keep those legacy plans active until every original gate passes. The authorized baseline reconciliation archives records without passing missing acceptance. Product, security, isolation, live-account and release/restore constraints remain in force; selecting a new owner-requested outcome does not waive them or require executing the old backlog first.
+
 - Decision: Accepted, 2026-09-13, within the owner's explicit change of delivery scope.
 - Replaces: the all-proposals implementation schedule, including prioritizing P010 self-development early. It does not replace any security contract or acceptance criterion.
 - Delivery state and next actions: [proposal index](../proposals/README.md).
@@ -8,7 +14,7 @@
 
 2026-09-13 interface addendum: the owner selected implementation of the approved visual guide and prototype across the existing frontend. [P014](../proposals/archive/014-consistent-frontend.md) owns this complete UI outcome and bounded local project-folder browsing. It was completed and archived after scoped verification, without resuming deferred modules or waiving existing release gates.
 
-2026-09-13 addendum: the owner subsequently selected a real local account-login and conversation experience. [D010](010-personal-local-experience.md) and [P013](../proposals/013-personal-local-experience.md) own that bounded outcome. It takes current implementation priority without waiving the common-use candidate's existing verification gates or resuming deferred work.
+2026-09-13 addendum: the owner subsequently selected a real local account-login and conversation experience. [D010](010-personal-local-experience.md) and [P013](../proposals/archive/013-personal-local-experience.md) own that bounded outcome. It takes current implementation priority without waiving the common-use candidate's existing verification gates or resuming deferred work.
 
 The owner wants a usable, verified product while conserving the remaining agent quota. Main already contains P001–P008 and P011 implementation, with substantial review and verification evidence. P010 and P012 have extensive separate work but unfinished integration and mandatory acceptance. Completing every proposal together has delayed a usable release.
 
@@ -41,4 +47,4 @@ This limits concurrent implementation and repeated broad verification. It also m
 
 ## 2026-09-13 personal VPS addendum
 
-The owner subsequently selected [P015](../proposals/015-personal-vps-workspace.md). [D011](011-personal-vps-workspace.md) authorizes a separately configured personal VPS profile with authenticated HTTPS, subscription login and approved existing folders. It supersedes the native-only-local restriction only for that explicit profile; P013 remains loopback-only, managed isolation requirements and outstanding proposal gates remain unchanged.
+The owner subsequently selected [P015](../proposals/archive/015-personal-vps-workspace.md). [D011](011-personal-vps-workspace.md) authorizes a separately configured personal VPS profile with authenticated HTTPS, subscription login and approved existing folders. It supersedes the native-only-local restriction only for that explicit profile; P013 remains loopback-only, managed isolation requirements and outstanding proposal gates remain unchanged.

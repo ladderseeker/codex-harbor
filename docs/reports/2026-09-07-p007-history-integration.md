@@ -26,7 +26,7 @@ The standalone P007 checkpoint `90aa34aa3d55516ce3e4a0209cb697d10011a07d8314f079
 
 ## Review and remaining gates
 
-Independent integration review closed in one bounded round with no actionable finding across authority, reservation fencing, continuation, scopes, archival and UI/OpenAPI merge seams. The Node 24 checkpoint and source-issue closures are recorded below. Dedicated live-account/model credentials remain unavailable; no personal state was used and no successful model smoke is claimed. See the [canonical proposal](../../design/proposals/007-session-history-and-recovery.md), [history user guide](../user/conversations.md) and [workspace developer guide](../developer/workspaces.md).
+Independent integration review closed in one bounded round with no actionable finding across authority, reservation fencing, continuation, scopes, archival and UI/OpenAPI merge seams. The Node 24 checkpoint and source-issue closures are recorded below. Dedicated live-account/model credentials remain unavailable; no personal state was used and no successful model smoke is claimed. See the [canonical proposal](../../design/proposals/archive/007-session-history-and-recovery.md), [history user guide](../user/conversations.md) and [workspace developer guide](../developer/workspaces.md).
 
 ## Node 24 integration and issue closure
 
@@ -35,3 +35,7 @@ Reviewed integration commit `0118dfe` and documentation merge `ca1a2cf` retain s
 `pnpm test:e2e` passed `harbor-e2e-10d1a7178a`; `node --import tsx tests/e2e/run.ts --workspaces` passed `harbor-workspaces-a5ce817a7b`. Both exited 0 with identical start/end digest. The full run deliberately interrupts the supervisor/database; its process-exit diagnostic accompanies expected failure injection. All Harbor components are real, external Codex/OIDC use fixtures, and run-owned cleanup completed.
 
 The [P007 review](../../issues/archive/2026-09-07-203000-p007-implementation-review.md), [authority correction](../../issues/archive/2026-09-07-202308-authority-expiry-after-lock-wait.md) and [replay/control bounds](../../issues/archive/2026-09-07-185228-p001-retention-control-bounds.md) are Resolved and archived. Two original feature rounds and one separate integration review are complete. The unchanged boundary retains its prior Linux checkpoint as described above. Dedicated live-account evidence still prevents Verified delivery; no completed proposal is claimed.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.

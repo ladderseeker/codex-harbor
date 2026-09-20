@@ -6,7 +6,7 @@
 - Archived: 2026-09-08
 - Owner: P003/P009 installed-module integration; P008 owns the corresponding schedule worker call
 - Affected files: `apps/supervisor/src/workspace-storage.ts`, `packages/workspaces/src/service.ts`, `infra/storage/workspace-service.ts`, `infra/storage/workspace-paths.py`, P008 standalone workspace preparation
-- Acceptance: [P003-01–06](../../design/proposals/003-parallel-project-workspaces.md#independent-acceptance), installed [P009-01](../../design/proposals/009-portable-deployment-and-restore.md#independent-acceptance), derived-workspace P004 acceptance and standalone P008 execution
+- Acceptance: [P003-01–06](../../design/proposals/archive/003-parallel-project-workspaces.md#independent-acceptance), installed [P009-01](../../design/proposals/archive/009-portable-deployment-and-restore.md#independent-acceptance), derived-workspace P004 acceptance and standalone P008 execution
 
 ## Evidence — 8 September 2026
 
@@ -41,3 +41,7 @@ Combined root source `9ee4984a923384cdcfabef54b660553d186bd0a8615ffb670d0f7afb71
 ## Subsequent acceptance follow-up — 8 September 2026
 
 The separately recorded P008-02 gap is closed by reviewed real-stack run `caa98775a7` at source `18682c08…cef0a3` /999, integrated in root `717ca45`. The [schedule report](../../docs/reports/2026-09-08-p008-development.md#targeted-p008-02-dst-follow-up--8-september-2026) records the four timezone cases and exact identities. Live-account and protected full restore gates remain unverified.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

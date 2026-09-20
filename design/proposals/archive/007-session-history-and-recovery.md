@@ -1,5 +1,30 @@
 # P007 — Session history and recovery
 
+- Record status: Finished
+- Archive disposition: Baseline reconciled
+- Reconciled: 2026-09-20 under [D013](../../decisions/013-evidence-based-delivery-workflow.md)
+- Inspected source: `008227355bd05cb27dc13f4fbb585ef709b474b0`
+- Baseline classification: Implemented history/recovery baseline; authenticated native resume remains unverified.
+- Current design: [Subsystem contract](../../systems/001-conversations-and-access.md)
+
+## Reconciled baseline
+
+Search/archive, replay watermarks, fenced recovery and explicit new-input continuation exist in `apps/api/src/history.ts`, `recovery.ts`, supervisor recovery, storage replay/capacity and migration 007. The integration report records `2976f628…11b40bd` and feature/integration reviews. The later live-history driver exists, but its authenticated execution remains open.
+
+[Historical evidence](../../../docs/reports/2026-09-07-p007-history-integration.md) retains its original commands, artifacts, review rounds and limitations. This documentation migration ran no application, account, isolation, restore or deployment check. Finished describes reconciliation of this legacy record; it does not establish completion of its original plan.
+
+## Unresolved obligation ownership
+
+- **P007-07 authenticated native history/restart/resume execution** → [2026-09-13-110315-common-use-live-acceptance.md](../../../issues/2026-09-13-110315-common-use-live-acceptance.md).
+- **Dedicated credentials for the required bounded live turn** → [2026-09-07-171225-live-runtime-credentials.md](../../../issues/2026-09-07-171225-live-runtime-credentials.md).
+- **Historical unexplained regression observation** → [2026-09-08-020429-p007-regression-evidence.md](../../../issues/2026-09-08-020429-p007-regression-evidence.md).
+
+These issues are in the inbox awaiting owner selection. Future execution requires a new cohesive proposal; this archived ID is historical lineage, not an active work owner. Original acceptance identifiers below remain stable evidence references.
+
+## Historical plan and evidence
+
+The following original plan, states and dated notes are preserved as non-normative history. Later dated evidence may supersede an earlier checkpoint; current requirements live in the subsystem design above. Historical statements about active queues, permissions, available worktrees or pending gates describe their original context and grant no present execution authority.
+
 - Decision: Accepted
 - Delivery: Implemented
 - Dependencies: [P001](001-secure-persistent-conversations.md)
@@ -15,7 +40,7 @@ Provide corresponding authenticated history, archive, snapshot, and recovery ope
 
 Maintain application history indexes and native thread references without editing Codex's private database schema. Native history remains authoritative for conversation content; UI event retention can be shorter. A snapshot identifies its sequence, and a client resumes strictly after that sequence. Detect expired cursors, known gaps, and stale runtime generations.
 
-Use the [operation state machine](../architecture.md#api-events-and-state-transitions). Persist and reconcile dispatch intent, recorded response, native history, and current runtime state. If they cannot establish delivery, keep `uncertain` visible. The owner may explicitly start a new operation after inspecting that risk; never label it an exactly-once continuation. Approval answers and cancellation need the same reconciliation discipline.
+Use the [operation state machine](../../architecture.md#api-events-and-state-transitions). Persist and reconcile dispatch intent, recorded response, native history, and current runtime state. If they cannot establish delivery, keep `uncertain` visible. The owner may explicitly start a new operation after inspecting that risk; never label it an exactly-once continuation. Approval answers and cancellation need the same reconciliation discipline.
 
 Database outage denies new mutations and approval answers; existing authorized work follows bounded buffering/emergency rules. Restoring connectivity cannot manufacture missing events. History search is owner-authorized, bounded, and treats snippets as untrusted content. Active operations/approvals and referenced attachments must survive retention maintenance.
 
@@ -33,9 +58,9 @@ Seed delivered P001 with completed, waiting, failed, and long-running conversati
 
 ## Delivery and verification
 
-Use planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm test:contract`, and relevant `pnpm test:live`. Fault injection must affect only the run's services and storage. Follow [shared setup/evidence/cleanup rules](README.md#shared-verification-contract). Do not run host reboot or process-kill tests against the developer's normal instance.
+Use planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm test:contract`, and relevant `pnpm test:live`. Fault injection must affect only the run's services and storage. Follow [shared setup/evidence/cleanup rules](../../workflow.md#implementation-and-verification-gate). Do not run host reboot or process-kill tests against the developer's normal instance.
 
-Migrate indexes additively, document retention and recovery limitations, and preserve the original native state during reconciliation. Rollback cannot blindly downgrade a native history format; require the [release compatibility rules](../architecture.md#release-retention-and-rollback-rules). Record evidence and independent review before delivery is verified.
+Migrate indexes additively, document retention and recovery limitations, and preserve the original native state during reconciliation. Rollback cannot blindly downgrade a native history format; require the [release compatibility rules](../../architecture.md#release-retention-and-rollback-rules). Record evidence and independent review before delivery is verified.
 
 ## Recorded implementation refinements — 7 September 2026
 
@@ -75,11 +100,11 @@ If the optional P003 reservation-release hook fails or rejects its exact ownersh
 
 ## Source issues
 
-[Common-use live history acceptance](../../issues/2026-09-13-110315-common-use-live-acceptance.md), High and Blocked, owns P007-07's remaining real-account execution. The bounded `pnpm test:live --history` driver is integrated after two review rounds and five no-model checks; its [report](../../docs/reports/2026-09-13-p007-live-history-driver.md) distinguishes that implementation from the still-unexecuted native/account gate. Dedicated test credentials remain unavailable.
+[Common-use live history acceptance](../../../issues/2026-09-13-110315-common-use-live-acceptance.md), High and Blocked, owns P007-07's remaining real-account execution. The bounded `pnpm test:live --history` driver is integrated after two review rounds and five no-model checks; its [report](../../../docs/reports/2026-09-13-p007-live-history-driver.md) distinguishes that implementation from the still-unexecuted native/account gate. Dedicated test credentials remain unavailable.
 
-[Replay and control bounds](../../issues/archive/2026-09-07-185228-p001-retention-control-bounds.md), Medium, is Resolved after strict replay age/count and reserved cancellation/recovery storage passed exact boundary tests and independent combined review for P007-02/05/06 and inherited P001-03/07. The archive records discovery and closing evidence.
+[Replay and control bounds](../../../issues/archive/2026-09-07-185228-p001-retention-control-bounds.md), Medium, is Resolved after strict replay age/count and reserved cancellation/recovery storage passed exact boundary tests and independent combined review for P007-02/05/06 and inherited P001-03/07. The archive records discovery and closing evidence.
 
-[Dedicated live credentials](../../issues/2026-09-07-171225-live-runtime-credentials.md) keeps the bounded live part of P007-07 unverified. Pinned non-model contracts and fixtures cannot waive it.
+[Dedicated live credentials](../../../issues/2026-09-07-171225-live-runtime-credentials.md) keeps the bounded live part of P007-07 unverified. Pinned non-model contracts and fixtures cannot waive it.
 
 ### First implementation review corrections — 7 September 2026
 
@@ -103,8 +128,8 @@ The integrated recovery path locks the current actor, project, workspace and con
 
 The P002/P003 integration candidate passed `pnpm check`, `pnpm build`, `pnpm test` (9 tests), `pnpm test:contract` (15 pinned-runtime contracts), and the real workspace E2E lane `harbor-workspaces-5e0a57a497` on source `2976f6286a9aea9645e2a27dfcb497e677c5268d5ff034593752dc98211b40bd` (842 files; matching start/end digests). The full P001/P002/P007 real-stack run `harbor-e2e-3890f83dff` passed on the identical production source, before adding only the derived-workspace test, with source `44285c761c564728834de678114711e3ff296b242224c39c3e7924617901fbf9`. Combined cases cover active conversation archival, recovery across the restart-changed session epoch and original workspace writer epoch, new-input continuation, derived checkout preservation and final reservation release with acknowledged historical uncertainty. Environment remains macOS arm64, Node 26.7.0, PostgreSQL 17.6, pinned Codex 0.153.4 and Chromium 1194. Independent integration review, matching Node 24/Linux integration and the dedicated live-account gate remain separate pending evidence.
 
-The narrow independent P002/P003/P007 integration review closed with no actionable finding on `2976f6286a9aea9645e2a27dfcb497e677c5268d5ff034593752dc98211b40bd`. It confirmed the unchanged native launcher/adapter boundary can retain the prior Linux checkpoint without a duplicate run. The [integration report](../../docs/reports/2026-09-07-p007-history-integration.md) distinguishes the matching candidate checks, test-only digest change, inherited isolation evidence and outstanding dedicated live gate.
+The narrow independent P002/P003/P007 integration review closed with no actionable finding on `2976f6286a9aea9645e2a27dfcb497e677c5268d5ff034593752dc98211b40bd`. It confirmed the unchanged native launcher/adapter boundary can retain the prior Linux checkpoint without a duplicate run. The [integration report](../../../docs/reports/2026-09-07-p007-history-integration.md) distinguishes the matching candidate checks, test-only digest change, inherited isolation evidence and outstanding dedicated live gate.
 
 ### Integrated delivery — 7 September 2026
 
-P007 is Implemented at source `2976f6286a9aea9645e2a27dfcb497e677c5268d5ff034593752dc98211b40bd` (842 files), reviewed integration `0118dfe`/`ca1a2cf`. Two feature review rounds and a separate integration review are complete. Node 24 check/build, 9 integration checks, 15 contracts, 8 workspace checks, full P001/P002/P007 E2E `harbor-e2e-10d1a7178a` and workspace E2E `harbor-workspaces-a5ce817a7b` passed; both E2E artifacts have matching start/end source. The [integration report](../../docs/reports/2026-09-07-p007-history-integration.md) records inherited unchanged Linux evidence separately. The [implementation review](../../issues/archive/2026-09-07-203000-p007-implementation-review.md), [shared authority correction](../../issues/archive/2026-09-07-202308-authority-expiry-after-lock-wait.md) and replay/control finding are resolved and archived. Required live-account acceptance remains blocked, so P007 stays active and is not Verified.
+P007 is Implemented at source `2976f6286a9aea9645e2a27dfcb497e677c5268d5ff034593752dc98211b40bd` (842 files), reviewed integration `0118dfe`/`ca1a2cf`. Two feature review rounds and a separate integration review are complete. Node 24 check/build, 9 integration checks, 15 contracts, 8 workspace checks, full P001/P002/P007 E2E `harbor-e2e-10d1a7178a` and workspace E2E `harbor-workspaces-a5ce817a7b` passed; both E2E artifacts have matching start/end source. The [integration report](../../../docs/reports/2026-09-07-p007-history-integration.md) records inherited unchanged Linux evidence separately. The [implementation review](../../../issues/archive/2026-09-07-203000-p007-implementation-review.md), [shared authority correction](../../../issues/archive/2026-09-07-202308-authority-expiry-after-lock-wait.md) and replay/control finding are resolved and archived. Required live-account acceptance remains blocked, so P007 stays active and is not Verified.

@@ -110,3 +110,7 @@ This four-file documentation update, based on root `4dbb49c`, passed one indepen
 ### Common-use navigation update — 13 September 2026
 
 The shared acknowledgement finding is now [resolved and archived](../../issues/archive/2026-09-13-022009-native-acknowledgement-deadlock.md) after its narrow common-use integration and current critical checks. This updates navigation and current status only; all recovered sources, failures and historical results above retain their original scope.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.

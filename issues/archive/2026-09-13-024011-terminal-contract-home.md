@@ -6,7 +6,7 @@
 - Archived: 2026-09-13
 - Owner: P011 integration tester; P006 contract maintainer
 - Affected files: `tests/contract/terminal.test.ts`
-- Acceptance: [P006-01](../../design/proposals/006-persistent-terminal.md#independent-acceptance), shared pinned-runtime contract gate
+- Acceptance: [P006-01](../../design/proposals/archive/006-persistent-terminal.md#independent-acceptance), shared pinned-runtime contract gate
 
 ## Observed failure and cause — 13 September 2026
 
@@ -27,3 +27,7 @@ Correction `e0e79f9933b580b63cf997d67119f73480d416dd`, integrated into main as `
 On Linux `6.8.0-134-generic`, Node 24.11.1 and pinned Codex 0.153.4, `node --import tsx --test tests/contract/terminal.test.ts` passed both checks, including actual PTY readiness, resize, byte output and the 16.3-second delayed exit. The run used a fresh isolated copy of the four exact public source files with the existing pinned public dependency tree. Test SHA-256 is `efb4b16a877de9e82a07c08da8f4fbed3be35f79f8b6110e0ad41e1f09b71886`; the adapter remained `0e7f4af9…a0bb48` above. All generated native homes were confirmed absent afterward. The retained result, including all four source hashes, is `.test-runs/recovery-20260913/terminal-corrected-result.json`, SHA-256 `16a4990a3504e8073a6a8088e7388e2994cffd931693217454f48276d9c156d9`.
 
 Documentation links and whitespace passed after the lifecycle update. This closes the demonstrated test prerequisite and its main integration. Full preview integration, cumulative contracts and the separate live/protected-restore obligations retain their own gates; no full-suite pass is substituted for the original 19/20 run.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

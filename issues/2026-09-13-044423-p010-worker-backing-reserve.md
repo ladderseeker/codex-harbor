@@ -1,10 +1,22 @@
 # Worker backing growth can consume stable control recovery space
 
+- Severity: High; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: High
 - Status: In progress
 - Owner: P010 implementer; separate reviewer verifies admission and Linux evidence
+
+Complete deferred outcome and acceptance are tracked in [2026-09-20-000003-self-development-acceptance.md](2026-09-20-000003-self-development-acceptance.md); this record retains its individual finding and correction evidence.
+
 - Affected files: `infra/self/preflight.py`, `infra/self/allocation.py`, shared worker storage admission and its tests
-- Acceptance: [P010-03/04/07](../design/proposals/010-self-development.md#independent-acceptance), under [D008's stable resource reserve](../design/decisions/008-isolated-self-development-workers.md)
+- Acceptance: [P010-03/04/07](../design/proposals/archive/010-self-development.md#independent-acceptance), under [D008's stable resource reserve](../design/decisions/008-isolated-self-development-workers.md)
 
 ## Source finding and observed topology — 13 September 2026
 

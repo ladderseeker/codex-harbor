@@ -1,9 +1,13 @@
 # D006 — Portable releases and a fenced host restore
 
+## Current ownership — 20 September 2026
+
+The [current subsystem designs](../systems/) apply this decision alongside architecture; [D013](013-evidence-based-delivery-workflow.md) and the [workflow](../workflow.md) now govern execution and record lifecycle. Proposal references below identify historical plans, not active work owners. Unfinished evidence remains in the [issue inbox](../../issues/), and future work receives a newly selected proposal. The dated decision rationale and technical constraints below are preserved.
+
 - Decision: Accepted
 - Delivery: In progress (administrator tooling and partial installed checks exist; module integration and required restore/live gates remain open)
 - Recorded: 2026-09-07
-- Scope: [P009](../proposals/009-portable-deployment-and-restore.md)
+- Scope: [P009](../proposals/archive/009-portable-deployment-and-restore.md)
 - Supersedes: None; concretizes the [architecture release contract](../architecture.md#release-retention-and-rollback-rules)
 
 ## Context and alternatives
@@ -90,7 +94,7 @@ An SSH runbook and installed administrator tooling remain usable with Caddy, API
 
 ## Evidence and remaining gates
 
-[P009-01–07](../proposals/009-portable-deployment-and-restore.md#independent-acceptance) own the complete fresh-install, reboot, A-to-B restore, failure, rollback and SSH outcomes. The first B is a disposable Ubuntu 24.04 arm64 VM with Docker 29.1.3, Node 24/pnpm prerequisites and a dedicated XFS filesystem; those installed prerequisites are not evidence that Harbor deployment is verified. Record exact image/artifact versions, kernel/filesystem/quota results, source and backup digests, commands, exit codes and resource use for both hosts.
+[P009-01–07](../proposals/archive/009-portable-deployment-and-restore.md#independent-acceptance) own the complete fresh-install, reboot, A-to-B restore, failure, rollback and SSH outcomes. The first B is a disposable Ubuntu 24.04 arm64 VM with Docker 29.1.3, Node 24/pnpm prerequisites and a dedicated XFS filesystem; those installed prerequisites are not evidence that Harbor deployment is verified. Record exact image/artifact versions, kernel/filesystem/quota results, source and backup digests, commands, exit codes and resource use for both hosts.
 
 Test restored logical/content identity with different destination device/inode identities, revoked old cookies/PATs, model credential re-encryption, retained uncertainty, fresh recovery, workspace Git/common integrity, attachment references, denied old receipt retries and zero contact with A's runtimes. Inject partial backup, missing secret/module, corrupt data, disk pressure and restore-process loss; neither healthy A nor an existing healthy B installation may be replaced. Exercise incompatible downgrade and out-of-band recovery with Harbor unavailable. Approved-endpoint connectivity measurements do not waive TLS/routing denials.
 

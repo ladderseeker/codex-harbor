@@ -1,5 +1,9 @@
 # Conversations and account setup
 
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
 The text-conversation foundation is implemented, with dedicated live-account acceptance [not yet available](../../issues/2026-09-07-171225-live-runtime-credentials.md) and recorded follow-ups still open. The [developer guide](../developer/development.md) explains how to try the isolated application with test identities and a deterministic Codex fixture.
 
 ## Start a conversation
@@ -47,7 +51,7 @@ If a submission loses its connection, use its retained retry action to submit th
 
 Open **View status** from the conversation ellipsis menu, then **Storage and limits**, for persisted conversation usage and managed project quota information. Project usage is marked unavailable when the trusted storage service cannot inspect it. **Conversation limits** explains the server's current replay and retry bounds. Reaching an admission limit prevents new work; it does not grant permission to delete project files automatically.
 
-Existing supporting tools retain their capability and installation requirements. The [proposal index](../../design/proposals/README.md) distinguishes implemented behavior from unfinished live-account, deployment, restore and deferred-feature obligations.
+Existing supporting tools retain their capability and installation requirements. The [current designs](../../design/systems/) distinguish available behavior from the unfinished live-account, deployment, restore and deferred-feature obligations in the [issue inbox](../../issues/).
 
 ## Search and organize history
 

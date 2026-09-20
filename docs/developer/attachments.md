@@ -1,5 +1,9 @@
 # Attachment verification and storage
 
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
 The attachment implementation uses authenticated browser-owner routes described by `/api/v1/openapi.json`: create metadata under `/sessions/{id}/attachments`, PUT a complete binary body under `/attachments/{id}/content`, read a protected preview/download, delete unsubmitted content, and GET/POST the session draft. Mutations use the ordinary CSRF, Origin and retained idempotency contract. PAT access fails closed because no attachment route descriptor grants it.
 
 The initial profile accepts bounded PNG and UTF-8 text; the [user guide](../user/attachments.md) lists effective limits and recovery behavior. PostgreSQL is authoritative for metadata, blobs and revisioned drafts. Migration 008 creates `attachments`, `conversation_drafts` and `session_attachment_storage`. Stage admission reserves declared bytes. A PUT accepts only the declared complete size/hash and validates media before committing staged content. Turn admission atomically associates validated references with its operation and clears only the submitted draft revision.
@@ -34,4 +38,4 @@ pnpm test:live --attachments
 
 The live variant discovers an image/text-capable model, submits only a generated red PNG and synthetic text, and requires a bounded completed response identifying the color and exact text. Without the dedicated key it exits 2 before making a model request. Normal Codex credentials are never used. This mandatory gate remains [blocked](../../issues/2026-09-07-171225-live-runtime-credentials.md).
 
-For P009, register all three database tables and complete project quota units including materialized attachment directories. Restore must preserve blobs and associations while revalidating/rebinding materialized directory/file identities before launching a runner. Old releases that cannot interpret this schema must deny new attachment writes; rollback must preserve existing blobs and native copies. See the [canonical proposal](../../design/proposals/005-attachments-and-rich-input.md) for the owning retention and backup contract.
+For P009, register all three database tables and complete project quota units including materialized attachment directories. Restore must preserve blobs and associations while revalidating/rebinding materialized directory/file identities before launching a runner. Old releases that cannot interpret this schema must deny new attachment writes; rollback must preserve existing blobs and native copies. See the [current subsystem design](../../design/systems/002-workspaces-and-resources.md) for the owning retention and backup contract.

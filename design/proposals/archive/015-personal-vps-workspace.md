@@ -1,24 +1,47 @@
 # P015 — Use a subscription account on an existing VPS project
 
+- Record status: Finished
+- Archive disposition: Baseline reconciled
+- Reconciled: 2026-09-20 under [D013](../../decisions/013-evidence-based-delivery-workflow.md)
+- Inspected source: `008227355bd05cb27dc13f4fbb585ef709b474b0`
+- Baseline classification: Implemented and historically deployed personal-VPS development baseline; prototype gate remains open.
+- Current design: [Subsystem contract](../../systems/004-deployment-and-profiles.md)
+
+## Reconciled baseline
+
+The original-folder/subscription profile and D012 development/attached previews exist in `packages/codex-adapter/src/local-runtime.ts`, `personal-development.ts`, personal-preview API/UI, `infra/personal-vps/` and migrations 017/018. Reports record deployed `13204d7`, actual installed tool/Git/dependency/test/build/preview/continuation/stop and expiry/revocation acceptance. This migration did not inspect or change the running installation.
+
+[Historical evidence](../../../docs/reports/2026-09-14-personal-development.md) retains its original commands, artifacts, review rounds and limitations. This documentation migration ran no application, account, isolation, restore or deployment check. Finished describes reconciliation of this legacy record; it does not establish completion of its original plan.
+
+## Unresolved obligation ownership
+
+- **P015-06/10 required rendered-prototype verification; actual application rendering does not replace it** → [2026-09-13-130622-personal-vps-acceptance.md](../../../issues/2026-09-13-130622-personal-vps-acceptance.md).
+
+These issues are in the inbox awaiting owner selection. Future execution requires a new cohesive proposal; this archived ID is historical lineage, not an active work owner. Original acceptance identifiers below remain stable evidence references.
+
+## Historical plan and evidence
+
+The following original plan, states and dated notes are preserved as non-normative history. Later dated evidence may supersede an earlier checkpoint; current requirements live in the subsystem design above. Historical statements about active queues, permissions, available worktrees or pending gates describe their original context and grant no present execution authority.
+
 - Proposal ID: P015
 - Decision: Accepted within the owner's 2026-09-13 request to propose and implement the analyzed VPS workflow; technical details remain subject to review.
 - Delivery: Implemented
 - Dependencies: Implemented P001 authentication/conversation/persistence, P003 Local workspace records, P007 history, P013 native adapter. Their outstanding evidence is not waived. P009 managed installation is a separate profile, not a prerequisite for this outcome.
 - User outcome: Sign into Harbor through HTTPS, register an approved existing VPS folder, authenticate official Codex with a ChatGPT subscription, have it read/edit that folder, leave work running after browser/SSH disconnect, and return to its results and conversation.
-- Evidence/status updated: 2026-09-14. Source `13204d7` is pushed on main and deployed as an immutable release. The [development report](../../docs/reports/2026-09-14-personal-development.md) records passing Linux/native, complete personal browser and critical suites, four scoped implementation reviews, verified public TLS, actual installed Git/dependency/test/build/Vite preview work, parent/child isolation, title persistence and same-conversation continuation. Earlier [13 September evidence](../../docs/reports/2026-09-13-personal-vps-candidate.md) retains its tested baselines.
+- Evidence/status updated: 2026-09-14. Source `13204d7` is pushed on main and deployed as an immutable release. The [development report](../../../docs/reports/2026-09-14-personal-development.md) records passing Linux/native, complete personal browser and critical suites, four scoped implementation reviews, verified public TLS, actual installed Git/dependency/test/build/Vite preview work, parent/child isolation, title persistence and same-conversation continuation. Earlier [13 September evidence](../../../docs/reports/2026-09-13-personal-vps-candidate.md) retains its tested baselines.
 - Next action: Complete the mandatory rendered-prototype gate in a permitted environment. All selected native, application, installed development/stop and preview-security acceptance checks have passed, including actual ticket/viewer expiry, logout revocation and mobile preview. The prototype gate remains unavailable under browser security policy; rendered actual application evidence does not silently waive it. Keep this proposal Implemented and active until that required gate passes.
 
 ## Scope and prerequisites
 
-[D011](../decisions/011-personal-vps-workspace.md) owns the explicit change from the managed container/XFS contract for this personal profile. Include owner OIDC login, protected browser/API/SSE, native account onboarding, administrator-approved existing roots, original Local folder writes, durable conversations, model discovery, stop/reconnect and systemd startup. Native account login is a trusted SSH administrator operation with a stopped supervisor; the owner completes the official provider's device flow. The UI reports readiness and explains how to finish login.
+[D011](../../decisions/011-personal-vps-workspace.md) owns the explicit change from the managed container/XFS contract for this personal profile. Include owner OIDC login, protected browser/API/SSE, native account onboarding, administrator-approved existing roots, original Local folder writes, durable conversations, model discovery, stop/reconnect and systemd startup. Native account login is a trusted SSH administrator operation with a stopped supervisor; the owner completes the official provider's device flow. The UI reports readiness and explains how to finish login.
 
 Require the complete pinned native distribution, including code-mode host and package-declared sandbox/shell/PATH resources; copying only the Codex entrypoint is not a valid release. Require Linux/systemd, a dedicated nonroot service user without sudo or Docker authority, pinned Node/Codex/dependencies, PostgreSQL, canonical verified HTTPS and an allowlisted real OIDC issuer/client/subject. A trusted existing reverse proxy may terminate HTTPS and forward to the loopback backend. The current host's Traefik must be preserved. State and immutable application assets live outside editable roots. No folder migration or copying is implicit.
 
-Exclude managed worktree/copy creation, attachments, interactive file editor, standalone terminal UI, schedules, managed previews, PATs, extensions and self-development brokers in this profile. [D012](../decisions/012-personal-vps-development.md) adds the selected personal attached preview and complete conversation-driven development workflow. Codex conversation tools may edit the original project within the configured native permission policy. Unsupported capabilities are denied in the API and accurately represented in the UI. Existing profiles retain their behavior. Full P009 backup/restore/promotion remains separate and unverified; this proposal does not relabel it complete.
+Exclude managed worktree/copy creation, attachments, interactive file editor, standalone terminal UI, schedules, managed previews, PATs, extensions and self-development brokers in this profile. [D012](../../decisions/012-personal-vps-development.md) adds the selected personal attached preview and complete conversation-driven development workflow. Codex conversation tools may edit the original project within the configured native permission policy. Unsupported capabilities are denied in the API and accurately represented in the UI. Existing profiles retain their behavior. Full P009 backup/restore/promotion remains separate and unverified; this proposal does not relabel it complete.
 
 ## Source issues
 
-None transferred. Related [live-account](../../issues/2026-09-07-171225-live-runtime-credentials.md), [history](../../issues/2026-09-13-110315-common-use-live-acceptance.md), and [P009 backup transfer](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md) obligations remain with their existing owners. P015 needs its own explicit owner-authorized account acceptance on disposable files; that cannot close unrelated dedicated-account gates.
+None transferred. Related [live-account](../../../issues/2026-09-07-171225-live-runtime-credentials.md), [history](../../../issues/2026-09-13-110315-common-use-live-acceptance.md), and [P009 backup transfer](../../../issues/2026-09-07-231526-p009-backup-transfer-approval.md) obligations remain with their existing owners. P015 needs its own explicit owner-authorized account acceptance on disposable files; that cannot close unrelated dedicated-account gates.
 
 ## User and API flows
 
@@ -69,7 +92,7 @@ First installation uses an empty private database. Future changes must stop admi
 
 The following checkpoint notes preserve the 13 September state. The current status and additional 14 September reviews are recorded above and in the development report.
 
-Three independent source and harness review rounds completed. Round 1 found environment incompatibility, exact-root registration, resource limits and empty-model configuration; round 2 verified fixes and the exact-binary AppArmor test scope. Candidate native and deterministic application checks passed; actual public installed/account acceptance remains blocked in the [P015 acceptance issue](../../issues/2026-09-13-130622-personal-vps-acceptance.md). Keep this proposal active until every mandatory gate passes.
+Three independent source and harness review rounds completed. Round 1 found environment incompatibility, exact-root registration, resource limits and empty-model configuration; round 2 verified fixes and the exact-binary AppArmor test scope. Candidate native and deterministic application checks passed; actual public installed/account acceptance remains blocked in the [P015 acceptance issue](../../../issues/2026-09-13-130622-personal-vps-acceptance.md). Keep this proposal active until every mandatory gate passes.
 
 ## Later owner clarification
 
@@ -81,25 +104,25 @@ The owner selected preserving SSH access and authorized read/write access for al
 
 ## Closing record
 
-The selected development outcome is implemented and deployed at `13204d7`. Verification remains open for the explicit gates in the current next action and [acceptance issue](../../issues/2026-09-13-130622-personal-vps-acceptance.md). No archive or Verified disposition is claimed.
+The selected development outcome is implemented and deployed at `13204d7`. Verification remains open for the explicit gates in the current next action and [acceptance issue](../../../issues/2026-09-13-130622-personal-vps-acceptance.md). No archive or Verified disposition is claimed.
 
 ## Google owner enrollment prerequisite
 
-[D011's trusted enrollment contract](../decisions/011-personal-vps-workspace.md#trusted-owner-identity-enrollment) covers obtaining the exact owner subject when only the intended Google email is known. This is a deployment prerequisite under P015-01 and P015-05, not a public registration feature. Verify successful identity capture, rejected wrong/unverified email, state/nonce/PKCE/cookie binding, expiry and create-only result behavior using the actual helper with only the external provider replaced. Public TLS and the owner's real Google interaction remain installed acceptance gates.
+[D011's trusted enrollment contract](../../decisions/011-personal-vps-workspace.md#trusted-owner-identity-enrollment) covers obtaining the exact owner subject when only the intended Google email is known. This is a deployment prerequisite under P015-01 and P015-05, not a public registration feature. Verify successful identity capture, rejected wrong/unverified email, state/nonce/PKCE/cookie binding, expiry and create-only result behavior using the actual helper with only the external provider replaced. Public TLS and the owner's real Google interaction remain installed acceptance gates.
 
-The owner's later request to reuse the existing VPS subscription login is covered by [D011's import exception](../decisions/011-personal-vps-workspace.md#owner-requested-existing-subscription-login-import). It does not waive P015-03 real-account verification or allow sharing ordinary runtime state.
+The owner's later request to reuse the existing VPS subscription login is covered by [D011's import exception](../../decisions/011-personal-vps-workspace.md#owner-requested-existing-subscription-login-import). It does not waive P015-03 real-account verification or allow sharing ordinary runtime state.
 
 ## Native package completeness correction
 
-The live owner reported that Codex could not execute tools because `codex-code-mode-host` was missing. Prior packages copied only `bin/codex`; the pinned npm vendor target also owns the sibling helper, package manifest, sandbox/shell resources and PATH utilities. P015 now requires complete-layout packaging and installer rejection of incomplete distributions. Preserve earlier smoke results within their limited scopes; actual installed model-tool read/write acceptance remains a blocker in the [P015 issue](../../issues/2026-09-13-130622-personal-vps-acceptance.md). Do not repair immutable live binaries in place: assemble, review and test a separate complete candidate before promotion.
+The live owner reported that Codex could not execute tools because `codex-code-mode-host` was missing. Prior packages copied only `bin/codex`; the pinned npm vendor target also owns the sibling helper, package manifest, sandbox/shell resources and PATH utilities. P015 now requires complete-layout packaging and installer rejection of incomplete distributions. Preserve earlier smoke results within their limited scopes; actual installed model-tool read/write acceptance remains a blocker in the [P015 issue](../../../issues/2026-09-13-130622-personal-vps-acceptance.md). Do not repair immutable live binaries in place: assemble, review and test a separate complete candidate before promotion.
 
 ## Complete development acceptance
 
-The owner authorized implementation, push on main and VPS deployment on 14 September 2026. Decision remains Accepted; Delivery is Implemented as of the 14 September candidate and installed evidence. [D012](../decisions/012-personal-vps-development.md) owns the expanded contract; these gates extend P015-01–06 without waiving them.
+The owner authorized implementation, push on main and VPS deployment on 14 September 2026. Decision remains Accepted; Delivery is Implemented as of the 14 September candidate and installed evidence. [D012](../../decisions/012-personal-vps-development.md) owns the expanded contract; these gates extend P015-01–06 without waiving them.
 
 - **P015-07 — Development loop:** Through a real Harbor conversation in a disposable original project, execute ordinary Git status/add/commit, read/edit files, install locked dependencies using the packaged pnpm, run tests/build and serve the resulting app on the configured loopback preview port. Verify actual nonroot native execution, network and writable temp/cache behavior; readonly and outside-project writes remain denied. Keep owner projects unchanged during acceptance.
 - **P015-08 — Attached preview:** Open the running development app from Harbor on its separate verified HTTPS origin. Verify viewing session revocation/expiry, ticket replay denial, explicit port admission, credentials/header stripping, HTTP and WebSocket behavior, unreachable-server feedback, and mobile/desktop access. Reject arbitrary targets and control-port collisions. State shared personal-port and process lifecycle limits.
 - **P015-09 — Conversation completeness:** First substantive task receives a durable meaningful title; manual rename wins and existing default conversations gain titles. Sidebar/header/reload agree. Streamed and authoritative final text reconcile without duplication or silent loss, including tool output/failure, disconnect/reopen and continued native work. Permission UI reflects restored effective policy.
 - **P015-10 — Installed candidate:** Build/check, relevant end-to-end and critical regressions, pinned contracts, real Linux developer/native boundaries and independent reviews pass for an identified candidate. Perform private state backup and drained promotion, retain rollback compatibility, and verify the public owner browser development loop after deployment.
 
-The [14 September development report](../../docs/reports/2026-09-14-personal-development.md) records implementation, four scoped review rounds, native developer/browser evidence and the parent/child completion defect. The final routing regression passed. Installed development acceptance is recorded in that report; the actual preview-security and installed stop checks passed. The required rendered-prototype gate remains unavailable.
+The [14 September development report](../../../docs/reports/2026-09-14-personal-development.md) records implementation, four scoped review rounds, native developer/browser evidence and the parent/child completion defect. The final routing regression passed. Installed development acceptance is recorded in that report; the actual preview-security and installed stop checks passed. The required rendered-prototype gate remains unavailable.

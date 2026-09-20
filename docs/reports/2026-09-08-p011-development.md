@@ -1,6 +1,6 @@
 # P011 development checkpoint
 
-Delivery is In progress. This is an incomplete implementation checkpoint, with no independent implementation review yet. The canonical outcome remains [P011](../../design/proposals/011-private-project-previews.md) and [D007](../../design/decisions/007-confined-project-preview-origins.md).
+Delivery is In progress. This is an incomplete implementation checkpoint, with no independent implementation review yet. The canonical outcome remains [P011](../../design/proposals/archive/011-private-project-previews.md) and [D007](../../design/decisions/007-confined-project-preview-origins.md).
 
 The initial real application lane `pnpm test:e2e --previews` passed on Node 24.11.1 in `harbor-previews-1fb5feff56`. Its retained result records matching start/end source digest `4b3239f226171de7999c0da6e03ad6abe2224ec6a1e7f4cfe2f7a5f066374dd2` across 981 files. It exercises the actual UI, API, PostgreSQL, supervisor, relay and separate preview origin, including SSE, explicit opening, cookie boundaries and stopping with reader-lease release. Only external OIDC and Codex protocol boundaries are fixtures. This is not real native Linux isolation evidence. Later UI editing/fencing and OpenAPI changes are outside that tested source.
 
@@ -111,3 +111,7 @@ The cumulative command ledger has SHA256 `674491883648d5573e45714d5848ae4a274668
 Delivery is now Implemented. The [preview retirement race](../../issues/archive/2026-09-13-022008-preview-retirement-race.md) and [two implementation-review findings](../../issues/archive/2026-09-13-024503-p011-implementation-review.md) are Resolved and archived with their histories and closing evidence. Current guides and both indexes reflect those dispositions; historical links now target the same archived records. A separate bounded documentation review corrected a stale scheduling status in the user index. On macOS/Node 24.11.1, `node scripts/check-docs.mjs` passed for 100 documents and `git diff --check` passed with this lifecycle update.
 
 P011 stays in the active proposal folder: protected fresh-host restore and applicable upstream live-account gates remain mandatory and unverified. Prior reports and failed attempts retain their original source/environment scope. This acceptance does not promote an installation or substitute local metadata recovery for protected filesystem restore.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.

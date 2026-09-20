@@ -74,3 +74,7 @@ The pre-existing local AGENTS.md SSH-handoff edit remains owner work. No tempora
 ## Final delivery state
 
 The installed development outcome and all executed application/security gates above passed. P015 remains Implemented and its [acceptance issue](../../issues/2026-09-13-130622-personal-vps-acceptance.md) remains active solely for the mandatory rendered-prototype gate unavailable under browser policy. Actual application desktop/mobile inspection does not silently waive that obligation. Final follow-up changes are tests and documentation only; the installed application remains the tested immutable `13204d7` artifact. Documentation-only independent review and link/whitespace checks reconcile the final record.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.

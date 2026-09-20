@@ -1,5 +1,30 @@
 # P005 — Attachments and rich input
 
+- Record status: Finished
+- Archive disposition: Baseline reconciled
+- Reconciled: 2026-09-20 under [D013](../../decisions/013-evidence-based-delivery-workflow.md)
+- Inspected source: `008227355bd05cb27dc13f4fbb585ef709b474b0`
+- Baseline classification: Implemented PNG/text attachment baseline; real model input remains unverified.
+- Current design: [Subsystem contract](../../systems/002-workspaces-and-resources.md)
+
+## Reconciled baseline
+
+Validated staging, atomic turn association, drafts and runtime publication exist in `apps/api/src/attachments.ts`, `packages/attachments/src/`, `apps/web/src/Attachments.tsx` and migration 008. Feature/integration reports record three feature reviews, cumulative acceptance and separately qualified Linux publication evidence.
+
+[Historical evidence](../../../docs/reports/2026-09-07-p005-integration.md) retains its original commands, artifacts, review rounds and limitations. This documentation migration ran no application, account, isolation, restore or deployment check. Finished describes reconciliation of this legacy record; it does not establish completion of its original plan.
+
+## Unresolved obligation ownership
+
+- **P005-06 real supported image/file input and observable response** → [2026-09-07-171225-live-runtime-credentials.md](../../../issues/2026-09-07-171225-live-runtime-credentials.md).
+- **Delivery and verification: attachment blobs/references/publication in complete P009-04 restore** → [2026-09-07-073831-codex-runtime-compatibility.md](../../../issues/2026-09-07-073831-codex-runtime-compatibility.md).
+- **Unexplained historical attachment draft regression** → [2026-09-08-044009-p005-selection-regression.md](../../../issues/2026-09-08-044009-p005-selection-regression.md).
+
+These issues are in the inbox awaiting owner selection. Future execution requires a new cohesive proposal; this archived ID is historical lineage, not an active work owner. Original acceptance identifiers below remain stable evidence references.
+
+## Historical plan and evidence
+
+The following original plan, states and dated notes are preserved as non-normative history. Later dated evidence may supersede an earlier checkpoint; current requirements live in the subsystem design above. Historical statements about active queues, permissions, available worktrees or pending gates describe their original context and grant no present execution authority.
+
 - Decision: Accepted
 - Delivery: Implemented
 - Dependencies: [P001](001-secure-persistent-conversations.md)
@@ -15,7 +40,7 @@ Provide authenticated staging/upload/read/delete operations and allow the turn A
 
 Store opaque attachment ID, ownership/session binding, staged/attached lifecycle, detected media type, size/hash, safe display name, storage reference, and expiry. Atomically validate attachment availability and associate it with accepted turn intent. A submitted attachment cannot be garbage-collected as an abandoned upload.
 
-Use the [upload and rendering boundary](../architecture.md#execution-and-filesystem-isolation): private bounded storage, generated storage names, type/signature checks, no trusted user MIME/paths, no automatic executable HTML/SVG rendering, and per-upload/count/quota limits. Expose files to the runtime through scoped references or controlled workspace copies only. The browser/API cannot choose a host path or fetch a secret file by impersonating an attachment reference.
+Use the [upload and rendering boundary](../../architecture.md#execution-and-filesystem-isolation): private bounded storage, generated storage names, type/signature checks, no trusted user MIME/paths, no automatic executable HTML/SVG rendering, and per-upload/count/quota limits. Expose files to the runtime through scoped references or controlled workspace copies only. The browser/API cannot choose a host path or fetch a secret file by impersonating an attachment reference.
 
 Discover and capability-test the pinned runtime's accepted input types. A UI fixture showing an image bubble does not prove the real model received an image. Keep ordinary prompts, attachment metadata, and credentials separate; do not echo sensitive upload bytes into operational logs.
 
@@ -32,7 +57,7 @@ Use P001 with synthetic images, text files, malformed/spoofed media, and a delib
 
 ## Delivery and verification
 
-Use planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm test:contract`, `pnpm test:live`, and relevant `pnpm test:isolation`. Follow the [shared evidence/cleanup contract](README.md#shared-verification-contract); no real personal photos or private documents in fixtures. Keep browser clipboard tests deterministic and exercise at least one real paste path in the supported browser.
+Use planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm test:contract`, `pnpm test:live`, and relevant `pnpm test:isolation`. Follow the [shared evidence/cleanup contract](../../workflow.md#implementation-and-verification-gate); no real personal photos or private documents in fixtures. Keep browser clipboard tests deterministic and exercise at least one real paste path in the supported browser.
 
 Add attachment migrations and registration for backup, restore, quota accounting, and retention. Before verified delivery, test the existing deployment integration if P009 is delivered; otherwise make attachment persistence independently testable and define its registry entry for P009. Rollback preserves attached content and denies unsupported new writes rather than exposing storage publicly. Document supported types and limits after implementation.
 
@@ -44,7 +69,7 @@ Uploads are private PostgreSQL blobs, alongside opaque session/project identity,
 
 After dispatch admission, the supervisor resolves only that operation's committed attachment IDs and publishes immutable copies under the managed project quota, at `attachments/<session-id>/<attachment-id>`. A narrow trusted helper checks the root and exact names, creates root-owned directories and read-only files, verifies existing content by digest for replay-safe publication, and fsyncs publication. A committed blob remains authoritative across failed filesystem/DB acknowledgements. Only the selected session directory is mounted read-only at `/attachments`; it is absent from writable sandbox roots. Retrying publication cannot resend a turn. Native input uses the pinned `localImage` form for PNG and a text item naming the fixed path for plain-text files. Physical copies remain with referenced native conversation history; staged GC never touches them. With P003, the supervisor resolves the registered project identity separately from the selected checkout through the session/workspace/project database binding. The quota helper checks that project canonical path and inode under its storage lock; the launcher checks the same project identity and verifies that the selected Local or derived checkout belongs to it before mounting the session attachments. P003 remains an optional delivered integration, not a dependency for the independent P005 outcome.
 
-Model modalities are taken from pinned runtime discovery; missing image modality fails closed for image dispatch. The browser shows the same capability decision and preserves attached reference identities in history. These are protocol support decisions, not evidence of a real image-aware response. The [official app-server documentation](https://learn.chatgpt.com/docs/app-server) documents `text`, `image` and `localImage` input and model discovery; pinned 0.153.4 generated schemas remain the exact transport contract. Dedicated live-account evidence remains blocked by the [existing live-test credential issue](../../issues/2026-09-07-171225-live-runtime-credentials.md).
+Model modalities are taken from pinned runtime discovery; missing image modality fails closed for image dispatch. The browser shows the same capability decision and preserves attached reference identities in history. These are protocol support decisions, not evidence of a real image-aware response. The [official app-server documentation](https://learn.chatgpt.com/docs/app-server) documents `text`, `image` and `localImage` input and model discovery; pinned 0.153.4 generated schemas remain the exact transport contract. Dedicated live-account evidence remains blocked by the [existing live-test credential issue](../../../issues/2026-09-07-171225-live-runtime-credentials.md).
 
 Draft text and selected attachment IDs are stored in a bounded owner/session database draft with revision CAS and a 24-hour expiry, never in browser persistent storage. Credentials belong exclusively in the existing credential setup UI. Submission clears only the exact accepted draft revision; another tab's newer draft is not silently erased. Failed or ambiguous turn submission preserves its exact intent and draft. Upload UI reports progress, permits abort, and requires reselecting an incomplete file after reload before retrying its immutable size/hash identity. Previews render only validated PNG or escaped text; every download has attachment disposition, nosniff, no-store and owner authorization. New attachment/draft routes are browser-owner-only unless an explicit future PAT descriptor grants them.
 
@@ -52,10 +77,10 @@ The P009 backup registry entry is the attachment/draft metadata and blobs in Pos
 
 ## Current delivery checkpoint
 
-The [7 September implementation report](../../docs/reports/2026-09-07-p005-attachments.md) records final UI/application source `3bc9345e363d6d614da725da402492f51c06d68a21fba9c83a5a111db37f85c5`, matching-source real-stack acceptance and the unchanged Linux boundary checkpoint, three completed independent review rounds, and the separate blocked P005-06 live-account gate. The subsequent [workspace/history integration report](../../docs/reports/2026-09-07-p005-integration.md) records the cumulative authority, workspace publication and recovery acceptance checkpoint separately. Current behavior is documented in the [user guide](../../docs/user/attachments.md) and [developer guide](../../docs/developer/attachments.md). P005 remains active and is not Verified or archived.
+The [7 September implementation report](../../../docs/reports/2026-09-07-p005-attachments.md) records final UI/application source `3bc9345e363d6d614da725da402492f51c06d68a21fba9c83a5a111db37f85c5`, matching-source real-stack acceptance and the unchanged Linux boundary checkpoint, three completed independent review rounds, and the separate blocked P005-06 live-account gate. The subsequent [workspace/history integration report](../../../docs/reports/2026-09-07-p005-integration.md) records the cumulative authority, workspace publication and recovery acceptance checkpoint separately. Current behavior is documented in the [user guide](../../../docs/user/attachments.md) and [developer guide](../../../docs/developer/attachments.md). P005 remains active and is not Verified or archived.
 
 ## Source issues
 
-- [Draft sequence regression](../../issues/2026-09-08-044009-p005-selection-regression.md): Medium, In progress. Separate cumulative attempts failed at readiness, selection or draft-save waits before reload. A later full diagnostic critical run passed; earlier causes remain unestablished and are not attributed to the previously resolved 429 finding.
-- [P005 implementation review](../../issues/archive/2026-09-07-213300-p005-implementation-review.md): Resolved Medium draft expiry, preflight pause, malformed PNG and stale completion findings; owned by P005-02/P005-04/P005-05. Three feature review rounds and the report above retain their validation; the separate cumulative integration report retains its review and acceptance evidence.
-- [Upload-recovery visibility timeout](../../issues/archive/2026-09-07-224419-p005-reload-visibility.md): Low, Resolved and archived on 2026-09-08. A new captured reproduction identified test-request pressure; bounded phase pacing and diagnostics passed the full Node 24 regression on source `69193104…c01644` and one independent review. Earlier uncaptured failures remain unattributed. No production behavior changed and the live-account gate remains separate.
+- [Draft sequence regression](../../../issues/2026-09-08-044009-p005-selection-regression.md): Medium, In progress. Separate cumulative attempts failed at readiness, selection or draft-save waits before reload. A later full diagnostic critical run passed; earlier causes remain unestablished and are not attributed to the previously resolved 429 finding.
+- [P005 implementation review](../../../issues/archive/2026-09-07-213300-p005-implementation-review.md): Resolved Medium draft expiry, preflight pause, malformed PNG and stale completion findings; owned by P005-02/P005-04/P005-05. Three feature review rounds and the report above retain their validation; the separate cumulative integration report retains its review and acceptance evidence.
+- [Upload-recovery visibility timeout](../../../issues/archive/2026-09-07-224419-p005-reload-visibility.md): Low, Resolved and archived on 2026-09-08. A new captured reproduction identified test-request pressure; bounded phase pacing and diagnostics passed the full Node 24 regression on source `69193104…c01644` and one independent review. Earlier uncaptured failures remain unattributed. No production behavior changed and the live-account gate remains separate.

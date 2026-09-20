@@ -1,9 +1,19 @@
 # Dedicated credentials are unavailable for live Codex acceptance
 
+- Severity: High; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: High
 - Status: Blocked
+- Owner: [P001](../design/proposals/archive/001-secure-persistent-conversations.md#source-issues); later proposals inherit this prerequisite only for their required real-account tests
+
 - Recorded: 2026-09-07 17:12:25 Asia/Shanghai
-- Owner: [P001](../design/proposals/001-secure-persistent-conversations.md#source-issues); later proposals inherit this prerequisite only for their required real-account tests
 - Category: Verification environment prerequisite
 - Affected: P001-08 and subsequent acceptance criteria requiring authenticated real Codex turns; `tests/live/run.ts`
 
@@ -24,3 +34,7 @@ Later on 2026-09-13, the bounded P007 driver was implemented, integrated and ind
 The required real-account smoke cannot currently run. This blocks P001 verification and any later proposal's live acceptance gate that remains dependent on the missing credentials. It does not block implementing those paths, deterministic application acceptance, non-model runtime contracts, or Linux isolation tests.
 
 The live runner must accept explicitly configured dedicated test credentials, create fresh run-specific state/workspaces, bound model usage, and redact secrets. Once the credential prerequisite is available, run each required live scenario and record the version, source/artifact identity, command, environment, result, and meaningful limitations. No passing fixture or unavailable-test exit may be counted as live acceptance. Keep this record active until actual live evidence closes the affected gates.
+
+## Retained acceptance ownership — 20 September 2026
+
+Remaining dedicated-account scenarios are P001-08 (conversation/approval/cancel), P003-06 (parallel turns), P005-06 (image/file input), P007-07 (native history/restart/resume), P008-07 (unattended occurrence), P009-01/07 (deployed conversation/account), deferred P010-07 (real coding conversation), and deferred P012-06 (skill and model-directed MCP with effect/input evidence). P002 retains only its applicable inherited runtime boundary; no distinct missing token scenario is invented. Credential availability alone does not prove that every driver exists or passes. Personal P013/P015 owner trials do not close these dedicated managed-profile lanes.

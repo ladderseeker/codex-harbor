@@ -1,8 +1,18 @@
 # Diagnose intermittent approved-gateway availability in Linux verification
 
+- Severity: Medium; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: Medium
 - Status: Open
-- Owner: [P001](../design/proposals/001-secure-persistent-conversations.md#delivery-and-verification); [P009](../design/proposals/009-portable-deployment-and-restore.md) carries target-host verification
+- Owner: [P001](../design/proposals/archive/001-secure-persistent-conversations.md#delivery-and-verification); [P009](../design/proposals/archive/009-portable-deployment-and-restore.md) carries target-host verification
+
 - Recorded: 2026-09-07
 - Affected: infra/egress/; tests/isolation/probes.ts; disposable Linux VM outbound network
 

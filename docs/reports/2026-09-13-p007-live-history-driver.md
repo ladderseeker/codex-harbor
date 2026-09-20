@@ -29,3 +29,7 @@ Main's first collector invoked the local Mach-O pnpm executable through a shell 
 ## Remaining gate
 
 The [common-use live acceptance issue](../../issues/2026-09-13-110315-common-use-live-acceptance.md) remains Blocked for actual execution with the [dedicated credential prerequisite](../../issues/2026-09-07-171225-live-runtime-credentials.md). Use the [developer workflow](../developer/development.md#command-availability) and existing authorization when the prerequisites are available. Preserve the lane's owned cleanup and exact source evidence. P007 is still Implemented, not Verified; this report does not finish a proposal, establish deployment continuity or satisfy protected restore/promotion.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.

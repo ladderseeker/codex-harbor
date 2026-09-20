@@ -6,7 +6,7 @@
 - Archived: 2026-09-13
 - Owner: P011 implementer; independent lifecycle reviewer
 - Affected files: `infra/previews/launcher.ts`, `tests/previews/retirement-linux.ts`
-- Acceptance: [P011-01/05](../../design/proposals/011-private-project-previews.md#independent-acceptance)
+- Acceptance: [P011-01/05](../../design/proposals/archive/011-private-project-previews.md#independent-acceptance)
 
 ## Observed defect — 8 September 2026
 
@@ -27,3 +27,7 @@ Main accepted the corrected implementation in `0822992`, with the final Linux ev
 The cumulative `pnpm check`, `pnpm build`, `pnpm test`, `pnpm test:contract`, preview domain/migration and deployment contract checks passed on Node 24.11.1 and pnpm 12.3.4, with isolated pinned Codex 0.153.4. Critical application run `46bafa3212` and actual Linux `HARBOR_PREVIEW_REVIEW_ONLY=1 node --import tsx tests/previews/e2e.ts` run `c591ca08c4` passed at identical start/end source `991fb86c4a2cefe8908c57df9e69435ae15ae07144c1be184fc1d1fc0b5517c4` /1,036 files. The latter used fresh XFS/native-runner/relay resources and confirmed exact cleanup. The original targeted disappearance canary remains the causal evidence for this correction; the final lifecycle run establishes integrated retirement behavior.
 
 Commands, result hashes, environment and evidence ownership are linked from the [main acceptance report](../../docs/reports/2026-09-08-p011-development.md#main-acceptance--13-september-2026). Documentation links and whitespace are checked with this archive move. This closes the scoped race and main integration; protected restore and upstream live gates remain proposal obligations, and the historical unidentified lifetime failure has not been assigned a retrospective cause.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

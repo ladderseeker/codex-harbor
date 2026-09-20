@@ -1,6 +1,10 @@
 # Scheduled work
 
-P008 is Implemented, not Verified. Two feature review rounds and bounded module integration review have closed. Targeted DST end-to-end acceptance has passed; dedicated live-account and protected full restore/promotion evidence remain pending. The [proposal](../../design/proposals/008-scheduled-tasks.md) owns the full contract and delivery gates.
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
+Scheduled execution is implemented, with mandatory live-account and protected restore evidence still open. Two feature review rounds and bounded module integration review have closed. Targeted DST end-to-end acceptance has passed; dedicated live-account and protected full restore/promotion evidence remain pending. The [current subsystem design](../../design/systems/003-scheduled-execution.md) owns the full contract and delivery gates.
 
 Open **Schedules** below **New chat** in the sidebar in a managed installation, choose a project, and create a schedule. Enter the prompt, model, effort and permission profile, then preview the next occurrences before activating it. The preview shows the requested local minute, timezone, UTC offset and actual UTC instant.
 

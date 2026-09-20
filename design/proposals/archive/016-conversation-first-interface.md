@@ -1,5 +1,9 @@
 # P016 — A conversation-first Harbor interface
 
+## Current design reference — 20 September 2026
+
+The [interface design](../../systems/006-interface.md) now owns current requirements. This archived plan and its Verified/Completed evidence remain historical. The baseline reconciliation did not rerun its application gates or close broader [inbox obligations](../../../issues).
+
 ## Status and outcome
 
 - Proposal ID: P016

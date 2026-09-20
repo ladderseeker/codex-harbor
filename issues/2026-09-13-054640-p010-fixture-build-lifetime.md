@@ -1,10 +1,22 @@
 # Confined development fixture ends before an accepted build
 
+- Severity: Medium; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: Medium
 - Status: In progress
 - Owner: P010 implementer; separate fixture-boundary reviewer verifies the correction
+
+Complete deferred outcome and acceptance are tracked in [2026-09-20-000003-self-development-acceptance.md](2026-09-20-000003-self-development-acceptance.md); this record retains its individual finding and correction evidence.
+
 - Affected files: `tests/fixtures/codex/server.mjs`, confined fixture process handling and its tests; the existing contract is in `infra/self/gateway/pnpm.mjs`
-- Acceptance: [P010-01/02/03/05](../design/proposals/010-self-development.md#independent-acceptance), under [D008's confined external fixture refinement](../design/decisions/008-isolated-self-development-workers.md)
+- Acceptance: [P010-01/02/03/05](../design/proposals/archive/010-self-development.md#independent-acceptance), under [D008's confined external fixture refinement](../design/decisions/008-isolated-self-development-workers.md)
 
 ## Source finding — 13 September 2026
 

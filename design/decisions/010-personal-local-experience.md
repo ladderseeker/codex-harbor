@@ -1,7 +1,11 @@
 # D010 — Personal local Codex experience
 
+## Current ownership — 20 September 2026
+
+The [current subsystem designs](../systems/) apply this decision alongside architecture; [D013](013-evidence-based-delivery-workflow.md) and the [workflow](../workflow.md) now govern execution and record lifecycle. Proposal references below identify historical plans, not active work owners. Unfinished evidence remains in the [issue inbox](../../issues/), and future work receives a newly selected proposal. The dated decision rationale and technical constraints below are preserved.
+
 - Decision: Accepted, 2026-09-13, for the owner's request to start Harbor locally, sign in to their Codex account, and try a real conversation.
-- Scope: [P013](../proposals/013-personal-local-experience.md). Technical details remain subject to implementation and independent review.
+- Scope: [P013](../proposals/archive/013-personal-local-experience.md). Technical details remain subject to implementation and independent review.
 - Amends: [architecture](../architecture.md#local-first-development-and-portable-environments), [D004](004-protected-runtime-credentials.md), and the selected delivery priority in [D009](009-common-use-release.md), only for the explicit personal local profile. Existing Linux deployment and acceptance obligations remain unchanged.
 
 ## Context and options
@@ -26,4 +30,4 @@ Local native contracts, real Harbor acceptance, and one user-authenticated conve
 
 ## 2026-09-13 personal VPS addendum
 
-The owner subsequently selected [P015](../proposals/015-personal-vps-workspace.md). [D011](011-personal-vps-workspace.md) authorizes a separately configured personal VPS profile with authenticated HTTPS, subscription login and approved existing folders. It supersedes the native-only-local restriction only for that explicit profile; P013 remains loopback-only, managed isolation requirements and outstanding proposal gates remain unchanged.
+The owner subsequently selected [P015](../proposals/archive/015-personal-vps-workspace.md). [D011](011-personal-vps-workspace.md) authorizes a separately configured personal VPS profile with authenticated HTTPS, subscription login and approved existing folders. It supersedes the native-only-local restriction only for that explicit profile; P013 remains loopback-only, managed isolation requirements and outstanding proposal gates remain unchanged.

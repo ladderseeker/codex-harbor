@@ -6,7 +6,7 @@
 - Archived: 2026-09-08
 - Owner: P009; P004/P006 installed-module integration implementer
 - Affected files: `infra/deploy/package.py`, installed `apps/web/dist/`, deployment package and browser acceptance tests
-- Acceptance: [P009-01](../../design/proposals/009-portable-deployment-and-restore.md#independent-acceptance), with the [file/terminal integration](../../docs/reports/2026-09-08-p004-p006-integration.md)
+- Acceptance: [P009-01](../../design/proposals/archive/009-portable-deployment-and-restore.md#independent-acceptance), with the [file/terminal integration](../../docs/reports/2026-09-08-p004-p006-integration.md)
 
 ## Evidence — 8 September 2026
 
@@ -29,3 +29,7 @@ The reviewed packager copies the actual built `apps/web/dist/` bytes into its ha
 Actual installed ordinary browser run `61563bc3-aca4-450e-8d54-a9bfb5bc3567` passed without response manipulation; separate fault run `cff10b97-b885-4321-bf15-84d7ac75996d` passed a deliberately lost save response and visible exact-request reconciliation. Both loaded authenticated Monaco/xterm, saved exact file bytes through the unprivileged API, exercised the real pinned PTY and preserved the document CSP. Harbor ran on Ubuntu 24.04 arm64/Linux 6.8 with Docker 29.1.3, managed XFS and Node 24.11.1; a fresh macOS Chromium1194 client reached only the exact forwarded test origins. The independent reviewer inspected both result sets and the test-only driver delta `a0a579868be8c0136253e512856bd06497aa90692bfbc2e01913ba9196eb10a8` /961. Main inspected saved-editor and native-terminal screenshots. Owned browser/forward resources were then closed.
 
 These successful cases explicitly reused the owned installation after fixture preconditions were restored. Earlier co-located browser attempts failed with `ERR_NETWORK_CHANGED`, and later fixture-state/quota/precondition failures remain recorded. Neither an unexplained transport cause nor a successful first-attempt fresh fixture is claimed. Exact-source check/build and host critical/workspace/terminal suites, actual Linux workspace checks and complete managed file acceptance are recorded in the [module report](../../docs/reports/2026-09-08-installed-module-integration.md). Two module source/correction rounds and final bounded evidence review closed this defect. Protected off-host restore, live-account acceptance and complete P009 verification remain separate gates.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

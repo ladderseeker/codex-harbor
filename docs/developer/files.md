@@ -1,6 +1,10 @@
 # File and Git tools
 
-Harbor provides authenticated file views, a Monaco editor, downloads and reviewed Git actions. Its canonical limits and acceptance obligations are in [P004](../../design/proposals/004-files-and-change-review.md). The [feature evidence report](../reports/2026-09-08-p004-files.md) records its application/Linux checks and two completed implementation review rounds. Subsequent installed evidence and remaining verification gates are recorded in the [module report](../reports/2026-09-08-installed-module-integration.md).
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
+Harbor provides authenticated file views, a Monaco editor, downloads and reviewed Git actions. Its canonical limits and acceptance obligations are in [P004](../../design/systems/002-workspaces-and-resources.md). The [feature evidence report](../reports/2026-09-08-p004-files.md) records its application/Linux checks and two completed implementation review rounds. Subsequent installed evidence and remaining verification gates are recorded in the [module report](../reports/2026-09-08-installed-module-integration.md).
 
 Use the selected workspace's **Files and changes** button. Text drafts stay in the open browser tab. A save changes the file only; stage and commit are separate actions. A stale save leaves the draft intact. **Refresh revision, keep draft** loads the current revision without replacing draft text, after which Save is a new deliberate operation. Closing an unsaved draft requires an explicit choice; browser reload does not recover unsaved browser memory.
 

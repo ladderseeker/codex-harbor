@@ -1,5 +1,29 @@
 # P002 — Programmatic API access
 
+- Record status: Finished
+- Archive disposition: Baseline reconciled
+- Reconciled: 2026-09-20 under [D013](../../decisions/013-evidence-based-delivery-workflow.md)
+- Inspected source: `008227355bd05cb27dc13f4fbb585ef709b474b0`
+- Baseline classification: Implemented scoped-token baseline; inherited runtime evidence remains qualified.
+- Current design: [Subsystem contract](../../systems/001-conversations-and-access.md)
+
+## Reconciled baseline
+
+Token creation/revocation, project/scope ceilings, current authority and OpenAPI are present in `apps/api/src/tokens.ts`, `token-access.ts`, `packages/policy/src/authority.ts` and migration 005. Original token acceptance and the later lock-wait authority correction have historical application and independent-review evidence; no separate unfixed token outcome was identified by this reconciliation.
+
+[Historical evidence](../../../docs/reports/2026-09-07-p002-api-tokens.md) retains its original commands, artifacts, review rounds and limitations. This documentation migration ran no application, account, isolation, restore or deployment check. Finished describes reconciliation of this legacy record; it does not establish completion of its original plan.
+
+## Unresolved obligation ownership
+
+- **Applicable inherited P001 runtime/live gate; P002-01–06 and authority corrections retain their recorded passes** → [2026-09-07-171225-live-runtime-credentials.md](../../../issues/2026-09-07-171225-live-runtime-credentials.md).
+- **Deployed capability and upgrade limits inherited by token-supported workflows** → [2026-09-07-073831-codex-runtime-compatibility.md](../../../issues/2026-09-07-073831-codex-runtime-compatibility.md).
+
+These issues are in the inbox awaiting owner selection. Future execution requires a new cohesive proposal; this archived ID is historical lineage, not an active work owner. Original acceptance identifiers below remain stable evidence references.
+
+## Historical plan and evidence
+
+The following original plan, states and dated notes are preserved as non-normative history. Later dated evidence may supersede an earlier checkpoint; current requirements live in the subsystem design above. Historical statements about active queues, permissions, available worktrees or pending gates describe their original context and grant no present execution authority.
+
 - Decision: Accepted
 - Delivery: Implemented
 - Dependencies: [P001](001-secure-persistent-conversations.md)
@@ -15,7 +39,7 @@ Publish an OpenAPI contract and streaming-event schema for the capabilities actu
 
 Store token identifier/prefix, verifier hash, owner binding, explicit capabilities, allowed project IDs, expiry, revocation, and audit metadata. Never persist or log raw tokens. The authority of a request is the intersection of token grants, resource ownership, and current server policy. Execution/approval scopes include a maximum execution profile; a token cannot gain a stronger profile indirectly through a prompt, configuration change, or approval answer.
 
-Use the [shared operation/idempotency rules](../architecture.md#api-events-and-state-transitions). A revoked token cannot start queued work or retain a stream. Already-running work follows its recorded execution grant; revocation is distinct from emergency stop. Token management itself requires owner-browser authority with appropriate CSRF/session checks. No token is accepted from query strings or browser local storage.
+Use the [shared operation/idempotency rules](../../architecture.md#api-events-and-state-transitions). A revoked token cannot start queued work or retain a stream. Already-running work follows its recorded execution grant; revocation is distinct from emergency stop. Token management itself requires owner-browser authority with appropriate CSRF/session checks. No token is accepted from query strings or browser local storage.
 
 ## Independent acceptance
 
@@ -30,7 +54,7 @@ Seed P001 in a fresh instance with its allowed project and a synthetic resource 
 
 ## Delivery and verification
 
-Run the P002 browser/API cases through actual Harbor services using P001 external fixtures. Use planned `pnpm check`, `pnpm test`, and `pnpm test:e2e`; run real contract/live lanes if the adapter or account interaction changes. Follow the [shared evidence and cleanup contract](README.md#shared-verification-contract). No future workspace UI or scheduler is required to test tokens.
+Run the P002 browser/API cases through actual Harbor services using P001 external fixtures. Use planned `pnpm check`, `pnpm test`, and `pnpm test:e2e`; run real contract/live lanes if the adapter or account interaction changes. Follow the [shared evidence and cleanup contract](../../workflow.md#implementation-and-verification-gate). No future workspace UI or scheduler is required to test tokens.
 
 Add token tables/indexes with an additive migration; revocation must work across service restarts. Document token use and API versioning under `docs/` only after implementation. Rollback disables token authentication and preserves revocation records without falling back to unauthenticated access. Link actual acceptance and independent-review evidence before `Verified`.
 
@@ -50,11 +74,11 @@ On 7 September 2026, `pnpm check`, `pnpm build`, nine integration tests, 13 adap
 
 Independent review round 1 identified pre-send control revocation handling, conditional OpenAPI headers, and editable UI rejection handling. Those fixes passed focused contracts and the complete stable regression, including paused approval/cancel send guards. Round 2 independently checked the fixes and matching source/evidence and closed with no remaining actionable findings. Integration on Node 24.11.1 also passed check/build, nine integration tests, 13 contracts, and the full P002/P001 E2E run `harbor-e2e-f45757ee74`, with matching source digest at start and end. `pnpm test:live` returned exit 2 because dedicated credentials are unavailable; no model request was made. P002 remains unverified pending applicable upstream and live-account gates.
 
-Available behavior is documented in the [token settings guide](../../docs/user/api-tokens.md) and [programmatic API guide](../../docs/developer/programmatic-api.md). The [implementation report](../../docs/reports/2026-09-07-p002-api-tokens.md) records the source identity, review closure, integration baseline, and remaining gates.
+Available behavior is documented in the [token settings guide](../../../docs/user/api-tokens.md) and [programmatic API guide](../../../docs/developer/programmatic-api.md). The [implementation report](../../../docs/reports/2026-09-07-p002-api-tokens.md) records the source identity, review closure, integration baseline, and remaining gates.
 
 ## Subsequent authority finding
 
-On 7 September 2026, a separate real PostgreSQL probe found [expiry accepted after an authority row-lock wait](../../issues/archive/2026-09-07-202308-authority-expiry-after-lock-wait.md), High severity. P002 owns the shared policy correction and P002-03/05 regression evidence; P007 also owns its recovery integration. The earlier review/test results remain historical evidence, and this newly discovered blocker must be resolved before verification.
+On 7 September 2026, a separate real PostgreSQL probe found [expiry accepted after an authority row-lock wait](../../../issues/archive/2026-09-07-202308-authority-expiry-after-lock-wait.md), High severity. P002 owns the shared policy correction and P002-03/05 regression evidence; P007 also owns its recovery integration. The earlier review/test results remain historical evidence, and this newly discovered blocker must be resolved before verification.
 ### Locked authority expiry correction — 7 September 2026
 
 A real PostgreSQL row-lock probe showed that a volatile clock predicate can still be evaluated before `FOR SHARE` waits. Authority now acquires the owner-identity gate, locks the actor row by identity, and evaluates expiry, idle timeout, revocation and pin binding in a separate statement after acquiring that lock. Pool callers use one owned transaction; browser activity updates only after this fresh check. The final runtime send guard repeats authorization after session/generation waits. Proven pre-wire denial continues to reject only the pending control, preserving an already-authorized running turn. The owner rotation gate is shared by readers and exclusive during pin changes, and is acquired before meta/actor locks.
@@ -65,8 +89,8 @@ The last authority decision for P001 project registration occurs after its admis
 
 Corrective checkpoint: Node 26.7.0 / pnpm 12.3.4 on macOS arm64, pinned Codex 0.153.4 and Chromium 1194. `pnpm check`, `pnpm build`, nine integration tests, thirteen contracts, and the complete real P001/P002 E2E passed. Run `harbor-e2e-cc7b466f60` recorded matching start/end source digest `9b01ead96025c7b47664911b76ed08496f245fa8b03d3640a6e52d6fa4e6672a` (808 files). Independent focused review closed the three authority call-site corrections with no remaining actionable critical finding in that scope. This checkpoint preserves the separate live-account gate and does not establish P007 or P003 integration behavior.
 
-Main integration on Node 24.11.1 also passed check/build, nine integration tests, thirteen contracts and the complete E2E `harbor-e2e-402f47b9ab` at that same digest. The original expired-token reproduction now rejects after the blocked row is released. The [report addendum](../../docs/reports/2026-09-07-p002-api-tokens.md#authority-correction-and-integration--7-september-2026) records the third review round and evidence; the shared source issue remains active for P003/P007 integration.
+Main integration on Node 24.11.1 also passed check/build, nine integration tests, thirteen contracts and the complete E2E `harbor-e2e-402f47b9ab` at that same digest. The original expired-token reproduction now rejects after the blocked row is released. The [report addendum](../../../docs/reports/2026-09-07-p002-api-tokens.md#authority-correction-and-integration--7-september-2026) records the third review round and evidence; the shared source issue remains active for P003/P007 integration.
 
 ### Combined authority closure — 7 September 2026
 
-The shared authority finding is now Resolved after separate P003/P007 integration review and passing combined Node 24 acceptance. See the [history integration report](../../docs/reports/2026-09-07-p007-history-integration.md) for the tested source and E2E/contract results. Earlier pending-integration statements describe their historical checkpoints; the dedicated live-account and applicable upstream gates remain open.
+The shared authority finding is now Resolved after separate P003/P007 integration review and passing combined Node 24 acceptance. See the [history integration report](../../../docs/reports/2026-09-07-p007-history-integration.md) for the tested source and E2E/contract results. Earlier pending-integration statements describe their historical checkpoints; the dedicated live-account and applicable upstream gates remain open.

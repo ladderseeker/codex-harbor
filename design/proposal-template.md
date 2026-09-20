@@ -1,81 +1,79 @@
-# Feature proposal template
+# Change proposal template
 
-Copy this structure to `design/proposals/<number>-<stable-feature-name>.md` and replace every placeholder. First check the [active index](proposals/README.md) and [archive index](proposals/archive/README.md) for existing work and allocated IDs. Follow the [canonical lifecycle rules](../AGENTS.md#document-ownership-and-lifecycle). Scale explanation to the feature, but keep every required decision or mark it explicitly not applicable with a reason.
+Copy to `design/proposals/<number>-<stable-name>.md` and replace every placeholder. Search the [proposal directory](proposals/README.md), [archive](proposals/archive/README.md) and [issue inbox](../issues/README.md) first. Follow the [canonical workflow](workflow.md); this template supplies the plan structure, not a second lifecycle definition. Scale detail to the outcome and explain any non-applicable section.
 
-## Status and outcome
+## Metadata
 
-- Proposal ID: `<identifier>`
-- Decision: `Draft` initially; allowed states are `Draft`, `Accepted`, `Superseded`.
-- Delivery: `Planned` initially; allowed states are `Planned`, `In progress`, `Implemented`, `Verified`. Never infer delivery from decision status.
-- User outcome: `<one complete capability observable through Harbor>`
-- Evidence/status updated: `<date and relevant implementation/review references>`
-- Next action: `<concrete remaining work or dependency gate>`
+- ID: `<stable P-number, never reused>`
+- Status: `Draft` initially; use the workflow's `Draft → Accepted → Implemented` states.
+- Created: `<date>`
+- Owner: `<main conversation / accountable owner>`
+- Outcome: `<one cohesive observable result>`
+- Authorization: `<existing owner direction and its limits>`
+- Dependencies: `<required capability/evidence, source, satisfied or missing, and whether it blocks execution or completion; None if none>`
+- Source issues: `<linked issue IDs; None if none>`
+- Design references: `<current architecture/subsystem/decision/UI sections>`
+- Exact file fence: `<link to the exact permitted paths below>`
+- Acceptance IDs: `<stable IDs defined below>`
 
-Describe the concrete trigger and visible result. State current behavior and the intended change. Link relevant architecture sections. Do not imply that the user has individually approved every technical detail.
+## Problem, outcome and exclusions
 
-## Scope and prerequisites
+Describe the trigger, existing behavior and intended observable result. Select a complete outcome, including relevant UI/API/state/permissions/lifecycle/failure behavior together. Size and technical layers are not splitting rules. Exclude unrelated outcomes explicitly. A proposal may change several subsystems but must remain logically closed after its declared dependencies.
 
-List included behavior, meaningful exclusions, and earlier accepted capabilities this proposal requires. Split by a complete outcome rather than frontend/backend layers or estimated size.
+## Dependencies and current design
 
-Explain how a fresh isolated environment installs or seeds those earlier prerequisites. No future proposal may be necessary to exercise or verify this feature. A dependency on an earlier capability does not waive independent acceptance of the feature's own behavior.
+For each metadata dependency, identify the delivered capability or required evidence, source revision/limits and reproducible setup in a fresh environment. Explain any gate that remains missing and the exact dependent work it blocks. Do not rely on cycles or a future proposal to make this outcome exercisable.
+
+Name the current canonical requirement and the proposed change. Settle product, architecture, security and acceptance decisions before execution; link a focused decision record for a major reversal. Do not copy whole current designs into the plan or turn historical archived plans into binding authority.
 
 ## Source issues
 
-List linked source issues or state `None`. For each transferred issue, map every obligation owned here to named acceptance IDs or sections, retaining severity, remaining risk, the gate it blocks, and pending or completed evidence. Link other owning proposals for shared transfers. Apply the [issue transfer rules](../AGENTS.md#issue-resolution-and-transfer) when changing ownership or completing this proposal.
+Map every obligation taken from each linked issue to a named acceptance ID or section. Retain severity, risk, blocked gate and evidence status. State any obligation left with another owner; a partial transfer stays in the inbox. Follow the [transfer rules](workflow.md#issue-resolution-and-transfer).
 
 ## User and API flows
 
-Give the successful browser flow, corresponding public API flow, loading/waiting states, cancellation behavior, and relevant errors. Identify authentication and authorization checks. If a browser or API flow is not applicable, explain why.
+Describe the successful browser and public API paths, authentication/authorization, loading/waiting states, cancellation, errors and unsupported/uncertain outcomes. Mark a missing UI or API surface not applicable with a reason. State how the owner recognizes durable success rather than mere request acceptance.
 
-Describe how the owner can tell success from queued, interrupted, failed, unsupported, or uncertain outcomes. Do not expose internal details in product UI unless they help a decision.
+## Contracts, state and security
 
-## Contracts, data, and ownership
+Specify changes to endpoints/events, durable records and owners, revisions/idempotency, concurrency, retries, disconnect/recovery, retention and migration compatibility. Identify external Codex capabilities, pinned-version evidence and fail-closed behavior. Cite primary sources for new consequential external claims.
 
-Specify endpoint/event schema changes, domain records, state transitions, revisions, idempotency, and the component responsible for durable state. Explain concurrency, retries, disconnects, recovery, and retention. Include migration and backward-compatibility implications.
+Describe affected permission ceilings, mounts/paths, secrets, untrusted rendering, network exposure and quotas, with observable denial assertions. Apply the same policy to UI and API. Candidate/build work must keep trusted fixed authority, disposable resources and stable-instance recovery separate from untrusted project execution.
 
-State the Codex capability or other external boundary used, the pinned/version-discovery requirement, and the fallback or fail-closed behavior when unsupported. Use direct first-party citations for consequential external claims.
+## Implementation brief
 
-## Security and resource limits
+Describe the settled component changes and sequence, named designs to read first, per-worker ownership if needed, baseline/diff ownership, acceptance commands and private evidence/resources. Supply a [self-contained execution brief](workflow.md#mains-execution-brief) to the fresh-context implementer; do not rely on inherited conversation history. Mechanical choices within the contract are delegated; new design decisions and fence changes return to main.
 
-Describe applicable identity, permission ceilings, mounts/paths, secret handling, untrusted rendering, network exposure, and quota controls. Apply the same policy to UI and API. Define relevant denial tests rather than using a generic claim that the feature is secure.
+## Exact file fence
 
-For agent-driven build/test or self-development features, explain candidate isolation, fixed trusted broker authority, stable-instance resource reservation, and recovery without handing project code blanket launcher privileges.
+List every permitted added/edited/deleted tracked path, including both sides of moves. No directory glob expands this fence. Name private run-owned scratch/evidence locations separately. Main must amend this plan before dependent edits outside the fence.
 
-## Implementation approach
+- `<repository-relative exact path>`
 
-Describe component changes, operational dependencies, and a sequence that yields an independently usable feature. Identify risks needing a small capability spike. Keep implementation commands aligned with the shared architecture/developer command contract. Label unimplemented commands as planned.
+## Verification and acceptance
 
-## Verification and acceptance criteria
+Assign stable IDs such as `P018-01` to reproducible setup, actions and observable assertions. Map each to tests/evidence as implemented. Cover the complete outcome's relevant success, denial, retry, idempotency, reconnect/recovery, concurrency, quotas and failure behavior. Include durable results through the actual browser/API/persistence/supervisor where applicable.
 
-Specify reproducible setup, fixture data, actions, and observable assertions. Include:
+Name the [applicable gate](workflow.md#implementation-and-verification-gate) and available commands from the [developer guide](../docs/developer/development.md#command-availability). Behavioral work retains build/check/test, real-stack E2E and critical regressions, plus real-runtime/live or actual Linux lanes for changed boundaries. Fixtures replace external boundaries only. Documentation-only work uses structure/consistency, local links/anchors and whitespace, including new files; do not invent application checks.
 
-- Real browser/frontend/backend/database/supervisor integration for relevant UI outcomes, and authenticated API verification for API outcomes.
-- Deterministic protocol fixtures at the external Codex boundary and a disposable OIDC provider for the real login flow; no replacement of internal Harbor behavior under test. Explicit third-party fixture services may exercise integrations without contacting real user services.
-- Separate real pinned-Codex contract tests, bounded live-account smoke tests, and actual Linux isolation tests where relevant; do not present fixture results as proof of those boundaries.
-- Negative authorization, error/retry, idempotency, reconnect/recovery, concurrency, and quota cases appropriate to the feature.
-- Fresh instance namespaces for URLs/ports, database, secrets, Codex state, volumes, and artifacts; cleanup cannot touch a stable instance.
-- Evidence to retain: revision/versions, command, exit status, traces/screenshots/logs as applicable, with secret redaction and explicit skips.
-
-List the relevant lanes from the [canonical planned command contract](architecture.md#local-first-development-and-portable-environments). Assign stable acceptance IDs such as `P001-01` and map them to executable tests and evidence when implemented. Do not require unrelated suites or claim commands run before implementation. Documentation-only changes use link/structure/consistency review, not fictional E2E results.
-
-Acceptance criteria must demonstrate the promised complete outcome using earlier prerequisites only. A build, mock response, or design review alone is insufficient for implemented feature acceptance.
+Specify source/artifact identity, isolated instance setup and cleanup, command/environment/exit evidence, redaction and unavailable-gate handling. Identify reused unchanged-boundary evidence with its tested revision and limits. A build or report alone does not establish the complete outcome.
 
 ## Rollout and recovery
 
-Describe configuration, migrations, resource prerequisites, candidate validation, promotion/draining, rollback compatibility, and any irreversible effects. Follow the user's existing authorization; if approval is needed, prepare the tested concrete artifact first. Do not invent a standing approval requirement.
+Describe configuration, migrations, resource prerequisites, candidate validation, promotion/draining, rollback compatibility and irreversible effects where applicable. Existing authorization governs those actions; prepare the concrete tested result before any required approval. Preserve unrelated work, owned resources and interruption recovery.
 
-## Review record and remaining issues
+## Review and findings
 
-Record implementation → independent review → fixes → verification, with dates and evidence. Link unresolved issue records that include severity, affected files, reproduction/evidence, impact, and next steps. Critical unresolved requirements block implementation completion. Distinguish open dependency validation from defects and from unfinished planning.
+After the green gate, main automatically invokes separate fresh-context design and provenance reviewers using the [review contract](workflow.md#delegation-and-review). Record each round's findings, main's dispositions, original-implementer fixes, verified results and evidence limits. Stop at most after three rounds. Link unrelated findings and any remaining blocker to issues; do not silently expand scope or waive a missing gate.
 
 ## Closing record
 
-Keep this section pending while active. On archive, fill the fields required by the [proposal completion rules](../AGENTS.md#proposal-completion-and-archive):
+Keep pending until the [completion conditions](workflow.md#proposal-completion-and-archive) pass. Record:
 
-- Archive disposition and date: `<Completed, Superseded, or Withdrawn; date>`
-- Outcome or reason: `<delivered result, replacement, or withdrawal reason>`
-- Validation and review: `<tested source revision or source/artifact digest; commands, environment, results, review rounds; linked report>`
-- Remaining impact: `<limitations, follow-ups, affected issues/dependencies, replacement links where applicable>`
-- Current documentation: `<links to implemented behavior and operational guidance, or not applicable with reason>`
+- Outcome, date and archive disposition.
+- Tested source revision or reproducible source/artifact digest and exact scope.
+- Commands, environment, results, review rounds/dispositions and linked report.
+- Current designs/docs, source-issue evidence, limitations and follow-up ownership.
+- Owner-facing uncommitted result for review and commit confirmation.
 
-Retain dated status and reopening history below the closing record when needed.
+Retain dated reopening or supersession history when needed. An intentionally retired plan keeps its actual state and evidence; it cannot acquire Implemented merely through archival.

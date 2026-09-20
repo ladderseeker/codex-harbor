@@ -4,7 +4,7 @@
 - Status: Resolved
 - Archive disposition: Resolved
 - Archived: 2026-09-07
-- Owner: [P007](../../design/proposals/007-session-history-and-recovery.md) corrective implementation; [P001](../../design/proposals/001-secure-persistent-conversations.md#contracts-and-security) acceptance
+- Owner: [P007](../../design/proposals/archive/007-session-history-and-recovery.md) corrective implementation; [P001](../../design/proposals/archive/001-secure-persistent-conversations.md#contracts-and-security) acceptance
 - Recorded: 2026-09-07
 - Affected files: packages/storage/src/maintenance.ts; apps/api/src/server.ts
 - Acceptance: P001-03 replay resynchronization and P001-07 bounded storage; inherited by subsequent API clients
@@ -34,3 +34,7 @@ P007 enforces 2,000-event/seven-day replay limits separately from durable histor
 Reviewed integration `0118dfe`/`ca1a2cf` has source `2976f6286a9aea9645e2a27dfcb497e677c5268d5ff034593752dc98211b40bd` (842 files). Node 24.11.1 on macOS arm64 passed check/build, 9 integration tests, 15 pinned Codex 0.153.4 contracts and 8 workspace tests. Full real Harbor P001/P002/P007 E2E `harbor-e2e-10d1a7178a` and workspace E2E `harbor-workspaces-a5ce817a7b` exited 0 with identical start/end digests. Runs used PostgreSQL 17.6, Chromium 1194 and disposable external OIDC/Codex fixtures; cleanup affected only run-owned resources. Independent review accepted the unchanged native boundary's separate P003 Linux evidence.
 
 The [integration report](../../docs/reports/2026-09-07-p007-history-integration.md) records exact checks and limitations. This resolves this finding, not its proposals: the [dedicated live-account gate](../2026-09-07-171225-live-runtime-credentials.md) and separately tracked gateway/deployment obligations remain open. Earlier sections preserve historical discovery and intermediate status.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

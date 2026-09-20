@@ -1,5 +1,29 @@
 # P011 — Private project previews
 
+- Record status: Finished
+- Archive disposition: Baseline reconciled
+- Reconciled: 2026-09-20 under [D013](../../decisions/013-evidence-based-delivery-workflow.md)
+- Inspected source: `008227355bd05cb27dc13f4fbb585ef709b474b0`
+- Baseline classification: Implemented managed-preview baseline; protected fresh-host restore remains unverified.
+- Current design: [Subsystem contract](../../systems/002-workspaces-and-resources.md)
+
+## Reconciled baseline
+
+Private preview API/gateway, supervised lifecycle and UI exist in `apps/api/src/previews.ts`, `preview-gateway.ts`, `apps/supervisor/src/previews.ts`, `packages/previews/src/`, `apps/web/src/Previews.tsx` and migration 014. Main acceptance records `0822992`, source `991fb86c…5517c4`, two reviews and corrective actual Linux lifecycle evidence. Earlier full Linux/installed checks keep their own source limits.
+
+[Historical evidence](../../../docs/reports/2026-09-08-p011-development.md#main-acceptance--13-september-2026) retains its original commands, artifacts, review rounds and limitations. This documentation migration ran no application, account, isolation, restore or deployment check. Finished describes reconciliation of this legacy record; it does not establish completion of its original plan.
+
+## Unresolved obligation ownership
+
+- **Final implementation/registry contract: protected fresh-host restore of inactive previews, revoked grants/tickets and no source-host contact** → [2026-09-07-231526-p009-backup-transfer-approval.md](../../../issues/2026-09-07-231526-p009-backup-transfer-approval.md).
+- **Applicable inherited runtime/deployment capability limits; preview execution is account-free** → [2026-09-07-073831-codex-runtime-compatibility.md](../../../issues/2026-09-07-073831-codex-runtime-compatibility.md).
+
+These issues are in the inbox awaiting owner selection. Future execution requires a new cohesive proposal; this archived ID is historical lineage, not an active work owner. Original acceptance identifiers below remain stable evidence references.
+
+## Historical plan and evidence
+
+The following original plan, states and dated notes are preserved as non-normative history. Later dated evidence may supersede an earlier checkpoint; current requirements live in the subsystem design above. Historical statements about active queues, permissions, available worktrees or pending gates describe their original context and grant no present execution authority.
+
 - Decision: Accepted
 - Delivery: Implemented
 - Implementation started: 2026-09-08 from reviewed root `80560da`, with an isolated worktree and private pinned dependencies. Reviewed implementation accepted on main on 2026-09-13; protected restore and upstream verification remain open.
@@ -14,7 +38,7 @@ The initial feature supports ordinary project HTTP applications and explicitly t
 
 ## Contracts and security
 
-[D007 — Separate project-preview origins and a confined runner connection](../decisions/007-confined-project-preview-origins.md) is the accepted implementation boundary after independent design review. It owns unique origins, the body-only browser grant exchange, a fixed loopback relay over the exact no-egress runner namespace, and reader/exclusive-writer lifetime rules. It does not weaken D001, the stable Harbor CSP, or the public workspace-management gate. Implementation began on 8 September 2026 in an isolated worktree; acceptance remains pending.
+[D007 — Separate project-preview origins and a confined runner connection](../../decisions/007-confined-project-preview-origins.md) is the accepted implementation boundary after independent design review. It owns unique origins, the body-only browser grant exchange, a fixed loopback relay over the exact no-egress runner namespace, and reader/exclusive-writer lifetime rules. It does not weaken D001, the stable Harbor CSP, or the public workspace-management gate. Implementation began on 8 September 2026 in an isolated worktree; acceptance remains pending.
 
 Store preview ID, workspace/runtime generation, permitted internal destination, lifecycle, process ownership, access grant, and expiry. Creation is an authenticated durable operation; stopping a preview confirms process/proxy termination and does not cancel an unrelated conversation implicitly.
 
@@ -37,9 +61,9 @@ The trusted proxy resolves only registered runner destinations. Block metadata/c
 
 ## Source issues
 
-- [Preview retirement race](../../issues/archive/2026-09-13-022008-preview-retirement-race.md): Medium, Resolved. Exact disappearance handling, bounded independent review, main integration and P011-01/05 lifecycle acceptance passed; historical unidentified failures retain their original qualifications.
-- [P011 implementation review](../../issues/archive/2026-09-13-024503-p011-implementation-review.md): High, Resolved. Stop reservation and accepted-execution readiness corrections passed two review rounds, focused local/Linux acceptance and cumulative main verification.
-- [P009 backup transfer authorization](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, active and Blocked in P009. Conditional deployed registry/restore coverage inherits this checkpoint prerequisite; it does not prevent P011's local browser/network/isolation implementation and acceptance.
+- [Preview retirement race](../../../issues/archive/2026-09-13-022008-preview-retirement-race.md): Medium, Resolved. Exact disappearance handling, bounded independent review, main integration and P011-01/05 lifecycle acceptance passed; historical unidentified failures retain their original qualifications.
+- [P011 implementation review](../../../issues/archive/2026-09-13-024503-p011-implementation-review.md): High, Resolved. Stop reservation and accepted-execution readiness corrections passed two review rounds, focused local/Linux acceptance and cumulative main verification.
+- [P009 backup transfer authorization](../../../issues/2026-09-07-231526-p009-backup-transfer-approval.md): High, active and Blocked in P009. Conditional deployed registry/restore coverage inherits this checkpoint prerequisite; it does not prevent P011's local browser/network/isolation implementation and acceptance.
 
 ## Design review record
 
@@ -58,10 +82,10 @@ Use delivered P003 with a small real HTTP fixture application, hostile-script va
 
 ## Delivery and verification
 
-The [account-free headless-command spike](../../docs/reports/2026-09-08-p011-protocol-spike.md) passed on Codex 0.153.4/Node 24.11.1/macOS. A zero-byte `command/exec/write` acknowledges the exact connection-scoped command identity and rejects unstarted/wrong/exited IDs. This supplies a candidate native identity check for the existing startup contract; it does not replace exact runner/relay checks, completed-generation denial or HTTP readiness. Implementation began on 8 September 2026; the complete feature acceptance remains pending.
+The [account-free headless-command spike](../../../docs/reports/2026-09-08-p011-protocol-spike.md) passed on Codex 0.153.4/Node 24.11.1/macOS. A zero-byte `command/exec/write` acknowledges the exact connection-scoped command identity and rejects unstarted/wrong/exited IDs. This supplies a candidate native identity check for the existing startup contract; it does not replace exact runner/relay checks, completed-generation denial or HTTP readiness. Implementation began on 8 September 2026; the complete feature acceptance remains pending.
 
-Use `pnpm check`, `pnpm test`, `pnpm test:e2e`, and the relevant `pnpm test:isolation` lane; adapter changes require pinned contracts and applicable live gates. Follow [shared setup/evidence rules](README.md#shared-verification-contract). Configure separate test origins explicitly; a screenshot of a local page is not authentication/isolation evidence.
+Use `pnpm check`, `pnpm test`, `pnpm test:e2e`, and the relevant `pnpm test:isolation` lane; adapter changes require pinned contracts and applicable live gates. Follow [shared setup/evidence rules](../../workflow.md#implementation-and-verification-gate). Configure separate test origins explicitly; a screenshot of a local page is not authentication/isolation evidence.
 
-Current implementation evidence is recorded in the [development report](../../docs/reports/2026-09-08-p011-development.md#main-acceptance--13-september-2026). Main accepted the implementation after two independent review rounds, corrective local/Linux lifecycle checks and cumulative critical verification. Earlier full isolation and installed checkpoints retain their precise source identities. Delivery is Implemented; protected/fresh-host restore and applicable upstream gates remain unverified, so the proposal stays active. The [user guide](../../docs/user/previews.md) and [developer setup](../../docs/developer/previews.md) describe the available behavior.
+Current implementation evidence is recorded in the [development report](../../../docs/reports/2026-09-08-p011-development.md#main-acceptance--13-september-2026). Main accepted the implementation after two independent review rounds, corrective local/Linux lifecycle checks and cumulative critical verification. Earlier full isolation and installed checkpoints retain their precise source identities. Delivery is Implemented; protected/fresh-host restore and applicable upstream gates remain unverified, so the proposal stays active. The [user guide](../../../docs/user/previews.md) and [developer setup](../../../docs/developer/previews.md) describe the available behavior.
 
 Preview lifecycle migration, expiry/cleanup and deployment registration are implemented. Local metadata rebind restores previews as inactive until deliberately restarted; this does not establish a protected fresh-host filesystem restore. Proxy, cookie and user/API boundaries have independent review. Complete the remaining restore and upstream gates before verified delivery.

@@ -1,6 +1,6 @@
 # Common-use delivery scope and retained work — 13 September 2026
 
-The owner replaced simultaneous P001–P012 delivery with a common-use release, followed by individual features selected from actual need. [D009](../../design/decisions/009-common-use-release.md) records that decision; the [proposal index](../../design/proposals/README.md#current-delivery-queue) owns the current queue. This report records the candidate work and deferral handoff. It does not claim a verified release.
+The owner replaced simultaneous P001–P012 delivery with a common-use release, followed by individual features selected from actual need. [D009](../../design/decisions/009-common-use-release.md) records that decision; the [proposal index](../../design/workflow.md#discover-and-select-one-outcome) owns the current queue. This report records the candidate work and deferral handoff. It does not claim a verified release.
 
 ## Candidate and verification
 
@@ -36,3 +36,7 @@ Main independently checked these branch heads and working-tree states during the
 The root `.test-runs/common-use-release-20260913/deferred-work.json` records the independently observed heads and dirty filenames. Temporary stashes are reconciled and the stash list is empty; existing named recovery references are preserved. The unrelated root `.pnpm-store/` remains untouched.
 
 P010's cache-transfer, private-tools recovery, capacity and full isolation/candidate gates remain with P010. Its work was paused without a new VM action, transfer, guest launch or deployment. Deferral does not resolve those findings. Review this handoff and the proposal's source issues before resuming; do not restart the entire roadmap.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.

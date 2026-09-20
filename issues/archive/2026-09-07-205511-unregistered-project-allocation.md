@@ -4,7 +4,7 @@
 - Status: Resolved
 - Archive disposition: Resolved
 - Archived: 2026-09-08
-- Owner: [P009](../../design/proposals/009-portable-deployment-and-restore.md), deployment readiness and backup consistency
+- Owner: [P009](../../design/proposals/archive/009-portable-deployment-and-restore.md), deployment readiness and backup consistency
 - Recorded: 2026-09-07
 - Affected files: apps/api/src/server.ts; packages/storage/src/index.ts; infra/storage/quota.py
 - Acceptance: P009-01/04/05; trusted storage preflight and complete backup registry
@@ -38,3 +38,7 @@ The orphan remains on disk and is reported with its explicit registration path. 
 The complementary actual Linux publication lane on source `2ae952b318729bbb08525635a0ae4a04e21d2fe91cd38fdbf2cb33b045285c1f` preserved an unknown pool-slot sentinel and another untouched slot through owned publication failure/recovery. The separate reviewer inspected the final inventory test and retained result together with that preservation evidence, and closed this issue's bounded detection/reconciliation obligations in one focused closure review following the two P009 baseline rounds. The reviewed inventory assertions are retained in the repository test.
 
 Initial project allocation remains non-atomic across SQL and the filesystem; resolution provides detection, blocked completeness claims and deliberate identity-checked recovery, not automatic adoption or rollback. Complete protected backup/restore, later module inventories and release/live gates remain separately owned by P009. No protected transfer, source-host fencing or fresh-host restore is inferred from this issue's closure.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

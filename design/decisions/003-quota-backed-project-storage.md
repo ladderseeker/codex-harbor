@@ -1,8 +1,12 @@
 # D003 — Use quota-backed Linux project storage
 
+## Current ownership — 20 September 2026
+
+The [current subsystem designs](../systems/) apply this decision alongside architecture; [D013](013-evidence-based-delivery-workflow.md) and the [workflow](../workflow.md) now govern execution and record lifecycle. Proposal references below identify historical plans, not active work owners. Unfinished evidence remains in the [issue inbox](../../issues/), and future work receives a newly selected proposal. The dated decision rationale and technical constraints below are preserved.
+
 - Decision: Accepted
 - Recorded: 2026-09-07
-- Scope: [P001](../proposals/001-secure-persistent-conversations.md), extending [D002](002-registered-mount-authority.md)
+- Scope: [P001](../proposals/archive/001-secure-persistent-conversations.md), extending [D002](002-registered-mount-authority.md)
 - Supersedes: Unbounded Docker local volumes as a production native-history store
 - Delivery evidence: [Implemented; actual XFS enforcement checks passed](../../docs/reports/2026-09-07-p001-foundation.md)
 

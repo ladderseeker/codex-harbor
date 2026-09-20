@@ -1,5 +1,9 @@
 # Personal local experience
 
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
 P013's local profile is implemented and independently reviewed. Local browser/API/database/supervisor acceptance, pinned native permission checks and the owner's real account conversation passed. A separate mandatory critical regression failed and keeps P013 unverified. See the [delivery report](../reports/2026-09-13-personal-local-experience.md) for exact scope and evidence.
 
 The profile runs Harbor on loopback and calls a local Codex process. Its default conversation permission ceiling is read-only. It uses the native sandbox and does not establish Linux container, network or hard-quota isolation. Managed workspaces, attachments, file editing, terminals, schedules, previews and explicit uncertain-work recovery are unavailable in this initial local scope; the normal Linux profile retains those implemented features.
@@ -28,4 +32,4 @@ Ctrl+C requests owned service shutdown while preserving data. Start again with `
 
 ## Verification limits
 
-A personal account trial is user activity, not an automated dedicated-account acceptance run for P001–P009. Keep original proposal gates and reports unchanged. Completed independent review covered native permission denial, pre-login home validation, startup cancellation, account readiness and unsupported local controls. The [critical browser regression gate](../../issues/archive/2026-09-13-143001-local-critical-regression-gate.md) passed under P014; final P013 lifecycle reconciliation remains separate. Restart after source/build changes; rebuilding shared web assets while serving can leave registered asset routes out of date.
+A personal account trial is user activity, not an automated dedicated-account acceptance run for P001–P009. Keep the inherited acceptance obligations and historical reports unchanged. Completed independent review covered native permission denial, pre-login home validation, startup cancellation, account readiness and unsupported local controls. The [critical browser regression gate](../../issues/archive/2026-09-13-143001-local-critical-regression-gate.md) passed under P014; P013’s legacy record was subsequently reconciled under P017 without rerunning those gates. Restart after source/build changes; rebuilding shared web assets while serving can leave registered asset routes out of date.

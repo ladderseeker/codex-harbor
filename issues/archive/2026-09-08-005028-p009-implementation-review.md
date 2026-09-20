@@ -7,7 +7,7 @@
 - Owner: P009 implementer; independent reviewer and main-agent integration
 - Recorded: 2026-09-08
 - Affected files: infra/deploy/common.py, harborctl, backup.py, control.py, extract.py, publish.py, probe.ts and destination configuration
-- Acceptance: [P009-01–07](../../design/proposals/009-portable-deployment-and-restore.md#independent-acceptance)
+- Acceptance: [P009-01–07](../../design/proposals/archive/009-portable-deployment-and-restore.md#independent-acceptance)
 
 ## Round 1 evidence
 
@@ -62,3 +62,7 @@ The same installed artifact passed the independently reviewed exact administrato
 Main integration preserves every deployment production/test byte from the reviewed commit; only the report's dated addenda needed conflict resolution. Combined root source `8d5479e8acb408f1f53b1c03a4946d8295adf9b6cc43e7e8ea32a3b481f3130d`, 928 files, passed Node 24 `pnpm check`, including 72 documentation files. No redundant Linux run is attributed to the larger aggregate source.
 
 The original findings and missing follow-up behavior are resolved. P004/P006 module, writer, drain and restored-authority integration remains in their active implementation issues. P009's protected checkpoint/restore, actual restored-history activation, promotion/rollback and live-account gates remain active in their proposals and separate blocker records. This issue closure does not mark P009 Verified or authorize a blocked transfer.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

@@ -1,6 +1,6 @@
 # P012 account-free native protocol spike
 
-Recorded 2026-09-08 (Asia/Shanghai). This checks upstream non-model capability for the [P012 design](../../design/proposals/012-managed-skills-and-mcp.md); Harbor implementation and feature verification remain pending.
+Recorded 2026-09-08 (Asia/Shanghai). This checks upstream non-model capability for the [P012 design](../../design/proposals/archive/012-managed-skills-and-mcp.md); Harbor implementation and feature verification remain pending.
 
 ## Environment and identity
 
@@ -25,3 +25,7 @@ The probe's fixed answer is test-fixture behavior, not a proposed Harbor auto-ap
 This was a host-process protocol check. It does not establish Linux runner confinement, Harbor UI/API/database integration, immutable extension publication, disable/restart fencing, or model-directed skill/MCP use. The published P012 contract and its independent review must cover those outcomes. Dedicated live-account verification remains blocked by the [credential issue](../../issues/2026-09-07-171225-live-runtime-credentials.md).
 
 The current documentation exposes some fields absent from the repository's generated 0.153.4 types. Implementation must use the pinned contract and fail closed on unsupported capabilities. The [official reference](https://learn.chatgpt.com/docs/app-server) explains the corresponding methods; the successful run establishes only the specific pinned behavior listed above.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.

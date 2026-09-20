@@ -1,15 +1,39 @@
 # P006 — Persistent terminal
 
+- Record status: Finished
+- Archive disposition: Baseline reconciled
+- Reconciled: 2026-09-20 under [D013](../../decisions/013-evidence-based-delivery-workflow.md)
+- Inspected source: `008227355bd05cb27dc13f4fbb585ef709b474b0`
+- Baseline classification: Implemented persistent terminal baseline; protected fresh-host restore remains unverified.
+- Current design: [Subsystem contract](../../systems/002-workspaces-and-resources.md)
+
+## Reconciled baseline
+
+PTY lifecycle, controller ownership, bounded input/output, reconnect and confirmed retirement exist in `apps/api/src/terminals.ts`, `terminal-stream.ts`, `apps/supervisor/src/terminals.ts`, `packages/terminals/src/` and migration 011. Reports establish actual pinned account-free PTY and Linux behavior plus installed module outcomes. Account-free PTY evidence is distinct from inherited model-account gates.
+
+[Historical evidence](../../../docs/reports/2026-09-08-p006-development.md) retains its original commands, artifacts, review rounds and limitations. This documentation migration ran no application, account, isolation, restore or deployment check. Finished describes reconciliation of this legacy record; it does not establish completion of its original plan.
+
+## Unresolved obligation ownership
+
+- **Cleanup/restore contract: P009-04 fresh-host terminal history, invalidated controller/input authority, retired processes and no byte replay** → [2026-09-08-005028-p006-implementation-review.md](../../../issues/2026-09-08-005028-p006-implementation-review.md).
+- **Inherited runtime/deployment limits; native PTY itself is account-free** → [2026-09-07-073831-codex-runtime-compatibility.md](../../../issues/2026-09-07-073831-codex-runtime-compatibility.md).
+
+These issues are in the inbox awaiting owner selection. Future execution requires a new cohesive proposal; this archived ID is historical lineage, not an active work owner. Original acceptance identifiers below remain stable evidence references.
+
+## Historical plan and evidence
+
+The following original plan, states and dated notes are preserved as non-normative history. Later dated evidence may supersede an earlier checkpoint; current requirements live in the subsystem design above. Historical statements about active queues, permissions, available worktrees or pending gates describe their original context and grant no present execution authority.
+
 - Decision: Accepted
 - Delivery: Implemented
 - Dependencies: [P003](003-parallel-project-workspaces.md)
 - Outcome: The owner opens a shell in the selected workspace, leaves the page, and reconnects to its bounded output and running process.
-- Implementation checkpoint: [Feature evidence](../../docs/reports/2026-09-08-p006-development.md) and [final installed module evidence](../../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure) record completed source/acceptance review. Required fresh-host protected restore and upstream gates remain open; delivery is not Verified.
+- Implementation checkpoint: [Feature evidence](../../../docs/reports/2026-09-08-p006-development.md) and [final installed module evidence](../../../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure) record completed source/acceptance review. Required fresh-host protected restore and upstream gates remain open; delivery is not Verified.
 
 ## Source issues
 
-- [Native PTY contract home](../../issues/archive/2026-09-13-024011-terminal-contract-home.md): Medium, Resolved. Fresh persistent test homes fix a reproduced Linux helper-path prerequisite; independent review, actual unchanged PTY checks and main integration passed. This is separate from full feature and deployment verification.
-- [P006 implementation review](../../issues/2026-09-08-005028-p006-implementation-review.md): High, Blocked for required fresh-host protected restore/authority evidence under P009-04. Two corrective feature rounds and module review closed the dispatch, input, output, retention and installed retirement/local rebind scope.
+- [Native PTY contract home](../../../issues/archive/2026-09-13-024011-terminal-contract-home.md): Medium, Resolved. Fresh persistent test homes fix a reproduced Linux helper-path prerequisite; independent review, actual unchanged PTY checks and main integration passed. This is separate from full feature and deployment verification.
+- [P006 implementation review](../../../issues/2026-09-08-005028-p006-implementation-review.md): High, Blocked for required fresh-host protected restore/authority evidence under P009-04. Two corrective feature rounds and module review closed the dispatch, input, output, retention and installed retirement/local rebind scope.
 
 ## Scope and user/API flow
 
@@ -38,7 +62,7 @@ Use P003 with an isolated shell fixture, known workspace markers, delayed output
 
 ## Delivery and verification
 
-Use planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm test:contract`, `pnpm test:live` where account-dependent, and `pnpm test:isolation`. Follow [shared evidence rules](README.md#shared-verification-contract). A scripted terminal-output event alone does not close P006-01 or P006-06.
+Use planned `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm test:contract`, `pnpm test:live` where account-dependent, and `pnpm test:isolation`. Follow [shared evidence rules](../../workflow.md#implementation-and-verification-gate). A scripted terminal-output event alone does not close P006-01 or P006-06.
 
 Add terminal metadata/output retention migration and documented shutdown behavior. Session credentials and terminal output are private state with different lifetimes; backups must not promise to restore a running PTY. Promotion drains terminals or records explicit interruption. Add user documentation that distinguishes detach from termination, and verify the complete feature independently.
 
@@ -100,6 +124,6 @@ Design review: an independent agent checked runtime separation, authority, typed
 
 - 2026-09-07: Started isolated implementation on the reviewed attachment/workspace/history integration `cb6be0d`, under the accepted contract. Migration 011 is reserved. Coordinate the generic typed writer interface with P004 migration 010; terminal semantics remain independently owned by P006.
 
-- 2026-09-08: Two feature review rounds and complete terminal acceptance closed on their recorded sources. Root `2bdb5ef` adds reviewed installed module checkpoint `77b2ad5`, source `f13afc57f3956a7b457e567da02f1bb00ad214405c52c7a3d28f2d5c94ad1d27` /961 files. It includes bounded drain, exact retirement/recovery and revoked restored controller/input authority; matching critical/workspace/full-terminal application suites passed. The [module report](../../docs/reports/2026-09-08-installed-module-integration.md) preserves distinct Linux/installed evidence and pending final installed/release gates. Delivery remains In progress.
+- 2026-09-08: Two feature review rounds and complete terminal acceptance closed on their recorded sources. Root `2bdb5ef` adds reviewed installed module checkpoint `77b2ad5`, source `f13afc57f3956a7b457e567da02f1bb00ad214405c52c7a3d28f2d5c94ad1d27` /961 files. It includes bounded drain, exact retirement/recovery and revoked restored controller/input authority; matching critical/workspace/full-terminal application suites passed. The [module report](../../../docs/reports/2026-09-08-installed-module-integration.md) preserves distinct Linux/installed evidence and pending final installed/release gates. Delivery remains In progress.
 
-- 2026-09-08 delivery checkpoint: final installed ordinary and response-loss lanes on immutable `8c11ca94…84f22` passed, with independent module source/evidence review and the full recorded host/Linux regression map. Root `04ab86b` includes the final report/test handoff. Scoped behavior is Implemented; mandatory fresh-host protected restore and inherited live/release gates remain open, so the proposal stays active and is not Verified. See the [final module evidence](../../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure).
+- 2026-09-08 delivery checkpoint: final installed ordinary and response-loss lanes on immutable `8c11ca94…84f22` passed, with independent module source/evidence review and the full recorded host/Linux regression map. Root `04ab86b` includes the final report/test handoff. Scoped behavior is Implemented; mandatory fresh-host protected restore and inherited live/release gates remain open, so the proposal stays active and is not Verified. See the [final module evidence](../../../docs/reports/2026-09-08-installed-module-integration.md#final-installed-outcome-and-review-closure).

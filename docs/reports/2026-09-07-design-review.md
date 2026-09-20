@@ -29,7 +29,7 @@ The checks covered local target paths and anchors, code fences, final newlines, 
 
 ## Remaining validation
 
-The [medium-severity Codex compatibility issue](../../issues/archive/2026-09-07-073831-codex-runtime-compatibility.md) remains open. It is an implementation/release gate, not an unresolved design blocker. P001 must establish the delivered runtime and local Linux capability baseline; P009 must establish target-host and release/restore readiness. Later features extend the relevant evidence.
+The [medium-severity Codex compatibility issue](../../issues/2026-09-07-073831-codex-runtime-compatibility.md) remains open. It is an implementation/release gate, not an unresolved design blocker. P001 must establish the delivered runtime and local Linux capability baseline; P009 must establish target-host and release/restore readiness. Later features extend the relevant evidence.
 
 No running Harbor services, feature implementation, security enforcement, deployment readiness, or E2E success is established by this report.
 
@@ -38,3 +38,7 @@ No running Harbor services, feature implementation, security enforcement, deploy
 The source snapshot reviewed above was subsequently committed as `a645599bb957f67b47d587970c7814b5bd2b6396`; that baseline matches the recorded digest. The check counts, review results, and Open issue status above describe that historical baseline.
 
 The lifecycle update on 2026-09-07 moved the compatibility finding to the issue archive as **Transferred**, with explicit pending obligations in P001 and P009. Its link above now follows the same record. Current tracking is in the [issue index](../../issues/README.md); the finding is not resolved, and this addendum changes none of the historical evidence or validation results.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.

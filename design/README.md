@@ -1,28 +1,36 @@
 # Harbor design
 
-The architecture is the accepted implementation baseline. P014 completed the scoped frontend redesign; [P016](proposals/archive/016-conversation-first-interface.md) completed the conversation-first refinement; broader implementation and verification remain under way. The [proposal index](proposals/README.md) owns current feature status, dependencies, evidence and next actions. Decision (`Draft`, `Accepted`, `Superseded`) and delivery (`Planned`, `In progress`, `Implemented`, `Verified`) remain separate. Existing session authorization governs work; metadata does not create a universal approval gate.
+Current requirements live in the architecture, numbered subsystem designs and the UI guide. Proposals describe bounded changes against those documents; archived proposals and reports preserve dated decisions and evidence. [D013](decisions/013-evidence-based-delivery-workflow.md) records the ownership change and legacy reconciliation. Design acceptance never establishes implementation or deployment readiness.
 
-- [Architecture](architecture.md): system boundaries, identity, runtime/data contracts, local development, verification, self-development, and releases.
-- [Design tokens and UI guide](design-tokens.html): approved visual baseline, component rules, and workflow for extending the design consistently.
-- [Interface prototype](prototypes/README.md): standalone monochrome reference for the approved design before application implementation.
-- [D001 — Confined runtime egress](decisions/001-confined-runtime-egress.md): fixed gateway and isolated networks; Linux denials/connectivity passed, intermittent availability tracked.
-- [D002 — Registered mount authority](decisions/002-registered-mount-authority.md): trusted ancestry, disjoint projects, and descriptor-relative operations; local/Linux checks passed.
-- [D003 — Quota-backed project storage](decisions/003-quota-backed-project-storage.md): trusted XFS allocation, runner access, and persistent hard limits; actual Linux checks passed.
-- [D004 — Protected runtime credentials](decisions/004-protected-runtime-credentials.md): supervisor-owned discovery and encrypted onboarding; fixture/cleanup checks passed, live-account gate pending.
-- [D005 — Managed parallel workspaces](decisions/005-managed-project-workspaces.md): trusted Git/copy storage, workspace ownership and durable metadata operations; combined application/Linux checks passed, live-account gate pending.
-- [D006 — Portable releases and a fenced host restore](decisions/006-portable-release-and-restore.md): accepted deployment/backup/restore design in progress; packaged installation and bounded administrator recovery passed, protected fresh-host restore remains pending in P009.
-- [D007 — Separate project-preview origins and a confined runner connection](decisions/007-confined-project-preview-origins.md): implemented origin, browser-grant, fixed relay and reader-lease contract for P011; two review rounds and browser/Linux acceptance passed on the [recorded sources](../docs/reports/2026-09-08-p011-development.md), with protected restore and upstream gates pending.
-- [D008 — Confined self-development workers](decisions/008-isolated-self-development-workers.md): accepted broker, container/guest boundary, independent verifier and exact-artifact contract for P010; implementation and Linux/performance evidence remain pending.
-- [D009 — Common-use release before roadmap expansion](decisions/009-common-use-release.md): current delivery priority; finish and verify everyday workflows, preserve deferred P010/P012 work, then deliver one needed outcome at a time. Existing acceptance gates remain unchanged.
-- [D010 — Personal local Codex experience](decisions/010-personal-local-experience.md): the owner's selected local account-login and conversation outcome, implemented under P013 with explicit native execution boundaries.
-- [D011 — Personal VPS existing-project experience](decisions/011-personal-vps-workspace.md): selected P015 subscription/account and original-folder deployment with explicit native execution limits.
-- [D012 — Personal VPS development](decisions/012-personal-vps-development.md): selected complete development loop, private attached previews and persistent conversation feedback under P015.
-- [Active proposals](proposals/README.md): complete user outcomes, dependencies, acceptance criteria, and implementation status.
-- [Proposal archive](proposals/archive/README.md): completed, superseded, or withdrawn proposals, including completed P014.
-- [Proposal template](proposal-template.md): the required structure for a new or revised feature proposal.
-- [Developer guide](../docs/developer/development.md): implemented commands, development workflow, and verification limits.
-- [Issue index](../issues/README.md): active findings and pending proposal-owned work, with access to issue history.
+## Current contracts
 
-The [repository document lifecycle](../AGENTS.md#document-ownership-and-lifecycle) owns status, completion, archive, transfer, and reopening rules. The architecture is the canonical system design; the linked decision records preserve significant implementation choices and later changes.
+- [Architecture](architecture.md): shared identity, runtime, data, isolation, verification and release invariants.
+- [Subsystem designs](systems/README.md): current feature contracts, source ownership, partial/deferred boundaries and remaining evidence obligations.
+- [Design tokens and UI guide](design-tokens.html): approved visual tokens, interaction patterns and the rules for extending them.
+- [Interface prototype](prototypes/README.md): the standalone reviewable reference; application behavior requires its own acceptance.
+- [Delivery workflow](workflow.md): proposal lifecycle, main/worker responsibilities, review, provenance, issue ownership and closure.
+- [Proposal template](proposal-template.md): metadata, exact file fence, dependencies and acceptance for a selected change.
 
-A feature can depend on earlier accepted capabilities, but must be exercisable and verifiable in a fresh isolated environment without waiting for a future feature. Split proposals by complete outcomes, not frontend/backend layers or arbitrary size. Do not mark a feature complete from mock-only tests, a design review, or a successful build alone.
+## Decision records
+
+These explain significant choices; follow later explicit supersession notes and current design ownership.
+
+- [D001 — Confined runtime egress](decisions/001-confined-runtime-egress.md).
+- [D002 — Registered mount authority](decisions/002-registered-mount-authority.md).
+- [D003 — Quota-backed project storage](decisions/003-quota-backed-project-storage.md).
+- [D004 — Protected runtime credentials](decisions/004-protected-runtime-credentials.md).
+- [D005 — Managed parallel workspaces](decisions/005-managed-project-workspaces.md).
+- [D006 — Portable releases and a fenced host restore](decisions/006-portable-release-and-restore.md).
+- [D007 — Separate project-preview origins and a confined runner connection](decisions/007-confined-project-preview-origins.md).
+- [D008 — Confined self-development workers](decisions/008-isolated-self-development-workers.md).
+- [D009 — Common-use release scope](decisions/009-common-use-release.md).
+- [D010 — Personal local Codex experience](decisions/010-personal-local-experience.md).
+- [D011 — Personal VPS existing-project experience](decisions/011-personal-vps-workspace.md).
+- [D012 — Personal VPS development](decisions/012-personal-vps-development.md).
+- [D013 — Evidence-based delivery workflow](decisions/013-evidence-based-delivery-workflow.md).
+
+## Work and evidence
+
+Discover records through the [proposal directory](proposals/README.md), [proposal archive](proposals/archive/README.md), [issue inbox](../issues/README.md) and [issue archive](../issues/archive/README.md). Their folder listings replace manual per-record status and priority tables. Select one cohesive outcome from current need; do not treat all historical unfinished work as an execution queue.
+
+The [developer guide](../docs/developer/development.md) documents available commands and verification prerequisites. [Documentation](../docs/README.md) contains actual behavior guides and dated reports. Legacy baseline reconciliation closes old planning records while preserving every unresolved obligation in issues; it is not proof that a deferred feature shipped or a missing gate passed.

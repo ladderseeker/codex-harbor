@@ -1,6 +1,10 @@
 # Managed project workspaces
 
-P003 adds Local, Git Worktree and explicit non-Git Copy workspaces. Its boundary is defined by [D005](../../design/decisions/005-managed-project-workspaces.md); the [proposal](../../design/proposals/003-parallel-project-workspaces.md) retains acceptance ownership and the missing live-account gate.
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
+P003 adds Local, Git Worktree and explicit non-Git Copy workspaces. Its boundary is defined by [D005](../../design/decisions/005-managed-project-workspaces.md); the [current subsystem design](../../design/systems/002-workspaces-and-resources.md) retains acceptance ownership and the missing live-account gate.
 
 Use **Manage workspaces** to inspect Local and create a derived workspace. Git Worktree uses a detached immutable commit and excludes Local's uncommitted changes. The Local checkout remains in place. Managed worktrees share their project's Git metadata; they are separate checkouts, not mutual security boundaries. External gitdir/alternates, submodules and arbitrary repository Git customization are outside the supported import profile. The fixed helper ignores repository configuration, hooks, filter drivers and global configuration.
 
@@ -44,7 +48,7 @@ The live command additionally needs dedicated `HARBOR_TEST_OPENAI_API_KEY` crede
 
 ## Backup registration
 
-A consistent project backup includes project/workspace/session rows, `workspace_storage_operations`, `workspace_releases`, all managed checkouts, shared Git metadata, native histories, and the matching trusted workspace receipts. Drain writers and reconcile pending storage effects before snapshotting. Restore canonical identities explicitly; do not silently substitute a new inode for a registered checkout. P009 owns complete host restore verification and launcher identity reconciliation.
+A consistent project backup includes project/workspace/session rows, `workspace_storage_operations`, `workspace_releases`, all managed checkouts, shared Git metadata, native histories, and the matching trusted workspace receipts. Drain writers and reconcile pending storage effects before snapshotting. Restore canonical identities explicitly; do not silently substitute a new inode for a registered checkout. The managed deployment inbox obligation owns complete host restore verification and launcher identity reconciliation.
 
 Removal records its clean authorization and exact checkout/common identity in a durable `removing` receipt before the first unlink. Interrupted removal retains the project metadata reservation; after exact helper retirement it resumes only that recorded deletion without re-inspecting partially removed contents. Failed removals before this checkpoint may retry the same bounded operation and receipt identity; they do not append a new record for each retry. Private storage IPC rejects incomplete responses and enforces an absolute 45-second deadline independently of traffic.
 

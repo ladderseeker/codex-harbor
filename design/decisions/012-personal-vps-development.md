@@ -1,7 +1,11 @@
 # D012 — Complete personal VPS development through Harbor
 
+## Current ownership — 20 September 2026
+
+The [current subsystem designs](../systems/) apply this decision alongside architecture; [D013](013-evidence-based-delivery-workflow.md) and the [workflow](../workflow.md) now govern execution and record lifecycle. Proposal references below identify historical plans, not active work owners. Unfinished evidence remains in the [issue inbox](../../issues/), and future work receives a newly selected proposal. The dated decision rationale and technical constraints below are preserved.
+
 - Decision: Accepted within the owner's 14 September 2026 authorization to implement the recommended development workflow, push main and deploy it to the VPS.
-- Owner: [P015](../proposals/015-personal-vps-workspace.md).
+- Owner: [P015](../proposals/archive/015-personal-vps-workspace.md).
 - Amends: [D011](011-personal-vps-workspace.md) for the personal VPS profile only. Managed isolation and deferred P010/P012 remain unchanged.
 
 ## Context and decision
@@ -30,6 +34,6 @@ Persist authoritative final assistant items, reconciling streamed partial conten
 
 ## Acceptance and promotion
 
-[P015-07–10](../proposals/015-personal-vps-workspace.md#complete-development-acceptance) extend the existing P015 gates. Exercise a disposable real project through Harbor UI/API/storage/supervisor and the pinned native runtime: modify files, ordinary Git operations, locked dependency installation, tests/build, localhost serving and authenticated browser preview. Close/reopen the browser during accepted work and continue the same conversation. Verify readonly and outside-write denials, preview authorization, title persistence, full replies and tool failures.
+[P015-07–10](../proposals/archive/015-personal-vps-workspace.md#complete-development-acceptance) extend the existing P015 gates. Exercise a disposable real project through Harbor UI/API/storage/supervisor and the pinned native runtime: modify files, ordinary Git operations, locked dependency installation, tests/build, localhost serving and authenticated browser preview. Close/reopen the browser during accepted work and continue the same conversation. Verify readonly and outside-write denials, preview authorization, title persistence, full replies and tool failures.
 
 Build and review a separate immutable candidate, freeze its identity for acceptance, then drain live admission and back up private database/config/native state before promotion. Preserve the previous release and compatible rollback instructions. Never use a new schema with an incompatible old binary. Record incomplete gates in the existing P015 issue; unrelated proposals are not closed by this delivery.

@@ -1,6 +1,10 @@
 # Deployment development commands
 
-P009 is **In progress and unverified**. These commands exist in the feature implementation; they are not a production-readiness claim. The [development checkpoint](../reports/2026-09-08-p009-development.md) records the tested subset. Actual protected backup transfer, fresh-host restoration, promotion/rollback and dedicated live-account acceptance remain blocked or unverified. The [transfer approval issue](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md) records the automatic-review rejection; no transfer was performed or retried indirectly.
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
+The managed deployment outcome is **partial and unverified**. These commands exist in the feature implementation; they are not a production-readiness claim. The [development checkpoint](../reports/2026-09-08-p009-development.md) records the tested subset. Actual protected backup transfer, fresh-host restoration, promotion/rollback and dedicated live-account acceptance remain blocked or unverified. The [transfer approval issue](../../issues/2026-09-07-231526-p009-backup-transfer-approval.md) records the automatic-review rejection; no transfer was performed or retried indirectly.
 
 ## Build and authenticate a package
 
@@ -71,4 +75,4 @@ For an update, replace `none` with the exact current destination ID. Failed prob
 
 ## Personal VPS profile
 
-[P015](../../design/proposals/015-personal-vps-workspace.md) adds a separate subscription/existing-folder profile. See the [personal VPS guide](personal-vps.md) for implemented tooling and explicit acceptance limits. This does not complete P009 managed installation or its restore gates.
+[P015](../../design/systems/004-deployment-and-profiles.md) adds a separate subscription/existing-folder profile. See the [personal VPS guide](personal-vps.md) for implemented tooling and explicit acceptance limits. This does not complete P009 managed installation or its restore gates.

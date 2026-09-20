@@ -1,5 +1,9 @@
 # Programmatic API
 
+## Design and evidence ownership — 20 September 2026
+
+[Current subsystem designs](../../design/systems/) own behavior and limits; the [issue inbox](../../issues/) owns unfinished acceptance. Historical proposal IDs below identify feature lineage and evidence, not active execution. Future changes follow a newly selected proposal under the [workflow](../../design/workflow.md); baseline reconciliation did not rerun application gates.
+
 Use HTTPS and `Authorization: Bearer <token>` with a token created through [owner settings](../user/api-tokens.md). Do not send cookies or put tokens in URLs. Anonymous API requests return JSON authentication errors. The protected `/api/v1/openapi.json` documents actual operations, JSON schemas, bearer scopes, and streaming events; unsupported API versions and unknown bearer routes fail closed.
 
 A client with `read` and `execute` grants can list `/api/v1/projects`, create `/api/v1/sessions` using an allowed `projectId` and discovered model settings, then submit `{text, model, effort, permissionProfile}` to `/api/v1/sessions/<id>/turns`. Mutations require `Content-Type: application/json` and `Idempotency-Key: <Unix milliseconds>:<UUID>`. Use the exact same key and body after an uncertain network result. Reusing a key with changed input returns 409. Keys expire after 24 hours; a client must not replay an old uncertain side effect with a new key.

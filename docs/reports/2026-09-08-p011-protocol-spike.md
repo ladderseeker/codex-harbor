@@ -1,6 +1,6 @@
 # P011 headless command capability
 
-Recorded 8 September 2026. This is a bounded upstream capability check for [P011](../../design/proposals/011-private-project-previews.md), which remains Planned. It does not implement a Harbor preview, prove HTTP readiness, or establish Linux isolation.
+Recorded 8 September 2026. This is a bounded upstream capability check for [P011](../../design/proposals/archive/011-private-project-previews.md), which remains Planned. It does not implement a Harbor preview, prove HTTP readiness, or establish Linux isolation.
 
 ## Tested source and environment
 
@@ -23,3 +23,7 @@ P011 can test and use a bounded zero-byte write as an acknowledgement of its con
 This probe did not run npm, an HTTP application, the Harbor supervisor, a relay, a browser grant, a background-child retirement case or a 24-hour lifetime. P011's full application, authorization, streaming, hostile-origin and supported Linux lanes remain required. The official reference describes sandboxed command execution and its process-ID controls; the pinned generated types and the actual probe establish the narrower behavior used here. [Official app-server reference](https://learn.chatgpt.com/docs/app-server#command-execution).
 
 One independent prerequisite review checked the diagnostic code/hash, both results and the report's scope, closing with no actionable finding. Documentation links and whitespace passed across 78 files. This is not a P011 implementation review or completion gate.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.

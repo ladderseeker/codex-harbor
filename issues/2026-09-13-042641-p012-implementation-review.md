@@ -1,10 +1,22 @@
 # P012 implementation review findings
 
+- Severity: Medium; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: Medium
 - Status: In progress
 - Owner: P012 implementer; separate P012 reviewer verifies corrections
+
+Complete deferred outcome and acceptance are tracked in [2026-09-20-000004-managed-extensions-acceptance.md](2026-09-20-000004-managed-extensions-acceptance.md); this record retains its individual finding and correction evidence.
+
 - Affected files: `apps/supervisor/src/extension-actions.ts`, `packages/extensions/src/removal.ts`, `packages/extensions/src/catalog.ts`, `apps/api/src/extensions.ts`, `apps/web/src/Extensions.tsx`, and extension acceptance coverage
-- Acceptance: [P012-01–06](../design/proposals/012-managed-skills-and-mcp.md#independent-acceptance), as mapped below
+- Acceptance: [P012-01–06](../design/proposals/archive/012-managed-skills-and-mcp.md#independent-acceptance), as mapped below
 
 ## Evidence and scope — 13 September 2026
 
@@ -16,7 +28,7 @@ This record does not replace the separate [shared native acknowledgement finding
 
 - Severity/status: Medium / In progress
 - Source: `apps/supervisor/src/extension-actions.ts:303–315`, `packages/extensions/src/removal.ts:27–32`, `apps/web/src/Extensions.tsx:496–517`
-- Acceptance: P012-02/03/04; [dispatch and recovery](../design/proposals/012-managed-skills-and-mcp.md#revision-dispatch-disable-and-recovery) and [unused-version removal](../design/proposals/012-managed-skills-and-mcp.md#immutable-sources-and-trusted-configuration)
+- Acceptance: P012-02/03/04; [dispatch and recovery](../design/proposals/archive/012-managed-skills-and-mcp.md#revision-dispatch-disable-and-recovery) and [unused-version removal](../design/proposals/archive/012-managed-skills-and-mcp.md#immutable-sources-and-trusted-configuration)
 
 With a ready disabled MCP version, pause the supervisor and accept a probe. Revoke or expire its browser authority, or invalidate the captured revision, before resuming dispatch. `rejectUnowned` fails this queued request before writer or native admission but leaves `retired=false`. Removal treats that action as a pin and returns `EXTENSION_VERSION_PINNED`; the failed-action UI offers no cancellation, and acknowledgement is limited to uncertain actions. A request that never executed can therefore prevent removal through the available UI.
 
@@ -26,7 +38,7 @@ Atomically retire only a rejection whose pre-dispatch state proves it never exec
 
 - Severity/status: Medium / In progress
 - Source: `apps/supervisor/src/extension-actions.ts:528–536,549`, `packages/extensions/src/catalog.ts:24–31`
-- Acceptance: P012-01/03/06; [owner flow](../design/proposals/012-managed-skills-and-mcp.md#owner-and-api-flow) and [bounded discovery](../design/proposals/012-managed-skills-and-mcp.md#revision-dispatch-disable-and-recovery)
+- Acceptance: P012-01/03/06; [owner flow](../design/proposals/archive/012-managed-skills-and-mcp.md#owner-and-api-flow) and [bounded discovery](../design/proposals/archive/012-managed-skills-and-mcp.md#revision-dispatch-disable-and-recovery)
 
 After 100 status polls, the probe continues regardless of `runtimeStatus`. Catalog validation checks the server name and tools but does not require a connected runtime. The pinned protocol permits failed, cancelled, starting or null status with an empty tool map, so an unsuccessful startup can become a successful empty catalog.
 
@@ -36,7 +48,7 @@ Require confirmed connection before publishing a successful catalog. A failed or
 
 - Severity/status: Medium / In progress
 - Source: `apps/api/src/extensions.ts:155–168`, `apps/web/src/Extensions.tsx:327–330`
-- Acceptance: P012-01/02/05; [source/path/digest visibility](../design/proposals/012-managed-skills-and-mcp.md#owner-and-api-flow)
+- Acceptance: P012-01/02/05; [source/path/digest visibility](../design/proposals/archive/012-managed-skills-and-mcp.md#owner-and-api-flow)
 
 The API omits each version's captured registration/source metadata. The panel discards the result and manifest hash, showing a shortened UUID, file count and byte size instead. Refresh may change the source workspace, path or entrypoint, so extension-level source fields can describe another version. The owner cannot inspect the immutable code identity before Enable or Probe.
 
@@ -46,7 +58,7 @@ Expose and render bounded per-version workspace and relative source path, releva
 
 - Severity/status: Medium / In progress
 - Source: `apps/api/src/extensions.ts:172–177,178–182`, `apps/web/src/Extensions.tsx:316–323`
-- Acceptance: P012-01/04; [bounded pages and visible unresolved controls](../design/proposals/012-managed-skills-and-mcp.md#revision-dispatch-disable-and-recovery)
+- Acceptance: P012-01/04; [bounded pages and visible unresolved controls](../design/proposals/archive/012-managed-skills-and-mcp.md#revision-dispatch-disable-and-recovery)
 
 The project detail response returns only the latest 20 actions without an action cursor. Its `nextCursor` pages versions, and the UI renders only returned actions. After more than 20 retained actions, an older unresolved action can disappear while still pinning a version or reservation. Fetching an already known action ID is not a way for the owner to discover that hidden recovery obligation.
 

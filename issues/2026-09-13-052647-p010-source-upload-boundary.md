@@ -1,10 +1,22 @@
 # Maximum-size source capture does not fit its framed upload
 
+- Severity: Low; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: Low
 - Status: In progress
 - Owner: P010 implementer; separate verifier reviewer checks the correction
+
+Complete deferred outcome and acceptance are tracked in [2026-09-20-000003-self-development-acceptance.md](2026-09-20-000003-self-development-acceptance.md); this record retains its individual finding and correction evidence.
+
 - Affected files: `infra/self/transport.py`, `infra/self/commands.py`, `infra/self/worker.py`, `infra/self/exchange.py`, source-transfer boundary tests
-- Acceptance: [P010-01/03/07](../design/proposals/010-self-development.md#independent-acceptance)
+- Acceptance: [P010-01/03/07](../design/proposals/archive/010-self-development.md#independent-acceptance)
 
 ## Evidence and impact — 13 September 2026
 

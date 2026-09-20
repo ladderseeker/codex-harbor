@@ -1,10 +1,22 @@
 # Restored command aliases can retain a valid owner's replay identity
 
+- Severity: Medium; retained impact classification, not a priority.
+- Inbox owner: Unassigned; awaiting owner selection.
+
+## Inbox ownership — 20 September 2026
+
+This problem remains in the unprioritized inbox, unassigned until the owner selects a new proposal or a bounded fix. Archiving its legacy proposal did not resolve it. Historical severity, progress and former owner metadata below describe earlier work and do not create an execution queue.
+
+### Previous tracking metadata
+
 - Severity: Medium
 - Status: In progress
 - Owner: P012 implementer; separate module reviewer verifies the correction
+
+Complete deferred outcome and acceptance are tracked in [2026-09-20-000004-managed-extensions-acceptance.md](2026-09-20-000004-managed-extensions-acceptance.md); this record retains its individual finding and correction evidence.
+
 - Affected files: `packages/storage/src/extension-restore.ts`, `packages/extensions/src/commands.ts`, extension history indexing and restore regression tests
-- Acceptance: [P012-04/05](../design/proposals/012-managed-skills-and-mcp.md#independent-acceptance) and inherited [P009-04](../design/proposals/009-portable-deployment-and-restore.md#independent-acceptance)
+- Acceptance: [P012-04/05](../design/proposals/archive/012-managed-skills-and-mcp.md#independent-acceptance) and inherited [P009-04](../design/proposals/archive/009-portable-deployment-and-restore.md#independent-acceptance)
 
 ## Source finding — 13 September 2026
 

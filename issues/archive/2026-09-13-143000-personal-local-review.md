@@ -5,7 +5,7 @@
 - Resolved: 2026-09-13
 - Owner: P013 implementation lead
 - Affected files: `scripts/local-dev.ts`, `apps/api/src/config.ts`, `apps/supervisor/src/main.ts`, `apps/api/src/server.ts`, `apps/web/src/App.tsx`, `packages/codex-adapter/src/index.ts`, `packages/codex-adapter/src/local-runtime.ts`.
-- Scope: [P013](../../design/proposals/013-personal-local-experience.md), [D010](../../design/decisions/010-personal-local-experience.md).
+- Scope: [P013](../../design/proposals/archive/013-personal-local-experience.md), [D010](../../design/decisions/010-personal-local-experience.md).
 
 ## Evidence and impact
 
@@ -31,3 +31,7 @@ All six findings corrected and independently verified in two cross-component rev
 ### Later regression evidence — 13 September 2026
 
 The historical open-gate statement above is superseded by the [resolved regression record](2026-09-13-143001-local-critical-regression-gate.md): P014 instrumented critical acceptance passed, including retention/replay gap. This addendum does not archive P013.
+
+## Ownership navigation — 20 September 2026
+
+The disposition and evidence above are historical. Retired proposal references identify feature lineage; any unfinished inherited acceptance is retained in the [active inbox](../) and the [current subsystem designs](../../design/systems/). The P017 baseline migration did not resolve another finding or rerun this record’s checks.

@@ -26,7 +26,7 @@ The Linux lane proves read-only dirty Local preservation, writable derived Git c
 
 ## Failed checkpoints and correction evidence
 
-Initial native `openpty` failed with EPERM. The accepted terminal-only profile adds exactly `TIOCSPTLCK`; the unchanged base continues denying filesystem write ioctls. The next native checkpoint preserved bubblewrap's namespace denial. The fixed private factory now selects the pinned external-sandbox command policy only after confined runner admission, with the physical profile and network boundary enforced by Docker/XFS. Both decisions and official references are in [P006](../../design/proposals/006-persistent-terminal.md#dedicated-terminal-runtime-and-writer-ownership). No namespace creation permission or host fallback was introduced.
+Initial native `openpty` failed with EPERM. The accepted terminal-only profile adds exactly `TIOCSPTLCK`; the unchanged base continues denying filesystem write ioctls. The next native checkpoint preserved bubblewrap's namespace denial. The fixed private factory now selects the pinned external-sandbox command policy only after confined runner admission, with the physical profile and network boundary enforced by Docker/XFS. Both decisions and official references are in [P006](../../design/proposals/archive/006-persistent-terminal.md#dedicated-terminal-runtime-and-writer-ownership). No namespace creation permission or host fallback was introduced.
 
 Subsequent Linux failures were assertions using a nonexistent container session label and the database spelling of a public profile field; exact runner-name and public-profile assertions corrected those tests without weakening the confinement outcome. The final Linux lane passed the resulting checks.
 
@@ -42,7 +42,7 @@ Host checkpoints `db0b841755` and `1528a8099e` timed out waiting for output-floo
 
 P006's tested terminal path needs no model account. These no-account tests neither require a fabricated credential nor establish a real authenticated model turn. Existing proposal live-account gates remain separate and unchanged.
 
-Current documentation: [terminal user guide](../user/terminals.md), [developer workflow](../developer/development.md#terminal-development), [canonical proposal](../../design/proposals/006-persistent-terminal.md).
+Current documentation: [terminal user guide](../user/terminals.md), [developer workflow](../developer/development.md#terminal-development), [canonical proposal](../../design/proposals/archive/006-persistent-terminal.md).
 
 
 ## Round-1 corrections and round-2 verification checkpoint
@@ -84,3 +84,7 @@ Two terminal implementation review rounds are closed with no actionable finding 
 ## Main integration tracking — 8 September 2026
 
 The reviewed branch is committed as `f033824b495c1b42fe2c6fd9e9d94bac8db8db3f`. Root integration is in progress on the reviewed P004/P009 baseline. Its canonical [P006 implementation issue](../../issues/2026-09-08-005028-p006-implementation-review.md) remains active for shared writer, installed module/service/image, drain and restored-authority work. The [P002 rate assertion](../../issues/archive/2026-09-08-015752-p002-rate-limit-acceptance.md) is resolved with the final critical evidence above. The [historical P007 cleanup observation](../../issues/2026-09-08-020429-p007-regression-evidence.md) stays Open; diagnostic delivery and a passing run do not establish its old cause.
+
+## Navigation and ownership addendum — 20 September 2026
+
+P017 reconciled legacy planning records into the [proposal archive](../../design/proposals/archive/). [Current subsystem designs](../../design/systems/) now own requirements, and unfinished acceptance belongs to the [issue inbox](../../issues/) until a new proposal is selected. Historical statements here about active proposal states, queues, permissions and recovery locations describe the recorded date. This addendum changes navigation/ownership only: original tested sources, commands, results, review rounds and limitations above remain historical evidence. No application gate was rerun for the documentation migration. Historical raw artifacts or worktrees not present in this checkout were not newly verified.
