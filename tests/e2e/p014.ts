@@ -278,26 +278,30 @@ export async function p014({
     .getByLabel("Search conversations", { exact: true })
     .fill("no matching title p016");
   await expect(
-    page
-      .locator(".project-group")
-      .filter({ has: page.locator(".project-button.selected") }),
+    page.getByRole("dialog", { name: "Search and filters", exact: true }),
   ).toContainText("No matching conversations");
+  const searchMore = page
+    .getByRole("dialog", { name: "Search and filters", exact: true })
+    .locator(`[data-rename-focus="${first.id}"]`);
   await page.getByLabel("Search conversations", { exact: true }).fill("");
-  await expect(more).toBeVisible();
-  await more.click();
+  await expect(searchMore).toBeVisible();
+  await searchMore.click();
   await page
     .getByRole("button", { name: "Archive conversation", exact: true })
     .click();
-  await expect(more).toHaveCount(0);
+  await expect(searchMore).toHaveCount(0);
   await page.locator(".history-filters select").selectOption("archived");
-  await expect(more).toBeVisible();
-  await more.click();
+  await expect(searchMore).toBeVisible();
+  await searchMore.click();
   await page
     .getByRole("button", { name: "Restore conversation", exact: true })
     .click();
-  await expect(more).toHaveCount(0);
+  await expect(searchMore).toHaveCount(0);
+  await expect(
+    page.getByLabel("Search conversations", { exact: true }),
+  ).toBeFocused();
   await page.locator(".history-filters select").selectOption("active");
-  await expect(more).toBeVisible();
+  await expect(searchMore).toBeVisible();
   const restored = await (
     await context.request.get(origin + `/api/v1/sessions/${first.id}/snapshot`)
   ).json();
@@ -307,9 +311,7 @@ export async function p014({
       message.text.includes("P014 multiline"),
     ),
   ).toBe(true);
-  await page
-    .getByRole("button", { name: "Search and filters", exact: true })
-    .click();
+  await page.keyboard.press("Escape");
 
   await input.fill("[markdown]");
   await input.press("Enter");

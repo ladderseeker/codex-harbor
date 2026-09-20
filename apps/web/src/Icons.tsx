@@ -2,6 +2,11 @@ export function Icon({
   name,
 }: {
   name:
+    | "archive"
+    | "info"
+    | "stop"
+    | "logout"
+    | "key"
     | "folder"
     | "compose"
     | "plus"
@@ -17,6 +22,12 @@ export function Icon({
     | "arrow";
 }) {
   const paths = {
+    archive: "M4 9h16v12H4ZM3 3h18v6H3ZM9 13h6",
+    info: "M12 11v6M12 7h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z",
+    stop: "M5 5h14v14H5Z",
+    logout: "M9 4H4v16h5M13 8l4 4-4 4M8 12h13",
+    key: "M14 9a5 5 0 1 1-10 0 5 5 0 0 1 10 0ZM13 12l8 8M17 16l3-3",
+
     search: "M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z",
     settings:
       "M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1ZM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
@@ -39,7 +50,20 @@ export function Icon({
   };
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d={paths[name]} />
+      {name === "more" ? (
+        [5, 12, 19].map((cx) => (
+          <circle
+            key={cx}
+            cx={cx}
+            cy="12"
+            r="1.8"
+            fill="currentColor"
+            stroke="none"
+          />
+        ))
+      ) : (
+        <path d={paths[name]} />
+      )}
     </svg>
   );
 }

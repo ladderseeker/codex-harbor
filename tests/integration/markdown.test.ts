@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { createElement, Fragment } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MarkdownMessage } from "../../apps/web/src/MarkdownMessage.tsx";
+const unhighlight = (html: string) =>
+  html.replace(/<span class="hljs-[^"]+">/g, "").replace(/<\/span>/g, "");
 const render = (text: string) =>
   renderToStaticMarkup(createElement(MarkdownMessage, { text }));
 
@@ -32,16 +34,19 @@ test("long outer Markdown fences preserve inner code fences, including incomplet
     "````markdown\n# Literal\n```js\nconst n = 1;\n```\n````\n\n**Finished**";
   const partial = render(source.slice(0, source.indexOf("const") + 8));
   assert.match(
-    partial,
+    unhighlight(partial),
     /<code class="language-markdown"># Literal\n```js\nconst n/,
   );
   const complete = render(source);
-  assert.match(complete, /const n = 1;\n```\n<\/code>/);
+  assert.match(unhighlight(complete), /const n = 1;\n```\n<\/code>/);
   assert.match(complete, /<strong>Finished<\/strong>/);
   assert.doesNotMatch(complete, /<h1>/);
   for (let i = 0; i <= source.length; i++)
     assert.doesNotThrow(() => render(source.slice(0, i)));
-  assert.match(render("~~~markdown\n```js\nx\n```\n~~~"), /```js\nx\n```/);
+  assert.match(
+    unhighlight(render("~~~markdown\n```js\nx\n```\n~~~")),
+    /```js\nx\n```/,
+  );
 });
 
 test("HTML, unsafe URLs and images cannot create active content or automatic requests", () => {
@@ -84,18 +89,60 @@ test("footnotes navigate within the document and have unique IDs in each reply",
   assert.match(render("[external](https://example.com)"), /target="_blank"/);
 });
 
-test("code/source copy controls sit after the code region and never repeat on ordinary paragraphs", () => {
+test("code/source copy controls sit in the header before the code region and never repeat on ordinary paragraphs", () => {
   const html = render(
     "First paragraph.\n\nSecond paragraph.\n\n```js\n  const x = 1;\n\n    x++;\n```\n\n````markdown\n# Heading\n```js\nx();\n```\n````",
   );
-  assert.equal([...html.matchAll(/class="markdown-code-actions"/g)].length, 2);
-  assert.match(html, /<\/pre><div class="markdown-code-actions">/);
+  assert.equal([...html.matchAll(/class="markdown-code-header"/g)].length, 2);
+  assert.ok(html.indexOf('aria-label="Copy code"') < html.indexOf("<pre"));
   assert.match(html, /aria-label="Copy code"/);
   assert.match(html, /aria-label="Copy Markdown source"/);
-  assert.match(html, /  const x = 1;\n\n    x\+\+;\n<\/code>/);
+  assert.match(unhighlight(html), /  const x = 1;\n\n    x\+\+;\n<\/code>/);
   assert.equal(
     [...render("Plain\n\nparagraph\n\n`inline code`").matchAll(/<button/g)]
       .length,
     0,
   );
+});
+
+test("bounded explicit bundled grammars highlight code without executing source", () => {
+  for (const language of [
+    "js",
+    "ts",
+    "py",
+    "sh",
+    "shell",
+    "json",
+    "yml",
+    "html",
+    "css",
+    "sql",
+    "go",
+    "rs",
+    "java",
+    "c",
+    "cpp",
+    "md",
+  ]) {
+    const html = render(
+      `\`\`\`${language}\nconst value = "hello"; # comment <b>text</b> { color: red; }\n\`\`\``,
+    );
+    assert.match(html, /hljs-/);
+  }
+  for (const [language, source] of [
+    ["unknown", "<script>bad()</script>"],
+    ["", "<img src=x>"],
+    ["mermaid", "graph TD; A-->B"],
+    ["js", "x".repeat(32769)],
+    ["js", "界".repeat(10923)],
+  ]) {
+    const html = render(`\`\`\`${language}\n${source}\n\`\`\``);
+    assert.doesNotMatch(html, /class="hljs-|<script>|<img /);
+  }
+  assert.match(render("\`\`\`\ntext\n\`\`\`"), />Text<\/span>/);
+  const malicious = render(
+    '\`\`\`html\n<script>alert(1)</script><img onerror="bad()">\n\`\`\`',
+  );
+  assert.doesNotMatch(malicious, /<script>|<img /);
+  assert.match(malicious, /&lt;/);
 });

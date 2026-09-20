@@ -11,6 +11,7 @@ if (process.argv.includes("--terminals")) {
 import { p005 } from "./p005.ts";
 import { acknowledgementContention } from "./acknowledgement.ts";
 import { p007 } from "./p007.ts";
+import { p023 } from "./p023.ts";
 import { p014 } from "./p014.ts";
 import { createPool } from "../../packages/storage/src/index.ts";
 if (process.argv.includes("--files")) {
@@ -438,6 +439,7 @@ try {
         rootId,
         rootPath: path.join(dir, "project-roots"),
       });
+      await p023({ page, context, origin, artifacts });
       await writeFile(
         path.join(artifacts, "result.json"),
         JSON.stringify(
@@ -448,13 +450,13 @@ try {
             sourceAtEnd: sourceDigest(),
             node: process.version,
             scope:
-              "P014 real browser/API/PostgreSQL/supervisor; external OIDC/Codex fixtures",
+              "P014/P023 real browser/API/PostgreSQL/supervisor; external OIDC/Codex fixtures",
           },
           null,
           2,
         ),
       );
-      console.log("P014 design E2E passed. Artifacts: " + artifacts);
+      console.log("P014/P023 design E2E passed. Artifacts: " + artifacts);
     } else {
       await page
         .getByRole("button", { name: "Add project", exact: true })

@@ -140,7 +140,10 @@ export async function p007(h: Context) {
     .getByRole("button", { name: "Search and filters", exact: true })
     .click();
   await page.locator(".history-filters select").selectOption("archived");
-  await page.locator(".session-row.selected .session-rename").click();
+  await page
+    .getByRole("dialog", { name: "Search and filters", exact: true })
+    .locator(".session-row.selected .session-rename")
+    .click();
   await page
     .getByRole("button", { name: "Restore conversation", exact: true })
     .click();
@@ -148,9 +151,7 @@ export async function p007(h: Context) {
     .poll(async () => (await snapshot(id)).session.archived)
     .toBe(false);
   await page.locator(".history-filters select").selectOption("active");
-  await page
-    .getByRole("button", { name: "Search and filters", exact: true })
-    .click();
+  await page.keyboard.press("Escape");
   expect(await readFile(path.join(h.fixtureState, id + ".json"), "utf8")).toBe(
     originalNative,
   );
@@ -1252,12 +1253,9 @@ export async function p007(h: Context) {
     409,
   );
   await page.goto(origin + "/?conversation=" + id);
-  await expect(
-    page.locator(".session-row.selected .session-rename"),
-  ).toHaveCount(1);
+
   const activeHistory = page
-    .locator(".project-group")
-    .filter({ has: page.locator(".project-button.selected") })
+    .getByRole("dialog", { name: "Search and filters", exact: true })
     .getByRole("region", { name: "Conversation history" });
   await page
     .getByRole("button", { name: "Search and filters", exact: true })
@@ -1275,9 +1273,7 @@ export async function p007(h: Context) {
     fullPage: true,
   });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page
-    .getByRole("button", { name: "Open navigation", exact: true })
-    .click();
+
   await expect(
     activeHistory
       .locator(".conversation-link")
@@ -1290,6 +1286,7 @@ export async function p007(h: Context) {
     path: path.join(h.artifacts, "p007-history-mobile.png"),
     fullPage: true,
   });
+  await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 1280, height: 900 });
   // Personal workbench: names, authoritative final text and command diagnostics
   // survive refresh and preserve an explicit owner title even when it is blank-like.
@@ -1310,11 +1307,11 @@ export async function p007(h: Context) {
   await expect(
     page.locator(".message-assistant .message-text").last(),
   ).toHaveText("Fixture response: " + taskText);
-  await page.locator(".command-output summary").click();
-  await expect(page.locator(".command-output pre")).toContainText(
+  await page.locator(".conversation-activity summary").click();
+  await expect(page.locator(".conversation-activity pre")).toContainText(
     "Tests passed",
   );
-  await expect(page.locator(".command-output pre")).toContainText(
+  await expect(page.locator(".conversation-activity pre")).toContainText(
     "exit code: 0",
   );
   await page.reload();

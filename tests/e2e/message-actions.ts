@@ -27,6 +27,21 @@ export async function messageActions(page: Page) {
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
     expectedSource,
   );
+  const highlighted = message
+    .locator(".markdown-code")
+    .filter({ has: page.locator("code.language-typescript") });
+  await expect(highlighted.locator(".hljs-keyword")).toHaveText("const");
+  const header = highlighted.locator(".markdown-code-header");
+  expect((await header.boundingBox())!.y).toBeLessThan(
+    (await highlighted.locator("pre").boundingBox())!.y,
+  );
+  expect(
+    (await header.locator(".markdown-code-label").boundingBox())!.x,
+  ).toBeLessThan((await header.getByRole("button").boundingBox())!.x);
+  await header.getByRole("button", { name: "Copy code", exact: true }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    'const title: string = "Harbor";\n',
+  );
   const requests: string[] = [];
   const observe = (request: import("@playwright/test").Request) => {
     if (request.method() !== "GET") requests.push(request.url());

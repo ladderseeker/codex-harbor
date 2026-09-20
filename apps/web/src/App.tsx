@@ -1,3 +1,7 @@
+import {
+  ConversationActivity,
+  groupConversationMessages,
+} from "./ConversationActivity.tsx";
 import { MessageActions } from "./MessageActions.tsx";
 import { completedAssistantResponses } from "./message-responses.ts";
 import {
@@ -816,6 +820,84 @@ export function App() {
       className="app"
       style={{ "--rail-width": `${sidebarWidth}px` } as React.CSSProperties}
     >
+      {searchOpen && (
+        <Modal
+          title="Search and filters"
+          className="search-dialog"
+          close={() => setSearchOpen(false)}
+          returnFocus=".rail-search"
+          initialFocus="input[type=search]"
+          backdropDismiss
+          trapFocus
+        >
+          <section className="history-filters" aria-label="Search filters">
+            <label className="search-input-row">
+              <Icon name="search" />
+              <span className="sr-only">Search conversations</span>
+              <input
+                autoFocus
+                type="search"
+                placeholder="Search conversations"
+                value={historyQuery}
+                maxLength={120}
+                onChange={(event) => setHistoryQuery(event.target.value)}
+              />
+            </label>
+            <div className="search-scope-row">
+              <span>
+                <Icon name="folder" />
+                {project?.name ?? "Selected project"}
+              </span>
+              <label>
+                <span className="sr-only">Show</span>
+                <select
+                  value={historyFilter}
+                  onChange={(event) => setHistoryFilter(event.target.value)}
+                >
+                  <option value="active">Active conversations</option>
+                  <option value="archived">Archived conversations</option>
+                  <option value="all">All conversations</option>
+                </select>
+              </label>
+            </div>
+            <label className="archive-toggle">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(event) => setShowArchived(event.target.checked)}
+              />
+              Show archived projects
+            </label>
+          </section>
+          {projectId && (
+            <div className="search-results">
+              <History
+                key={projectId}
+                searchResults
+                projectId={projectId}
+                query={historyQuery}
+                filter={historyFilter}
+                selectedId={selectedId}
+                revision={JSON.stringify(
+                  sessions.filter((s) => s.projectId === projectId),
+                )}
+                select={(id) => {
+                  setSearchOpen(false);
+                  selectSession(id);
+                }}
+                viewStatus={(id) => {
+                  setSearchOpen(false);
+                  selectSession(id);
+                  setStatusOpen(true);
+                }}
+                workspaces={workspaceData.workspaces}
+                disabled={blocked}
+                execute={execute}
+              />
+            </div>
+          )}
+        </Modal>
+      )}
       <a className="skip-link" href="#conversation">
         Skip to conversation
       </a>
@@ -876,42 +958,6 @@ export function App() {
           >
             Schedules
           </button>
-        )}
-        {searchOpen && (
-          <section className="history-filters" aria-label="Search and filters">
-            <p className="field-help">
-              Search in {project?.name ?? "selected project"}
-            </p>
-            <label className="field">
-              Search conversations
-              <input
-                autoFocus
-                type="search"
-                value={historyQuery}
-                maxLength={120}
-                onChange={(event) => setHistoryQuery(event.target.value)}
-              />
-            </label>
-            <label className="field">
-              Show
-              <select
-                value={historyFilter}
-                onChange={(event) => setHistoryFilter(event.target.value)}
-              >
-                <option value="active">Active conversations</option>
-                <option value="archived">Archived conversations</option>
-                <option value="all">All conversations</option>
-              </select>
-            </label>
-            <label className="archive-toggle">
-              <input
-                type="checkbox"
-                checked={showArchived}
-                onChange={(event) => setShowArchived(event.target.checked)}
-              />
-              Show archived projects
-            </label>
-          </section>
         )}
         <div className="rail-heading">
           <h2>Projects</h2>
@@ -985,8 +1031,6 @@ export function App() {
                 {expandedProjects.has(item.id) && (
                   <History
                     projectId={item.id}
-                    query={item.id === projectId ? historyQuery : ""}
-                    filter={item.id === projectId ? historyFilter : "active"}
                     viewStatus={(id) => {
                       setProjectId(item.id);
                       selectSession(id);
@@ -1047,6 +1091,7 @@ export function App() {
               }
               onClick={() => setTokensOpen(true)}
             >
+              <Icon name="key" />
               API tokens
             </button>
             <button
@@ -1054,6 +1099,7 @@ export function App() {
               onClick={() => setAccountOpen(true)}
               disabled={!identity}
             >
+              <Icon name="settings" />
               Codex account{" "}
               <span>
                 {capabilities?.account?.authenticated ? "Ready" : "Set up"}
@@ -1065,6 +1111,7 @@ export function App() {
               onClick={() => setEmergencyOpen(true)}
               disabled={!identity || stopped}
             >
+              <Icon name="stop" />
               Emergency stop
             </button>
             <button
@@ -1079,6 +1126,7 @@ export function App() {
               }
               disabled={!identity || sending}
             >
+              <Icon name="logout" />
               Sign out
             </button>
           </div>
@@ -1291,71 +1339,78 @@ export function App() {
                     </p>
                   </div>
                 )}
-                {snapshot?.messages.map((message) => (
-                  <article
-                    key={message.id}
-                    className={`message message-${message.role}`}
-                    aria-label={`${message.role === "user" ? "You" : message.role === "assistant" ? "Codex" : "Harbor"} message`}
-                  >
-                    <div className="message-heading">
-                      <strong>
-                        {message.role === "user"
-                          ? "You"
-                          : message.role === "assistant"
-                            ? "Codex"
-                            : "Harbor"}
-                      </strong>
-                      <time dateTime={message.createdAt}>
-                        {new Date(message.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </time>
-                    </div>
-                    {message.role === "tool" ? (
-                      <details className="command-output">
-                        <summary>
-                          Command{" "}
-                          {message.status === "streaming"
-                            ? "running"
-                            : "result"}
-                        </summary>
-                        <pre className="message-text">{message.text}</pre>
-                        <small>
-                          Command output is limited to 32 KiB per command and
-                          256 KiB per conversation.
-                        </small>
-                      </details>
-                    ) : message.role === "assistant" ? (
-                      <MarkdownMessage text={message.text} />
-                    ) : (
-                      <div className="message-text">{message.text}</div>
-                    )}
-                    {richDraft.files
-                      .filter(
-                        (a) =>
-                          a.operationId === message.operationId &&
-                          message.role === "user",
-                      )
-                      .map((a) => (
-                        <AttachmentPreview key={a.id} attachment={a} />
-                      ))}
-                    {message.role === "user" && (
-                      <MessageActions text={message.text} />
-                    )}
-                    {message.role === "assistant" &&
-                      responseTexts.has(message.id) && (
-                        <MessageActions
-                          key={`${current.id}:${message.id}`}
-                          text={responseTexts.get(message.id)!}
-                          assistant
+                {groupConversationMessages(snapshot?.messages ?? []).map(
+                  (entry) => {
+                    if (entry.kind === "activity")
+                      return (
+                        <ConversationActivity
+                          key={entry.id}
+                          messages={entry.messages}
                         />
-                      )}
-                    {message.status === "streaming" && (
-                      <span className="streaming-label">Writing…</span>
-                    )}
-                  </article>
-                ))}
+                      );
+                    const message = entry.message;
+                    return (
+                      <article
+                        key={message.id}
+                        className={`message message-${message.role}`}
+                        aria-label={`${message.role === "user" ? "You" : message.role === "assistant" ? "Codex" : "Harbor"} message`}
+                      >
+                        <div
+                          className={
+                            message.role === "user" ? "user-bubble" : undefined
+                          }
+                        >
+                          <div className="message-heading">
+                            <strong>
+                              {message.role === "user"
+                                ? "You"
+                                : message.role === "assistant"
+                                  ? "Codex"
+                                  : "Harbor"}
+                            </strong>
+                            <time dateTime={message.createdAt}>
+                              {new Date(message.createdAt).toLocaleTimeString(
+                                [],
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}
+                            </time>
+                          </div>
+                          {message.role === "assistant" ? (
+                            <MarkdownMessage text={message.text} />
+                          ) : (
+                            <div className="message-text">{message.text}</div>
+                          )}
+                          {richDraft.files
+                            .filter(
+                              (a) =>
+                                a.operationId === message.operationId &&
+                                message.role === "user",
+                            )
+                            .map((a) => (
+                              <AttachmentPreview key={a.id} attachment={a} />
+                            ))}
+                        </div>
+                        {message.role === "user" && (
+                          <MessageActions text={message.text} />
+                        )}
+                        {message.role === "assistant" &&
+                          responseTexts.has(message.id) && (
+                            <MessageActions
+                              key={`${current.id}:${message.id}`}
+                              text={responseTexts.get(message.id)!}
+                              assistant
+                            />
+                          )}
+                        {message.status === "streaming" && (
+                          <span className="streaming-label">Writing…</span>
+                        )}
+                      </article>
+                    );
+                  },
+                )}
                 {pendingApprovals.map((approval) => (
                   <ApprovalCard
                     key={approval.id}
@@ -2095,9 +2150,17 @@ function Modal({
   failure,
   retry,
   returnFocus,
+  initialFocus,
+  backdropDismiss = false,
+  trapFocus = false,
+  className = "",
 }: {
   title: string;
   returnFocus?: string;
+  initialFocus?: string;
+  backdropDismiss?: boolean;
+  trapFocus?: boolean;
+  className?: string;
   children: React.ReactNode;
   close: () => void;
   failure?: string;
@@ -2112,6 +2175,7 @@ function Modal({
         ?.closest("details.action-menu")
         ?.querySelector<HTMLElement>("summary") ?? focused;
     dialog?.showModal();
+    if (initialFocus) dialog?.querySelector<HTMLElement>(initialFocus)?.focus();
     return () => {
       dialog?.close();
       requestAnimationFrame(() => {
@@ -2143,7 +2207,37 @@ function Modal({
   }, []);
   return (
     <dialog
-      className="dialog"
+      className={`dialog ${className}`}
+      onKeyDown={(event) => {
+        if (!trapFocus || event.key !== "Tab") return;
+        const controls = [
+          ...event.currentTarget.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], summary, [tabindex]:not([tabindex="-1"])',
+          ),
+        ].filter(
+          (element) => element.checkVisibility() && !element.closest("[inert]"),
+        );
+        const first = controls[0],
+          last = controls.at(-1);
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }}
+      onClick={(event) => {
+        if (!backdropDismiss || event.target !== event.currentTarget) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        if (
+          event.clientX < rect.left ||
+          event.clientX > rect.right ||
+          event.clientY < rect.top ||
+          event.clientY > rect.bottom
+        )
+          close();
+      }}
       ref={ref}
       aria-labelledby="dialog-title"
       onCancel={(event) => {

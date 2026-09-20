@@ -1593,27 +1593,25 @@
       </section>
       <section class="section" id="conversation-actions">
         <h2>Conversation actions and resource status · 15 September 2026</h2>
-        <p>Keep the white/gray/black foundation. The sole semantic color extension is
+        <p>Keep the white/gray/black foundation. The resource-status semantic color extension is
           <code>--resource-active: #27834a</code>, used only for a 6px circular
           resource-occupation mark. It means confirmed retained runtime or workspace
           reservation, not connection health or generation. Supply accessible text
           and a tooltip; a neutral mark must not claim confirmed idle when unknown.
           Status details describe ownership and release behavior.</p>
         <p>Search uses a top sidebar magnifier and an explicitly labelled current-project
-          input with existing filters. Conversation and project ellipsis buttons use
-          the existing 19px stroke icon system and 30px targets (36px on touch).
+          search dialog (600px maximum, 16px inset) with a prominent 16px input, leading magnifier and close control. Its accessible title and input label are visually hidden. A compact secondary row shows the project with a folder icon and active/archived/all select; archived-project visibility sits beneath. Results are borderless rows with an 18px leading conversation icon, 10px gap and left-aligned labels; use neutral hover/selected fill. Initial focus goes to the input, and results have their own pagination. Search never filters the active sidebar; Escape/backdrop dismiss and restore focus. Expanded project history starts at five rows and Show more adds five; loading disables that control and failure retains rows with Retry. Conversation and project ellipsis buttons use
+          the existing 19px icon system, three filled 1.8px-radius circles, muted neutral contrast and 30px targets (36px on touch). Menu rows have a fixed 18px leading icon column, 10px gap and left-aligned labels.
           Menus reuse 10px radii, 6px item radii, neutral edges and existing menu shadow.
           Open with click, Enter or Space; Escape closes and restores focus. Never
-          require hover on touch. Settings open from the bottom-right gear; no
+          require hover on touch. Browser tap feedback inherits <code>--selected</code>, preserving neutral gray instead of the native colored tap flash. Settings open from the bottom-right gear; no
           configuration actions in a toast. Dialogs reuse the supporting-surface rules.</p>
-        <p>Every user message has a copy action. A completed assistant turn has one
+        <p>Every user message has a copy action beneath and outside its bubble, with 6px separation. Hide it only on hover-capable pointers at rest; message hover, keyboard focus and touch reveal it. Failure feedback remains visible. A completed assistant turn has one
           left-aligned toolbar beneath the final body, ordered copy, like, dislike.
           Copy uses original Markdown for the full turn, excluding tools and interface
           labels. Reactions use aria-pressed, are mutually exclusive and toggleable;
           their state is temporary and has no backend or analytics effects.</p>
-        <p>Code and literal Markdown blocks place copy in a bottom-right toolbar outside
-          their scroll area; use 6px separation and the existing muted icon-button
-          treatment. Keep identical placement on mobile. Copy code without fences or
+        <p>Code and literal Markdown blocks have a single neutral header above the scroll area: language at top left (Text when absent), copy at top right. Use 6px 10px header padding, a 1px bottom edge, 11px muted label and the existing icon-button treatment. Keep identical placement on mobile. Copy code without fences or
           language labels and preserve whitespace. Ordinary paragraphs have no separate
           copy action. Hover and keyboard focus expose a short tooltip; successful
           clipboard completion briefly shows a check, then restores the icon. Failures
@@ -1623,7 +1621,7 @@
       <section class="section" id="conversation-markdown">
         <h2>Conversation Markdown</h2>
         <p>Assistant messages render CommonMark and GFM: paragraphs, headings, emphasis, lists, disabled task checkboxes, quotations, links, rules, tables, inline code and fenced code. User input and command output stay literal. Accumulated streaming text is parsed again as delimiters arrive; unfinished fences remain code, and an outer four-backtick Markdown fence preserves an inner three-backtick example. Never execute raw HTML or automatically fetch image references; images appear as explicit links. Mermaid fences show a visible “Mermaid source” label and readable code in this release.</p>
-        <p>Reuse the 15px/1.75 conversation text (14px mobile), 17px/600 headings (16px mobile), 17px paragraph spacing and 12px monospace inline code with #f2f2f2 surface and 4px radius. Code blocks use the soft surface, 1px edge, 8px radius, 12px padding, and 1.6 line height. Language labels use 11px muted text and 6px separation. Tables use 1px edges and 8px × 12px cell padding with soft header backgrounds; GFM alignment is represented by CSS classes to respect the application CSP. Tables and code scroll internally and are keyboard focusable. Quotations use a 3px edge and 16px inset. Links are underlined, inherit ink, and use the existing focus outline and muted hover state. The standalone prototype includes desktop/mobile specimens for these patterns.</p>
+        <p>Reuse the 15px/1.75 conversation text (14px mobile), 17px/600 headings (16px mobile), 17px paragraph spacing and 12px monospace inline code with #f2f2f2 surface and 4px radius. Code blocks use the soft surface, 1px edge, 8px radius, 12px padding, and 1.6 line height. Language labels use 11px muted text in the block header. Only code syntax may use #8250df (keywords), #0550ae (functions/numbers), #0a3069 (strings), #953800 (attributes/types), and #6e7781 (comments). These content colors never tint shell surfaces, which use equal-channel white/gray values. Bundled highlight.js 11.11.1 supports explicit JavaScript/TypeScript, Python, shell, JSON, YAML, HTML/XML, CSS, SQL, Go, Rust, Java, C/C++ and Markdown aliases, with no detection or network loading. Unknown, unlabelled, Mermaid or blocks larger than 32 KiB stay literal escaped source; highlighting is memoized and copy preserves source bytes. Tables use 1px edges and 8px × 12px cell padding with soft header backgrounds; GFM alignment is represented by CSS classes to respect the application CSP. Tables and code scroll internally and are keyboard focusable. Quotations use a 3px edge and 16px inset. Links are underlined, inherit ink, and use the existing focus outline and muted hover state. The standalone prototype includes desktop/mobile specimens for these patterns.</p>
       </section>
       <section class="section" id="supporting-surfaces">
         <p>
@@ -1654,7 +1652,7 @@
           on-demand status. Do not show unavailable placeholder features.
           Storage, environment, workspace, connection and retention details live
           in their corresponding dialogs. Keep actionable failures and approvals
-          visible in the conversation. Command output remains a quiet disclosure
+          visible in the conversation. Consecutive commands in the same operation share one initially closed activity disclosure, including while running. Its 12px muted summary shows command count/running state with 8px vertical padding; expanded details retain literal diagnostics, and expansion survives updates. Approvals/input and actionable errors stay outside it. Command output remains
           bounded to 32 KiB per command and 256 KiB per conversation.
         </p>
         <div class="specimen">

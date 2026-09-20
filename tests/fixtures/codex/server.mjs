@@ -365,6 +365,22 @@ createInterface({ input: process.stdin }).on("line", (line) => {
         text.includes("[ack-lock]") ? 100 : 30,
       );
     }
+    if (text === "[activity-group]") {
+      let index = 0;
+      const command = () => {
+        const item = {type:"commandExecution", id:randomUUID(), pluginId:null, scriptPath:null, command:`printf 'command ${++index}'`, cwd:process.cwd(), processId:null, source:"agent", status:"inProgress", commandActions:[], aggregatedOutput:null, exitCode:null, durationMs:null};
+        event("item/started", {threadId:p.threadId,turnId:turn.id,item,startedAtMs:0});
+        event("item/commandExecution/outputDelta", {threadId:p.threadId,turnId:turn.id,itemId:item.id,delta:`running command ${index}\n`});
+        timers.set(turn.id, setTimeout(() => {
+          item.status="completed"; item.aggregatedOutput=`command ${index}\n  literal <diagnostic>\n`; item.exitCode=0; item.durationMs=1500;
+          turn.items.push(item);
+          event("item/completed", {threadId:p.threadId,turnId:turn.id,item,startedAtMs:0,completedAtMs:1500});
+          if(index < 3) command(); else finish(p.threadId, turn.id, "Activity complete.", "completed");
+        }, 1500));
+      };
+      command();
+      return;
+    }
     if (text === "[markdown]") {
       const itemId = randomUUID();
       event("item/agentMessage/delta", { threadId: p.threadId, turnId: turn.id, itemId, delta: markdownStart });

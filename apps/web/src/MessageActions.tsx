@@ -37,7 +37,7 @@ export function CopyButton({
     }
   }
   return (
-    <span className="copy-control">
+    <span className={`copy-control ${state === "failed" ? "copy-failed" : ""}`}>
       <button
         type="button"
         className="icon-button"

@@ -13,7 +13,9 @@ export function History({
   query = "",
   filter = "active",
   viewStatus,
+  searchResults = false,
 }: {
+  searchResults?: boolean;
   query?: string;
   filter?: string;
   viewStatus(id: string): void;
@@ -37,11 +39,24 @@ export function History({
     revision: number;
   } | null>(null);
   const epoch = useRef(0);
+  const rowCount = useRef(0);
+  const failedLoad = useRef<{ next?: string; refresh: boolean }>({
+    refresh: false,
+  });
+  const focusScope = useRef<HTMLElement>(null);
+  const pendingActionFocus = useRef<string | null>(null);
   function restoreActionFocus(id: string) {
     requestAnimationFrame(() => {
       const target =
-        document.querySelector<HTMLElement>(`[data-rename-focus="${id}"]`) ??
-        document.querySelector<HTMLElement>(".session-row .session-rename") ??
+        focusScope.current?.querySelector<HTMLElement>(
+          `[data-rename-focus="${id}"]`,
+        ) ??
+        focusScope.current?.querySelector<HTMLElement>(
+          ".session-row .session-rename",
+        ) ??
+        focusScope.current
+          ?.closest("dialog")
+          ?.querySelector<HTMLElement>("input[type=search]") ??
         document.querySelector<HTMLElement>(".project-button.selected");
       target?.focus();
     });
@@ -49,15 +64,16 @@ export function History({
   async function load(next?: string, refresh = false) {
     const requestEpoch = ++epoch.current;
     setLoading(true);
+    failedLoad.current = { next, refresh };
     try {
-      const query = new URLSearchParams({ projectId, q, state, limit: "20" });
+      const query = new URLSearchParams({ projectId, q, state, limit: "5" });
       if (next) query.set("cursor", next);
       let result = await request<{
         sessions: (Session & { snippet: string })[];
         nextCursor: string | null;
       }>("/history?" + query);
       if (refresh) {
-        const targetCount = rows.length;
+        const targetCount = rowCount.current;
         while (result.nextCursor && result.sessions.length < targetCount) {
           if (epoch.current !== requestEpoch) return;
           query.set("cursor", result.nextCursor);
@@ -72,7 +88,17 @@ export function History({
         }
       }
       if (epoch.current !== requestEpoch) return;
-      setRows((old) => (next ? [...old, ...result.sessions] : result.sessions));
+      setRows((old) => {
+        const unique = [
+          ...new Map(
+            (next ? [...old, ...result.sessions] : result.sessions).map(
+              (row) => [row.id, row],
+            ),
+          ).values(),
+        ];
+        rowCount.current = unique.length;
+        return unique;
+      });
       setCursor(result.nextCursor);
       setError("");
     } catch (e) {
@@ -82,13 +108,32 @@ export function History({
       if (epoch.current === requestEpoch) setLoading(false);
     }
   }
+  const identity = `${projectId}:${state}:${q}`;
+  const lastIdentity = useRef(identity);
   useEffect(() => {
-    const timer = setTimeout(() => void load(), 200);
+    const changed = lastIdentity.current !== identity;
+    lastIdentity.current = identity;
+    if (changed) {
+      setRows([]);
+      rowCount.current = 0;
+      setCursor(null);
+      setError("");
+    }
+    setLoading(true);
+    const timer = setTimeout(() => void load(undefined, !changed), 200);
     return () => {
       clearTimeout(timer);
       epoch.current++;
     };
   }, [q, state, projectId, revision]);
+  // The acknowledged mutation also refreshes /sessions. That revision can
+  // supersede this component's read, so restore only after current rows commit.
+  useEffect(() => {
+    if (loading || !pendingActionFocus.current) return;
+    const id = pendingActionFocus.current;
+    pendingActionFocus.current = null;
+    restoreActionFocus(id);
+  }, [loading, rows]);
   const refreshRef = useRef(() => {});
   refreshRef.current = () => {
     if (
@@ -103,8 +148,30 @@ export function History({
     return () => window.clearInterval(timer);
   }, []);
   return (
-    <section className="history" aria-label="Conversation history">
-      {error && <p role="alert">{error}</p>}
+    <section
+      ref={focusScope}
+      className="history"
+      aria-label="Conversation history"
+      aria-busy={loading}
+    >
+      {error && (
+        <div role="alert">
+          <p>{error}</p>
+          <button
+            disabled={loading}
+            onClick={() =>
+              void load(failedLoad.current.next, failedLoad.current.refresh)
+            }
+          >
+            Retry history
+          </button>
+        </div>
+      )}
+      {loading && (
+        <p className="rail-empty" role="status">
+          Loading conversations…
+        </p>
+      )}
       <div className="conversation-list">
         {rows.map((s) => (
           <div
@@ -116,22 +183,26 @@ export function History({
               aria-current={selectedId === s.id ? "page" : undefined}
               onClick={() => select(s.id)}
             >
-              <span
-                className={`rail-dot ${s.backgroundUntil || workspaces.some((w) => w.writerSessionId === s.id) ? "resource-held" : ""}`}
-                title={
-                  s.backgroundUntil ||
-                  workspaces.some((w) => w.writerSessionId === s.id)
-                    ? "Occupying runtime resources"
-                    : "View status for resource details"
-                }
-                role="img"
-                aria-label={
-                  s.backgroundUntil ||
-                  workspaces.some((w) => w.writerSessionId === s.id)
-                    ? "Occupying runtime resources"
-                    : "Resource details available in View status"
-                }
-              />
+              {searchResults ? (
+                <Icon name="compose" />
+              ) : (
+                <span
+                  className={`rail-dot ${s.backgroundUntil || workspaces.some((w) => w.writerSessionId === s.id) ? "resource-held" : ""}`}
+                  title={
+                    s.backgroundUntil ||
+                    workspaces.some((w) => w.writerSessionId === s.id)
+                      ? "Occupying runtime resources"
+                      : "View status for resource details"
+                  }
+                  role="img"
+                  aria-label={
+                    s.backgroundUntil ||
+                    workspaces.some((w) => w.writerSessionId === s.id)
+                      ? "Occupying runtime resources"
+                      : "Resource details available in View status"
+                  }
+                />
+              )}
               <span>
                 {s.title}
                 {workspaces.find((w) => w.id === s.workspaceId) && (
@@ -186,6 +257,7 @@ export function History({
                     });
                   }}
                 >
+                  <Icon name="compose" />
                   Rename
                 </button>
                 <button
@@ -206,12 +278,13 @@ export function History({
                           : "Archive conversation",
                       ),
                       async () => {
-                        await load();
-                        restoreActionFocus(s.id);
+                        pendingActionFocus.current = s.id;
+                        await load(undefined, true);
                       },
                     );
                   }}
                 >
+                  <Icon name="archive" />
                   {s.archived ? "Restore conversation" : "Archive conversation"}
                 </button>
                 <button
@@ -222,6 +295,7 @@ export function History({
                     viewStatus(s.id);
                   }}
                 >
+                  <Icon name="info" />
                   View status
                 </button>
                 {s.backgroundUntil && (
@@ -248,12 +322,13 @@ export function History({
                           "Stop background processes",
                         ),
                         async () => {
-                          await load();
-                          restoreActionFocus(s.id);
+                          pendingActionFocus.current = s.id;
+                          await load(undefined, true);
                         },
                       );
                     }}
                   >
+                    <Icon name="stop" />
                     {s.backgroundStopRequested
                       ? "Stopping background processes…"
                       : "Stop background processes"}
@@ -276,16 +351,10 @@ export function History({
                 { expectedRevision: target.revision, title: target.title },
                 "Rename conversation",
               ),
-              () => {
+              async () => {
                 setEditing(null);
-                void load();
-                requestAnimationFrame(() =>
-                  document
-                    .querySelector<HTMLButtonElement>(
-                      `[data-rename-focus="${target.id}"]`,
-                    )
-                    ?.focus(),
-                );
+                pendingActionFocus.current = target.id;
+                await load(undefined, true);
               },
             );
           }}
@@ -316,8 +385,12 @@ export function History({
         <p className="rail-empty">No matching conversations</p>
       )}
       {cursor && (
-        <button disabled={loading} onClick={() => void load(cursor)}>
-          Load older conversations
+        <button
+          className="history-more"
+          disabled={loading}
+          onClick={() => void load(cursor)}
+        >
+          Show more
         </button>
       )}
     </section>
