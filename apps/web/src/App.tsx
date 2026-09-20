@@ -2209,7 +2209,15 @@ function Modal({
     <dialog
       className={`dialog ${className}`}
       onKeyDown={(event) => {
-        if (!trapFocus || event.key !== "Tab") return;
+        if (!trapFocus) return;
+        if (event.key === "Escape") {
+          // Search inputs otherwise consume the first Escape to clear text.
+          event.preventDefault();
+          event.stopPropagation();
+          close();
+          return;
+        }
+        if (event.key !== "Tab") return;
         const controls = [
           ...event.currentTarget.querySelectorAll<HTMLElement>(
             'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], summary, [tabindex]:not([tabindex="-1"])',

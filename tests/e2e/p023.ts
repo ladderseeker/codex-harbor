@@ -227,6 +227,36 @@ export async function p023({
     fullPage: true,
   });
   await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
+  await opener.click();
+  await search.fill("P023 missing Escape regression");
+  await expect(dialog).toContainText("No matching conversations");
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue("P023 missing Escape regression");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
+  await opener.click();
+  await search.fill("P023 history 00");
+  await expect(dialog.locator(".conversation-link")).toHaveCount(1);
+  const resultMenu = dialog.locator("details.action-menu");
+  const resultMenuSummary = resultMenu.locator("summary");
+  await resultMenuSummary.click();
+  await expect(resultMenu).toHaveAttribute("open", "");
+  const renameAction = resultMenu.getByRole("button", {
+    name: "Rename",
+    exact: true,
+  });
+  await renameAction.focus();
+  await expect(renameAction).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+  await expect(search).toHaveValue("P023 history 00");
+  await expect(resultMenu).not.toHaveAttribute("open");
+  await expect(resultMenuSummary).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
   await expect(opener).toBeFocused();
   await opener.click();
   await page.mouse.click(5, 5);
