@@ -1,0 +1,13 @@
+# Personal service stop can leave unreconciled runtime membership
+
+- Severity: High; retained unknown members prevent the selected instance's clean promotion and can fence affected conversations.
+- Status: Open; observed on installed `817c3d097166`, normal-stop cause unproven.
+- Owner: Main for the current P024 deployment recovery; a product correction requires a separately selected bounded plan after diagnosis.
+- Recorded: 21 September 2026, Asia/Shanghai.
+- Related: [P024 R5](../design/proposals/024-attachments-and-chat-composer.md#follow-up-acceptance-gates), [D014](../design/decisions/014-personal-conversation-concurrency.md#idle-classification-and-retirement), [delivery evidence](../docs/reports/2026-09-21-p024-installed-attachment-fix.md#committed-candidate-and-interrupted-promotion).
+
+The first P024 correction promotion stopped the old services but failed a pre-activation assertion and resumed them. Its exception receipt does not name the assertion. Subsequent read-only inspection observed two unknown conversation-runtime members with matching valid host/boot/generation identity, absent same-boot cgroup paths, and stop-requested session flags. Active/uncertain operation, workspace writer and release counts were zero. This is not evidence of ambiguous operation effects, nor proof of why graceful retirement failed to release membership.
+
+The installed restart implementation intentionally preserves these records: a missing or substituted cgroup does not prove absence. Ordinary restart cannot resolve them, and the personal profile has no targeted operator reconciliation command. The existing verified host-boot-change path can release valid old-boot membership without replaying work or relabeling uncertain effects. That operational recovery does not fix or explain normal-stop retention. The deployment remains guarded until a supported recovery and the full durable-zero checks succeed.
+
+Preserve the fail-closed contract. Do not manually delete memberships, clear stop flags, infer absence from process-group names, or weaken the promotion gate. Reproduce normal systemd stop with isolated Linux state, valid retained runtimes and installed service restrictions; capture bounded retirement and shutdown timing. Determine whether signal delivery, shutdown ordering, timeout or another mechanism prevents durable release. A future correction must retain exact generation/cgroup authority, real supported-Linux regression evidence and independent reviews. Never use owner input as a reproduction.
