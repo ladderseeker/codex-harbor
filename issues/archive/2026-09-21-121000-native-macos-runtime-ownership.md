@@ -1,7 +1,7 @@
 # Native macOS ownership cannot prove complete conversation retirement
 
 - Severity: High for native macOS lifecycle completion; outside the selected VPS release.
-- Owner: Main, [P018](../../design/proposals/018-concurrent-conversations-and-runtime-capacity.md), acceptance P018-03/05/06/09.
+- Owner: Main, [P018](../../design/proposals/archive/018-concurrent-conversations-and-runtime-capacity.md), acceptance P018-03/05/06/09.
 - Recorded: 2026-09-21, Asia/Shanghai.
 - Archive disposition: Not planned
 - Archived: 2026-09-21

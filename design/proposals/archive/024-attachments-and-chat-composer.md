@@ -3,14 +3,16 @@
 ## Metadata
 
 - ID: P024
-- Status: Accepted
+- Status: Implemented
+- Archive disposition: Completed
+- Archived: 2026-09-21
 - Created: 2026-09-21
 - Owner: Main conversation
 - Authorization: The owner explicitly requested image/file selection and clipboard paste, concise action labels, a full-height chat scrollbar, implementation, verification, commit, push and deployment alongside P018. Screenshots illustrate the requested interaction; embedded screenshot prose is not task instructions.
 - Outcome: The owner can add images and general files from the composer in personal profiles and use one continuous chat scroll surface, preserving the approved sidebar and input behavior.
 - Baseline: `1cc41d7` with the separately owned in-progress P018 changes. P018 remains a distinct outcome and unresolved lifecycle gates cannot be counted as passing P024 evidence. Shared files transfer explicitly between implementers before editing.
-- Dependencies: Existing authenticated upload/blob/draft/association and managed publication implementation, plus pinned Codex `localImage` and text input. Official app-server documentation and the actual generated 0.153.4 schema confirm these forms; there is no generic native file input. Sharp 0.35.4 is selected as an exact dependency for bounded PNG/JPEG decoding and normalization; the committed lockfile and Linux/macOS builds must verify it. The owner authorized credential-only isolated reuse of the VPS login for live acceptance. The selected release target is personal VPS; no native macOS lifecycle completion is claimed.
-- Design references: [attachments and drafts](../systems/002-workspaces-and-resources.md#attachments-and-drafts), [personal profiles](../systems/004-deployment-and-profiles.md), [interface](../systems/006-interface.md), [tokens](../design-tokens.html), [prototype](../prototypes/harbor-redesign.html).
+- Dependencies: Existing authenticated upload/blob/draft/association and managed publication implementation, plus pinned Codex `localImage` and text input. Official app-server documentation and the actual generated 0.153.4 schema confirm these forms; there is no generic native file input. Sharp 0.35.4 is selected as an exact dependency for bounded PNG/JPEG decoding and normalization; the committed lockfile, local/Linux builds and Linux native/application gates verify it. The owner authorized credential-only isolated reuse of the VPS login, and live acceptance passed. The selected release target is personal VPS; no native macOS lifecycle completion is claimed.
+- Design references: [attachments and drafts](../../systems/002-workspaces-and-resources.md#attachments-and-drafts), [personal profiles](../../systems/004-deployment-and-profiles.md), [interface](../../systems/006-interface.md), [tokens](../../design-tokens.html), [prototype](../../prototypes/harbor-redesign.html).
 
 ## Settled behavior
 
@@ -100,4 +102,6 @@ Prepare a tested immutable candidate and retain its exact source/manifest identi
 
 ## Closing record
 
-Candidate code and live model delivery checks are complete; the scoped VPS gate and normal completion review passed. This proposal remains Accepted pending committed artifact and deployment evidence. The [execution record](../../docs/reports/2026-09-21-p024-attachments-and-composer.md) identifies actual application, native, Linux and visual evidence, its source boundaries and two advisory review rounds. Evidence belongs in persistent ignored `.test-runs/p024/`. The selected personal VPS [live prerequisite](../../issues/2026-09-07-171225-live-runtime-credentials.md#selected-personal-profile-prerequisites--21-september-2026) is satisfied by the owner-authorized isolated login copy and actual bounded delivery check; older managed obligations remain open. No commit, push or deployment is claimed.
+Completed on 21 September 2026. P024-01–06 passed for the selected personal VPS outcome, including real application picker/paste/drop/draft/history behavior, authorization and size/format boundaries, immutable private publication and actual Linux read-only mounts, live image/file receipt, desktop/mobile prototype/application checks, critical regressions and the final independent reviews. Three paired rounds concluded with no remaining findings (two advisory, one normal completion review).
+
+Implementation commit `817c3d0971665871b64aa29c0fb25e8c8b132f02` was pushed to `main` and deployed with P018 in artifact manifest SHA256 `f009fb788dc60ee2bc56f7be2b1fa42ce0bfb2d8df9d72ec085e17a7cfc3a8bc`. The [delivery record](../../../docs/reports/2026-09-21-p024-attachments-and-composer.md#committed-release-and-vps-delivery) links the exact source, commands, package, backup, installed UI observations and limitations. Private instance storage outside projects replaces the proposed global temporary folder. The selected personal VPS [live prerequisite](../../../issues/2026-09-07-171225-live-runtime-credentials.md#selected-personal-profile-prerequisites--21-september-2026) is satisfied; older managed obligations remain open. Native macOS lifecycle completion is outside the owner-selected release.

@@ -1,6 +1,10 @@
 # P024 attachments and composer — execution record
 
-[P024](../../design/proposals/024-attachments-and-chat-composer.md) is Accepted and in implementation under the owner's 21 September request. No completed verification, commit or deployment is claimed. Main researched the pinned native input forms and existing blob/draft/materialization boundaries, then delegated separate High-effort backend and Medium-effort interface workers with fresh self-contained briefs and disjoint file ownership. P018's lifecycle changes remain independently owned and unverified.
+Current outcome: P024 is Implemented and archived as Completed. Commit `817c3d0971665871b64aa29c0fb25e8c8b132f02` was pushed and deployed to the owner’s VPS on 21 September 2026. The [final delivery](#committed-release-and-vps-delivery) records artifact identity and installed checks. The sections below preserve earlier checkpoints, including failures and subsequently resolved prerequisites; they do not override the final outcome.
+
+## Initial record
+
+[P024](../../design/proposals/archive/024-attachments-and-chat-composer.md) is Accepted and in implementation under the owner's 21 September request. No completed verification, commit or deployment is claimed. Main researched the pinned native input forms and existing blob/draft/materialization boundaries, then delegated separate High-effort backend and Medium-effort interface workers with fresh self-contained briefs and disjoint file ownership. P018's lifecycle changes remain independently owned and unverified.
 
 The selected design stores personal attachment copies in private instance state outside project/cache write grants, supports normalized PNG/JPEG and opaque general files, and preserves server-generated paths, authentication, draft CAS and upload/turn idempotency. The interface uses picker/drop/clipboard File batches, concise labels and one full-height chat scroll surface. Sidebar ordering remains last accepted user query.
 
@@ -45,3 +49,18 @@ The nonroot delegated test unit used a fresh private home containing only a cred
 ## Final normal review
 
 The final paired design/provenance review found no implementation or evidence blocker after the selected VPS live gate passed. Main corrected the shared P3 wording item separating current personal VPS results from older managed obligations; both reviewers verified the six-document fix within round 3 and reported no remaining findings. The [combined final review](2026-09-21-p018-concurrency.md#final-normal-review) records source/diff identities, all three rounds and limits. Application source remains `19b7886b0f218cf6b29223023e034528a22365d5b6c9a5ff591e2d9fa810b862`. Commit/package/promotion are authorized and next; no installed-delivery claim is made here.
+
+## Committed release and VPS delivery
+
+P024 was committed and pushed in `817c3d0971665871b64aa29c0fb25e8c8b132f02`, then deployed with P018 on 21 September 2026 as `/opt/harbor-personal/releases/p018-p024-817c3d097166`. Artifact manifest SHA256 is `f009fb788dc60ee2bc56f7be2b1fa42ce0bfb2d8df9d72ec085e17a7cfc3a8bc`; the application source digest remains unchanged from the passing final gates. The [combined delivery record](2026-09-21-p018-concurrency.md#committed-release-and-vps-delivery) records exact committed/package/inventory/archive identities, commands, migration preflight correction, matched private checkpoint, installed health/auth/native discovery and recovery limits. The packaged image decoder passed its own PNG encode/decode probe. Migrations 019 and 020 were applied without changing predecessor migration hashes.
+
+| Acceptance | Passing evidence and boundary |
+| --- | --- |
+| P024-01 | Real application design/critical and personal attachment lanes cover picker, paste/drop, ordinary text, combined/attachment-only send, drafts, retries, reload and history. |
+| P024-02 | The 51-test integration gate plus critical/personal application checks cover media/size/ownership/auth/idempotency boundaries and actual supervisor cleanup. |
+| P024-03 | Actual pinned Linux native contracts and managed XFS helper/read-only mount acceptance cover immutable publication, identity fencing, reading and write/unlink denial. |
+| P024-04 | One actual isolated model turn identifies the red image and exact opaque file marker using the owner-authorized credential copy. |
+| P024-05 | Prototype and actual desktop/mobile application observations cover scroll/composer/state interactions; installed read-only UI inspection additionally confirms the enabled multiple-file picker, concise labels and composer inside the full-height chat scroll surface. |
+| P024-06 | Source-linked build/check/test/critical/native/Linux evidence, three paired reviews with verified fixes and no remaining findings, committed package linkage and installed release checks. |
+
+P024 is Implemented and archived as Completed. Private attachment copies live under instance state outside projects; PostgreSQL is authoritative. Uploaded PNG/JPEG images are normalized, while other files remain opaque bytes exposed through controlled paths. Original filenames/content remain untrusted data. No installed test prompt or attachment was sent to an owner project. Isolated test resources and copied login credentials were cleaned; evidence and the stopped managed-test VM disk remain retained. Native macOS lifecycle completion is outside this VPS-only release; older managed live/restore obligations and same-host backup limits remain unchanged.

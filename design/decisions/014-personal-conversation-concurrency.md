@@ -1,7 +1,7 @@
 # D014 — Personal conversation concurrency
 
 - Decision: Accepted, 21 September 2026, under the owner’s P018 implementation and deployment request.
-- Execution: [P018](../proposals/018-concurrent-conversations-and-runtime-capacity.md).
+- Execution: [P018](../proposals/archive/018-concurrent-conversations-and-runtime-capacity.md).
 - Scope: released personal VPS conversation scheduling. Shared personal-local code remains present, but native macOS lifecycle support is not planned for this release under the owner’s 21 September decision. Shared scheduler regressions retain the managed contract.
 - Supersedes: [D005](005-managed-project-workspaces.md) workspace-exclusive conversation ownership only for the two personal profiles. Managed file/Git, terminal, preview and conversation ownership remains exclusive.
 
