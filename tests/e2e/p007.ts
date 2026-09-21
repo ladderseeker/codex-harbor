@@ -1,3 +1,4 @@
+import { lockSessionResource } from "../../packages/storage/src/session-lock.ts";
 import { saveConversationOutput } from "../../apps/supervisor/src/conversation-output.ts";
 import { digest } from "../../packages/policy/src/index.ts";
 import {
@@ -704,6 +705,7 @@ export async function p007(h: Context) {
   // Exact replay bounds are independent of uncertain durable state and delayed janitors.
   const replaySession = await newSession();
   await transaction(db, async (tx) => {
+    await lockSessionResource(tx, replaySession);
     for (let i = 0; i < 2001; i++)
       await event(tx, replaySession, "test.replay", { i });
   });
@@ -766,11 +768,15 @@ export async function p007(h: Context) {
         }),
       { id: replaySession, cursor },
     );
-  await transaction(db, (tx) =>
-    event(tx, replaySession, "test.before-subscribe", {}),
-  );
+  await transaction(db, async (tx) => {
+    await lockSessionResource(tx, replaySession);
+    await event(tx, replaySession, "test.before-subscribe", {});
+  });
   await connectReplay(snap.cursor);
-  await transaction(db, (tx) => event(tx, replaySession, "test.after-gap", {}));
+  await transaction(db, async (tx) => {
+    await lockSessionResource(tx, replaySession);
+    await event(tx, replaySession, "test.after-gap", {});
+  });
   await expect
     .poll(() => page.evaluate(() => (window as any).p007Stream.events.length))
     .toBe(2);
@@ -783,6 +789,7 @@ export async function p007(h: Context) {
     [snap.cursor + 2, "test.after-gap"],
   ]);
   await transaction(db, async (tx) => {
+    await lockSessionResource(tx, replaySession);
     for (let i = 0; i < 2001; i++)
       await event(tx, replaySession, "test.live-gap", { i });
   });
@@ -791,7 +798,10 @@ export async function p007(h: Context) {
     .toBe(1);
   const recoveredSnapshot = await snapshot(replaySession);
   await connectReplay(recoveredSnapshot.cursor);
-  await transaction(db, (tx) => event(tx, replaySession, "test.resumed", {}));
+  await transaction(db, async (tx) => {
+    await lockSessionResource(tx, replaySession);
+    await event(tx, replaySession, "test.resumed", {});
+  });
   await expect
     .poll(() => page.evaluate(() => (window as any).p007Stream.events.length))
     .toBe(1);
@@ -1136,24 +1146,83 @@ export async function p007(h: Context) {
         "SELECT (SELECT count(*) FROM intents) AS intents,(SELECT count(*) FROM audits) AS audits",
       )
     ).rows[0];
-    for (let i = 0; i < 3; i++) {
-      const response = await command(
-        "/security/runtime-credentials/remove",
-        {},
-      );
-      if (response.status() !== 200) {
-        const body = await response.json().catch(() => ({}));
-        const code =
-          typeof body?.error?.code === "string" &&
-          /^[A-Z0-9_]{1,80}$/.test(body.error.code)
-            ? body.error.code
-            : "UNAVAILABLE";
-        await writeFile(
-          path.join(h.artifacts, "p007-removal-failure.json"),
-          JSON.stringify({ index: i, status: response.status(), code }) + "\n",
-        );
+    // A removal invalidates discovery. Already-absent removal still performs
+    // native cleanup, so its explicit pre-effect busy fence may reject while
+    // discovery/recovery retires. Keep one key per logical call; only that
+    // documented rejection may wait, and no alias/audit may be added by it.
+    const removalAttempts: {
+      index: number;
+      attempt: number;
+      status: number;
+      code: string | null;
+      elapsedMs: number;
+    }[] = [];
+    try {
+      for (let i = 0; i < 3; i++) {
+        const key = `${Date.now()}:${randomUUID()}`;
+        const started = Date.now();
+        for (let attempt = 0; ; attempt++) {
+          const response = await command(
+            "/security/runtime-credentials/remove",
+            {},
+            key,
+          );
+          const body = await response.json().catch(() => ({}));
+          const code =
+            typeof body?.error?.code === "string" &&
+            /^[A-Z0-9_]{1,80}$/.test(body.error.code)
+              ? body.error.code
+              : null;
+          removalAttempts.push({
+            index: i,
+            attempt,
+            status: response.status(),
+            code,
+            elapsedMs: Date.now() - started,
+          });
+          if (response.status() === 200) {
+            expect(body.configured).toBe(false);
+            break;
+          }
+          const busy =
+            response.status() === 409 && code === "CREDENTIAL_IN_USE";
+          if (!busy || Date.now() - started >= 15000 || attempt >= 30) {
+            await writeFile(
+              path.join(h.artifacts, "p007-removal-failure.json"),
+              JSON.stringify({
+                index: i,
+                status: response.status(),
+                code: code ?? "UNAVAILABLE",
+              }) + "\n",
+            );
+            expect(
+              response.status(),
+              "Empty credential removal must settle; only bounded pre-effect busy rejection may wait",
+            ).toBe(200);
+          }
+          expect(
+            (
+              await db.query(
+                "SELECT (SELECT count(*) FROM intents) AS intents,(SELECT count(*) FROM audits) AS audits",
+              )
+            ).rows[0],
+          ).toEqual(removalCounts);
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
       }
-      expect(response.status()).toBe(200);
+    } finally {
+      await writeFile(
+        path.join(h.artifacts, "p007-empty-removal-retries.json"),
+        JSON.stringify(
+          {
+            deadlineMs: 15000,
+            sameKeyPerLogicalCall: true,
+            attempts: removalAttempts,
+          },
+          null,
+          2,
+        ),
+      );
     }
     expect(
       (
@@ -1419,6 +1488,7 @@ export async function p007(h: Context) {
     exitCode: 0,
   };
   await transaction(db, async (client) => {
+    await lockSessionResource(client, outputBoundary);
     await saveConversationOutput(
       client,
       outputBoundary,
@@ -1461,8 +1531,9 @@ export async function p007(h: Context) {
     );
     remainingBytes -= size;
   }
-  await transaction(db, (client) =>
-    saveConversationOutput(
+  await transaction(db, async (client) => {
+    await lockSessionResource(client, outputBoundary);
+    await saveConversationOutput(
       client,
       outputBoundary,
       boundaryOperation,
@@ -1474,8 +1545,8 @@ export async function p007(h: Context) {
           aggregatedOutput: "z".repeat(200),
         },
       },
-    ),
-  );
+    );
+  });
   expect(
     Number(
       (

@@ -1,5 +1,6 @@
-import type { DB } from "./index.ts";
+import type { PoolClient } from "pg";
 import { event } from "./index.ts";
+import { lockSessionResource } from "./session-lock.ts";
 export const runtimeProjection = (alias: string) =>
   `(SELECT json_build_object('state',cr.state,'generation',cr.generation,'lastActivityAt',cr.last_activity_at,'idleUntil',cr.idle_until) FROM conversation_runtimes cr WHERE cr.session_id=${alias}.id)`;
 export const workspaceRuntimeProjection = (alias: string) =>
@@ -13,13 +14,11 @@ export type QueueReason =
   | "workspace_busy"
   | "maintenance";
 export async function queueReason(
-  db: DB,
+  db: PoolClient,
   operation: { id: string; session_id: string },
   reason: QueueReason,
 ) {
-  await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
-    operation.session_id,
-  ]);
+  await lockSessionResource(db, operation.session_id);
   const changed = await db.query(
     "UPDATE operations SET queue_reason=$2 WHERE id=$1 AND state='queued' AND queue_reason IS DISTINCT FROM $2 RETURNING id",
     [operation.id, reason],
@@ -31,12 +30,13 @@ export async function queueReason(
     });
 }
 export async function runtimeState(
-  db: DB,
+  db: PoolClient,
   sessionId: string,
   generation: number,
   state: string,
   activity = false,
 ) {
+  await lockSessionResource(db, sessionId);
   const changed = await db.query(
     "UPDATE conversation_runtimes SET state=$3,last_activity_at=CASE WHEN $4 THEN clock_timestamp() ELSE last_activity_at END,idle_until=CASE WHEN $3='idle' THEN CASE WHEN $4 THEN clock_timestamp()+interval '30 minutes' ELSE coalesce(idle_until,last_activity_at+interval '30 minutes') END ELSE NULL END WHERE session_id=$1 AND generation=$2 AND (state IS DISTINCT FROM $3 OR $4) RETURNING session_id",
     [sessionId, generation, state, activity],

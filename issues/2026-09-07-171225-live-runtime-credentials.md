@@ -41,7 +41,7 @@ Remaining dedicated-account scenarios are P001-08 (conversation/approval/cancel)
 
 ## Selected personal-profile prerequisites — 21 September 2026
 
-Main owns the additional bounded prerequisites for [P018-09](../design/proposals/archive/018-concurrent-conversations-and-runtime-capacity.md#verification-and-acceptance) (parallel native conversations and retained-thread reuse) and [P024-04](../design/proposals/archive/024-attachments-and-chat-composer.md#acceptance-and-delivery) (synthetic image identification and exact file-content delivery). These selections do not assign or close the older managed-profile obligations above.
+Main owns the additional bounded prerequisites for [P018-09](../design/proposals/archive/018-concurrent-conversations-and-runtime-capacity.md#verification-and-acceptance) (parallel native conversations and retained-thread reuse) and [P024-04](../design/proposals/024-attachments-and-chat-composer.md#acceptance-and-delivery) (synthetic image identification and exact file-content delivery). These selections do not assign or close the older managed-profile obligations above.
 
 The current dedicated test key/model are absent locally, and the inspected isolated candidate parent has no matching dedicated live configuration. The bounded drivers now exist at `tests/personal-vps/concurrency-live.ts` and `tests/personal-vps/attachments-live.ts`; missing-prerequisite exits are not live acceptance. Account-free pinned native contracts, real application tests with external runtime fixtures and actual Linux isolation have separate evidence scopes in the [P018](../docs/reports/2026-09-21-p018-concurrency.md) and [P024](../docs/reports/2026-09-21-p024-attachments-and-composer.md) execution records.
 

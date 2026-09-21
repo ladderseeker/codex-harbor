@@ -1,4 +1,6 @@
 import sharp from "sharp";
+import { createConnection } from "node:net";
+import { Agent as HttpAgent, request as httpRequest } from "node:http";
 import { ATTACHMENT_LIMITS } from "../../packages/contracts/src/attachments.ts";
 import { attachmentWorkspaces } from "./p005-workspaces.ts";
 import { expect, type Page, type BrowserContext } from "@playwright/test";
@@ -6,11 +8,12 @@ import type { Pool } from "pg";
 import { randomUUID, createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { request as httpsRequest } from "node:https";
+import { Agent as HttpsAgent, request as httpsRequest } from "node:https";
 import { request as playwrightRequest } from "@playwright/test";
 import { png, highBitPng } from "../fixtures/png.ts";
 import { maintainAttachments } from "../../packages/attachments/src/store.ts";
 export async function p005({
+  apiPort,
   page,
   context,
   origin,
@@ -20,6 +23,7 @@ export async function p005({
   traceFile,
   artifacts,
 }: {
+  apiPort: number;
   page: Page;
   context: BrowserContext;
   origin: string;
@@ -681,11 +685,198 @@ export async function p005({
       })
     ).status(),
   ).toBe(400);
+  const rejectedUpload = await stageFile(negative.id, Buffer.from("bounded"));
+  const oversized = Buffer.alloc(ATTACHMENT_LIMITS.fileBytes + 1);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const rejected = await putFile(rejectedUpload.id, oversized);
+    expect(rejected.status()).toBe(413);
+    expect((await rejected.json()).error.code).toBe("REQUEST_TOO_LARGE");
+  }
+  // Exercise framed streaming rejection through the real HTTPS proxy, then
+  // reuse that exact client connection for a valid authenticated request.
+  const uploadCookie = (await context.cookies(origin))
+    .map((c) => `${c.name}=${c.value}`)
+    .join("; ");
+  const agent = new HttpsAgent({ keepAlive: true, maxSockets: 1 });
+  const directAgent = new HttpAgent({ keepAlive: true, maxSockets: 1 });
+  const framedRequest = (upload: boolean, direct = false) =>
+    new Promise<{ status: number; code?: string; reusedSocket: boolean }>(
+      (resolve, reject) => {
+        let sent = false,
+          received = false,
+          status = 0,
+          responseBody = "";
+        const complete = () => {
+          if (sent && received) {
+            let code: string | undefined;
+            try {
+              code = JSON.parse(responseBody).error?.code;
+            } catch {
+              reject(Error("Expected JSON response after framed request"));
+              return;
+            }
+            resolve({ status, code, reusedSocket: req.reusedSocket });
+          }
+        };
+        const req = (direct ? httpRequest : httpsRequest)(
+          (direct ? `http://127.0.0.1:${apiPort}` : origin) +
+            (upload
+              ? `/api/v1/attachments/${rejectedUpload.id}/content`
+              : "/api/v1/me"),
+          {
+            method: upload ? "PUT" : "GET",
+            agent: direct ? directAgent : agent,
+            rejectUnauthorized: false,
+            headers: {
+              ...headers(),
+              Cookie: uploadCookie,
+              ...(upload
+                ? {
+                    "Content-Type": "application/octet-stream",
+                    "Transfer-Encoding": "chunked",
+                  }
+                : {}),
+            },
+          },
+          (response) => {
+            status = response.statusCode ?? 0;
+            response.on("data", (bytes) => {
+              responseBody += bytes;
+              if (responseBody.length > 65536)
+                req.destroy(Error("Unexpected response size"));
+            });
+            response.once("end", () => {
+              received = true;
+              complete();
+            });
+            response.once("error", reject);
+          },
+        );
+        req.setTimeout(10000, () =>
+          req.destroy(Error("Framed upload timed out")),
+        );
+        req.once("finish", () => {
+          sent = true;
+          complete();
+        });
+        req.once("error", reject);
+        req.end(upload ? oversized : undefined);
+      },
+    );
+  try {
+    for (const direct of [false, true]) {
+      const chunked = await framedRequest(true, direct);
+      expect(chunked.status).toBe(413);
+      expect(chunked.code).toBe("REQUEST_TOO_LARGE");
+      const subsequent = await framedRequest(false, direct);
+      expect(subsequent.status).toBe(200);
+      expect(subsequent.reusedSocket).toBe(true);
+    }
+  } finally {
+    agent.destroy();
+    directAgent.destroy();
+  }
+  // Test the API's own drain deadline, bypassing proxy/client timeouts. Send
+  // only one byte of a declared 1 GiB body, or omit the final chunk after crossing
+  // the real parser cap. No allocation scales with the declared huge length.
+  const drainDeadlines = [];
+  for (const framing of ["content-length", "chunked"] as const) {
+    const observed = await new Promise<{
+      response: string;
+      elapsedMs: number;
+      responseAtMs: number;
+    }>((resolve, reject) => {
+      const started = Date.now();
+      let response = "",
+        responseAtMs = -1;
+      const socket = createConnection({ host: "127.0.0.1", port: apiPort });
+      const deadline = setTimeout(() => {
+        reject(Error("Oversized body was not retired by its drain deadline"));
+        socket.destroy();
+      }, 10000);
+      socket.once("connect", () => {
+        const requestHeaders = {
+          Host: `127.0.0.1:${apiPort}`,
+          ...headers(),
+          Cookie: uploadCookie,
+          "Content-Type": "application/octet-stream",
+          Connection: "keep-alive",
+          ...(framing === "content-length"
+            ? { "Content-Length": "1073741824" }
+            : { "Transfer-Encoding": "chunked" }),
+        };
+        socket.write(
+          `PUT /api/v1/attachments/${rejectedUpload.id}/content HTTP/1.1\r\n` +
+            Object.entries(requestHeaders)
+              .map(([key, value]) => `${key}: ${value}\r\n`)
+              .join("") +
+            "\r\n",
+        );
+        if (framing === "content-length") socket.write("x");
+        else {
+          socket.write(oversized.length.toString(16) + "\r\n");
+          socket.write(oversized);
+          socket.write("\r\n");
+        }
+      });
+      socket.on("data", (bytes) => {
+        if (responseAtMs < 0) responseAtMs = Date.now() - started;
+        response += bytes;
+        if (response.length > 8192) {
+          reject(Error("Unexpected oversized response"));
+          socket.destroy();
+        }
+      });
+      socket.once("error", (error) => {
+        if (!response.startsWith("HTTP/1.1 413 ")) reject(error);
+      });
+      socket.once("close", () => {
+        clearTimeout(deadline);
+        resolve({ response, elapsedMs: Date.now() - started, responseAtMs });
+      });
+    });
+    expect(Number(observed.response.split(" ")[1])).toBe(413);
+    expect(JSON.parse(observed.response.split("\r\n\r\n")[1]).error.code).toBe(
+      "REQUEST_TOO_LARGE",
+    );
+    expect(observed.responseAtMs).toBeLessThan(3000);
+    expect(observed.elapsedMs).toBeGreaterThanOrEqual(4000);
+    expect(observed.elapsedMs).toBeLessThan(8000);
+    drainDeadlines.push({
+      framing,
+      elapsedMs: observed.elapsedMs,
+      responseAtMs: observed.responseAtMs,
+    });
+  }
+  await writeFile(
+    path.join(artifacts, "p024-upload-transport.json"),
+    JSON.stringify(
+      {
+        passed: true,
+        repeatedProxyOversize413: 3,
+        chunkedOversize413: true,
+        validSameConnectionRequest: true,
+        drainDeadlines,
+      },
+      null,
+      2,
+    ),
+  );
   expect(
     (
-      await putFile(a.id, Buffer.alloc(ATTACHMENT_LIMITS.fileBytes + 1))
-    ).status(),
-  ).toBe(413);
+      await db.query("SELECT state,content FROM attachments WHERE id=$1", [
+        rejectedUpload.id,
+      ])
+    ).rows[0],
+  ).toEqual({ state: "uploading", content: null });
+  const malformed = await context.request.post(
+    origin + `/api/v1/sessions/${negative.id}/draft`,
+    {
+      headers: { ...headers(), "Content-Type": "application/json" },
+      data: "{",
+    },
+  );
+  expect(malformed.status()).toBe(400);
   expect(
     (
       await command(`/sessions/${negative.id}/turns`, {

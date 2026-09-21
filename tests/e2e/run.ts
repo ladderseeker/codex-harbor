@@ -10,6 +10,7 @@ if (process.argv.includes("--terminals")) {
 }
 import { p005 } from "./p005.ts";
 import { acknowledgementContention } from "./acknowledgement.ts";
+import { conversationLockOrder } from "./conversation-lock-order.ts";
 import { p007 } from "./p007.ts";
 import { p023 } from "./p023.ts";
 import { p024 } from "./p024.ts";
@@ -38,19 +39,75 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import pg from "pg";
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { randomUUID, randomBytes, createHash } from "node:crypto";
-import { mkdtemp, mkdir, writeFile, rm, readFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  writeFile,
+  rm,
+  readFile,
+  readdir,
+} from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { createServer } from "node:net";
 import { chromium, expect, request as apiRequest } from "@playwright/test";
+import ts from "typescript";
 const sourceAtStart = sourceDigest();
 const children: ChildProcess[] = [];
 let diagnosticText = "";
 let rotationBearer = "";
+const commandResponses: {
+  sequence: number;
+  path: string;
+  startedAt: number;
+  elapsedMs: number;
+  status: number;
+  errorCode: string | null;
+}[] = [];
+let commandSequence = 0;
+let runFailed = false;
+function safeProcessDiagnostics() {
+  const sqlStateMatches: Record<string, number> = {};
+  for (const match of diagnosticText.matchAll(
+    /(?:["']?code["']?|SQLSTATE)\s*[:=]\s*["']?(40001|40P01|23505|23503|23514|25P02|57014|57P01|08006|53300|P0001)\b/g,
+  ))
+    sqlStateMatches[match[1]] = (sqlStateMatches[match[1]] ?? 0) + 1;
+  const categories = {
+    retiredRuntimeCleanupPending:
+      "Empty retired runtime ownership cleanup remains pending",
+    scheduleReconciliationPending:
+      "Schedule metadata reconciliation remains pending",
+    fileSettlementPending: "File effect settlement remains pending",
+    previewRetirementUnconfirmed: "preview-retirement-unconfirmed",
+  };
+  return {
+    retainedCharacterLimit: 131072,
+    sqlStateMatches,
+    fixedCategoryMatches: Object.fromEntries(
+      Object.entries(categories).map(([key, text]) => [
+        key,
+        diagnosticText.split(text).length - 1,
+      ]),
+    ),
+    children: children.map((child, index) => ({
+      index,
+      exitCode: child.exitCode,
+      signalCode: child.signalCode,
+    })),
+    limits:
+      "Only allowlisted matches in retained output; handled API errors may not be logged, and absence is not evidence of no internal error",
+  };
+}
 const serve = process.argv.includes("--serve");
 const designOnly = process.argv.includes("--design");
+const p002Only = process.argv.includes("--p002-only");
 const schedulesDstOnly = process.argv.includes("--schedules-dst");
 const schedulesOnly = process.argv.includes("--schedules") || schedulesDstOnly;
+if (
+  p002Only &&
+  (serve || designOnly || schedulesOnly || process.argv.includes("--critical"))
+)
+  throw Error("--p002-only requires its own isolated diagnostic run");
 const dir = await mkdtemp(
     path.join(
       process.platform === "darwin" ? "/private/tmp" : os.tmpdir(),
@@ -110,9 +167,236 @@ const compose = (args: string[]) =>
     stdio: "pipe",
     timeout: 120000,
   });
+const normalizeDiagnosticSql = (sql: string) => sql.trim().replace(/\s+/g, " ");
+async function staticSqlSources() {
+  const statements = new Map<string, string[]>();
+  async function visit(directory: string) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const filename = path.join(directory, entry.name);
+      if (entry.isDirectory()) await visit(filename);
+      else if (entry.isFile() && entry.name.endsWith(".ts")) {
+        const source = ts.createSourceFile(
+          filename,
+          await readFile(filename, "utf8"),
+          ts.ScriptTarget.Latest,
+          true,
+        );
+        const inspect = (node: ts.Node) => {
+          if (
+            ts.isStringLiteral(node) ||
+            ts.isNoSubstitutionTemplateLiteral(node)
+          ) {
+            const sql = normalizeDiagnosticSql(node.text);
+            if (
+              /^(SELECT|UPDATE|INSERT|DELETE|WITH|BEGIN|COMMIT|ROLLBACK|SET|LOCK)\b/i.test(
+                sql,
+              )
+            ) {
+              const line =
+                source.getLineAndCharacterOfPosition(node.getStart(source))
+                  .line + 1;
+              const anchors = statements.get(sql) ?? [];
+              anchors.push(`${filename.split(path.sep).join("/")}:${line}`);
+              statements.set(sql, anchors);
+            }
+          }
+          ts.forEachChild(node, inspect);
+        };
+        inspect(source);
+      }
+    }
+  }
+  for (const directory of [
+    "apps/api/src",
+    "apps/supervisor/src",
+    "packages/storage/src",
+    "packages/workspaces/src",
+  ])
+    await visit(directory);
+  return statements;
+}
+function deadlockStatementSources(
+  logs: string,
+  sources: Map<string, string[]>,
+) {
+  const statements: {
+    deadlockIndex: number;
+    processId: string;
+    queryHash: string;
+    classification: "static_sql_literal" | "unknown";
+    sourceAnchors: string[];
+    sourceAnchorCount: number;
+  }[] = [];
+  let deadlockIndex = 0;
+  let inDeadlockDetail = false;
+  let current: { processId: string; sql: string } | undefined;
+  const finish = () => {
+    if (!current) return;
+    const normalized = normalizeDiagnosticSql(current.sql);
+    const anchors = sources.get(normalized) ?? [];
+    statements.push({
+      deadlockIndex,
+      processId: current.processId,
+      queryHash: createHash("sha256").update(normalized).digest("hex"),
+      classification: anchors.length ? "static_sql_literal" : "unknown",
+      sourceAnchors: anchors.slice(0, 16),
+      sourceAnchorCount: anchors.length,
+    });
+    if (statements.length > 80) statements.shift();
+    current = undefined;
+  };
+  for (const line of logs.split("\n")) {
+    const record = line.match(
+      /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} UTC \[\d+\] ([A-Z]+):\s+(.*)$/,
+    );
+    if (record) {
+      finish();
+      if (record[1] === "ERROR" && record[2] === "deadlock detected") {
+        deadlockIndex++;
+        inDeadlockDetail = true;
+      } else if (record[1] !== "DETAIL") inDeadlockDetail = false;
+    }
+    if (!inDeadlockDetail) continue;
+    const statement = (record ? record[2] : line.trimStart()).match(
+      /^Process (\d+): (.*)$/,
+    );
+    if (statement) {
+      finish();
+      current = { processId: statement[1], sql: statement[2] };
+    } else if (current && !record) current.sql += "\n" + line;
+  }
+  finish();
+  return statements;
+}
+async function capturePostgresDiagnostics() {
+  const startedAt = Date.now();
+  const byteLimit = 1024 * 1024;
+  let logs = "";
+  let captureStatus = "captured";
+  try {
+    // Raw output stays in bounded memory; never serialize command errors or SQL.
+    logs = execFileSync(
+      "docker",
+      [
+        "compose",
+        ...localComposeFiles(),
+        "logs",
+        "--no-color",
+        "--no-log-prefix",
+        "--tail",
+        "2000",
+        "postgres",
+      ],
+      { env, stdio: "pipe", timeout: 15000, maxBuffer: byteLimit },
+    ).toString();
+  } catch {
+    captureStatus = "unavailable_or_limit_exceeded";
+  }
+  const categories: Record<string, string> = {
+    "deadlock detected": "deadlock_detected",
+    "could not serialize access due to concurrent update":
+      "serialization_concurrent_update",
+    "could not serialize access due to concurrent delete":
+      "serialization_concurrent_delete",
+    "could not serialize access due to read/write dependencies among transactions":
+      "serialization_dependencies",
+    "canceling statement due to statement timeout": "statement_timeout",
+    "canceling statement due to lock timeout": "lock_timeout",
+    "current transaction is aborted, commands ignored until end of transaction block":
+      "transaction_aborted",
+  };
+  const counts = Object.fromEntries(
+    Object.values(categories).map((category) => [category, 0]),
+  );
+  const errors: { timestamp: string; processId: string; category: string }[] =
+    [];
+  for (const line of logs.split("\n")) {
+    const match = line.match(
+      /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} UTC) \[(\d+)\] ERROR:\s+(.+)$/,
+    );
+    const category = match && categories[match[3]];
+    if (!match || !category) continue;
+    counts[category]++;
+    errors.push({ timestamp: match[1], processId: match[2], category });
+    if (errors.length > 80) errors.shift();
+  }
+  const deadlockWaits = [
+    ...logs.matchAll(
+      /(?:DETAIL:\s+|^\s*)Process (\d+) waits for (AccessShareLock|RowShareLock|RowExclusiveLock|ShareUpdateExclusiveLock|ShareLock|ShareRowExclusiveLock|ExclusiveLock|AccessExclusiveLock) on transaction (\d+); blocked by process (\d+)\.\s*$/gm,
+    ),
+  ]
+    .slice(-120)
+    .map((match) => ({
+      processId: match[1],
+      lockType: match[2],
+      transactionId: match[3],
+      blockedByProcessId: match[4],
+    }));
+  let sourceScanStatus = "captured";
+  const sources = await staticSqlSources().catch(() => {
+    sourceScanStatus = "unavailable";
+    return new Map<string, string[]>();
+  });
+  const deadlockStatements = deadlockStatementSources(logs, sources);
+  const diagnosticsDb = new pg.Pool({
+    connectionString: env.DATABASE_URL,
+    max: 1,
+    connectionTimeoutMillis: 5000,
+    query_timeout: 5000,
+  });
+  diagnosticsDb.on("error", () => {});
+  let databaseDeadlocks: number | null = null;
+  try {
+    databaseDeadlocks = Number(
+      (
+        await diagnosticsDb.query(
+          "SELECT deadlocks FROM pg_stat_database WHERE datname=current_database()",
+        )
+      ).rows[0].deadlocks,
+    );
+  } catch {
+    // Retain an explicit unavailable counter without serializing driver errors.
+  } finally {
+    await diagnosticsDb.end();
+  }
+  await writeFile(
+    path.join(artifacts, "postgres-diagnostics.json"),
+    JSON.stringify(
+      {
+        instance,
+        sourceAtStart,
+        startedAt,
+        elapsedMs: Date.now() - startedAt,
+        captureStatus,
+        tailLineLimit: 2000,
+        byteLimit,
+        counts,
+        errors,
+        deadlockWaits,
+        sourceScanStatus,
+        staticSqlCount: sources.size,
+        deadlockStatements,
+        databaseDeadlocks,
+        limits:
+          "Allowlisted metadata from this fixture's bounded PostgreSQL log tail only; no SQL or raw logs retained. Missing matches do not exclude errors, and timestamps alone do not attribute an error to an HTTP request.",
+      },
+      null,
+      2,
+    ),
+  );
+  return { databaseDeadlocks, loggedDeadlocks: counts.deadlock_detected };
+}
 const start = (file: string) => {
   const p = spawn(process.execPath, ["--import", "tsx", file], {
-    env,
+    env: {
+      ...env,
+      PGAPPNAME:
+        file === "apps/supervisor/src/main.ts"
+          ? "harbor-e2e-supervisor"
+          : file === "apps/api/src/main.ts"
+            ? "harbor-e2e-api"
+            : "harbor-e2e-fixture",
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
   const capture = (b: Buffer) => {
@@ -196,6 +480,97 @@ async function captureFailure(name: string) {
     JSON.stringify({ pages, browserFailures }, null, 2),
   );
 }
+async function captureP002State(db: pg.Pool, outcome: "passed" | "failed") {
+  const sqlState = (error: unknown) => {
+    const code = (error as { code?: unknown })?.code;
+    return typeof code === "string" && /^[A-Z0-9]{5}$/.test(code) ? code : null;
+  };
+  const queries = {
+    operations:
+      "SELECT id,session_id,kind,state,generation,queue_reason,created_at,updated_at FROM operations ORDER BY created_at DESC,id DESC LIMIT 80",
+    unsettledOperations:
+      "SELECT id,session_id,kind,state,generation,queue_reason,created_at,updated_at FROM operations WHERE state IN ('queued','dispatching','running','waiting_approval','waiting_input','uncertain') ORDER BY created_at DESC,id DESC LIMIT 80",
+    sessions:
+      "SELECT id,project_id,workspace_id,state,generation,background_stop_requested,background_until,updated_at FROM sessions ORDER BY updated_at DESC,id DESC LIMIT 80",
+    workspaces:
+      "SELECT id,project_id,kind,state,writer_session_id,writer_generation,writer_kind,writer_owner_id,writer_epoch FROM workspaces ORDER BY (writer_owner_id IS NOT NULL) DESC,created_at DESC,id DESC LIMIT 80",
+    approvals:
+      "SELECT id,session_id,operation_id,state,kind,generation,deadline FROM approvals ORDER BY deadline DESC,id DESC LIMIT 80",
+    events:
+      "SELECT session_id,sequence,type,created_at,CASE WHEN data->>'operationId' ~ '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$' THEN data->>'operationId' END AS operation_id,CASE WHEN data->>'approvalId' ~ '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$' THEN data->>'approvalId' END AS approval_id FROM events ORDER BY created_at DESC,session_id,sequence DESC LIMIT 120",
+    waits:
+      "SELECT state,wait_event_type,wait_event,pg_blocking_pids(pid) AS blockers FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() LIMIT 80",
+  };
+  const entries = Object.entries(queries);
+  const results = await Promise.allSettled(
+    entries.map(([, query]) => db.query(query)),
+  );
+  const metadata = Object.fromEntries(
+    results.map((result, index) => [
+      entries[index][0],
+      result.status === "fulfilled"
+        ? result.value.rows
+        : { unavailable: true, sqlState: sqlState(result.reason) },
+    ]),
+  );
+  let queueFailures: unknown;
+  try {
+    const required = [
+      "id",
+      "name",
+      "state",
+      "retry_count",
+      "created_on",
+      "started_on",
+      "completed_on",
+      "output",
+    ];
+    const observed = (
+      await db.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_schema='pgboss' AND table_name='job'",
+      )
+    ).rows.map((row) => row.column_name as string);
+    queueFailures = required.every((column) => observed.includes(column))
+      ? {
+          observedColumns: required,
+          jobs: (
+            await db.query(
+              "SELECT id,state,retry_count,created_on,started_on,completed_on,CASE WHEN coalesce(output->>'code',output#>>'{value,code}') ~ '^([A-Z0-9]{5}|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EACCES|ENOENT)$' THEN coalesce(output->>'code',output#>>'{value,code}') END AS error_code FROM pgboss.job WHERE name='harbor-dispatch' AND state::text IN ('failed','retry') ORDER BY created_on DESC,id DESC LIMIT 40",
+            )
+          ).rows,
+        }
+      : { unavailable: true, reason: "Expected job schema not observed" };
+  } catch (error) {
+    queueFailures = { unavailable: true, sqlState: sqlState(error) };
+  }
+  await writeFile(
+    path.join(artifacts, `p002-state-${outcome}.json`),
+    JSON.stringify(
+      {
+        instance,
+        outcome,
+        capturedAt: new Date().toISOString(),
+        consistency: "Bounded read-only samples; no transaction freeze",
+        sourceAtStart,
+        limits: {
+          operations: 80,
+          unsettledOperations: 80,
+          sessions: 80,
+          workspaces: 80,
+          approvals: 80,
+          events: 120,
+          waits: 80,
+          queueFailures: 40,
+        },
+        ...metadata,
+        queueFailures,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
 try {
   await mkdir(artifacts, { recursive: true, mode: 0o700 });
   await mkdir(path.join(dir, "project-roots"), { mode: 0o700 });
@@ -377,11 +752,44 @@ try {
       route: string,
       body: unknown,
       key = `${Date.now()}:${randomUUID()}`,
-    ) =>
-      context.request.post(origin + "/api/v1" + route, {
-        data: body,
-        headers: { ...headers, "Idempotency-Key": key },
-      });
+    ) => {
+      const sequence = ++commandSequence;
+      const startedAt = Date.now();
+      const record = (status: number, errorCode: string | null) => {
+        commandResponses.push({
+          sequence,
+          path: /^\/[a-zA-Z0-9/_-]{1,160}$/.test(route)
+            ? route
+            : "UNCLASSIFIED_ROUTE",
+          startedAt,
+          elapsedMs: Date.now() - startedAt,
+          status,
+          errorCode,
+        });
+        if (commandResponses.length > 120) commandResponses.shift();
+      };
+      let response;
+      try {
+        response = await context.request.post(origin + "/api/v1" + route, {
+          data: body,
+          headers: { ...headers, "Idempotency-Key": key },
+        });
+      } catch (error) {
+        record(0, "TRANSPORT_ERROR");
+        throw error;
+      }
+      let errorCode: string | null = null;
+      if (response.status() >= 400) {
+        const result = await response.json().catch(() => undefined);
+        errorCode =
+          typeof result?.error?.code === "string" &&
+          /^[A-Z][A-Z0-9_]{0,79}$/.test(result.error.code)
+            ? result.error.code
+            : "UNCLASSIFIED_RESPONSE";
+      }
+      record(response.status(), errorCode);
+      return response;
+    };
     for (const token of [undefined, "invalid"]) {
       const response = await context.request.post(
         origin + "/api/v1/security/emergency-stop",
@@ -436,7 +844,66 @@ try {
         })
       ).status(),
     ).toBe(403);
-    if (designOnly) {
+    if (p002Only) {
+      const focusedDb = new pg.Pool({ connectionString: env.DATABASE_URL });
+      try {
+        const created = await command("/projects", {
+          name: "Acceptance project",
+          rootId,
+          path: "p002-project",
+          create: true,
+        });
+        expect(created.status()).toBe(200);
+        const projectId = (await created.json()).project.id as string;
+        await page.reload();
+        await expect(
+          page
+            .locator(".project-button")
+            .filter({ hasText: "Acceptance project" }),
+        ).toBeVisible();
+        rotationBearer = await p002({
+          page,
+          context,
+          origin,
+          csrf: me.csrfToken,
+          db: focusedDb,
+          projectId,
+          logs: () => diagnosticText,
+          artifacts,
+          pauseSupervisor: () => {
+            supervisor.kill("SIGSTOP");
+          },
+          resumeSupervisor: () => {
+            supervisor.kill("SIGCONT");
+          },
+        });
+        await captureP002State(focusedDb, "passed");
+        await writeFile(
+          path.join(artifacts, "result.json"),
+          JSON.stringify(
+            {
+              instance,
+              status: "passed",
+              sourceAtStart,
+              sourceAtEnd: sourceDigest(),
+              node: process.version,
+              scope:
+                "P002 isolated diagnostic: unchanged real browser/API/PostgreSQL/supervisor assertions; external OIDC/Codex fixtures only; full critical gate remains separate",
+            },
+            null,
+            2,
+          ),
+        );
+        console.log(
+          "P002 isolated real-stack diagnostic passed. Artifacts: " + artifacts,
+        );
+      } catch (error) {
+        await captureP002State(focusedDb, "failed").catch(() => undefined);
+        throw error;
+      } finally {
+        await focusedDb.end();
+      }
+    } else if (designOnly) {
       await p014({
         page,
         context,
@@ -642,12 +1109,21 @@ try {
           { timeout: 30000 },
         )
         .toBe("succeeded");
-      const delayed = await (
-        await command(`/sessions/${id}/turns`, {
-          ...payload,
-          text: "[delay] [background] cancel me",
-        })
-      ).json();
+      const delayedResponse = await command(`/sessions/${id}/turns`, {
+        ...payload,
+        text: "[delay] [background] cancel me",
+      });
+      expect(
+        delayedResponse.status(),
+        "Delayed turn admission must be accepted",
+      ).toBe(202);
+      const delayed = await delayedResponse.json();
+      expect(
+        delayed.operation?.id,
+        "Accepted turn must identify its operation",
+      ).toMatch(
+        /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/,
+      );
       await expect
         .poll(
           async () =>
@@ -784,12 +1260,44 @@ try {
         expect(response.status()).toBe(200);
         return (await response.json()).session.id as string;
       };
-      const getSnapshot = async (sessionId: string) =>
-        (
-          await context.request.get(
-            origin + `/api/v1/sessions/${sessionId}/snapshot`,
-          )
-        ).json();
+      const getSnapshot = async (sessionId: string) => {
+        const startedAt = Date.now();
+        const response = await context.request.get(
+          origin + `/api/v1/sessions/${sessionId}/snapshot`,
+        );
+        const body = await response.json().catch(() => undefined);
+        const code = body?.error?.code;
+        const errorCode =
+          typeof code === "string" && /^[A-Z_]{1,64}$/.test(code)
+            ? code
+            : "UNCLASSIFIED_RESPONSE";
+        if (response.status() !== 200 || body?.session?.id !== sessionId)
+          await writeFile(
+            path.join(artifacts, "snapshot-response-failure.json"),
+            JSON.stringify(
+              {
+                path: `/api/v1/sessions/${sessionId}/snapshot`,
+                startedAt,
+                elapsedMs: Date.now() - startedAt,
+                status: response.status(),
+                errorCode,
+                sessionPresent: Boolean(body?.session),
+                api: { exitCode: api.exitCode, signalCode: api.signalCode },
+                supervisor: {
+                  exitCode: supervisor.exitCode,
+                  signalCode: supervisor.signalCode,
+                },
+              },
+              null,
+              2,
+            ),
+          );
+        expect(response.status(), `Snapshot response: ${errorCode}`).toBe(200);
+        expect(body?.session?.id, "Snapshot must contain its session").toBe(
+          sessionId,
+        );
+        return body;
+      };
       const inputSession = await newSession();
       const input = await (
         await command(`/sessions/${inputSession}/turns`, {
@@ -846,6 +1354,21 @@ try {
       ).toBe(beforeCredentialChange.state);
       const testDb = new pg.Pool({ connectionString: env.DATABASE_URL });
       try {
+        await conversationLockOrder({
+          db: testDb,
+          command,
+          context,
+          origin,
+          artifacts,
+          fixtureState: env.HARBOR_FIXTURE_STATE_DIR,
+          newSession,
+          pauseSupervisor: () => {
+            supervisor.kill("SIGSTOP");
+          },
+          resumeSupervisor: () => {
+            supervisor.kill("SIGCONT");
+          },
+        });
         // Lose captured-runtime eligibility after the real managed writer claim.
         // A retry must roll back that claim, so ordinary dispatch can still run.
         const rollbackSession = await newSession();
@@ -936,6 +1459,7 @@ try {
           artifacts,
         });
         await p005({
+          apiPort,
           page: reopened,
           context,
           origin,
@@ -970,6 +1494,7 @@ try {
             supervisor.kill("SIGCONT");
           },
         }).catch(async (error) => {
+          await captureP002State(testDb, "failed").catch(() => undefined);
           await writeFile(
             path.join(artifacts, "p002-queue-failure.json"),
             JSON.stringify(
@@ -1001,6 +1526,7 @@ try {
           );
           throw error;
         });
+        await captureP002State(testDb, "passed");
         const interruptCrashSession = await newSession();
         const interruptCrash = await (
           await command(`/sessions/${interruptCrashSession}/turns`, {
@@ -1820,9 +2346,28 @@ try {
     }
   }
 } catch (error) {
+  runFailed = true;
   await captureFailure("browser-failure").catch(() => undefined);
   throw error;
 } finally {
+  const postgresDiagnostics = await capturePostgresDiagnostics().catch(
+    () => undefined,
+  );
+  await writeFile(
+    path.join(artifacts, "command-responses.json"),
+    JSON.stringify(
+      {
+        instance,
+        sourceAtStart,
+        totalCommands: commandSequence,
+        retainedLimit: 120,
+        responses: commandResponses,
+        processDiagnostics: safeProcessDiagnostics(),
+      },
+      null,
+      2,
+    ),
+  ).catch(() => undefined);
   await browser?.close();
   for (const p of children) p.kill("SIGTERM");
   await Promise.all(
@@ -1842,5 +2387,15 @@ try {
     compose(["down", "--volumes", "--remove-orphans"]);
   } finally {
     await rm(dir, { recursive: true, force: true });
+  }
+  if (!runFailed) {
+    expect(
+      postgresDiagnostics?.databaseDeadlocks,
+      "Fresh fixture database must contain no deadlocks",
+    ).toBe(0);
+    expect(
+      postgresDiagnostics?.loggedDeadlocks,
+      "Retained PostgreSQL log must contain no deadlocks",
+    ).toBe(0);
   }
 }

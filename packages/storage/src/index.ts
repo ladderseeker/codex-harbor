@@ -79,7 +79,13 @@ export async function transaction<T>(
     db.release();
   }
 }
-export async function event(db: DB, id: string, type: string, data: unknown) {
+/** Caller holds project -> workspace -> session locks in this transaction. */
+export async function event(
+  db: pg.PoolClient,
+  id: string,
+  type: string,
+  data: unknown,
+) {
   const r = await db.query(
     "UPDATE sessions SET sequence=sequence+1,updated_at=now() WHERE id=$1 RETURNING sequence",
     [id],
@@ -135,8 +141,8 @@ export function publicRow(row: Record<string, unknown>) {
       ]),
   );
 }
-/** Caller holds this conversation lock before changing any turn state. */
-export async function deriveSessionState(db: DB, sessionId: string) {
+/** Caller holds project -> workspace -> session locks before changing turn state. */
+export async function deriveSessionState(db: pg.PoolClient, sessionId: string) {
   await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [sessionId]);
   const states = await db.query(
     "SELECT state FROM operations WHERE session_id=$1 AND kind='turn' AND NOT (state='uncertain' AND uncertainty_acknowledged_at IS NOT NULL) ORDER BY created_at DESC,id DESC",

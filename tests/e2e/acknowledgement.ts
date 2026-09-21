@@ -11,6 +11,7 @@ import {
 } from "./acknowledgement-db.ts";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { observeParentWaitGraph } from "./conversation-lock-order.ts";
 export async function acknowledgementContention(o: {
   db: Pool;
   command(route: string, body: unknown, key?: string): Promise<APIResponse>;
@@ -34,6 +35,9 @@ export async function acknowledgementContention(o: {
   let operationId: string | undefined,
     ackPid: number | undefined,
     requestPid: number | undefined;
+  let requestWaitGraph:
+    | Awaited<ReturnType<typeof observeParentWaitGraph>>
+    | undefined;
   const cleanupErrors: string[] = [];
   try {
     gate = await db.connect();
@@ -76,14 +80,14 @@ export async function acknowledgementContention(o: {
       .poll(
         async () => {
           // The fixture emits only the approval after ACK for this marker. Its
-          // request handler is therefore the session-row contender, not an earlier
+          // request handler is therefore the parent-row contender, not an earlier
           // turn/started notification or a synthetic Harbor transaction.
-          const rows = (
-            await db.query(
-              "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND $1::int=ANY(pg_blocking_pids(pid)) AND query='SELECT id FROM sessions WHERE id=$1 FOR UPDATE'",
-              [ackPid],
-            )
-          ).rows;
+          requestWaitGraph = await observeParentWaitGraph(
+            db,
+            ackPid!,
+            "harbor-e2e-supervisor",
+          );
+          const rows = requestWaitGraph.chains;
           if (rows.length === 1) requestPid = Number(rows[0].pid);
           return rows.length;
         },
@@ -200,6 +204,7 @@ export async function acknowledgementContention(o: {
           operationId,
           ackPid,
           requestPid,
+          requestWaitGraph,
           cleanupErrors,
         },
         null,

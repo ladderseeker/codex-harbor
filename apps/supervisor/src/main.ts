@@ -1,4 +1,8 @@
 import {
+  lockSessionResource,
+  lockSessionResources,
+} from "../../../packages/storage/src/session-lock.ts";
+import {
   runtimeState,
   queueReason,
 } from "../../../packages/storage/src/conversation-runtimes.ts";
@@ -159,6 +163,12 @@ const generation = await transaction(pool, async (db) => {
         "UPDATE harbor_meta SET generation=generation+1 RETURNING generation",
       )
     ).rows[0].generation,
+  );
+  await lockSessionResources(
+    db,
+    (await db.query("SELECT id FROM sessions ORDER BY id")).rows.map(
+      (row) => row.id,
+    ),
   );
   await db.query(
     "UPDATE operations SET state='failed',updated_at=now() WHERE kind<>'turn' AND state IN ('dispatching','running','waiting_approval','waiting_input','uncertain')",
@@ -468,9 +478,7 @@ async function update(id: string, state: string, data: unknown = {}) {
     );
     if (!found.rowCount) return;
     const sessionId = found.rows[0].session_id;
-    await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
-      sessionId,
-    ]);
+    await lockSessionResource(db, sessionId);
     await db.query(
       "UPDATE operations SET state=$2,updated_at=now() WHERE id=$1 AND (state<>'uncertain' OR $2='uncertain') AND ($2<>'uncertain' OR state IN ('queued','dispatching','running','waiting_approval','waiting_input','uncertain'))",
       [id, state],
@@ -511,9 +519,7 @@ async function onEvent(
   if (!belongsToTurn(p, captured) || captured.operation !== operationId) return;
   let completed = false;
   await transaction(pool, async (db) => {
-    await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
-      sessionId,
-    ]);
+    await lockSessionResource(db, sessionId);
     const valid = await db.query(
       "SELECT 1 FROM operations WHERE id=$1 AND generation=$2 AND state IN ('dispatching','running','waiting_approval','waiting_input')",
       [operationId, captured.generation],
@@ -575,6 +581,7 @@ async function onEvent(
       processes: [],
     }));
     await transaction(pool, async (db) => {
+      await lockSessionResource(db, sessionId);
       const current = await db.query(
         "UPDATE sessions SET process_inspection=$2 WHERE id=$1 AND generation=$3 RETURNING id",
         [
@@ -625,9 +632,7 @@ async function classifyRuntime(sessionId: string, runtime: RuntimeState) {
     return;
   }
   await transaction(pool, async (db) => {
-    await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
-      sessionId,
-    ]);
+    await lockSessionResource(db, sessionId);
     if (
       !runtime.operation &&
       !runtime.retiring &&
@@ -709,6 +714,7 @@ async function retireSessionRuntime(
     uncertain: async () => {
       if (runtimes.get(sessionId) === runtime) runtimes.delete(sessionId);
       await transaction(pool, async (db) => {
+        await lockSessionResource(db, sessionId);
         if (personal)
           await runtimeState(db, sessionId, runtime.generation, "unknown");
         const saved = await db.query(
@@ -727,6 +733,7 @@ async function retireSessionRuntime(
       if (!personal)
         await releaseWorkspace(pool, sessionId, runtime.generation);
       await transaction(pool, async (db) => {
+        await lockSessionResource(db, sessionId);
         await db.query(
           "DELETE FROM conversation_runtimes WHERE session_id=$1 AND generation=$2",
           [sessionId, runtime.generation],
@@ -767,9 +774,7 @@ async function onRequest(
     return;
   }
   await transaction(pool, async (db) => {
-    await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
-      sessionId,
-    ]);
+    await lockSessionResource(db, sessionId);
     const valid = await db.query(
       "SELECT 1 FROM operations WHERE id=$1 AND generation=$2 AND state IN ('dispatching','running','waiting_approval','waiting_input')",
       [operationId, captured.generation],
@@ -1018,9 +1023,18 @@ async function tick() {
         await update(r.operation, "interrupted", { reason: "Emergency stop" });
       await retireSessionRuntime(id, r);
     }
-    await pool.query(
-      "UPDATE operations SET state='interrupted' WHERE state='queued'",
-    );
+    await transaction(pool, async (db) => {
+      const ids = (
+        await db.query(
+          "SELECT DISTINCT session_id FROM operations WHERE state='queued' ORDER BY session_id",
+        )
+      ).rows.map((row) => row.session_id);
+      await lockSessionResources(db, ids);
+      await db.query(
+        "UPDATE operations SET state='interrupted' WHERE state='queued' AND session_id=ANY($1::uuid[])",
+        [ids],
+      );
+    });
     return;
   }
   if (personal) {
@@ -1092,9 +1106,7 @@ async function tick() {
           expired ? { decision: "decline" } : a.answer,
         );
       await transaction(pool, async (db) => {
-        await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
-          a.session_id,
-        ]);
+        await lockSessionResource(db, a.session_id);
         await db.query("UPDATE approvals SET state=$2 WHERE id=$1", [
           a.id,
           expired ? "expired" : "resolved",
@@ -1120,9 +1132,7 @@ async function tick() {
         [401, 403].includes(error.statusCode)
       ) {
         await transaction(pool, async (db) => {
-          await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
-            a.session_id,
-          ]);
+          await lockSessionResource(db, a.session_id);
           await db.query(
             "UPDATE approvals SET state='pending',answer=NULL,answer_actor_hash=NULL WHERE id=$1 AND state='answering'",
             [a.id],
@@ -1174,9 +1184,7 @@ async function tick() {
             scope: "cancel",
             projectId,
           });
-          await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
-            cancel.session_id,
-          ]);
+          await lockSessionResource(db, cancel.session_id);
           await requireAuthority(db, cancel.actor_hash, c, {
             scope: "cancel",
             projectId,
@@ -1224,9 +1232,7 @@ async function tick() {
         if (!completed && !denied)
           r.mailbox.poison("Turn interruption could not be confirmed");
         const uncertain = await transaction(pool, async (db) => {
-          await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
-            cancel.session_id,
-          ]);
+          await lockSessionResource(db, cancel.session_id);
           const target = (
             await db.query(
               "SELECT state FROM operations WHERE id=$1 FOR UPDATE",
@@ -1783,9 +1789,7 @@ async function tick() {
       await transaction(pool, async (db) => {
         // Match notification persistence: conversation before its operation.
         // An immediate native request may already be waiting to persist here.
-        await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
-          o.session_id,
-        ]);
+        await lockSessionResource(db, o.session_id);
         const active = await db.query(
           "UPDATE operations SET state='running',updated_at=now() WHERE id=$1 AND state='dispatching' RETURNING session_id",
           [o.id],
@@ -1833,9 +1837,7 @@ async function tick() {
       ) {
         if (provenUnstarted)
           await transaction(pool, async (db) => {
-            await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
-              o.session_id,
-            ]);
+            await lockSessionResource(db, o.session_id);
             const released = await db.query(
               "DELETE FROM conversation_runtimes WHERE session_id=$1 AND generation=$2 AND state='starting' AND native_identity IS NULL RETURNING session_id",
               [o.session_id, Number(o.generation)],

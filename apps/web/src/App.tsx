@@ -243,6 +243,7 @@ export function App() {
   const transcriptRef = useRef<HTMLDivElement>(null);
   const followsBottom = useRef(true);
   const [attachmentsBusy, setAttachmentsBusy] = useState(false);
+  const attachmentsBusyRef = useRef(false);
   const visibleApproval = useRef<string | undefined>(undefined);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
@@ -643,8 +644,9 @@ export function App() {
   async function execute(
     intent: Intent,
     complete: (result: unknown) => void = () => {},
+    reserved = false,
   ) {
-    if (!identity || sendingRef.current) return;
+    if (!identity || (sendingRef.current && !reserved)) return;
     sendingRef.current = true;
     setSending(true);
     setError("");
@@ -792,7 +794,8 @@ export function App() {
       uncertain ||
       !settingsReady ||
       !richDraft.ready ||
-      attachmentsBusy ||
+      attachmentsBusyRef.current ||
+      sendingRef.current ||
       richDraft.saving ||
       !!richDraft.error ||
       !workspaceWritable
@@ -807,8 +810,16 @@ export function App() {
       setError("This message is too large. Shorten it before sending.");
       return;
     }
-    const saved = richDraft.dirty ? await richDraft.save() : richDraft.draft;
-    if (!saved) return;
+    sendingRef.current = true;
+    setSending(true);
+    const saved = richDraft.dirty
+      ? await richDraft.save()
+      : richDraft.getDraft();
+    if (!saved) {
+      sendingRef.current = false;
+      setSending(false);
+      return;
+    }
     void execute(
       newIntent(
         `/sessions/${encodeURIComponent(id)}/turns`,
@@ -823,9 +834,10 @@ export function App() {
         "Send message",
       ),
       () => {
-        richDraft.accepted();
+        richDraft.accepted(saved.attachmentIds);
         followsBottom.current = true;
       },
+      true,
     );
   }
 
@@ -1593,6 +1605,7 @@ export function App() {
                       value={text}
                       placeholder="Describe your task…"
                       onChange={(event) =>
+                        !sendingRef.current &&
                         richDraft.edit({ text: event.target.value })
                       }
                       maxLength={capabilities?.limits?.maxInputBytes ?? 32768}
@@ -1618,7 +1631,11 @@ export function App() {
                     {identity && (
                       <AttachmentPicker
                         key={selectedId}
-                        onBusyChange={setAttachmentsBusy}
+                        onBusyChange={(busy) => {
+                          attachmentsBusyRef.current = busy;
+                          setAttachmentsBusy(busy);
+                        }}
+                        isReserved={() => sendingRef.current}
                         state={richDraft}
                         csrf={identity.csrfToken}
                         session={selectedId}

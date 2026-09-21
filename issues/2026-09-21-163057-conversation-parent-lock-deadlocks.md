@@ -1,0 +1,20 @@
+# Conversation regression fixtures encounter PostgreSQL deadlocks
+
+- Severity: High; repeated critical regression failures block the current release.
+- Owner: Main, reopened [P024](../design/proposals/024-attachments-and-chat-composer.md#follow-up-acceptance-gates), acceptance P024-R4.
+- Recorded: 21 September 2026, Asia/Shanghai.
+- Status: Open; mechanism confirmed and correction implemented; full acceptance, independent reviews and delivery pending.
+
+The isolated Linux snapshot 08 critical fixture `harbor-e2e-16b9344d35` captured four PostgreSQL `deadlock detected` errors with numeric transaction wait cycles. The same run failed the P002 approval check, expecting `waiting_approval` but observing `interrupted`. Snapshot 07 separately captured a session-snapshot HTTP 500 `INTERNAL_ERROR` after 1,031 ms. Numeric wait edges and timing do not prove that every prior failure has the same cause. Accessible receipts, exact source identities and failures are in the [correction report](../docs/reports/2026-09-21-p024-installed-attachment-fix.md) and private `.test-runs/p024-send-fix/linux-07/` and `linux-08/` artifacts. No owner data was used.
+
+A source-backed candidate is a parent-lock inversion: repeated updates to one session tuple can recheck its project/workspace foreign keys, acquiring parent key-share locks after the child is already locked. Concurrent admission or retirement takes parent locks before the session. The [P006 retention finding](2026-09-08-005028-p006-implementation-review.md#output-retention-lock-inversion--8-september-2026) records this failure class in a different subsystem; it is precedent, not proof of the current cause. The earlier [native acknowledgement correction](archive/2026-09-13-022009-native-acknowledgement-deadlock.md) remains present and must not be silently reopened as the same defect.
+
+A 300-transaction PostgreSQL 17.6 probe using exact snapshot 07 replay/event modules did not reproduce a failure; it omitted a competing parent-lock holder. Main is verifying the narrower parent/child mechanism with deterministic barriers and capturing only static-source query anchors from full-stack deadlock details. No generic transaction retry, lease clearing, authority weakening or unproven storage change is authorized by diagnosis.
+
+Resolve by identifying the actual cycle, applying the established parent-before-child order before the first child lock where required, retaining a failing old-source control and meaningful corrected-source regression, and passing the complete relevant gate and independent reviews. Preserve all failed observations and their attribution limits.
+
+## Confirmed mechanism and selected correction
+
+Probe03 deterministically reproduced the parent/session foreign-key cycle using unchanged snapshot07 modules and actual observed lock barriers. Snapshot09 then attributed all four full-stack deadlock pairs to the sequence UPDATE in `event()` and the supervisor's exact session-generation locking statement (three source callsites share that SQL). This confirms the mechanism in the real stack without retroactively assigning every prior failure the same cause. Main selected the explicit entry-point resource fence in P024-R4; the canonical conversation design and exact execution fence were updated before implementation. The correction is implemented. Snapshot 11 real-service barriers observed both API and supervisor waiting behind the exact parent gate while a separate transaction acquired the session with NOWAIT, then verified successful native output and approval settlement. No database/logged deadlocks were observed in that attempt, but an unrelated browser transport interruption prevented full critical completion. Complete acceptance, independent reviews and delivery remain pending.
+
+The complete correction gate and one fresh independent design/provenance review round passed. Reviewed personal VPS packaging, promotion and installed verification remain pending; this record stays open until that delivery is confirmed.

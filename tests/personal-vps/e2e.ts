@@ -1,4 +1,8 @@
 import { runAttachments } from "./attachments.ts";
+import {
+  installedLiveConfig,
+  runInstalledAttachments,
+} from "./installed-attachments.ts";
 import { writeFileSync } from "node:fs";
 import { runConcurrency } from "./concurrency.ts";
 import {
@@ -6,7 +10,12 @@ import {
   checkPersonalPreview,
 } from "./preview-fixture.ts";
 /** P015 deterministic acceptance: actual nonroot Harbor; only external OIDC/Codex simulated. */
-import { spawn, execFileSync, type ChildProcess } from "node:child_process";
+import {
+  spawn,
+  execFileSync,
+  spawnSync,
+  type ChildProcess,
+} from "node:child_process";
 import {
   mkdir,
   mkdtemp,
@@ -17,6 +26,7 @@ import {
   writeFile,
   rm,
   stat,
+  lstat,
 } from "node:fs/promises";
 import { createServer as httpsServer } from "node:https";
 import { request as httpRequest } from "node:http";
@@ -30,6 +40,10 @@ if (process.platform !== "linux" || process.getuid?.() !== 0)
   throw Error("P015 E2E needs the trusted Linux administrator test lane");
 const concurrency = process.argv.includes("--concurrency");
 const attachments = process.argv.includes("--attachments");
+const installedLive = process.argv.includes("--installed-attachments-live");
+if ([concurrency, attachments, installedLive].filter(Boolean).length > 1)
+  throw Error("Choose exactly one personal acceptance mode");
+const liveConfig = installedLive ? await installedLiveConfig() : undefined;
 const source = process.cwd(),
   digest = sourceDigest();
 const id = "harbor-p015-" + randomBytes(5).toString("hex");
@@ -39,11 +53,11 @@ const release = path.join(run, "release"),
   state = path.join(run, "state"),
   project = path.join(run, "project");
 const node = path.join(run, "node"),
-  binary = path.join(run, "codex"),
+  binary = liveConfig?.binary ?? path.join(run, "codex"),
   cert = path.join(run, "cert.pem"),
   key = path.join(run, "key.pem");
 const children: ChildProcess[] = [];
-const supervisorUnits = new Map<ChildProcess, string>();
+const serviceUnits = new Map<ChildProcess, string>();
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 let proxy: ReturnType<typeof httpsServer> | undefined;
 let previewFixture:
@@ -59,14 +73,36 @@ async function freePort() {
   return port;
 }
 async function stop(p: ChildProcess) {
-  if (p.exitCode !== null || p.signalCode !== null) return;
-  const unit = supervisorUnits.get(p);
-  if (unit)
-    execFileSync("systemctl", ["stop", unit], {
+  const unit = serviceUnits.get(p);
+  if (unit) {
+    const absent = async () => {
+      try {
+        await lstat(`/sys/fs/cgroup/system.slice/${unit}`);
+        return false;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return true;
+        throw error;
+      }
+    };
+    const stopped = spawnSync("systemctl", ["stop", unit], {
       stdio: "ignore",
       timeout: 35000,
     });
-  else p.kill("SIGTERM");
+    if (stopped.status !== 0) {
+      const loaded = spawnSync(
+        "systemctl",
+        ["show", unit, "--property=LoadState", "--value"],
+        { encoding: "utf8", timeout: 10000 },
+      );
+      if (loaded.stdout?.trim() !== "not-found" || !(await absent()))
+        throw Error("Owned service retirement unconfirmed; resources retained");
+    }
+    // KillMode=control-group must retire retained native children before deleting
+    // the dedicated home/credential. A vanished --collect unit is safe only when
+    // its exact cgroup has also disappeared.
+    await expect.poll(absent, { timeout: 10000 }).toBe(true);
+    serviceUnits.delete(p);
+  } else if (p.exitCode === null && p.signalCode === null) p.kill("SIGTERM");
   if (p.exitCode !== null || p.signalCode !== null) return;
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(
@@ -81,9 +117,19 @@ async function stop(p: ChildProcess) {
 }
 try {
   await mkdir(artifacts, { recursive: true });
+  await writeFile(
+    path.join(artifacts, "owned-resources.json"),
+    JSON.stringify(
+      { id, run, user: id, databaseContainer: id, sourceDigest: digest },
+      null,
+      2,
+    ),
+    { mode: 0o600 },
+  );
   await chmod(run, 0o755);
   await mkdir(release);
-  await mkdir(state, { mode: 0o700 });
+  await mkdir(state, { mode: 0o711 });
+  await chmod(state, 0o711);
   await mkdir(project, { mode: 0o700 });
   for (const entry of [
     "apps",
@@ -102,6 +148,7 @@ try {
   await chmod(node, 0o755);
   await mkdir(path.join(state, "home"), { mode: 0o700 });
   await mkdir(path.join(state, "codex"), { mode: 0o700 });
+  await mkdir(path.join(state, "control"), { mode: 0o700 });
   execFileSync("useradd", [
     "--system",
     "--user-group",
@@ -117,72 +164,84 @@ try {
       execFileSync("id", ["-u", id], { encoding: "utf8" }).trim(),
     ),
     gid = Number(execFileSync("id", ["-g", id], { encoding: "utf8" }).trim());
-  execFileSync("chown", ["-R", `${uid}:${gid}`, state, project]);
-  const fixture = path.join(release, "external-codex.mjs");
-  await writeFile(
-    fixture,
-    `import { startPersonalPreviewApp } from "./tests/personal-vps/preview-app.mjs"; let personalDevApp;
+  for (const child of [
+    project,
+    ...["home", "codex", "control"].map((name) => path.join(state, name)),
+  ])
+    await chown(child, uid, gid);
+  if (liveConfig) {
+    const credential = path.join(state, "codex", "auth.json");
+    await cp(path.join(liveConfig.credentialHome, "auth.json"), credential);
+    await chmod(credential, 0o600);
+    await chown(credential, uid, gid);
+  }
+  if (!liveConfig) {
+    const fixture = path.join(release, "external-codex.mjs");
+    await writeFile(
+      fixture,
+      `import { startPersonalPreviewApp } from "./tests/personal-vps/preview-app.mjs"; let personalDevApp;
 ` +
-      (
-        await readFile(
-          path.join(source, "tests/fixtures/codex/server.mjs"),
-          "utf8",
+        (
+          await readFile(
+            path.join(source, "tests/fixtures/codex/server.mjs"),
+            "utf8",
+          )
         )
-      )
-        .replace(
-          'from "./markdown.mjs"',
-          'from "./tests/fixtures/codex/markdown.mjs"',
-        )
-        .replace("let authenticated = false;", "let authenticated = true;")
-        .replace(
-          "const stateFile = process.env.HARBOR_FIXTURE_STATE_FILE;",
-          'const stateFile = process.env.CODEX_HOME + "/test-history-" + process.env.HARBOR_CONVERSATION_ID + ".json";',
-        )
-        .replace(
-          "const text = p.input[0].text;",
-          `const text = p.input[0].text;
+          .replace(
+            'from "./markdown.mjs"',
+            'from "./tests/fixtures/codex/markdown.mjs"',
+          )
+          .replace("let authenticated = false;", "let authenticated = true;")
+          .replace(
+            "const stateFile = process.env.HARBOR_FIXTURE_STATE_FILE;",
+            'const stateFile = process.env.CODEX_HOME + "/test-history-" + process.env.HARBOR_CONVERSATION_ID + ".json";',
+          )
+          .replace(
+            "const text = p.input[0].text;",
+            `const text = p.input[0].text;
           if (p.input.length > 1) {
             const images=p.input.filter(i=>i.type==='localImage').map(i=>({path:i.path,size:readFileSync(i.path).length}));
             const files=p.input.filter(i=>i.type==='text' && i.text.startsWith('An attached file')).map(i=>{const match=i.text.match(/JSON-encoded path ("(?:[^"\\\\]|\\\\.)*") with display name/);if(!match)throw Error('invalid file input');const path=JSON.parse(match[1]);return {path,hex:readFileSync(path).toString('hex')};});
             writeFileSync(process.env.CODEX_HOME+'/test-attachments-'+process.env.HARBOR_CONVERSATION_ID+'.json',JSON.stringify({images,files}));
           }`,
-        )
-        .replace(
-          '"Fixture response: " + text',
-          '(text.includes("[write-canary]") ? (writeFileSync(process.cwd() + "/canary.txt", "P015 original folder"), personalDevApp ||= startPersonalPreviewApp(Number(process.env.PORT)), "Fixture response: " + text) : "Fixture response: " + text)',
-        ),
-  );
-  // This wrapper is explicitly the external deterministic protocol boundary, never native sandbox evidence.
-  await writeFile(
-    binary,
-    `#!${node}\nif(process.argv.includes('--version')) console.log('codex-cli 0.153.4'); else import(${JSON.stringify(fixture)});\n`,
-    { mode: 0o755 },
-  );
-  // Validate the relocated external fixture before starting Harbor services.
-  const fixtureReplies = execFileSync(binary, ["app-server"], {
-    uid,
-    gid,
-    env: {
-      PATH: `${run}:/usr/bin:/bin`,
-      CODEX_HOME: path.join(state, "codex"),
-    },
-    input:
-      JSON.stringify({ id: 1, method: "initialize", params: {} }) +
-      "\n" +
-      JSON.stringify({ id: 2, method: "account/read", params: {} }) +
-      "\n",
-    encoding: "utf8",
-    timeout: 10000,
-    maxBuffer: 65536,
-  })
-    .trim()
-    .split("\n")
-    .map((line) => JSON.parse(line));
-  expect(
-    fixtureReplies.find((reply) => reply.id === 2)?.result.account,
-  ).toEqual({
-    type: "apiKey",
-  });
+          )
+          .replace(
+            '"Fixture response: " + text',
+            '(text.includes("[write-canary]") ? (writeFileSync(process.cwd() + "/canary.txt", "P015 original folder"), personalDevApp ||= startPersonalPreviewApp(Number(process.env.PORT)), "Fixture response: " + text) : "Fixture response: " + text)',
+          ),
+    );
+    // This wrapper is explicitly the external deterministic protocol boundary, never native sandbox evidence.
+    await writeFile(
+      binary,
+      `#!${node}\nif(process.argv.includes('--version')) console.log('codex-cli 0.153.4'); else import(${JSON.stringify(fixture)});\n`,
+      { mode: 0o755 },
+    );
+    // Validate the relocated external fixture before starting Harbor services.
+    const fixtureReplies = execFileSync(binary, ["app-server"], {
+      uid,
+      gid,
+      env: {
+        PATH: `${run}:/usr/bin:/bin`,
+        CODEX_HOME: path.join(state, "codex"),
+      },
+      input:
+        JSON.stringify({ id: 1, method: "initialize", params: {} }) +
+        "\n" +
+        JSON.stringify({ id: 2, method: "account/read", params: {} }) +
+        "\n",
+      encoding: "utf8",
+      timeout: 10000,
+      maxBuffer: 65536,
+    })
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(
+      fixtureReplies.find((reply) => reply.id === 2)?.result.account,
+    ).toEqual({
+      type: "apiKey",
+    });
+  }
   execFileSync(
     "openssl",
     [
@@ -253,9 +312,13 @@ try {
       { id: rootId, name: "Original project", path: project },
     ]),
     HARBOR_PERMISSION_CEILING: "workspace-write",
-    HARBOR_MODELS: "fixture",
+    HARBOR_MODELS: liveConfig?.model ?? "fixture",
     HARBOR_INSTANCE_ID: id,
   };
+  if (liveConfig) {
+    delete env.HARBOR_PERSONAL_PREVIEWS;
+    delete env.HARBOR_PERSONAL_PREVIEW_PORT;
+  }
   execFileSync(
     "docker",
     [
@@ -296,9 +359,9 @@ try {
   let logTail = "";
   const start = (file: string, external = false) => {
     const supervisorRole = file === "apps/supervisor/src/main.ts";
-    const unit = `${id}-supervisor-${randomBytes(4).toString("hex")}.service`;
-    const envFile = path.join(run, "supervisor.env");
-    if (supervisorRole)
+    const unit = `${id}-${supervisorRole ? "supervisor" : "api"}-${randomBytes(4).toString("hex")}.service`;
+    const envFile = path.join(run, "service.env");
+    if (!external)
       writeFileSync(
         envFile,
         Object.entries(env)
@@ -308,8 +371,8 @@ try {
         { mode: 0o600 },
       );
     const p = spawn(
-      supervisorRole ? "systemd-run" : node,
-      supervisorRole
+      !external ? "systemd-run" : node,
+      !external
         ? [
             "--unit",
             unit,
@@ -320,8 +383,23 @@ try {
             "--service-type=exec",
             `--uid=${uid}`,
             `--gid=${gid}`,
-            "--property=Delegate=yes",
-            "--property=ProtectControlGroups=no",
+            `--property=Delegate=${supervisorRole ? "yes" : "no"}`,
+            `--property=ProtectControlGroups=${supervisorRole ? "no" : "yes"}`,
+            "--property=UMask=0077",
+            "--property=NoNewPrivileges=yes",
+            "--property=PrivateTmp=yes",
+            "--property=ProtectSystem=strict",
+            "--property=ProtectHome=read-only",
+            "--property=ProtectKernelTunables=yes",
+            "--property=ProtectKernelModules=yes",
+            `--property=ReadWritePaths=${["home", "codex", "control"]
+              .map((name) => path.join(state, name))
+              .concat(project)
+              .join(" ")}`,
+            "--property=InaccessiblePaths=-/run/docker.sock -/var/run/docker.sock",
+            `--property=MemoryMax=${supervisorRole ? "4G" : "1G"}`,
+            `--property=CPUQuota=${supervisorRole ? "150%" : "100%"}`,
+            `--property=TasksMax=${supervisorRole ? "512" : "256"}`,
             "--property=KillMode=control-group",
             `--property=WorkingDirectory=${release}`,
             `--property=EnvironmentFile=${envFile}`,
@@ -334,8 +412,6 @@ try {
         : ["--import", "tsx", file],
       {
         cwd: release,
-        uid: external || supervisorRole ? undefined : uid,
-        gid: external || supervisorRole ? undefined : gid,
         env: external
           ? {
               ...env,
@@ -351,7 +427,21 @@ try {
         stdio: ["ignore", "pipe", "pipe"],
       },
     );
-    if (supervisorRole) supervisorUnits.set(p, unit);
+    if (!external) {
+      serviceUnits.set(p, unit);
+      writeFileSync(
+        path.join(artifacts, "owned-units.json"),
+        JSON.stringify(
+          [...serviceUnits.values()].map((name) => ({
+            unit: name,
+            cgroup: `/sys/fs/cgroup/system.slice/${name}`,
+          })),
+          null,
+          2,
+        ),
+        { mode: 0o600 },
+      );
+    }
     children.push(p);
     p.stdout?.on("data", (b) => {
       logTail = (logTail + b).slice(-16000);
@@ -413,7 +503,7 @@ try {
     .catch(() => {
       throw Error(
         "Harbor startup failed: " +
-          logTail
+          (installedLive ? "live diagnostics suppressed" : logTail)
             .replaceAll(password, "[redacted]")
             .replace(/postgres:\/\/[^\s]+/g, "[database redacted]"),
       );
@@ -489,7 +579,125 @@ try {
     )
   ).json();
   expect(registeredWorkspaces.workspaces[0].relativePath).toBe("");
-  if (attachments) {
+  const filesystem = await Promise.all(
+    [
+      state,
+      ...["home", "codex", "control"].map((name) => path.join(state, name)),
+    ].map(async (file) => {
+      const info = await stat(file);
+      const container = file === state;
+      expect(info.uid).toBe(container ? 0 : uid);
+      expect(info.mode & 0o777).toBe(container ? 0o711 : 0o700);
+      return {
+        path: path.relative(run, file),
+        uid: info.uid,
+        mode: (info.mode & 0o777).toString(8),
+      };
+    }),
+  );
+  const effectiveUnits = await Promise.all(
+    [...serviceUnits].map(async ([, unit]) => {
+      const fields = [
+        "MainPID",
+        "ControlGroup",
+        "User",
+        "Group",
+        "UMask",
+        "NoNewPrivileges",
+        "PrivateTmp",
+        "ProtectSystem",
+        "ProtectHome",
+        "ProtectKernelTunables",
+        "ProtectKernelModules",
+        "ProtectControlGroups",
+        "Delegate",
+        "ReadWritePaths",
+        "InaccessiblePaths",
+        "KillMode",
+        "MemoryMax",
+        "CPUQuotaPerSecUSec",
+        "TasksMax",
+      ];
+      const output = execFileSync(
+        "systemctl",
+        ["show", unit, ...fields.map((field) => "--property=" + field)],
+        { encoding: "utf8" },
+      );
+      const properties = Object.fromEntries(
+        output
+          .trim()
+          .split("\n")
+          .map((line) => {
+            const i = line.indexOf("=");
+            return [line.slice(0, i), line.slice(i + 1)];
+          }),
+      );
+      expect(properties.ControlGroup).toBe(`/system.slice/${unit}`);
+      expect(properties.UMask).toBe("0077");
+      for (const field of [
+        "NoNewPrivileges",
+        "PrivateTmp",
+        "ProtectKernelTunables",
+        "ProtectKernelModules",
+      ])
+        expect(properties[field]).toBe("yes");
+      expect(properties.ProtectSystem).toBe("strict");
+      expect(properties.ProtectHome).toBe("read-only");
+      expect(properties.KillMode).toBe("control-group");
+      expect(properties.Delegate).toBe(
+        unit.includes("-supervisor-") ? "yes" : "no",
+      );
+      expect(properties.ProtectControlGroups).toBe(
+        unit.includes("-supervisor-") ? "no" : "yes",
+      );
+      expect(properties.ReadWritePaths.split(" ").sort()).toEqual(
+        ["home", "codex", "control"]
+          .map((name) => path.join(state, name))
+          .concat(project)
+          .sort(),
+      );
+      const status = await readFile(
+        `/proc/${Number(properties.MainPID)}/status`,
+        "utf8",
+      );
+      expect(status).toMatch(
+        new RegExp(`^Uid:\\s+${uid}\\s+${uid}\\s+${uid}\\s+${uid}$`, "m"),
+      );
+      expect(status).toMatch(/^Umask:\s+0077$/m);
+      expect(status).toMatch(/^NoNewPrivs:\s+1$/m);
+      return {
+        unit,
+        properties,
+        observedProcess: { uid, umask: "0077", noNewPrivileges: true },
+      };
+    }),
+  );
+  await writeFile(
+    path.join(artifacts, "installed-service-boundary.json"),
+    JSON.stringify(
+      { sourceDigest: digest, filesystem, effectiveUnits },
+      null,
+      2,
+    ),
+  );
+  if (liveConfig) {
+    await runInstalledAttachments({
+      context,
+      page,
+      origin,
+      post,
+      projectId: registered.id,
+      workspaceId: registeredWorkspaces.workspaces[0].id,
+      artifacts,
+      databaseUrl: env.DATABASE_URL!,
+      nativeHome: env.HARBOR_PERSONAL_VPS_CODEX_HOME!,
+      model: liveConfig.model,
+      sourceDigest: digest,
+    });
+    console.log(
+      `P024 installed full-stack live attachments passed: ${artifacts}`,
+    );
+  } else if (attachments) {
     await runAttachments({
       context,
       page,
@@ -916,4 +1124,20 @@ try {
     execFileSync("docker", ["rm", "-f", "-v", id], { stdio: "ignore" });
   if (userCreated) execFileSync("userdel", [id], { stdio: "ignore" });
   await rm(run, { recursive: true, force: true });
+  await writeFile(
+    path.join(artifacts, "owned-cleanup.json"),
+    JSON.stringify(
+      {
+        completed: true,
+        servicesStopped: true,
+        runRemoved: true,
+        copiedCredentialRemoved: Boolean(liveConfig),
+        databaseRemoved: databaseCreated,
+        userRemoved: userCreated,
+      },
+      null,
+      2,
+    ),
+    { mode: 0o600 },
+  );
 }

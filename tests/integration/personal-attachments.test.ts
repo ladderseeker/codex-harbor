@@ -12,6 +12,7 @@ import {
   chmod,
   writeFile,
   symlink,
+  link,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -22,6 +23,7 @@ import {
 import { hashBytes } from "../../packages/attachments/src/media.ts";
 test("personal publication verifies exact immutable bytes, identity, retry and no-follow paths", async () => {
   const original = { ...process.env };
+  const oldUmask = process.umask(0o077);
   const root = await realpath(
     await mkdtemp(join(tmpdir(), "harbor-attachments-")),
   );
@@ -60,6 +62,24 @@ test("personal publication verifies exact immutable bytes, identity, retry and n
       [{ ...files[0], ...first.files[0] }],
     );
     assert.deepEqual(retry, first);
+    // Existing malformed copies must fail closed rather than being repaired by
+    // the chmod used for a newly created unpublished file.
+    await chmod(path, 0o400);
+    await assert.rejects(
+      publishPersonalAttachments(session, workspace, first.directory, files),
+    );
+    assert.equal((await lstat(path)).mode & 0o777, 0o400);
+    await chmod(path, 0o444);
+    await link(path, path + "-linked");
+    await assert.rejects(
+      publishPersonalAttachments(session, workspace, first.directory, files),
+    );
+    await rm(path + "-linked");
+    await assert.rejects(
+      publishPersonalAttachments(session, workspace, first.directory, [
+        { ...files[0], device: first.files[0].device, inode: "0" },
+      ]),
+    );
     await assert.rejects(
       publishPersonalAttachments(session, workspace, first.directory, [
         { ...files[0], id: "../escape" },
@@ -121,6 +141,7 @@ test("personal publication verifies exact immutable bytes, identity, retry and n
       ]),
     );
   } finally {
+    process.umask(oldUmask);
     for (const k of Object.keys(process.env))
       if (!(k in original)) delete process.env[k];
     Object.assign(process.env, original);

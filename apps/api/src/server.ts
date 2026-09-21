@@ -1,3 +1,4 @@
+import { lockSessionResource } from "../../../packages/storage/src/session-lock.ts";
 import { runtimeProjection } from "../../../packages/storage/src/conversation-runtimes.ts";
 import { reasoningEfforts } from "../../../packages/contracts/src/index.js";
 import {
@@ -119,6 +120,22 @@ export async function buildServer(c: Config) {
   const externalEffectsGranted = new WeakSet<object>();
   const selfRevocations = new WeakSet<object>();
   app.setErrorHandler((error, request, reply) => {
+    if ((error as { code?: string }).code === "FST_ERR_CTP_BODY_TOO_LARGE") {
+      // Fastify closes parser-error connections before a proxy finishes writing
+      // the rejected upload, which can replace our 413 with a reset/502. Discard
+      // unread framed bytes without buffering, with an absolute drain deadline.
+      // Other parser errors retain Fastify's close behavior.
+      reply.removeHeader("connection");
+      if (!request.raw.readableEnded && !request.raw.destroyed) {
+        const deadline = setTimeout(() => request.raw.destroy(), 5000);
+        deadline.unref();
+        const cleared = () => clearTimeout(deadline);
+        request.raw.once("end", cleared);
+        request.raw.once("close", cleared);
+        request.raw.once("aborted", cleared);
+        request.raw.resume();
+      }
+    }
     const e =
       error instanceof HarborError
         ? error
@@ -855,6 +872,7 @@ export async function buildServer(c: Config) {
     "/api/v1/sessions/:id/snapshot",
     async (req) =>
       transaction(pool, async (db) => {
+        await lockSessionResource(db, req.params.id);
         await pruneReplay(db, req.params.id);
         const s = await session(db, req.params.id);
         return {
@@ -1024,10 +1042,13 @@ export async function buildServer(c: Config) {
             })
             .strict()
             .parse(req.body);
-          await db.query(
-            "SELECT s.id FROM sessions s JOIN approvals a ON a.session_id=s.id WHERE a.id=$1 FOR UPDATE OF s",
+          const found = await db.query(
+            "SELECT session_id FROM approvals WHERE id=$1",
             [req.params.id],
           );
+          if (!found.rowCount)
+            throw new HarborError(404, "NOT_FOUND", "Approval not found");
+          await lockSessionResource(db, found.rows[0].session_id);
           const r = await db.query(
             "SELECT a.*,s.permission_profile,s.generation AS current_generation FROM approvals a JOIN sessions s ON s.id=a.session_id WHERE a.id=$1 FOR UPDATE OF a",
             [req.params.id],

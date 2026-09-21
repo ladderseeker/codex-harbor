@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { HarborError } from "../../policy/src/index.ts";
 import { capacity } from "./capacity.ts";
 import { event } from "./index.ts";
+import { lockSessionResource } from "./session-lock.ts";
 export async function requestTurnCancellation(
   db: PoolClient,
   turnId: string,
@@ -12,10 +13,13 @@ export async function requestTurnCancellation(
     authorize: (db: PoolClient) => Promise<void>;
   },
 ) {
-  await db.query(
-    "SELECT s.id FROM sessions s JOIN operations o ON o.session_id=s.id WHERE o.id=$1 FOR UPDATE OF s",
+  const found = await db.query(
+    "SELECT session_id FROM operations WHERE id=$1",
     [turnId],
   );
+  if (!found.rowCount)
+    throw new HarborError(404, "NOT_FOUND", "Turn not found");
+  await lockSessionResource(db, found.rows[0].session_id);
   const r = await db.query("SELECT * FROM operations WHERE id=$1 FOR UPDATE", [
     turnId,
   ]);

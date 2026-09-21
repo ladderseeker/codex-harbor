@@ -157,11 +157,26 @@ export function useRichDraft(session: string, csrf: string | undefined) {
     reload,
     refreshFiles,
     setError,
-    accepted() {
+    accepted(attachmentIds: string[]) {
+      if (current.current !== session || epoch.current !== viewGeneration)
+        return;
+      // Acknowledgement is authoritative even if the subsequent draft GET fails.
+      // Reload still reads the server's CAS-preserved newer draft from other tabs.
+      latest.current = blank;
+      setDraft(blank);
+      setDirty(false);
+      pending.current = undefined;
+      setFiles(
+        filesRef.current.filter((file) => !attachmentIds.includes(file.id)),
+      );
       const result = reload(),
         generation = epoch.current;
       void result.catch((e) => {
-        if (epoch.current === generation) setError(e.message);
+        if (epoch.current === generation)
+          setError(
+            "Message accepted. Reload the saved draft to continue: " +
+              e.message,
+          );
       });
     },
   };
@@ -174,6 +189,7 @@ export function AttachmentPicker({
   modalities,
   disabled,
   onBusyChange,
+  isReserved,
 }: {
   state: RichDraft;
   csrf: string;
@@ -181,6 +197,7 @@ export function AttachmentPicker({
   modalities: string[];
   disabled: boolean;
   onBusyChange: (busy: boolean) => void;
+  isReserved: () => boolean;
 }) {
   const queue = useRef<File[]>([]);
   const held = useRef<File | undefined>(undefined);
@@ -198,9 +215,15 @@ export function AttachmentPicker({
     [retry, setRetry] = useState<(() => Promise<void>) | undefined>(undefined);
   const retryRef = useRef(false);
   const [drag, setDrag] = useState(false);
-  useEffect(() => {
-    onBusyChange(progress !== null || queued > 0 || !!retry);
-  }, [progress, queued, retry, onBusyChange]);
+  const removing = useRef(false);
+  function syncBusy() {
+    onBusyChange(
+      draining.current ||
+        !!held.current ||
+        queue.current.length > 0 ||
+        removing.current,
+    );
+  }
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -343,12 +366,15 @@ export function AttachmentPicker({
               }
             });
           }
-          void state.refreshFiles().catch(() => {});
+          await state.refreshFiles().catch(() => {});
         }
         return false;
       } finally {
         transferring = false;
-        if (mounted.current) setProgress(null);
+        if (mounted.current) {
+          setProgress(null);
+          syncBusy();
+        }
         upload.current = undefined;
       }
     }
@@ -377,10 +403,11 @@ export function AttachmentPicker({
       }
     } finally {
       draining.current = false;
+      if (mounted.current) syncBusy();
     }
   }
   function chooseBatch(files: File[]) {
-    if (disabled) {
+    if (disabled || isReserved()) {
       setSelectionError(
         "Attachments are unavailable while this conversation is busy.",
       );
@@ -418,10 +445,14 @@ export function AttachmentPicker({
         ? `Not added: ${rejected.slice(0, 4).join(", ") + (rejected.length > 4 ? ` and ${rejected.length - 4} more files` : "")}. Limits: 10 MiB per file, four files / 20 MiB per message; empty files are not accepted.`
         : "",
     );
+    syncBusy();
     setQueued(queue.current.length);
     void drain();
   }
   async function remove(a: Attachment) {
+    if (disabled || isReserved() || removing.current) return;
+    removing.current = true;
+    syncBusy();
     const intent = newIntent(`/attachments/${a.id}`, {}, "Remove attachment");
     try {
       await request(intent.path, {
@@ -436,6 +467,9 @@ export function AttachmentPicker({
       await state.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Removal failed");
+    } finally {
+      removing.current = false;
+      if (mounted.current) syncBusy();
     }
   }
   const latestChoose = useRef(chooseBatch);
@@ -607,6 +641,7 @@ export function AttachmentPicker({
                         ATTACHMENT_LIMITS.turnBytes
                     }
                     onClick={() =>
+                      !isReserved() &&
                       state.edit({
                         attachmentIds: [...state.draft.attachmentIds, a.id],
                       })
@@ -641,14 +676,23 @@ export function AttachmentPicker({
       </p>
       {state.error && (
         <>
-          <button type="button" onClick={() => void state.save()}>
+          <button
+            type="button"
+            disabled={disabled || !state.ready}
+            onClick={() => {
+              if (!isReserved()) void state.save();
+            }}
+          >
             Retry draft save
           </button>
           <button
             type="button"
             onClick={() => {
-              if (confirm("Replace local edits with the saved draft?"))
-                void state.reload();
+              if (
+                !isReserved() &&
+                confirm("Replace local edits with the saved draft?")
+              )
+                void state.reload().catch((e) => state.setError(e.message));
             }}
           >
             Reload saved draft
@@ -672,7 +716,7 @@ function PasteCapture({
       if (!(e.target instanceof HTMLElement) || !e.target.closest(".composer"))
         return;
       const files = Array.from(e.clipboardData?.files ?? []);
-      if (files.length && !latest.current.disabled) {
+      if (files.length) {
         e.preventDefault();
         latest.current.choose(files);
       }

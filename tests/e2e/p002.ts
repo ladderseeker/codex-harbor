@@ -494,6 +494,9 @@ export async function p002({
         await hold.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
           session.id,
         ]);
+        const holdPid = Number(
+          (await hold.query("SELECT pg_backend_pid() AS pid")).rows[0].pid,
+        );
         resumeSupervisor();
         paused = false;
         await expect
@@ -502,7 +505,13 @@ export async function p002({
               Number(
                 (
                   await db.query(
-                    "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query='SELECT id FROM sessions WHERE id=$1 FOR UPDATE'",
+                    // UNION deduplicates (origin,pid), bounding traversal even
+                    // when tuple-lock queues contain indirect blockers/cycles.
+                    "WITH RECURSIVE activity AS MATERIALIZED (SELECT pid,application_name,wait_event_type,query=$2 AS session_query,pg_blocking_pids(pid) AS blockers FROM pg_stat_activity WHERE datname=current_database() ORDER BY pid LIMIT 128), chain(origin,pid) AS (SELECT pid,pid FROM activity WHERE application_name='harbor-e2e-supervisor' AND wait_event_type='Lock' AND session_query UNION SELECT chain.origin,blocker.pid FROM chain JOIN activity ON activity.pid=chain.pid CROSS JOIN LATERAL unnest(activity.blockers) AS blocker(pid)) SELECT count(DISTINCT origin) FROM chain WHERE pid=$1",
+                    [
+                      holdPid,
+                      "SELECT id,project_id,workspace_id FROM sessions WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE",
+                    ],
                   )
                 ).rows[0].count,
               ),

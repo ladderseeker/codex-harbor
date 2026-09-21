@@ -1,7 +1,7 @@
 import { pruneReplay } from "./replay.ts";
-import type { DB } from "./index.ts";
+import type { Pool } from "pg";
 /** Replay is disposable; durable messages and unresolved operations are not. */
-export async function maintain(db: DB, at = new Date()) {
+export async function maintain(db: Pool, at = new Date()) {
   for (const row of (await db.query("SELECT id FROM sessions")).rows)
     await pruneReplay(db, row.id, at);
   await db.query(

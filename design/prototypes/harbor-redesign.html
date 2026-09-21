@@ -1357,7 +1357,7 @@
               <div class="composer-tools">
                 <button type="button" class="icon-button" id="attachFile" aria-label="Attach file">+</button>
                 <input type="file" id="attachmentInput" multiple hidden>
-                <select id="attachmentState" aria-label="Attachment specimen state"><option value="ready">Files</option><option value="loading">Uploading</option><option value="error">Error</option><option value="disabled">Disabled</option></select>
+                <select id="attachmentState" aria-label="Attachment specimen state"><option value="ready">Files</option><option value="loading">Uploading</option><option value="error">Error</option><option value="disabled">Disabled</option><option value="saving">Sending</option><option value="recovery">Draft recovery</option></select>
                 <label class="select-wrap"
                   ><svg><use href="#shield" /></svg
                   ><select id="permissions" aria-label="Permissions">
@@ -2181,6 +2181,7 @@ Checks passed</pre></details><section class="markdown-body" aria-label="Markdown
         });
       }
       function addFiles(files) {
+        if ($("attachFile").disabled) return;
         const rejected = [];
         for(const file of files) {
           if(!file.size || file.size > 10 * 1024 * 1024 || selectedFiles.length >= 4 || selectedFiles.reduce((sum,f) => sum+f.size,0)+file.size > 20*1024*1024) rejected.push(file.name);
@@ -2197,13 +2198,30 @@ Checks passed</pre></details><section class="markdown-body" aria-label="Markdown
       $("composer").addEventListener("drop", event => {event.preventDefault(); if(!$("attachFile").disabled) addFiles([...event.dataTransfer.files]);});
       $("attachmentState").onchange = () => {
         const value = $("attachmentState").value;
-        $("attachFile").disabled = value === "disabled";
+        const reserved = ["disabled", "saving", "recovery"].includes(value);
+        $("attachFile").disabled = reserved;
+        $("attachmentInput").disabled = reserved;
+        $("prompt").disabled = reserved;
+        $("send").disabled = value !== "ready" || !$("prompt").value.trim();
+        $("attachmentList").querySelectorAll("button").forEach(button => button.disabled = reserved);
         $("attachmentStatus").hidden = value !== "loading";
         $("attachmentStatus").innerHTML = 'Uploading <progress value="40" max="100"></progress> <button type="button" id="pauseUpload">Pause upload</button>';
         $("attachmentError").hidden = value !== "error";
         $("attachmentError").innerHTML = 'Upload paused. <button type="button" id="retryUpload">Retry upload</button>';
         $("pauseUpload").onclick = () => {$("attachmentState").value = "error"; $("attachmentState").onchange();};
         $("retryUpload").onclick = () => {$("attachmentState").value = "loading"; $("attachmentState").onchange();};
+        if (value === "saving") {
+          $("attachmentStatus").hidden = false;
+          $("attachmentStatus").textContent = "Saving draft…";
+        }
+        if (value === "recovery") {
+          selectedFiles = [];
+          renderAttachments();
+          $("prompt").value = "";
+          $("attachmentError").hidden = false;
+          $("attachmentError").innerHTML = 'Message accepted. Reload the saved draft to continue. <button type="button" id="reloadDraft">Reload saved draft</button>';
+          $("reloadDraft").onclick = () => {$("attachmentState").value = "ready"; $("attachmentState").onchange();};
+        }
       };
       let followBottom = true;
       $("scrollArea").addEventListener("scroll", () => {const e = $("scrollArea"); followBottom = e.scrollHeight-e.scrollTop-e.clientHeight < 100;});

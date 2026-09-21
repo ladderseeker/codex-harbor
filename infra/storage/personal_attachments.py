@@ -3,13 +3,16 @@ import base64, hashlib, json, os, re, stat, sys
 UUID = re.compile(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$')
 LIMIT = 10485760
 
-def directory(parent, name, create=False, private=False):
+def directory(parent, name, create=False, private=False, traverse=False):
     if create:
         try: os.mkdir(name, 0o700, dir_fd=parent); os.fsync(parent)
         except FileExistsError: pass
-    fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+    # Linux O_PATH needs search permission, not directory-list permission. The
+    # installed root-owned 0711 container deliberately grants only search access.
+    access = getattr(os, 'O_PATH', os.O_RDONLY) if traverse else os.O_RDONLY
+    fd = os.open(name, access | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
     s = os.fstat(fd)
-    if s.st_uid not in (0, os.getuid()) or (s.st_mode & 0o022 and not (s.st_uid == 0 and s.st_mode & stat.S_ISVTX)) or (private and (s.st_uid != os.getuid() or s.st_mode & 0o077)):
+    if s.st_uid not in (0, os.getuid()) or (s.st_mode & 0o022 and not (s.st_uid == 0 and s.st_mode & stat.S_ISVTX)) or (private and (s.st_uid != os.getuid() or stat.S_IMODE(s.st_mode) != 0o700)):
         os.close(fd); raise ValueError('unsafe directory ownership')
     return fd
 
@@ -25,13 +28,20 @@ def publish(request):
     fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
     try:
         for part in parent.split('/')[1:]:
-            child = directory(fd, part); os.close(fd); fd = child
+            child = directory(fd, part, traverse=True); os.close(fd); fd = child
         parent_info = os.fstat(fd)
-        if parent_info.st_uid != os.getuid() or parent_info.st_mode & 0o077: raise ValueError('private state required')
+        private_state = parent_info.st_uid == os.getuid() and stat.S_IMODE(parent_info.st_mode) == 0o700
+        root_container = parent_info.st_uid == 0 and not parent_info.st_mode & 0o022
+        if not private_state and not root_container: raise ValueError('trusted state required')
         native = directory(fd, os.path.basename(home), private=True); os.close(native)
+        if private_state:
+            # mkdir/fsync require a readable descriptor; never reopen the installed
+            # root container for listing or try to create its service-owned home.
+            child = directory(fd, '.', private=True); os.close(fd); fd = child
         for part in ['home', 'attachments', session]:
             # A recorded directory must never be silently recreated after removal.
-            child = directory(fd, part, create=not bool(request.get('directory')), private=True)
+            create = not bool(request.get('directory')) and (part != 'home' or private_state)
+            child = directory(fd, part, create=create, private=True)
             os.close(fd); fd = child
         info = os.fstat(fd); expected = request.get('directory')
         if expected and (expected['canonical'] != target or expected['device'] != str(info.st_dev) or expected['inode'] != str(info.st_ino)): raise ValueError('directory identity mismatch')
@@ -52,6 +62,9 @@ def publish(request):
                 try:
                     view = memoryview(data)
                     while view: view = view[os.write(f, view):]
+                    # Creation mode is filtered by the installed service's 0077
+                    # umask. Set only this new, unpublished descriptor explicitly.
+                    os.fchmod(f, 0o444)
                     os.fsync(f)
                 finally: os.close(f)
                 os.link(temporary, name, src_dir_fd=fd, dst_dir_fd=fd, follow_symlinks=False)
