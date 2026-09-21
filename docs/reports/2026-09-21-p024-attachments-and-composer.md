@@ -4,7 +4,7 @@ Initial delivery outcome (subsequently reopened): P024 was marked Implemented an
 
 ## Initial record
 
-[P024](../../design/proposals/024-attachments-and-chat-composer.md) is Accepted and in implementation under the owner's 21 September request. No completed verification, commit or deployment is claimed. Main researched the pinned native input forms and existing blob/draft/materialization boundaries, then delegated separate High-effort backend and Medium-effort interface workers with fresh self-contained briefs and disjoint file ownership. P018's lifecycle changes remain independently owned and unverified.
+[P024](../../design/proposals/archive/024-attachments-and-chat-composer.md) is Accepted and in implementation under the owner's 21 September request. No completed verification, commit or deployment is claimed. Main researched the pinned native input forms and existing blob/draft/materialization boundaries, then delegated separate High-effort backend and Medium-effort interface workers with fresh self-contained briefs and disjoint file ownership. P018's lifecycle changes remain independently owned and unverified.
 
 The selected design stores personal attachment copies in private instance state outside project/cache write grants, supports normalized PNG/JPEG and opaque general files, and preserves server-generated paths, authentication, draft CAS and upload/turn idempotency. The interface uses picker/drop/clipboard File batches, concise labels and one full-height chat scroll surface. Sidebar ordering remains last accepted user query.
 
