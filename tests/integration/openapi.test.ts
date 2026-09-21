@@ -25,3 +25,50 @@ test("versioned facade contract declares each path parameter and validates respo
         }
   }
 });
+
+test("turn and recovery request contracts support files while rejecting empty input", () => {
+  const ajv = new Ajv2020({ strict: false, validateFormats: false });
+  const paths = openapi.paths as Record<string, any>;
+  const schemas = [
+    openapi.components.schemas.TurnInput,
+    paths["/sessions/{id}/turns"].post.requestBody.content["application/json"]
+      .schema,
+    paths["/sessions/{id}/recovery/continue"].post.requestBody.content[
+      "application/json"
+    ].schema,
+  ];
+  const id = "11111111-1111-4111-8111-111111111111";
+  for (const [index, schema] of schemas.entries()) {
+    const validate = ajv.compile(schema);
+    const input = {
+      text: "",
+      model: "fixture",
+      effort: "medium",
+      permissionProfile: "workspace-write",
+      ...(index === 2
+        ? {
+            recoveryId: id,
+            expectedGeneration: 1,
+            acknowledgeUnknownEffects: true,
+          }
+        : {}),
+    };
+    assert.equal(validate(input), false);
+    assert.equal(validate({ ...input, text: "   " }), false);
+    assert.equal(validate({ ...input, text: "Continue" }), true);
+    assert.equal(validate({ ...input, attachmentIds: [id] }), true);
+    assert.equal(
+      validate({ ...input, attachmentIds: Array(5).fill(id) }),
+      false,
+    );
+    if (index === 2)
+      assert.equal(
+        validate({
+          ...input,
+          attachmentIds: [id],
+          acknowledgeUnknownEffects: false,
+        }),
+        false,
+      );
+  }
+});

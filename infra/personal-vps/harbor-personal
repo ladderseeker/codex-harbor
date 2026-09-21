@@ -39,7 +39,7 @@ def https(value, origin=False):
 
 def validate(c):
     fields = {'instance', 'origin', 'oidcIssuer', 'oidcClientId', 'ownerSubject', 'oidcSecretFile', 'release', 'user', 'apiPort', 'databasePort', 'roots', 'postgresImage', 'models', 'traefik', 'apparmorUserns'}
-    require(fields <= set(c) and set(c) <= fields | {'previews', 'previewPort'}, 'Configuration requires: ' + ', '.join(sorted(fields)) + '; optional previews and previewPort')
+    require(fields <= set(c) and set(c) <= fields | {'previews', 'previewPort', 'maxActiveTurns', 'maxConversationRuntimes'}, 'Configuration requires: ' + ', '.join(sorted(fields)) + '; optional previews and previewPort')
     require(re.fullmatch(r'[a-z][a-z0-9-]{0,23}', c['instance']), 'Invalid instance name')
     require(re.fullmatch(r'[a-z][a-z0-9-]{0,30}', c['user']) and c['user'] != 'root', 'Dedicated nonroot service user required')
     https(c['origin'], True)
@@ -65,6 +65,9 @@ def validate(c):
     release = absolute(c['release'])
     require(release.is_dir(), 'Release must already exist')
     require(re.fullmatch(r'postgres:17\.6-bookworm@sha256:[0-9a-f]{64}', c['postgresImage']), 'Postgres 17.6 image digest required')
+    active = c.get('maxActiveTurns', 4)
+    runtimes = c.get('maxConversationRuntimes', 4)
+    require(type(active) is int and 1 <= active <= 16 and type(runtimes) is int and active <= runtimes <= 32, 'Invalid conversation capacity limits')
     require(isinstance(c['models'], list) and c['models'] and all(isinstance(m, str) and re.fullmatch(r'[A-Za-z0-9._-]+', m) for m in c['models']), 'Invalid models')
     require(type(c['traefik']) is bool, 'traefik must be boolean')
     require(not c['traefik'] or urlsplit(c['origin']).port is None, 'Existing Traefik websecure routing requires the standard HTTPS port')
@@ -109,6 +112,7 @@ def environment(c, password, oidc_secret):
         'HARBOR_OIDC_ISSUER': c['oidcIssuer'], 'HARBOR_OIDC_CLIENT_ID': c['oidcClientId'],
         'HARBOR_OWNER_SUBJECT': c['ownerSubject'], 'HARBOR_HOST': '127.0.0.1',
         'HARBOR_PORT': str(c['apiPort']), 'HARBOR_PROJECT_ROOTS': json.dumps(c['roots'], separators=(',', ':')),
+        'HARBOR_MAX_ACTIVE_TURNS': str(c.get('maxActiveTurns', 4)), 'HARBOR_MAX_CONVERSATION_RUNTIMES': str(c.get('maxConversationRuntimes', 4)),
         'HARBOR_PERMISSION_CEILING': 'workspace-write', 'HARBOR_MODELS': ','.join(c['models']),
         'HARBOR_PERSONAL_PREVIEWS': json.dumps(c.get('previews', []), separators=(',', ':')),
         'HARBOR_PERSONAL_PREVIEW_PORT': str(c.get('previewPort', 3350)),
@@ -199,7 +203,8 @@ ProtectSystem=strict
 ProtectHome=read-only
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
-ProtectControlGroups=yes
+ProtectControlGroups={"no" if role == "supervisor" else "yes"}
+{"Delegate=yes" if role == "supervisor" else ""}
 ReadWritePaths={writable}
 InaccessiblePaths=-/run/docker.sock -/var/run/docker.sock
 [Install]

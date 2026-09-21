@@ -12,8 +12,14 @@ import { p005 } from "./p005.ts";
 import { acknowledgementContention } from "./acknowledgement.ts";
 import { p007 } from "./p007.ts";
 import { p023 } from "./p023.ts";
+import { p024 } from "./p024.ts";
 import { p014 } from "./p014.ts";
 import { createPool } from "../../packages/storage/src/index.ts";
+import {
+  claimWorkspace,
+  workspaceAdmission,
+  WorkspaceAdmissionChanged,
+} from "../../apps/supervisor/src/workspace-admission.ts";
 if (process.argv.includes("--files")) {
   await import("../files/e2e.ts");
   process.exit(process.exitCode ?? 0);
@@ -442,6 +448,7 @@ try {
       const designDb = new pg.Pool({ connectionString: env.DATABASE_URL });
       try {
         await p023({ page, context, origin, artifacts, db: designDb });
+        await p024({ page, context, origin, artifacts });
       } finally {
         await designDb.end();
       }
@@ -455,13 +462,13 @@ try {
             sourceAtEnd: sourceDigest(),
             node: process.version,
             scope:
-              "P014/P023 real browser/API/PostgreSQL/supervisor; external OIDC/Codex fixtures",
+              "P014/P023/P024 real browser/API/PostgreSQL/supervisor; external OIDC/Codex fixtures",
           },
           null,
           2,
         ),
       );
-      console.log("P014/P023 design E2E passed. Artifacts: " + artifacts);
+      console.log("P014/P023/P024 design E2E passed. Artifacts: " + artifacts);
     } else {
       await page
         .getByRole("button", { name: "Add project", exact: true })
@@ -839,6 +846,86 @@ try {
       ).toBe(beforeCredentialChange.state);
       const testDb = new pg.Pool({ connectionString: env.DATABASE_URL });
       try {
+        // Lose captured-runtime eligibility after the real managed writer claim.
+        // A retry must roll back that claim, so ordinary dispatch can still run.
+        const rollbackSession = await newSession();
+        const rollbackWorkspace = (
+          await testDb.query("SELECT workspace_id FROM sessions WHERE id=$1", [
+            rollbackSession,
+          ])
+        ).rows[0].workspace_id;
+        await expect
+          .poll(
+            async () =>
+              (
+                await testDb.query(
+                  "SELECT writer_session_id FROM workspaces WHERE id=$1",
+                  [rollbackWorkspace],
+                )
+              ).rows[0].writer_session_id,
+          )
+          .toBe(null);
+        const rollbackGeneration = Number(
+          (
+            await testDb.query(
+              "SELECT nextval('runtime_generation_seq') AS generation",
+            )
+          ).rows[0].generation,
+        );
+        let claimed!: () => void, releaseClaim!: () => void;
+        const claimReady = new Promise<void>((resolve) => {
+          claimed = resolve;
+        });
+        const claimBarrier = new Promise<void>((resolve) => {
+          releaseClaim = resolve;
+        });
+        const retry = workspaceAdmission(testDb, async (db) => {
+          expect(
+            await claimWorkspace(
+              db,
+              rollbackWorkspace,
+              rollbackSession,
+              rollbackGeneration,
+            ),
+          ).toBe(true);
+          claimed();
+          await claimBarrier;
+          throw new WorkspaceAdmissionChanged();
+        });
+        try {
+          await Promise.race([claimReady, retry]);
+          expect(
+            (
+              await testDb.query(
+                "SELECT writer_session_id FROM workspaces WHERE id=$1",
+                [rollbackWorkspace],
+              )
+            ).rows[0].writer_session_id,
+          ).toBe(null);
+        } finally {
+          releaseClaim();
+        }
+        expect(await retry).toBe(false);
+        expect(
+          (
+            await testDb.query(
+              "SELECT writer_session_id FROM workspaces WHERE id=$1",
+              [rollbackWorkspace],
+            )
+          ).rows[0].writer_session_id,
+        ).toBe(null);
+        const rollbackTurn = await (
+          await command(`/sessions/${rollbackSession}/turns`, payload)
+        ).json();
+        await expect
+          .poll(
+            async () =>
+              (await getSnapshot(rollbackSession)).operations.find(
+                (operation: any) => operation.id === rollbackTurn.operation.id,
+              ).state,
+            { timeout: 30000 },
+          )
+          .toBe("succeeded");
         await acknowledgementContention({
           db: testDb,
           command,
@@ -882,6 +969,37 @@ try {
           resumeSupervisor: () => {
             supervisor.kill("SIGCONT");
           },
+        }).catch(async (error) => {
+          await writeFile(
+            path.join(artifacts, "p002-queue-failure.json"),
+            JSON.stringify(
+              {
+                operations: (
+                  await testDb.query(
+                    "SELECT session_id,kind,state,generation,queue_reason FROM operations WHERE state IN ('queued','dispatching','running','waiting_approval','waiting_input','uncertain') ORDER BY created_at",
+                  )
+                ).rows,
+                sessions: (
+                  await testDb.query(
+                    "SELECT id,state,generation FROM sessions WHERE state IN ('queued','running','waiting_approval','uncertain')",
+                  )
+                ).rows,
+                workspaces: (
+                  await testDb.query(
+                    "SELECT id,writer_session_id,writer_generation,writer_kind FROM workspaces WHERE writer_owner_id IS NOT NULL",
+                  )
+                ).rows,
+                waits: (
+                  await testDb.query(
+                    "SELECT state,wait_event_type,wait_event,pg_blocking_pids(pid) AS blockers FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()",
+                  )
+                ).rows,
+              },
+              null,
+              2,
+            ),
+          );
+          throw error;
         });
         const interruptCrashSession = await newSession();
         const interruptCrash = await (
@@ -902,6 +1020,13 @@ try {
         const afterInterruptCrash = await (
           await command(`/sessions/${interruptCrashSession}/turns`, payload)
         ).json();
+        await testDb.query("CREATE SEQUENCE test_terminal_fault");
+        await testDb.query(
+          "CREATE FUNCTION test_fail_terminal_once() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.kind='turn' AND NEW.state='uncertain' AND nextval('test_terminal_fault')<=2 THEN RAISE EXCEPTION 'injected transient terminal settlement failure'; END IF; RETURN NEW; END $$",
+        );
+        await testDb.query(
+          "CREATE TRIGGER test_fail_terminal_once BEFORE UPDATE ON operations FOR EACH ROW EXECUTE FUNCTION test_fail_terminal_once()",
+        );
         await testDb.query(
           "CREATE FUNCTION test_fail_cancel() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.kind='cancel' AND NEW.state='failed' THEN RAISE EXCEPTION 'injected cancel settlement commit failure'; END IF; RETURN NEW; END $$",
         );
@@ -919,14 +1044,60 @@ try {
               ).state,
             { timeout: 30000 },
           )
-          .toBe("uncertain");
+          .toBe("uncertain")
+          .catch(async (error) => {
+            await writeFile(
+              path.join(artifacts, "interrupt-crash-failure.json"),
+              JSON.stringify(
+                {
+                  operations: (
+                    await testDb.query(
+                      "SELECT kind,state,generation FROM operations WHERE session_id=$1 ORDER BY created_at",
+                      [interruptCrashSession],
+                    )
+                  ).rows,
+                  session: (
+                    await testDb.query(
+                      "SELECT state,generation FROM sessions WHERE id=$1",
+                      [interruptCrashSession],
+                    )
+                  ).rows,
+                  events: (
+                    await testDb.query(
+                      "SELECT type FROM events WHERE session_id=$1 ORDER BY sequence DESC LIMIT 20",
+                      [interruptCrashSession],
+                    )
+                  ).rows,
+                  waits: (
+                    await testDb.query(
+                      "SELECT state,wait_event_type,wait_event,pg_blocking_pids(pid) AS blockers FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()",
+                    )
+                  ).rows,
+                },
+                null,
+                2,
+              ),
+            );
+            throw error;
+          });
         expect(
           (await getSnapshot(interruptCrashSession)).operations.find(
             (o: any) => o.id === crashCancel.operation.id,
           ).state,
         ).toBe("dispatching");
+        expect(
+          Number(
+            (await testDb.query("SELECT last_value FROM test_terminal_fault"))
+              .rows[0].last_value,
+          ),
+        ).toBeGreaterThanOrEqual(3);
         await testDb.query("DROP TRIGGER test_fail_cancel ON operations");
         await testDb.query("DROP FUNCTION test_fail_cancel()");
+        await testDb.query(
+          "DROP TRIGGER test_fail_terminal_once ON operations",
+        );
+        await testDb.query("DROP FUNCTION test_fail_terminal_once()");
+        await testDb.query("DROP SEQUENCE test_terminal_fault");
         await expect
           .poll(
             async () =>

@@ -1,3 +1,4 @@
+import { workspaceRuntimeProjection } from "../../../packages/storage/src/conversation-runtimes.ts";
 import { createWorkspace } from "../../../packages/workspaces/src/create.ts";
 import { requireAuthority } from "../../../packages/policy/src/authority.ts";
 import type { FastifyInstance } from "fastify";
@@ -46,7 +47,7 @@ export function registerWorkspaceRoutes(
         throw new HarborError(404, "NOT_FOUND", "Project not found");
       const rows = (
         await pool.query(
-          "SELECT w.*,(SELECT json_build_object('id',r.id,'state',r.state,'failureCode',r.failure_code) FROM workspace_releases r WHERE r.workspace_id=w.id ORDER BY created_at DESC LIMIT 1) AS latest_release FROM workspaces w WHERE project_id=$1 ORDER BY created_at",
+          `SELECT w.*,${workspaceRuntimeProjection("w")} AS conversation_runtimes,(SELECT json_build_object('id',r.id,'state',r.state,'failureCode',r.failure_code) FROM workspace_releases r WHERE r.workspace_id=w.id ORDER BY created_at DESC LIMIT 1) AS latest_release FROM workspaces w WHERE project_id=$1 ORDER BY created_at`,
           [project.id],
         )
       ).rows;

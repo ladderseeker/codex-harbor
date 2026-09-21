@@ -1,3 +1,4 @@
+import { personalAttachmentRoot } from "../../attachments/src/personal.ts";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,12 +8,20 @@ import {
   type OwnedRuntimeProcess,
 } from "./index.js";
 import { launchRunner } from "../../../infra/runner/launcher.js";
-import { launchLocalRuntime } from "./local-runtime.js";
+import {
+  launchLocalRuntime,
+  PersonalRuntimeNotStartedError,
+} from "./local-runtime.js";
 export type RuntimeConfig = RuntimeCallbacks & {
   purpose?: "conversation" | "terminal" | "preview";
   attachmentProject?: import("../../../infra/storage/admission.ts").NativeStorage;
   attachmentDirectory?: import("../../../infra/storage/admission.ts").NativeStorage;
-  onTransport?: (adapter: CodexAdapter) => void;
+  onTransport?: (adapter: CodexAdapter) => void | Promise<void>;
+  onOwnedIdentity?: (identity: {
+    groupId: number;
+    host: string;
+    cgroup?: import("./personal-cgroup.ts").PersonalCgroupIdentity;
+  }) => Promise<void>;
   withDispatch?: <T>(send: () => T) => Promise<T>;
   workspaceId?: string;
   gitCommon?: { canonical: string; device: string; inode: string };
@@ -33,6 +42,20 @@ export async function createRuntime(
     !config.fixture &&
     (globalThis.process.env.HARBOR_LOCAL_MODE === "personal" ||
       globalThis.process.env.HARBOR_PERSONAL_VPS_MODE === "personal");
+  const attachmentRoot = local
+    ? /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(
+        config.sessionId,
+      )
+      ? (
+          await personalAttachmentRoot(
+            config.sessionId,
+            config.workspacePath,
+          ).catch((error) => {
+            throw new PersonalRuntimeNotStartedError(error);
+          })
+        ).root
+      : ""
+    : "/attachments";
   const process = config.fixture
     ? fixtureProcess(config)
     : local
@@ -55,9 +78,10 @@ export async function createRuntime(
     config.purpose,
     !config.fixture && ["terminal", "preview"].includes(config.purpose ?? ""),
     local,
+    attachmentRoot,
   );
   try {
-    config.onTransport?.(adapter);
+    await config.onTransport?.(adapter);
     await adapter.initialize();
     return adapter;
   } catch (error) {

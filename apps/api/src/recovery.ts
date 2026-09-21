@@ -165,7 +165,7 @@ export function recoveryRoutes(app: FastifyInstance, context: Context) {
     "/api/v1/sessions/:id/recovery/continue",
     async (req, reply) => {
       const b = turnSchema
-        .extend({
+        .safeExtend({
           recoveryId: z.uuid(),
           expectedGeneration: z.number().int().nonnegative(),
           acknowledgeUnknownEffects: z.literal(true),

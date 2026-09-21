@@ -277,6 +277,9 @@ try {
       },
     ]),
     HARBOR_MODELS: process.env.HARBOR_MODELS ?? "",
+    HARBOR_MAX_ACTIVE_TURNS: process.env.HARBOR_MAX_ACTIVE_TURNS ?? "4",
+    HARBOR_MAX_CONVERSATION_RUNTIMES:
+      process.env.HARBOR_MAX_CONVERSATION_RUNTIMES ?? "4",
     HARBOR_CONTROL_SOCKET: path.join(dir, "control", "supervisor.sock"),
     HARBOR_CREDENTIAL_KEY_FILE: path.join(dir, "control", "key"),
     HARBOR_PERMISSION_CEILING: "read-only",

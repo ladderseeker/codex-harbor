@@ -1,3 +1,5 @@
+import sharp from "sharp";
+import { ATTACHMENT_LIMITS } from "../../packages/contracts/src/attachments.ts";
 import { attachmentWorkspaces } from "./p005-workspaces.ts";
 import { expect, type Page, type BrowserContext } from "@playwright/test";
 import type { Pool } from "pg";
@@ -145,8 +147,12 @@ export async function p005({
       },
       data,
     });
-  expect((await put()).status()).toBe(200);
-  expect((await put()).status()).toBe(200);
+  const uploaded = await put();
+  expect(uploaded.status(), await uploaded.text()).toBe(200);
+  const uploadedAttachment = (await uploaded.json()).attachment;
+  const repeatedUpload = await put();
+  expect(repeatedUpload.status(), await repeatedUpload.text()).toBe(200);
+  expect((await repeatedUpload.json()).attachment).toEqual(uploadedAttachment);
   expect(
     (
       await command(`/sessions/${other.id}/turns`, {
@@ -169,7 +175,55 @@ export async function p005({
     origin + `/api/v1/attachments/${a.id}/content`,
   );
   expect(download.headers()["content-disposition"]).toContain("attachment;");
-  expect((await download.body()).equals(png())).toBe(true);
+  expect(download.status()).toBe(200);
+  expect(download.headers()["content-type"]).toBe("image/png");
+  expect(download.headers()["x-content-type-options"]).toBe("nosniff");
+  const normalized = await download.body();
+  const normalizedMetadata = await sharp(normalized).metadata();
+  expect(normalizedMetadata).toMatchObject({
+    format: "png",
+    width: 1,
+    height: 1,
+  });
+  expect(normalizedMetadata.exif).toBeUndefined();
+  expect(normalizedMetadata.xmp).toBeUndefined();
+  expect(normalized.includes(Buffer.from("unsafe name"))).toBe(false);
+  expect(normalized.includes(Buffer.from("hostile()"))).toBe(false);
+  expect(await sharp(normalized).ensureAlpha().raw().toBuffer()).toEqual(
+    Buffer.from([255, 0, 0, 255]),
+  );
+  const normalizedDigest = createHash("sha256")
+    .update(normalized)
+    .digest("hex");
+  expect(uploadedAttachment).toMatchObject({
+    size: normalized.length,
+    digest: normalizedDigest,
+  });
+  expect(
+    (
+      await db.query(
+        "SELECT expected_hash,expected_size,digest,size,content FROM attachments WHERE id=$1",
+        [a.id],
+      )
+    ).rows[0],
+  ).toEqual({
+    expected_hash: hash,
+    expected_size: data.length,
+    digest: normalizedDigest,
+    size: normalized.length,
+    content: normalized,
+  });
+  // A new upload intent must still accept the original bytes after normalization.
+  const resumedOriginal = await putFile(a.id, data);
+  expect(resumedOriginal.status(), await resumedOriginal.text()).toBe(200);
+  expect((await resumedOriginal.json()).attachment).toEqual(uploadedAttachment);
+  const preview = await context.request.get(
+    origin + `/api/v1/attachments/${a.id}/preview`,
+  );
+  expect(preview.status()).toBe(200);
+  expect(preview.headers()["content-type"]).toBe("image/png");
+  expect(preview.headers()["content-security-policy"]).toContain("sandbox");
+  expect(await preview.body()).toEqual(normalized);
   const draftKey = key(),
     draftBody = {
       text: "[approval] Review the supplied image",
@@ -498,7 +552,7 @@ export async function p005({
     [other.id],
   );
   expect(droppedText.rowCount).toBe(1);
-  // Text files become inline text inputs; only images have native file paths.
+  // General files use text inputs identifying controlled paths; images use localImage.
   // Assert one attached row, the same operation as the image, and one dispatch.
   expect(droppedText.rows[0].state).toBe("attached");
   expect(droppedText.rows[0].operation_id).toBeTruthy();
@@ -612,11 +666,11 @@ export async function p005({
       await command(`/sessions/${negative.id}/attachments`, {
         name: "too-big.txt",
         mediaType: "text/plain",
-        size: 65537,
+        size: ATTACHMENT_LIMITS.textBytes + 1,
         sha256: hash,
       })
     ).status(),
-  ).toBe(413);
+  ).toBe(400);
   expect(
     (
       await command(`/sessions/${negative.id}/attachments`, {
@@ -627,7 +681,11 @@ export async function p005({
       })
     ).status(),
   ).toBe(400);
-  expect((await putFile(a.id, Buffer.alloc(262145))).status()).toBe(413);
+  expect(
+    (
+      await putFile(a.id, Buffer.alloc(ATTACHMENT_LIMITS.fileBytes + 1))
+    ).status(),
+  ).toBe(413);
   expect(
     (
       await command(`/sessions/${negative.id}/turns`, {
@@ -740,14 +798,12 @@ export async function p005({
   await page.getByRole("button", { name: "Pause upload", exact: true }).click();
   releasePause();
   await expect(
-    page.getByRole("button", { name: "Retry same upload", exact: true }),
+    page.getByRole("button", { name: "Retry upload", exact: true }),
   ).toBeVisible();
   const retryResponse = page.waitForResponse(
     (r) => r.request().method() === "PUT" && r.url().includes("/attachments/"),
   );
-  await page
-    .getByRole("button", { name: "Retry same upload", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Retry upload", exact: true }).click();
   const retriedUpload = await retryResponse;
   expect(retriedUpload.status(), await retriedUpload.text()).toBe(200);
   await expect(
@@ -778,11 +834,9 @@ export async function p005({
     buffer: Buffer.from("lost committed response"),
   });
   await expect(
-    page.getByRole("button", { name: "Retry same upload", exact: true }),
+    page.getByRole("button", { name: "Retry upload", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Retry same upload", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Retry upload", exact: true }).click();
   await expect(
     page.getByText("Selected for this message", { exact: true }),
   ).toHaveCount(2);
@@ -874,7 +928,7 @@ export async function p005({
   await page.getByRole("button", { name: "Pause upload", exact: true }).click();
   releaseMetadata();
   await expect(
-    page.getByRole("button", { name: "Retry same upload", exact: true }),
+    page.getByRole("button", { name: "Retry upload", exact: true }),
   ).toBeVisible();
   expect(binaryCalls).toBe(0);
   page.off("request", countBinary);
@@ -1161,7 +1215,7 @@ export async function p005({
   }
 
   const countSession = await newSession("Retained attachment count");
-  for (let i = 0; i < 32; i++)
+  for (let i = 0; i < ATTACHMENT_LIMITS.sessionCount; i++)
     await stageFile(countSession.id, Buffer.from("x"));
   expect(
     (
@@ -1174,12 +1228,17 @@ export async function p005({
     ).status(),
   ).toBe(429);
   const quotaSession = await newSession("Attachment byte quota");
-  for (let i = 0; i < 16; i++)
+  const reservationBytes = Buffer.alloc(ATTACHMENT_LIMITS.fileBytes);
+  for (
+    let reserved = 0;
+    reserved < ATTACHMENT_LIMITS.sessionBytes;
+    reserved += reservationBytes.length
+  )
     await stageFile(
       quotaSession.id,
-      Buffer.alloc(262144),
-      "image/png",
-      "reserved.png",
+      reservationBytes,
+      "application/octet-stream",
+      "reserved.bin",
     );
   expect(
     (
@@ -1192,15 +1251,16 @@ export async function p005({
     ).status(),
   ).toBe(429);
   const turnLimitSession = await newSession("Attachment turn byte quota"),
-    large = png(false, 240, 240),
+    large = Buffer.alloc(Math.floor(ATTACHMENT_LIMITS.turnBytes / 3) + 1, 65),
     largeIds: string[] = [];
-  expect(large.length).toBeLessThanOrEqual(262144);
+  expect(large.length).toBeLessThanOrEqual(ATTACHMENT_LIMITS.fileBytes);
+  expect(large.length * 3).toBeGreaterThan(ATTACHMENT_LIMITS.turnBytes);
   for (let i = 0; i < 3; i++) {
     const image = await stageFile(
       turnLimitSession.id,
       large,
-      "image/png",
-      "large.png",
+      "application/octet-stream",
+      "large.bin",
     );
     expect((await putFile(image.id, large)).status()).toBe(200);
     largeIds.push(image.id);
@@ -1218,11 +1278,11 @@ export async function p005({
   const seedSessions: string[] = [];
   try {
     let remaining =
-      104857600 -
+      ATTACHMENT_LIMITS.instanceBytes -
       Number(
         (
           await db.query(
-            "SELECT coalesce(sum(expected_size),0) AS n FROM attachments WHERE state IN ('uploading','staged','attached')",
+            "SELECT coalesce(sum(greatest(expected_size,coalesce(size,0))),0) AS n FROM attachments WHERE state IN ('uploading','staged','attached')",
           )
         ).rows[0].n,
       );
@@ -1233,13 +1293,25 @@ export async function p005({
         "INSERT INTO sessions(id,project_id,workspace_id,title,model,effort,permission_profile) SELECT $1,project_id,workspace_id,'Owned global quota seed',model,effort,permission_profile FROM sessions WHERE id=$2",
         [id, negative.id],
       );
-      for (let n = 0; n < 16 && remaining > 0; n++) {
-        const size = Math.min(262144, remaining);
+      let sessionRemaining = ATTACHMENT_LIMITS.sessionBytes;
+      for (
+        let n = 0;
+        n < ATTACHMENT_LIMITS.sessionCount &&
+        remaining > 0 &&
+        sessionRemaining > 0;
+        n++
+      ) {
+        const size = Math.min(
+          ATTACHMENT_LIMITS.fileBytes,
+          remaining,
+          sessionRemaining,
+        );
         await db.query(
-          "INSERT INTO attachments(id,session_id,project_id,name,declared_type,expected_size,expected_hash) VALUES($1,$2,$3,'Owned reservation','image/png',$4,$5)",
+          "INSERT INTO attachments(id,session_id,project_id,name,declared_type,expected_size,expected_hash) VALUES($1,$2,$3,'Owned reservation','application/octet-stream',$4,$5)",
           [randomUUID(), id, projectId, size, hash],
         );
         remaining -= size;
+        sessionRemaining -= size;
       }
     }
     expect(

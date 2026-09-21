@@ -1,3 +1,4 @@
+import { workspaceRuntimeProjection } from "../../storage/src/conversation-runtimes.ts";
 import { stat, realpath } from "node:fs/promises";
 import path from "node:path";
 import type { DB } from "../../storage/src/index.ts";
@@ -11,6 +12,7 @@ import type {
 } from "./types.ts";
 export function workspaceView(w: any): WorkspaceView {
   return {
+    conversationRuntimes: w.conversation_runtimes ?? [],
     id: w.id,
     projectId: w.project_id,
     name: w.name,
@@ -46,8 +48,7 @@ export function storedIdentity(w: any): WorkspaceIdentity {
   };
 }
 export async function selectedWorkspace(db: DB, id: string, lock = false) {
-  const query =
-    "SELECT w.*,(SELECT json_build_object('id',r.id,'state',r.state,'failureCode',r.failure_code) FROM workspace_releases r WHERE r.workspace_id=w.id ORDER BY created_at DESC LIMIT 1) AS latest_release,p.root_id,p.relative_path AS project_relative,p.archived_at AS project_archived FROM workspaces w JOIN projects p ON p.id=w.project_id WHERE w.id=$1";
+  const query = `SELECT w.*,${workspaceRuntimeProjection("w")} AS conversation_runtimes,(SELECT json_build_object('id',r.id,'state',r.state,'failureCode',r.failure_code) FROM workspace_releases r WHERE r.workspace_id=w.id ORDER BY created_at DESC LIMIT 1) AS latest_release,p.root_id,p.relative_path AS project_relative,p.archived_at AS project_archived FROM workspaces w JOIN projects p ON p.id=w.project_id WHERE w.id=$1`;
   let r = await db.query(query, [id]);
   if (!r.rowCount)
     throw new HarborError(404, "NOT_FOUND", "Workspace not found");
@@ -205,6 +206,10 @@ export async function requireWorkspaceIdle(
     `SELECT 1 FROM workspaces WHERE ${wholeProject ? "project_id" : "id"}=$1 AND writer_owner_id IS NOT NULL LIMIT 1`,
     [wholeProject ? w.project_id : w.id],
   );
+  const memberships = await db.query(
+    `SELECT 1 FROM conversation_runtimes cr JOIN workspaces w ON w.id=cr.workspace_id WHERE w.${wholeProject ? "project_id" : "id"}=$1 LIMIT 1`,
+    [wholeProject ? w.project_id : w.id],
+  );
   const queued = await db.query(
     `SELECT 1 FROM operations o JOIN sessions s ON s.id=o.session_id WHERE s.${wholeProject ? "project_id" : "workspace_id"}=$1 AND o.state IN ('queued','dispatching','running','waiting_approval','waiting_input') LIMIT 1`,
     [wholeProject ? w.project_id : w.id],
@@ -222,6 +227,7 @@ export async function requireWorkspaceIdle(
     [wholeProject ? w.project_id : w.id],
   );
   if (
+    memberships.rowCount ||
     busy.rowCount ||
     queued.rowCount ||
     filePending.rowCount ||

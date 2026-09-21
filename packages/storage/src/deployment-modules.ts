@@ -1,6 +1,7 @@
 /** Fixed installed modules. No registry input supplies SQL or executable hooks. */
 import type { DB } from "./index.ts";
 export const installedModules = {
+  P018: ["conversation_runtimes"],
   P004: [
     "file_operations",
     "file_inspections",
@@ -28,6 +29,7 @@ export const installedModules = {
 export async function installedModuleStatus(db: DB) {
   const row = (
     await db.query(`SELECT
+    (SELECT count(*) FROM conversation_runtimes) AS "activeConversationRuntimes",
     (SELECT count(*) FROM file_operations WHERE state='queued') AS "queuedFiles",
     (SELECT count(*) FROM file_operations WHERE state='dispatching') AS "activeFiles",
     (SELECT count(*) FROM file_operations WHERE state='uncertain' AND acknowledged_at IS NULL) AS "uncertainFiles",
@@ -46,6 +48,10 @@ export async function installedModuleStatus(db: DB) {
   );
 }
 export async function restoreInstalledModules(db: DB, source: string) {
+  // Restored process identities belong to the source host and are never inspected.
+  await db.query(
+    "UPDATE conversation_runtimes SET native_identity=NULL,state='unknown',idle_until=NULL",
+  );
   // Historical rows retain original outcomes/content. Source dispatch and control
   // identities never become active authority in this destination.
   for (const [kind, table] of [

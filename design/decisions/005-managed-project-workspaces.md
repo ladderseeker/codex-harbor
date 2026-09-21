@@ -1,5 +1,7 @@
 # D005 — Managed parallel project workspaces
 
+[D014](014-personal-conversation-concurrency.md) supersedes exclusive conversation admission only for personal local/VPS profiles. The managed contract below remains unchanged.
+
 ## Current ownership — 20 September 2026
 
 The [current subsystem designs](../systems/) apply this decision alongside architecture; [D013](013-evidence-based-delivery-workflow.md) and the [workflow](../workflow.md) now govern execution and record lifecycle. Proposal references below identify historical plans, not active work owners. Unfinished evidence remains in the [issue inbox](../../issues/), and future work receives a newly selected proposal. The dated decision rationale and technical constraints below are preserved.

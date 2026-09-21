@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { publishPersonalAttachments } from "./personal.ts";
 import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Pool } from "pg";
@@ -35,16 +36,50 @@ export async function prepareAttachments(
     await validateAttachmentModalities(db, files, operation.payload.model);
     const inputs: AttachmentInput[] = files.map((f) => ({
       id: f.id,
-      kind: f.media_type === "image/png" ? "image" : "text",
+      kind: ["image/png", "image/jpeg"].includes(f.media_type)
+        ? "image"
+        : "text",
+      name: f.name,
       path: `/attachments/${f.id}`,
     }));
     if (
       process.env.HARBOR_LOCAL_MODE === "personal" ||
       process.env.HARBOR_PERSONAL_VPS_MODE === "personal"
     ) {
-      if (inputs.length)
-        throw Error("Attachments are unavailable in this personal profile");
-      return { inputs };
+      if (!inputs.length) return { inputs };
+      const directory = (
+        await db.query(
+          "SELECT canonical,device,inode FROM session_attachment_storage WHERE session_id=$1",
+          [sessionId],
+        )
+      ).rows[0];
+      const result = await publishPersonalAttachments(
+        sessionId,
+        workspace,
+        directory,
+        files,
+      );
+      await db.query(
+        "INSERT INTO session_attachment_storage(session_id,canonical,device,inode) VALUES($1,$2,$3,$4) ON CONFLICT(session_id) DO NOTHING",
+        [
+          sessionId,
+          result.directory.canonical,
+          result.directory.device,
+          result.directory.inode,
+        ],
+      );
+      for (const f of result.files)
+        await db.query(
+          "UPDATE attachments SET device=$2,inode=$3 WHERE id=$1",
+          [f.id, f.device, f.inode],
+        );
+      return {
+        directory: result.directory,
+        inputs: inputs.map((f) => ({
+          ...f,
+          path: `${result.directory.canonical}/${f.id}`,
+        })),
+      };
     }
     if (fixture) {
       if (

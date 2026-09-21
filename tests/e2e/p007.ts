@@ -126,9 +126,7 @@ export async function p007(h: Context) {
   ).toBe(true);
   await page.reload();
   await page.locator(".session-row.selected .session-rename").click();
-  await page
-    .getByRole("button", { name: "Archive conversation", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Archive", exact: true }).click();
   await expect
     .poll(async () => (await snapshot(id)).session.archived)
     .toBe(true);
@@ -144,9 +142,7 @@ export async function p007(h: Context) {
     .getByRole("dialog", { name: "Search and filters", exact: true })
     .locator(".session-row.selected .session-rename")
     .click();
-  await page
-    .getByRole("button", { name: "Restore conversation", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Unarchive", exact: true }).click();
   await expect
     .poll(async () => (await snapshot(id)).session.archived)
     .toBe(false);

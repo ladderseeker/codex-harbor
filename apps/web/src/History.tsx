@@ -1,7 +1,13 @@
 import { Icon } from "./Icons.tsx";
 import { useEffect, useRef, useState } from "react";
 import type { Session } from "../../../packages/contracts/src/index.ts";
-import { request, newIntent, type Intent } from "./api.ts";
+import {
+  request,
+  newIntent,
+  confirmedRuntime,
+  runtimeNames,
+  type Intent,
+} from "./api.ts";
 export function History({
   projectId,
   selectedId,
@@ -206,19 +212,23 @@ export function History({
                 <Icon name="compose" />
               ) : (
                 <span
-                  className={`rail-dot ${s.backgroundUntil || workspaces.some((w) => w.writerSessionId === s.id) ? "resource-held" : ""}`}
+                  className={`rail-dot ${(s.runtime ? confirmedRuntime(s.runtime) : s.backgroundUntil || workspaces.some((w) => w.writerSessionId === s.id)) ? "resource-held" : ""}`}
                   title={
-                    s.backgroundUntil ||
-                    workspaces.some((w) => w.writerSessionId === s.id)
-                      ? "Occupying runtime resources"
-                      : "View status for resource details"
+                    s.runtime
+                      ? runtimeNames[s.runtime.state]
+                      : s.backgroundUntil ||
+                          workspaces.some((w) => w.writerSessionId === s.id)
+                        ? "Occupying runtime resources"
+                        : "View status for resource details"
                   }
                   role="img"
                   aria-label={
-                    s.backgroundUntil ||
-                    workspaces.some((w) => w.writerSessionId === s.id)
-                      ? "Occupying runtime resources"
-                      : "Resource details available in View status"
+                    s.runtime
+                      ? runtimeNames[s.runtime.state]
+                      : s.backgroundUntil ||
+                          workspaces.some((w) => w.writerSessionId === s.id)
+                        ? "Occupying runtime resources"
+                        : "Resource details available in View status"
                   }
                 />
               )}
@@ -306,7 +316,7 @@ export function History({
                   }}
                 >
                   <Icon name="archive" />
-                  {s.archived ? "Restore conversation" : "Archive conversation"}
+                  {s.archived ? "Unarchive" : "Archive"}
                 </button>
                 <button
                   onClick={(event) => {
@@ -317,14 +327,17 @@ export function History({
                   }}
                 >
                   <Icon name="info" />
-                  View status
+                  Status
                 </button>
-                {s.backgroundUntil && (
+                {(s.runtime || s.backgroundUntil) && (
                   <button
                     disabled={
                       disabled ||
                       s.backgroundStopRequested ||
+                      s.runtime?.state === "retiring" ||
                       [
+                        "accepted",
+                        "cancelling",
                         "queued",
                         "dispatching",
                         "running",
@@ -339,8 +352,11 @@ export function History({
                       void execute(
                         newIntent(
                           `/sessions/${s.id}/background-stop`,
-                          { generation: s.generation ?? 0 },
-                          "Stop background processes",
+                          {
+                            generation:
+                              s.runtime?.generation ?? s.generation ?? 0,
+                          },
+                          "Stop processes",
                         ),
                         async () => {
                           pendingActionFocus.current = s.id;
@@ -352,7 +368,7 @@ export function History({
                     <Icon name="stop" />
                     {s.backgroundStopRequested
                       ? "Stopping background processes…"
-                      : "Stop background processes"}
+                      : "Stop processes"}
                   </button>
                 )}
               </div>
@@ -397,7 +413,7 @@ export function History({
               Save title
             </button>
             <button type="button" onClick={() => setEditing(null)}>
-              Cancel edit
+              Cancel
             </button>
           </div>
         </form>
@@ -451,7 +467,7 @@ export function ConversationDetails({
           )
         }
       >
-        {session.archived ? "Restore conversation" : "Archive conversation"}
+        {session.archived ? "Unarchive" : "Archive"}
       </button>
     </section>
   );

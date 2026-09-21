@@ -127,6 +127,8 @@ Offer Local and Worktree modes. Prefer worktrees for concurrent Git work and exp
 
 [D005](decisions/005-managed-project-workspaces.md) defines managed Local, Git Worktree and copy storage, stable common metadata mounts, and the confined Git helper. Workspace admission coordinates managed runs, editor writes, and Git operations. Terminals retain writer reservations while shells or background jobs remain active; conflicting managed operations queue. This is cooperative coordination: arbitrary processes and external SSH can bypass it. Show Local conflicts and warn before simultaneous editing; never promise unconditional overwrite prevention.
 
+[D014](decisions/014-personal-conversation-concurrency.md) permits shared-directory conversation membership in personal local/VPS code, retaining one active turn per conversation and independent native generations. The owner selected Linux/VPS as the supported P018/P024 release target; native macOS lifecycle parity is outside this release. The owner coordinates shared edits. Durable capacity includes startup, retained, retiring and unknown runtimes; only confirmed ordinary idle may be automatically reclaimed. Managed writer coordination remains unchanged.
+
 The supervisor, not the browser, owns running work and subscriptions. Closing every page, changing networks, or restarting the HTTP service must leave execution intact. A turn may still complete, fail, hit a usage limit, or wait for approval. Waiting is visible and never interpreted as permission to continue.
 
 Persist ordered events and bounded terminal output. Reconnect from snapshots and cursors, detecting gaps and duplicates. Slow viewers cannot block execution; browser drafts contain no credentials.

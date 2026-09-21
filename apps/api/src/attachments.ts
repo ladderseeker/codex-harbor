@@ -24,7 +24,7 @@ export function attachmentRoutes(
 ) {
   app.addContentTypeParser(
     "application/octet-stream",
-    { parseAs: "buffer", bodyLimit: 262144 },
+    { parseAs: "buffer", bodyLimit: ATTACHMENT_LIMITS.fileBytes },
     (_req, body, done) => done(null, body),
   );
   app.post<{ Params: { id: string } }>(
@@ -34,18 +34,17 @@ export function attachmentRoutes(
         const b = z
           .object({
             name: z.string().min(1).max(240),
-            mediaType: z.enum(["image/png", "text/plain"]),
-            size: z.number().int().positive().max(262144),
+            mediaType: z.enum([
+              "image/png",
+              "image/jpeg",
+              "text/plain",
+              "application/octet-stream",
+            ]),
+            size: z.number().int().positive().max(ATTACHMENT_LIMITS.fileBytes),
             sha256: z.string().regex(/^[a-f0-9]{64}$/),
           })
           .strict()
           .parse(req.body);
-        if (b.mediaType === "text/plain" && b.size > 65536)
-          throw new HarborError(
-            413,
-            "ATTACHMENT_LIMIT",
-            "Text files must be at most 64 KiB",
-          );
         const s = await lockSession(db, req.params.id);
         await db.query("SELECT pg_advisory_xact_lock(740020)");
         const records = (
@@ -65,12 +64,12 @@ export function attachmentRoutes(
           );
         const total = (
           await db.query(
-            "SELECT coalesce(sum(expected_size),0)::bigint AS bytes FROM attachments WHERE state IN ('uploading','staged','attached')",
+            "SELECT coalesce(sum(greatest(expected_size,coalesce(size,0))),0)::bigint AS bytes FROM attachments WHERE state IN ('uploading','staged','attached')",
           )
         ).rows[0];
         const local = (
           await db.query(
-            "SELECT count(*)::int AS count,coalesce(sum(expected_size),0)::bigint AS bytes FROM attachments WHERE session_id=$1 AND state IN ('uploading','staged','attached')",
+            "SELECT count(*)::int AS count,coalesce(sum(greatest(expected_size,coalesce(size,0))),0)::bigint AS bytes FROM attachments WHERE session_id=$1 AND state IN ('uploading','staged','attached')",
             [s.id],
           )
         ).rows[0];
@@ -103,7 +102,7 @@ export function attachmentRoutes(
   );
   app.put<{ Params: { id: string } }>(
     "/api/v1/attachments/:id/content",
-    { bodyLimit: 262144 },
+    { bodyLimit: ATTACHMENT_LIMITS.fileBytes },
     async (req) => {
       if (!Buffer.isBuffer(req.body))
         throw new HarborError(
@@ -147,7 +146,25 @@ export function attachmentRoutes(
             "UPLOAD_EXPIRED",
             "Upload expired or was removed",
           );
-        const content = validateMedia(bytes, a.declared_type);
+        const content = await validateMedia(bytes, a.declared_type);
+        await db.query("SELECT pg_advisory_xact_lock(740020)");
+        const usage = (
+          await db.query(
+            "SELECT coalesce(sum(greatest(expected_size,coalesce(size,0))),0)::bigint AS total,coalesce(sum(greatest(expected_size,coalesce(size,0))) FILTER(WHERE session_id=$1),0)::bigint AS local FROM attachments WHERE state IN ('uploading','staged','attached')",
+            [a.session_id],
+          )
+        ).rows[0];
+        const increase =
+          Math.max(a.expected_size, content.length) - a.expected_size;
+        if (
+          Number(usage.total) + increase > ATTACHMENT_LIMITS.instanceBytes ||
+          Number(usage.local) + increase > ATTACHMENT_LIMITS.sessionBytes
+        )
+          throw new HarborError(
+            429,
+            "ATTACHMENT_QUOTA",
+            "Normalized attachment exceeds storage limit",
+          );
         const row = (
           await db.query(
             "UPDATE attachments SET state='staged',content=$2,media_type=declared_type,size=$3,digest=$4 WHERE id=$1 RETURNING *",
@@ -195,11 +212,14 @@ export function attachmentRoutes(
             "NOT_FOUND",
             "Attachment content unavailable",
           );
-        if (mode === "preview" && a.media_type !== "image/png")
+        if (
+          mode === "preview" &&
+          !["image/png", "image/jpeg"].includes(a.media_type)
+        )
           throw new HarborError(
             415,
             "PREVIEW_UNSUPPORTED",
-            "Only validated PNG has an inline preview",
+            "Only validated PNG and JPEG have an inline preview",
           );
         reply
           .header("content-type", a.media_type)
@@ -207,7 +227,7 @@ export function attachmentRoutes(
             "content-disposition",
             mode === "preview"
               ? "inline"
-              : `attachment; filename="attachment${a.media_type === "image/png" ? ".png" : ".txt"}"`,
+              : `attachment; filename="attachment"; filename*=UTF-8''${encodeURIComponent(a.name).replace(/['()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase())}`,
           )
           .header("content-security-policy", "default-src 'none'; sandbox")
           .header("x-content-type-options", "nosniff");

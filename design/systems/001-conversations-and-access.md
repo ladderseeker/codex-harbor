@@ -24,6 +24,10 @@ Browser closure and API restarts leave the supervisor's subscriptions and work a
 
 Only the owner signs in. OIDC pins issuer and subject with PKCE/state/nonce and exact callbacks; secure opaque server sessions protect assets, APIs and streams. Keep current authority checks after blocking locks and before each new dispatch. Logout removes interactive access without undoing an accepted execution grant. Emergency stop separately blocks new work and retires owned execution. The supervisor survives browser/API disconnect, and native runtime loss becomes interrupted or uncertain. Use the architecture’s durable intent, epoch, replay and idempotency contracts.
 
+### Personal runtime capacity
+
+[D014](../decisions/014-personal-conversation-concurrency.md) defines independent active-turn and runtime budgets, durable ownership and safe idle retirement for personal profiles. Defaults are four each; configured active range is 1–16 and runtime range 1–32, with runtime at least active. Successful personal turns may retain their runtime for continuation. Ordinary idle is reclaimable after a fresh empty process inspection, oldest execution activity first, and has a 30-minute maximum retention target. Active/approval/input, owned background/preview descendants and unknown process state are never automatic eviction candidates. Protected/unknown state has no time expiry. Targeted stop preserves history and must confirm absence before releasing its exact capacity. Restart never replays ambiguous input. Queue reasons and safe runtime states are visible through authenticated snapshots/API, without process identities. The bounded queue scan reaches eligible continuation behind a capacity-blocked new conversation.
+
 ## Programmatic access
 
 Owner settings support token creation, scope/project selection, expiry, last-use metadata, and revocation. Display the raw token once. A script authenticates with `Authorization: Bearer`, discovers the versioned API, submits work with an idempotency key, follows events, reads the result, and cancels permitted work. Authentication errors return API errors rather than an HTML login redirect.

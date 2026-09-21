@@ -12,6 +12,20 @@ import {
 import { tokenSchema } from "./tokens.ts";
 import { z } from "zod";
 import { projectSchema, sessionSchema, turnSchema } from "./index.ts";
+// Zod's custom object refinement is not emitted by toJSONSchema.
+const turnJsonSchema = (schema: z.ZodType = turnSchema) => ({
+  ...z.toJSONSchema(schema, { io: "input" }),
+  anyOf: [
+    {
+      properties: { text: { type: "string", pattern: "\\S" } },
+      required: ["text"],
+    },
+    {
+      properties: { attachmentIds: { type: "array", minItems: 1 } },
+      required: ["attachmentIds"],
+    },
+  ],
+});
 const string = { type: "string" },
   uuid = { type: "string", format: "uuid" },
   timestamp = { type: "string", format: "date-time" };
@@ -64,7 +78,30 @@ export const publicSchemas = {
     outputFloor: { type: "integer", minimum: 0 },
     outputLost: { type: "boolean" },
   }),
+  ConversationRuntime: object({
+    state: {
+      enum: [
+        "starting",
+        "active",
+        "waiting_approval",
+        "waiting_input",
+        "idle",
+        "protected",
+        "retiring",
+        "unknown",
+      ],
+    },
+    generation: { type: "integer" },
+    lastActivityAt: timestamp,
+    idleUntil: { type: ["string", "null"], format: "date-time" },
+  }),
   Workspace: object({
+    conversationRuntimes: array({
+      allOf: [
+        { $ref: "#/components/schemas/ConversationRuntime" },
+        object({ sessionId: uuid, title: string }),
+      ],
+    }),
     id: uuid,
     projectId: uuid,
     name: string,
@@ -95,6 +132,12 @@ export const publicSchemas = {
   }),
   Project: object({ id: uuid, name: string, createdAt: timestamp }),
   Session: object({
+    runtime: {
+      anyOf: [
+        { $ref: "#/components/schemas/ConversationRuntime" },
+        { type: "null" },
+      ],
+    },
     id: uuid,
     projectId: uuid,
     workspaceId: uuid,
@@ -134,6 +177,19 @@ export const publicSchemas = {
     createdAt: timestamp,
   }),
   Operation: object({
+    queueReason: {
+      type: ["string", "null"],
+      enum: [
+        "session_busy",
+        "active_capacity",
+        "runtime_capacity",
+        "protected_capacity",
+        "retirement_unknown",
+        "workspace_busy",
+        "maintenance",
+        null,
+      ],
+    },
     id: uuid,
     sessionId: uuid,
     kind: string,
@@ -272,7 +328,9 @@ const attachmentRecord = object({
   sessionId: uuid,
   name: string,
   state: { enum: ["uploading", "staged", "attached", "deleted", "expired"] },
-  mediaType: { enum: ["image/png", "text/plain"] },
+  mediaType: {
+    enum: ["image/png", "image/jpeg", "text/plain", "application/octet-stream"],
+  },
   size: { type: "integer" },
   digest: string,
   operationId: { type: ["string", "null"] },
@@ -311,8 +369,15 @@ const paths: Record<string, any> = {
     post: mutation(
       object({
         name: string,
-        mediaType: { enum: ["image/png", "text/plain"] },
-        size: { type: "integer", minimum: 1, maximum: 262144 },
+        mediaType: {
+          enum: [
+            "image/png",
+            "image/jpeg",
+            "text/plain",
+            "application/octet-stream",
+          ],
+        },
+        size: { type: "integer", minimum: 1, maximum: 10485760 },
         sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
       }),
       object({ attachment: attachmentRecord }),
@@ -331,7 +396,11 @@ const paths: Record<string, any> = {
             "Validated private download; attachment disposition and nosniff",
           content: {
             "image/png": { schema: { type: "string", format: "binary" } },
+            "image/jpeg": { schema: { type: "string", format: "binary" } },
             "text/plain": { schema: { type: "string" } },
+            "application/octet-stream": {
+              schema: { type: "string", format: "binary" },
+            },
           },
         },
         ...errors,
@@ -343,9 +412,10 @@ const paths: Record<string, any> = {
       ...secure,
       responses: {
         "200": {
-          description: "Validated PNG only; CSP sandbox",
+          description: "Normalized PNG/JPEG only; CSP sandbox",
           content: {
             "image/png": { schema: { type: "string", format: "binary" } },
+            "image/jpeg": { schema: { type: "string", format: "binary" } },
           },
         },
         ...errors,
@@ -465,9 +535,9 @@ const paths: Record<string, any> = {
   },
   "/sessions/{id}/recovery/continue": {
     post: mutation(
-      z.toJSONSchema(
+      turnJsonSchema(
         turnSchema
-          .extend({
+          .safeExtend({
             recoveryId: z.uuid(),
             expectedGeneration: z.number().int().nonnegative(),
             acknowledgeUnknownEffects: z.literal(true),
@@ -591,7 +661,7 @@ const paths: Record<string, any> = {
     },
   },
   "/sessions/{id}/turns": {
-    post: mutation(z.toJSONSchema(turnSchema), accepted, 202),
+    post: mutation(turnJsonSchema(), accepted, 202),
   },
   "/operations/{id}": { get: read(accepted) },
   "/approvals/{id}/answer": {
@@ -908,7 +978,7 @@ export const openapi = {
       TerminalHeartbeat: z.toJSONSchema(terminalHeartbeat),
       ProjectInput: z.toJSONSchema(projectSchema),
       SessionInput: z.toJSONSchema(sessionSchema),
-      TurnInput: z.toJSONSchema(turnSchema),
+      TurnInput: turnJsonSchema(),
     },
   },
   paths: { ...paths, ...schedulePaths },

@@ -15,7 +15,6 @@ export const turnSchema = z
     text: z
       .string()
       .trim()
-      .min(1)
       .max(32768)
       .refine(
         (text) => new TextEncoder().encode(text).length <= 32768,
@@ -27,7 +26,11 @@ export const turnSchema = z
     attachmentIds: z.array(z.uuid()).max(4).default([]),
     draftRevision: z.number().int().nonnegative().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) => input.text.length > 0 || input.attachmentIds.length > 0,
+    "Enter a message or attach a file",
+  );
 export const projectSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
@@ -57,7 +60,31 @@ export type SessionState =
   | "failed"
   | "interrupted"
   | "uncertain";
+export type ConversationRuntimeState =
+  | "starting"
+  | "active"
+  | "waiting_approval"
+  | "waiting_input"
+  | "idle"
+  | "protected"
+  | "retiring"
+  | "unknown";
+export interface ConversationRuntime {
+  state: ConversationRuntimeState;
+  generation: number;
+  lastActivityAt: string;
+  idleUntil: string | null;
+}
+export type QueueReason =
+  | "session_busy"
+  | "active_capacity"
+  | "runtime_capacity"
+  | "protected_capacity"
+  | "retirement_unknown"
+  | "workspace_busy"
+  | "maintenance";
 export interface Session {
+  runtime?: ConversationRuntime | null;
   archived?: boolean;
   metadataRevision?: number;
   generation?: number;
@@ -84,6 +111,7 @@ export interface Message {
   createdAt: string;
 }
 export interface Operation {
+  queueReason?: QueueReason | null;
   id: string;
   sessionId: string;
   kind: string;

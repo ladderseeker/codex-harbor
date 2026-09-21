@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorkspaceView } from "../../../packages/workspaces/src/types.ts";
-import { newIntent, request, type Intent } from "./api.ts";
+import { newIntent, request, runtimeNames, type Intent } from "./api.ts";
 
 export type Inspection = {
   available: boolean;
@@ -64,10 +64,12 @@ export function WorkspaceSummary({
   workspace,
   sessionId,
   queued,
+  shared = false,
 }: {
   workspace?: WorkspaceView;
   sessionId: string;
   queued: boolean;
+  shared?: boolean;
 }) {
   const [details, setDetails] = useState<{
     id: string;
@@ -110,6 +112,31 @@ export function WorkspaceSummary({
           <details className="workspace-details">
             <summary>Workspace details</summary>
             <p className="workspace-path">{workspace.relativePath}</p>
+            {shared && (
+              <>
+                <p className="field-help">
+                  Conversations share this directory and run independently.
+                  Coordinate edits to shared files.
+                </p>
+                <ul
+                  className="workspace-runtime-list"
+                  aria-label="Shared directory conversations"
+                >
+                  {workspace.conversationRuntimes?.length ? (
+                    workspace.conversationRuntimes.map((runtime) => (
+                      <li key={`${runtime.sessionId}:${runtime.generation}`}>
+                        {runtime.sessionId === sessionId
+                          ? "This conversation"
+                          : runtime.title}
+                        : {runtimeNames[runtime.state]}
+                      </li>
+                    ))
+                  ) : (
+                    <li>No retained conversation runtimes reported.</li>
+                  )}
+                </ul>
+              </>
+            )}
             {inspection?.git && (
               <p className="field-help">
                 {inspection.branch === null

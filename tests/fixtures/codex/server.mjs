@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { markdownStart, markdownEnd } from "./markdown.mjs";
 const activating = new Set();
 const crashOnInterrupt = new Set();
@@ -284,7 +285,12 @@ createInterface({ input: process.stdin }).on("line", (line) => {
         );
       }, 150);
     }
-    if (text.includes("[background]")) process.send?.({ background: true });
+    if (text.includes("[background]")) {
+      if(process.send) process.send({ background: true });
+      else spawn("/bin/sleep",["300"],{stdio:"ignore"});
+    }
+    const writeMatch = /\[write-file:(p018-[a-z0-9-]+\.txt)\]/.exec(text);
+    if(writeMatch) writeFileSync(join(process.env.HARBOR_FIXTURE_WORKSPACE || process.cwd(),writeMatch[1]),"P018 "+writeMatch[1]);
     if (text.includes("[input-flood]")) {
       const id = randomUUID();
       pending.set(id, { threadId: p.threadId, turnId: turn.id });
@@ -405,7 +411,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
           ? 3000
           : text.includes("[interrupt-crash]")
           ? 5000
-          : text.includes("[delay]")
+          : text.includes("[delay-long]") ? 10000 : text.includes("[delay]")
             ? 1500
             : 100,
       ),

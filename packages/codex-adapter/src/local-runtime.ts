@@ -1,6 +1,11 @@
+import { validatePersonalAttachmentDirectory } from "../../attachments/src/personal.ts";
+import {
+  createPersonalCgroup,
+  inspectRecoveredCgroup,
+} from "./personal-cgroup.ts";
 import { execFile, spawn } from "node:child_process";
 import { realpath, stat } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 import { delimiter, dirname, isAbsolute, join, relative } from "node:path";
 import { promisify } from "node:util";
 import { CODEX_VERSION, type OwnedRuntimeProcess } from "./index.js";
@@ -23,17 +28,17 @@ const retire = () => { process.kill(-process.pid, 'SIGKILL'); };
 process.on('SIGTERM', retire);
 process.on('SIGINT', retire);
 process.on('disconnect', retire);
+process.once('message', () => {
 const runtime = spawn(process.argv[1], ['-c', 'cli_auth_credentials_store="file"', 'app-server', '--listen', 'stdio://'], {
   stdio: [0, 1, 2], env: process.env,
 });
 runtime.on('error', retire);
 runtime.on('exit', retire);
 process.send({ runtimePid: runtime.pid });
+});
 `;
 
-export async function launchLocalRuntime(
-  config: RuntimeConfig,
-): Promise<OwnedRuntimeProcess> {
+async function prepareLocalRuntime(config: RuntimeConfig) {
   const vps = process.env.HARBOR_PERSONAL_VPS_MODE === "personal";
   if (
     vps &&
@@ -52,10 +57,15 @@ export async function launchLocalRuntime(
   if (
     (config.purpose ?? "conversation") !== "conversation" ||
     config.gitCommon ||
-    config.attachmentProject ||
-    config.attachmentDirectory
+    config.attachmentProject
   )
     throw Error("Personal local runtime supports plain conversations only");
+  if (config.attachmentDirectory)
+    await validatePersonalAttachmentDirectory(
+      config.attachmentDirectory,
+      config.sessionId,
+      config.workspacePath,
+    );
   const homeInput = vps
     ? process.env.HARBOR_PERSONAL_VPS_CODEX_HOME
     : process.env.HARBOR_LOCAL_CODEX_HOME;
@@ -116,6 +126,7 @@ export async function launchLocalRuntime(
     ].join(delimiter),
     HOME: home,
     CODEX_HOME: home,
+    HARBOR_CONVERSATION_ID: config.sessionId,
     LANG: "en_US.UTF-8",
     ...(development ? developmentEnvironment(development) : {}),
   };
@@ -126,6 +137,31 @@ export async function launchLocalRuntime(
   });
   if (version.stdout.trim() !== `codex-cli ${CODEX_VERSION}`)
     throw Error(`Personal runtime requires Codex ${CODEX_VERSION}`);
+  const cgroup =
+    process.platform === "linux"
+      ? await createPersonalCgroup(config.sessionId, config.generation)
+      : undefined;
+  return { binary, workspace, env, development, cgroup };
+}
+/** This error is emitted only before the guardian/native launch boundary. */
+export class PersonalRuntimeNotStartedError extends Error {
+  override name = "PersonalRuntimeNotStartedError";
+  constructor(cause: unknown) {
+    super(
+      cause instanceof Error
+        ? cause.message
+        : "Personal runtime preflight failed",
+      { cause },
+    );
+  }
+}
+export async function launchLocalRuntime(
+  config: RuntimeConfig,
+): Promise<OwnedRuntimeProcess> {
+  const { binary, workspace, env, development, cgroup } =
+    await prepareLocalRuntime(config).catch((error) => {
+      throw new PersonalRuntimeNotStartedError(error);
+    });
   const child = spawn(process.execPath, ["-e", guardian, binary], {
     cwd: workspace,
     detached: true,
@@ -133,6 +169,22 @@ export async function launchLocalRuntime(
     env,
   }) as OwnedRuntimeProcess;
   child.personalDevelopment = development;
+  if (cgroup) child.cleanupOwned = () => cgroup.cleanup();
+  if (!child.pid) throw Error("Personal guardian identity unavailable");
+  child.ownedIdentity = {
+    groupId: child.pid,
+    host: hostname(),
+    ...(cgroup ? { cgroup: cgroup.identity } : {}),
+  };
+  try {
+    await cgroup?.admit(child.pid);
+    await config.onOwnedIdentity?.(child.ownedIdentity);
+  } catch (error) {
+    child.kill("SIGTERM");
+    await cgroup?.retire().catch(() => {});
+    if (!config.onOwnedIdentity) await cgroup?.cleanup().catch(() => {});
+    throw error;
+  }
   let runtimePid: number | undefined;
   child.on("message", (message) => {
     const pid = (message as { runtimePid?: unknown }).runtimePid;
@@ -154,12 +206,14 @@ export async function launchLocalRuntime(
   };
   child.inspectOwned = async () => {
     try {
-      const members = await group();
+      const inspection = cgroup ? await cgroup.inspect() : null;
+      const members = inspection ? inspection.processes : await group();
       return {
-        status:
-          members.length === 0
+        status: !cgroup
+          ? "unavailable"
+          : inspection?.gone
             ? "runtime_gone"
-            : runtimePid
+            : runtimePid && cgroup
               ? "known"
               : "unavailable",
         generation: config.generation,
@@ -178,6 +232,10 @@ export async function launchLocalRuntime(
   let retirement: Promise<void> | undefined;
   child.closeOwned = () =>
     (retirement ??= (async () => {
+      if (cgroup) {
+        await cgroup.retire();
+        return;
+      }
       if (child.exitCode === null && child.signalCode === null)
         child.kill("SIGTERM");
       const deadline = Date.now() + 10_000;
@@ -186,6 +244,31 @@ export async function launchLocalRuntime(
           throw Error("Personal runtime group retirement unconfirmed");
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
+      throw Error(
+        "Complete personal runtime ownership is unavailable on macOS",
+      );
     })());
+  child.send?.({ start: true });
   return child;
+}
+
+/** Restart reconciliation is read-only: recovered PIDs are never signaled. */
+export async function inspectRecoveredLocalRuntime(
+  identity: unknown,
+  expectedGeneration?: number,
+): Promise<"absent" | "unknown"> {
+  const value = identity as {
+    groupId?: number;
+    host?: string;
+    cgroup?: unknown;
+  } | null;
+  if (
+    expectedGeneration !== undefined &&
+    (value?.cgroup as { generation?: number } | undefined)?.generation !==
+      expectedGeneration
+  )
+    return "unknown";
+  if (process.platform === "linux")
+    return inspectRecoveredCgroup(value?.cgroup, value?.host);
+  return "unknown";
 }

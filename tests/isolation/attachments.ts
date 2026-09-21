@@ -35,6 +35,8 @@ import {
   inspectManagedStorage,
 } from "../../infra/storage/client.js";
 import { prepareAttachments } from "../../packages/attachments/src/materialize.js";
+import sharp from "sharp";
+import { validateMedia } from "../../packages/attachments/src/media.ts";
 import { png } from "../fixtures/png.js";
 const sourceAtStart = sourceDigest();
 let passed = false;
@@ -251,6 +253,16 @@ try {
     });
     const files = [
       { bytes: png(), mediaType: "image/png", name: "synthetic.png" },
+      {
+        bytes: await sharp(png()).jpeg().toBuffer(),
+        mediaType: "image/jpeg",
+        name: "synthetic.jpg",
+      },
+      {
+        bytes: Buffer.from([0, 255, 80, 68, 70]),
+        mediaType: "application/octet-stream",
+        name: "opaque.pdf",
+      },
       {
         bytes: Buffer.from("HARBOR_SYNTHETIC_TEXT"),
         mediaType: "text/plain",
@@ -565,7 +577,7 @@ try {
   assert.deepEqual(await readFile(physical), original);
   assert.deepEqual(
     await readFile(join(otherPrepared.directory.canonical, other.ids[0]!)),
-    png(),
+    await validateMedia(png(), "image/png"),
   );
   passed = true;
   console.log(

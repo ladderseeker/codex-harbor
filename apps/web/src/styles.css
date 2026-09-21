@@ -2769,6 +2769,9 @@ svg {
   color: var(--muted);
   margin-top: 4px;
 }
+.workspace-runtime-list {
+  overflow-wrap: anywhere;
+}
 .workspace-details[open] {
   padding: 8px 0;
 }
@@ -3471,4 +3474,76 @@ svg {
   justify-content: center;
   flex: none;
   pointer-events: none;
+}
+
+/* P024: header-to-bottom chat scrolling with a normal-flow sticky composer. */
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overflow-anchor: none;
+}
+.chat-content {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.chat-scroll .transcript {
+  flex: 1 0 auto;
+  overflow: visible;
+}
+.chat-scroll .composer-region {
+  flex: none;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-top: auto;
+  background: var(--canvas);
+}
+.composer .attachment-list {
+  max-height: 180px;
+  overflow: auto;
+  min-width: 0;
+}
+.composer .attachment-list:empty {
+  display: none;
+}
+.composer .attachment-row {
+  flex-wrap: wrap;
+}
+.composer .attachment-preview {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chat-scroll {
+  scroll-padding-bottom: var(--composer-scroll-padding, 0px);
+}
+.chat-scroll:has(.composer-region :focus) {
+  scroll-padding-bottom: 0;
+}
+
+/* Sent files remain distinct and fit inside narrow message bubbles. */
+.message-attachments {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  min-width: 0;
+}
+.message-attachments:empty {
+  display: none;
+}
+.message-attachments > [role="listitem"] {
+  min-width: 0;
+}
+.message-attachments .attachment-preview {
+  display: flex;
+  max-width: 100%;
+}
+.message-attachments .attachment-preview > span {
+  min-width: 0;
+}
+.message-attachments .attachment-preview img {
+  flex: none;
 }

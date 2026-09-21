@@ -181,3 +181,63 @@ test(
     }
   },
 );
+
+test("P018-02 ownership persistence finishes before any native process or request starts", async () => {
+  const original = { ...process.env };
+  const root = await realpath(
+    await mkdtemp(join(tmpdir(), "harbor-owned-start-")),
+  );
+  const home = join(root, "home"),
+    workspacePath = join(root, "workspace"),
+    binary = join(root, "codex"),
+    marker = join(root, "launched");
+  await mkdir(home, { mode: 0o700 });
+  await mkdir(workspacePath);
+  await writeFile(
+    binary,
+    `#!${process.execPath}\nif(process.argv.includes('--version')) {console.log('codex-cli 0.153.4');process.exit(0);}\nrequire('node:fs').writeFileSync(${JSON.stringify(marker)},'started');\nsetInterval(()=>{},1000);\n`,
+    { mode: 0o700 },
+  );
+  process.env.HARBOR_LOCAL_MODE = "personal";
+  process.env.HARBOR_LOCAL_CODEX_HOME = home;
+  process.env.HARBOR_LOCAL_CODEX_BINARY = binary;
+  delete process.env.HARBOR_PERSONAL_VPS_MODE;
+  let child: Awaited<ReturnType<typeof launchLocalRuntime>> | undefined;
+  try {
+    child = await launchLocalRuntime({
+      sessionId: "owned-start",
+      projectId: "owned-start",
+      workspacePath,
+      generation: 77,
+      onOwnedIdentity: async (identity) => {
+        assert.ok(identity.groupId > 1);
+        assert.ok(identity.host);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await assert.rejects(
+          import("node:fs/promises").then((fs) => fs.stat(marker)),
+          { code: "ENOENT" },
+        );
+      },
+    });
+    for (let i = 0; i < 100; i++) {
+      try {
+        await import("node:fs/promises").then((fs) => fs.stat(marker));
+        break;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    }
+    assert.equal(
+      await import("node:fs/promises").then((fs) =>
+        fs.readFile(marker, "utf8"),
+      ),
+      "started",
+    );
+  } finally {
+    await child?.closeOwned?.();
+    for (const key of Object.keys(process.env))
+      if (!(key in original)) delete process.env[key];
+    Object.assign(process.env, original);
+    await rm(root, { recursive: true, force: true });
+  }
+});

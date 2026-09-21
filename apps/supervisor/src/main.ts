@@ -1,3 +1,12 @@
+import {
+  runtimeState,
+  queueReason,
+} from "../../../packages/storage/src/conversation-runtimes.ts";
+import { classifyIdle, capacityReason } from "./runtime-capacity.ts";
+import {
+  inspectRecoveredLocalRuntime,
+  PersonalRuntimeNotStartedError,
+} from "../../../packages/codex-adapter/src/local-runtime.ts";
 import { settleBackgroundRetirement } from "./background-retirement.ts";
 import { saveConversationOutput } from "./conversation-output.ts";
 import { processSchedules } from "../../../packages/schedules/src/worker.ts";
@@ -25,7 +34,12 @@ import {
   processWorkspaceReleases,
   releaseRecoveredWorkspace,
 } from "./workspace-recovery.ts";
-import { claimWorkspace, releaseWorkspace } from "./workspace-admission.ts";
+import {
+  claimWorkspace,
+  releaseWorkspace,
+  workspaceAdmission,
+  WorkspaceAdmissionChanged,
+} from "./workspace-admission.ts";
 import {
   selectedWorkspace,
   sessionWorkspace,
@@ -69,6 +83,7 @@ const c = config(),
   pool = createPool(c.DATABASE_URL);
 if (process.env.HARBOR_MANAGED_RELEASE) await verifyInstalledSchema(pool);
 else await migrate(pool);
+const personal = !!(c.HARBOR_LOCAL_MODE || c.HARBOR_PERSONAL_VPS_MODE);
 const ownerPin = digest(c.HARBOR_OIDC_ISSUER + "\0" + c.HARBOR_OWNER_SUBJECT);
 await bindIdentity(pool, ownerPin);
 if (c.HARBOR_LOCAL_MODE || c.HARBOR_PERSONAL_VPS_MODE)
@@ -103,7 +118,24 @@ const runtimes = new Map<string, RuntimeState>();
 const terminalRepairs = new Map<string, string>();
 const cancellationRepairs = new Map<string, "failed" | "succeeded">();
 const retirement = new RetirementRegistry<CodexAdapter>();
-const retire = (adapter: CodexAdapter) => retirement.retire(adapter);
+const retire = async (adapter: CodexAdapter) => {
+  const confirmed = await retirement.retire(adapter);
+  const owned = adapter.ownedIdentity();
+  if (
+    confirmed &&
+    owned?.cgroup &&
+    !(
+      await pool.query(
+        "SELECT 1 FROM conversation_runtimes WHERE generation=$1 AND native_identity->'cgroup'->>'path'=$2 LIMIT 1",
+        [owned.cgroup.generation, owned.cgroup.path],
+      )
+    ).rowCount
+  )
+    await adapter.cleanupRetiredOwnership().catch(() => {
+      console.error("Empty retired runtime ownership cleanup remains pending");
+    });
+  return confirmed;
+};
 fence.on("error", () => {
   alive = false;
   void terminals?.stop();
@@ -140,6 +172,50 @@ const generation = await transaction(pool, async (db) => {
   await db.query(
     "UPDATE approvals SET state='expired' WHERE state IN ('pending','answering')",
   );
+  // A legacy exclusive reservation cannot silently become shared authority.
+  if (
+    personal &&
+    (
+      await db.query(
+        "SELECT 1 FROM workspaces WHERE writer_owner_id IS NOT NULL LIMIT 1",
+      )
+    ).rowCount
+  )
+    throw Error(
+      "Drain legacy personal workspace reservations before upgrading",
+    );
+  const retained = personal
+    ? (await db.query("SELECT * FROM conversation_runtimes")).rows
+    : [];
+  for (const member of retained) {
+    if (
+      (await inspectRecoveredLocalRuntime(
+        member.native_identity,
+        Number(member.generation),
+      )) === "absent"
+    ) {
+      await db.query(
+        "DELETE FROM conversation_runtimes WHERE session_id=$1 AND generation=$2",
+        [member.session_id, member.generation],
+      );
+      await db.query(
+        "UPDATE sessions SET background_until=NULL,background_stop_requested=false WHERE id=$1",
+        [member.session_id],
+      );
+      await event(db, member.session_id, "background.stopped", {
+        generation: Number(member.generation),
+      });
+    } else {
+      await db.query(
+        "UPDATE conversation_runtimes SET state='unknown',idle_until=NULL WHERE session_id=$1 AND generation=$2",
+        [member.session_id, member.generation],
+      );
+      await db.query(
+        "UPDATE sessions SET state='uncertain',background_until=NULL,background_stop_requested=true WHERE id=$1",
+        [member.session_id],
+      );
+    }
+  }
   const abandonedBackground = await db.query(
     "UPDATE sessions SET state='uncertain',background_until=NULL,background_stop_requested=true WHERE background_until IS NOT NULL RETURNING id",
   );
@@ -150,8 +226,8 @@ const generation = await transaction(pool, async (db) => {
     });
   for (const row of rows.rows) {
     await db.query(
-      "UPDATE sessions SET state='uncertain',generation=$2 WHERE id=$1",
-      [row.session_id, g],
+      "UPDATE sessions SET state='uncertain',generation=CASE WHEN $3 THEN generation ELSE $2 END WHERE id=$1",
+      [row.session_id, g, personal],
     );
     await event(db, row.session_id, "runtime.uncertain", {
       reason: "Supervisor restarted; dispatched effects are not replayed",
@@ -215,15 +291,14 @@ async function clearNativeCredentials() {
   for (const [id, r] of runtimes) {
     withinDeadline();
     await r.adapter.logoutAccount();
-    runtimes.delete(id);
-    if (!(await retire(r.adapter)))
+    if (!(await retireSessionRuntime(id, r)))
       throw new HarborError(
         503,
         "RUNTIME_TERMINATION_UNCONFIRMED",
         "Credential cleanup requires confirmed runtime termination",
       );
   }
-  if (!c.HARBOR_FIXTURE_MODE) {
+  if (!personal && !c.HARBOR_FIXTURE_MODE) {
     const identities = (
       await pool.query(
         "SELECT id,project_id FROM sessions UNION ALL SELECT b.runtime_id,p.id FROM runtime_bootstrap b CROSS JOIN LATERAL (SELECT id FROM projects ORDER BY created_at LIMIT 1) p",
@@ -245,7 +320,10 @@ async function clearNativeCredentials() {
       "Credential cleanup requires confirmed runtime termination",
     );
   const projects = (await pool.query("SELECT * FROM projects")).rows;
-  if (!c.HARBOR_FIXTURE_MODE || process.env.HARBOR_STORAGE_SOCKET) {
+  if (
+    !personal &&
+    (!c.HARBOR_FIXTURE_MODE || process.env.HARBOR_STORAGE_SOCKET)
+  ) {
     for (const project of projects) {
       withinDeadline();
       await clearManagedCredentials(project.root_id, project.relative_path);
@@ -453,13 +531,15 @@ async function onEvent(
         "UPDATE operations SET state=$2,updated_at=now() WHERE id=$1",
         [operationId, state],
       );
-      if (c.HARBOR_PERSONAL_VPS_MODE && p.turn.status === "completed") {
+      if (personal && p.turn.status === "completed") {
         await db.query(
           "UPDATE sessions SET background_until=clock_timestamp()+interval '30 minutes',background_stop_requested=false WHERE id=$1",
           [sessionId],
         );
         await event(db, sessionId, "background.retained", { expiresIn: 1800 });
       }
+      if (personal)
+        await runtimeState(db, sessionId, captured.generation, "idle", true);
       await deriveSessionState(db, sessionId);
       await db.query(
         "UPDATE messages SET status='complete' WHERE operation_id=$1",
@@ -475,6 +555,8 @@ async function onEvent(
   });
   if (
     completed &&
+    personal &&
+    p.turn.status === "completed" &&
     !captured.mailbox.poisoned &&
     runtimes.get(sessionId) === captured &&
     captured.operation === operationId
@@ -510,18 +592,125 @@ async function onEvent(
     !captured.mailbox.poisoned &&
     runtimes.get(sessionId) === captured
   ) {
-    if (c.HARBOR_PERSONAL_VPS_MODE && p.turn.status === "completed") return;
-    await retireSessionRuntime(sessionId, captured);
+    if (personal && p.turn.status === "completed") {
+      await classifyRuntime(sessionId, captured);
+      return;
+    }
+    await retireSessionRuntime(sessionId, captured, false, operationId);
   }
 }
-async function retireSessionRuntime(sessionId: string, runtime: RuntimeState) {
-  // Keep ownership on unconfirmed retirement; never admit a new writer on a guess.
-  runtime.retiring = true;
+async function classifyRuntime(sessionId: string, runtime: RuntimeState) {
+  if (
+    runtime.operation ||
+    runtime.retiring ||
+    runtimes.get(sessionId) !== runtime
+  )
+    return;
+  const result = classifyIdle(
+    await runtime.adapter.inspectProcesses().catch(() => ({
+      status: "unavailable" as const,
+      generation: runtime.generation,
+      processes: [],
+    })),
+    runtime.generation,
+  );
+  if (
+    runtime.operation ||
+    runtime.retiring ||
+    runtimes.get(sessionId) !== runtime
+  )
+    return;
+  if (result === "gone") {
+    await retireSessionRuntime(sessionId, runtime);
+    return;
+  }
+  await transaction(pool, async (db) => {
+    await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
+      sessionId,
+    ]);
+    if (
+      !runtime.operation &&
+      !runtime.retiring &&
+      runtimes.get(sessionId) === runtime
+    )
+      await runtimeState(db, sessionId, runtime.generation, result);
+  });
+}
+async function retireSessionRuntime(
+  sessionId: string,
+  runtime: RuntimeState,
+  automatic = false,
+  completedOperation?: string,
+) {
+  if (runtime.retiring) return false;
+  const admitted = await transaction(pool, async (db) => {
+    await sessionWorkspace(db, sessionId, true);
+    const session = (
+      await db.query("SELECT generation FROM sessions WHERE id=$1 FOR UPDATE", [
+        sessionId,
+      ])
+    ).rows[0];
+    if (
+      !session ||
+      Number(session.generation) !== runtime.generation ||
+      runtime.retiring
+    )
+      return false;
+    if (
+      completedOperation !== undefined &&
+      runtime.operation !== completedOperation
+    )
+      return false;
+    if (automatic) {
+      const member = (
+        await db.query(
+          "SELECT * FROM conversation_runtimes WHERE session_id=$1 AND generation=$2 FOR UPDATE",
+          [sessionId, runtime.generation],
+        )
+      ).rows[0];
+      if (
+        !member ||
+        member.state !== "idle" ||
+        runtime.operation ||
+        runtimes.get(sessionId) !== runtime
+      )
+        return false;
+      const classification = classifyIdle(
+        await runtime.adapter.inspectProcesses(),
+        runtime.generation,
+      );
+      if (classification !== "idle") {
+        await runtimeState(
+          db,
+          sessionId,
+          runtime.generation,
+          classification === "gone" ? "unknown" : classification,
+        );
+        return false;
+      }
+      if (
+        runtime.operation ||
+        runtime.retiring ||
+        runtimes.get(sessionId) !== runtime
+      )
+        return false;
+    }
+    runtime.retiring = true;
+    if (completedOperation !== undefined) runtime.operation = "";
+    if (personal)
+      await runtimeState(db, sessionId, runtime.generation, "retiring");
+    return true;
+  });
+  if (!admitted) return false;
   return settleBackgroundRetirement({
-    retire: () => retire(runtime.adapter),
+    retire: async () =>
+      (await retire(runtime.adapter)) ||
+      (await retirement.confirmed(runtime.adapter)),
     uncertain: async () => {
       if (runtimes.get(sessionId) === runtime) runtimes.delete(sessionId);
       await transaction(pool, async (db) => {
+        if (personal)
+          await runtimeState(db, sessionId, runtime.generation, "unknown");
         const saved = await db.query(
           "UPDATE sessions SET state='uncertain',background_until=NULL,background_stop_requested=true WHERE id=$1 AND generation=$2 RETURNING id",
           [sessionId, runtime.generation],
@@ -529,20 +718,30 @@ async function retireSessionRuntime(sessionId: string, runtime: RuntimeState) {
         if (saved.rowCount)
           await event(db, sessionId, "runtime.uncertain", {
             reason:
-              "Development process retirement could not be confirmed; workspace remains reserved. Trusted SSH inspection and recovery are required.",
+              "Runtime retirement could not be confirmed; this conversation remains reserved.",
           });
       });
     },
     release: async () => {
       if (runtimes.get(sessionId) === runtime) runtimes.delete(sessionId);
-      await releaseWorkspace(pool, sessionId, runtime.generation);
+      if (!personal)
+        await releaseWorkspace(pool, sessionId, runtime.generation);
       await transaction(pool, async (db) => {
+        await db.query(
+          "DELETE FROM conversation_runtimes WHERE session_id=$1 AND generation=$2",
+          [sessionId, runtime.generation],
+        );
         const saved = await db.query(
           "UPDATE sessions SET background_until=NULL,background_stop_requested=false WHERE id=$1 AND generation=$2 RETURNING id",
           [sessionId, runtime.generation],
         );
         if (saved.rowCount)
           await event(db, sessionId, "background.stopped", {});
+      });
+      await runtime.adapter.cleanupRetiredOwnership().catch(() => {
+        console.error(
+          "Empty retired runtime ownership cleanup remains pending",
+        );
       });
     },
   });
@@ -622,6 +821,8 @@ async function onRequest(
       sessionId,
       state,
     ]);
+    if (personal)
+      await runtimeState(db, sessionId, captured.generation, state, true);
     await event(db, sessionId, "approval.pending", { operationId });
   });
 }
@@ -630,20 +831,28 @@ let lastMaintenance = 0;
 async function tick() {
   if (!alive) return;
   await fence.query("SELECT 1");
-  for (const [operation, state] of cancellationRepairs) {
-    await pool.query(
-      "UPDATE operations SET state=$2,updated_at=now() WHERE id=$1 AND kind='cancel'",
-      [operation, state],
-    );
-    cancellationRepairs.delete(operation);
-  }
   for (const [operation, reason] of terminalRepairs) {
-    await update(operation, "uncertain", { reason });
-    terminalRepairs.delete(operation);
+    try {
+      await update(operation, "uncertain", { reason });
+      terminalRepairs.delete(operation);
+    } catch {
+      // A failed independent settlement remains pending without starving peers.
+    }
+  }
+  for (const [operation, state] of cancellationRepairs) {
+    try {
+      await pool.query(
+        "UPDATE operations SET state=$2,updated_at=now() WHERE id=$1 AND kind='cancel'",
+        [operation, state],
+      );
+      cancellationRepairs.delete(operation);
+    } catch {
+      // Cancel bookkeeping cannot prevent the target's uncertainty from persisting.
+    }
   }
   if (Date.now() - lastMaintenance > 60000) {
     await maintain(pool);
-    if (!c.HARBOR_PERSONAL_VPS_MODE) await maintainAttachments(pool);
+    await maintainAttachments(pool);
     lastMaintenance = Date.now();
   }
   if (credentials.mutating) return;
@@ -814,20 +1023,47 @@ async function tick() {
     );
     return;
   }
-  if (c.HARBOR_PERSONAL_VPS_MODE) {
-    const idle = await pool.query(
-      "SELECT id,background_stop_requested,background_until,archived FROM sessions WHERE background_until IS NOT NULL",
-    );
-    for (const row of idle.rows) {
-      const runtime = runtimes.get(row.id);
-      if (
-        runtime &&
-        !runtime.operation &&
-        (row.background_stop_requested ||
-          row.archived ||
-          new Date(row.background_until).getTime() <= Date.now())
+  if (personal) {
+    // Reconcile disconnected members independently; an uncertain sibling never
+    // blocks confirmed capacity belonging to a different conversation.
+    const members = (
+      await pool.query(
+        "SELECT cr.*,s.background_stop_requested,s.archived FROM conversation_runtimes cr JOIN sessions s ON s.id=cr.session_id ORDER BY cr.last_activity_at,cr.session_id",
       )
-        await retireSessionRuntime(row.id, runtime);
+    ).rows;
+    for (const member of members) {
+      const runtime = runtimes.get(member.session_id);
+      if (!runtime) {
+        if (
+          (await inspectRecoveredLocalRuntime(
+            member.native_identity,
+            Number(member.generation),
+          )) === "absent"
+        )
+          await pool.query(
+            "DELETE FROM conversation_runtimes WHERE session_id=$1 AND generation=$2",
+            [member.session_id, member.generation],
+          );
+        continue;
+      }
+      if (runtime.operation || runtime.retiring) continue;
+      if (member.background_stop_requested || member.archived) {
+        await retireSessionRuntime(member.session_id, runtime);
+        continue;
+      }
+      await classifyRuntime(member.session_id, runtime);
+      const current = (
+        await pool.query(
+          "SELECT state,idle_until FROM conversation_runtimes WHERE session_id=$1 AND generation=$2",
+          [member.session_id, runtime.generation],
+        )
+      ).rows[0];
+      if (
+        current?.state === "idle" &&
+        current.idle_until &&
+        new Date(current.idle_until).getTime() <= Date.now()
+      )
+        await retireSessionRuntime(member.session_id, runtime, true);
     }
   }
   const approvals = await pool.query(
@@ -863,6 +1099,14 @@ async function tick() {
           a.id,
           expired ? "expired" : "resolved",
         ]);
+        if (personal)
+          await runtimeState(
+            db,
+            a.session_id,
+            runtime.generation,
+            "active",
+            true,
+          );
         await event(
           db,
           a.session_id,
@@ -1033,19 +1277,55 @@ async function tick() {
         cancel.id,
       ]);
   }
-  if ((await deploymentState(pool)).maintenance) return;
+  const maintenance = (await deploymentState(pool)).maintenance;
   const candidates = await pool.query(
-    "SELECT o.*,s.native_thread_id,s.project_id,s.workspace_id,p.root_id,w.relative_path,w.device,w.inode,w.canonical_path,w.common_path,w.common_device,w.common_inode FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id WHERE w.state='ready' AND p.archived_at IS NULL AND (w.writer_owner_id IS NULL OR (w.writer_kind='conversation' AND w.writer_session_id=s.id AND s.background_until IS NOT NULL AND NOT s.background_stop_requested)) AND o.kind='turn' AND o.state='queued' AND s.state<>'uncertain' AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.session_id=o.session_id AND active.kind='turn' AND (active.state IN ('dispatching','running','waiting_approval','waiting_input') OR (active.state='uncertain' AND active.uncertainty_acknowledged_at IS NULL))) ORDER BY o.created_at LIMIT 4",
+    "SELECT o.*,s.native_thread_id,s.project_id,s.workspace_id,s.state AS session_state,s.background_stop_requested,s.archived,p.root_id,w.relative_path,w.device,w.inode,w.canonical_path,w.common_path,w.common_device,w.common_inode FROM operations o JOIN sessions s ON s.id=o.session_id JOIN projects p ON p.id=s.project_id JOIN workspaces w ON w.id=s.workspace_id WHERE o.kind='turn' AND o.state='queued' ORDER BY o.created_at,o.id LIMIT $1",
+    [c.HARBOR_MAX_QUEUED],
   );
   for (const o of candidates.rows) {
-    if ([...runtimes.values()].filter((r) => r.operation).length >= 4) break;
-    if (runtimes.get(o.session_id)?.operation) continue;
-    if (
-      c.HARBOR_PERSONAL_VPS_MODE &&
-      !runtimes.has(o.session_id) &&
-      runtimes.size >= 4
-    )
+    const blocked = async (reason: Parameters<typeof queueReason>[2]) =>
+      transaction(pool, (db) => queueReason(db, o, reason));
+    if (maintenance) {
+      await blocked("maintenance");
       continue;
+    }
+    if (
+      o.background_stop_requested ||
+      runtimes.get(o.session_id)?.retiring ||
+      o.session_state === "uncertain" ||
+      (
+        await pool.query(
+          "SELECT 1 FROM operations WHERE session_id=$1 AND state='uncertain' AND uncertainty_acknowledged_at IS NULL LIMIT 1",
+          [o.session_id],
+        )
+      ).rowCount
+    ) {
+      await blocked("retirement_unknown");
+      continue;
+    }
+    if (
+      runtimes.get(o.session_id)?.operation ||
+      (
+        await pool.query(
+          "SELECT 1 FROM operations WHERE session_id=$1 AND kind='turn' AND state IN ('dispatching','running','waiting_approval','waiting_input') LIMIT 1",
+          [o.session_id],
+        )
+      ).rowCount
+    ) {
+      await blocked("session_busy");
+      continue;
+    }
+    const active = Number(
+      (
+        await pool.query(
+          "SELECT count(*) FROM operations WHERE kind='turn' AND state IN ('dispatching','running','waiting_approval','waiting_input')",
+        )
+      ).rows[0].count,
+    );
+    if (active >= c.HARBOR_MAX_ACTIVE_TURNS) {
+      await blocked("active_capacity");
+      continue;
+    }
     try {
       await requireAuthority(pool, o.actor_hash, c, {
         internalOperation: { kind: "turn", id: o.id },
@@ -1059,13 +1339,63 @@ async function tick() {
       });
       continue;
     }
+    if (personal && !runtimes.has(o.session_id)) {
+      let members = (
+        await pool.query(
+          "SELECT * FROM conversation_runtimes ORDER BY last_activity_at,session_id",
+        )
+      ).rows;
+      if (members.some((member) => member.session_id === o.session_id)) {
+        await blocked("retirement_unknown");
+        continue;
+      }
+      for (const member of members) {
+        if (members.length < c.HARBOR_MAX_CONVERSATION_RUNTIMES) break;
+        const victim = runtimes.get(member.session_id);
+        if (member.state === "idle" && victim && !victim.operation)
+          await retireSessionRuntime(member.session_id, victim, true);
+        members = (
+          await pool.query(
+            "SELECT * FROM conversation_runtimes ORDER BY last_activity_at,session_id",
+          )
+        ).rows;
+      }
+      if (members.length >= c.HARBOR_MAX_CONVERSATION_RUNTIMES) {
+        await blocked(capacityReason(members.map((member) => member.state)));
+        continue;
+      }
+    }
+    let runtimeCreationAttempted = false;
     try {
       authorizePermission(
         o.payload.permissionProfile,
         c.HARBOR_PERMISSION_CEILING,
       );
       const workspacePath = await verifyWorkspace(o);
-      const admitted = await transaction(pool, async (db) => {
+      const credentialVersion = await credentials.version();
+      let existing = runtimes.get(o.session_id);
+      if (
+        existing &&
+        (existing.permissionProfile !== o.payload.permissionProfile ||
+          existing.credentialVersion !== credentialVersion)
+      ) {
+        if (!(await retireSessionRuntime(o.session_id, existing))) {
+          await blocked("retirement_unknown");
+          continue;
+        }
+        existing = undefined;
+      }
+      const runtimeGeneration =
+        existing?.generation ??
+        Number(
+          (
+            await pool.query(
+              "SELECT nextval('runtime_generation_seq') AS generation",
+            )
+          ).rows[0].generation,
+        );
+      o.generation = runtimeGeneration;
+      const admitted = await workspaceAdmission(pool, async (db) => {
         await requireAuthority(db, o.actor_hash, c, {
           internalOperation: { kind: "turn", id: o.id },
           scope: "execute",
@@ -1077,8 +1407,9 @@ async function tick() {
             db,
             o.workspace_id,
             o.session_id,
-            runtimes.get(o.session_id)?.generation ?? generation,
-            c.HARBOR_PERSONAL_VPS_MODE && !!runtimes.get(o.session_id),
+            runtimeGeneration,
+            personal && !!existing,
+            personal,
           ))
         )
           return false;
@@ -1088,9 +1419,62 @@ async function tick() {
           projectId: o.project_id,
           permissionProfile: o.payload.permissionProfile,
         });
+        await deploymentAdmission(db);
+        const lockedSession = (
+          await db.query(
+            "SELECT generation FROM sessions WHERE id=$1 FOR UPDATE",
+            [o.session_id],
+          )
+        ).rows[0];
+        const reusable = () =>
+          existing &&
+          runtimes.get(o.session_id) === existing &&
+          !existing.retiring &&
+          !existing.mailbox.poisoned &&
+          !existing.operation &&
+          Number(lockedSession?.generation) === runtimeGeneration;
+        if (existing && !reusable()) throw new WorkspaceAdmissionChanged();
+        if (personal) {
+          if (!existing)
+            await db.query(
+              "INSERT INTO conversation_runtimes(session_id,workspace_id,generation,state,permission_profile,credential_version) VALUES($1,$2,$3,'starting',$4,$5)",
+              [
+                o.session_id,
+                o.workspace_id,
+                runtimeGeneration,
+                o.payload.permissionProfile,
+                credentialVersion,
+              ],
+            );
+          else {
+            const member = (
+              await db.query(
+                "SELECT state,native_identity FROM conversation_runtimes WHERE session_id=$1 AND generation=$2 FOR UPDATE",
+                [o.session_id, runtimeGeneration],
+              )
+            ).rows[0];
+            if (
+              !reusable() ||
+              !member?.native_identity ||
+              !["idle", "protected"].includes(member.state)
+            )
+              throw new WorkspaceAdmissionChanged();
+            await runtimeState(
+              db,
+              o.session_id,
+              runtimeGeneration,
+              "active",
+              true,
+            );
+          }
+        }
+        await db.query("UPDATE sessions SET generation=$2 WHERE id=$1", [
+          o.session_id,
+          runtimeGeneration,
+        ]);
         await db.query(
-          "UPDATE operations SET state='dispatching',generation=$2 WHERE id=$1",
-          [o.id, generation],
+          "UPDATE operations SET state='dispatching',queue_reason=NULL,generation=$2 WHERE id=$1 AND state='queued'",
+          [o.id, runtimeGeneration],
         );
         await db.query(
           "UPDATE sessions SET permission_profile=$3,model=$4,effort=$5 WHERE id=$1 AND $2::bigint>0",
@@ -1105,9 +1489,18 @@ async function tick() {
         await event(db, o.session_id, "operation.dispatching", {
           operationId: o.id,
         });
+        // Claim before releasing the same fence used by retirement. Completion
+        // callbacks must never observe an unclaimed gap after durable admission.
+        if (existing) {
+          if (!reusable()) throw new WorkspaceAdmissionChanged();
+          existing.operation = o.id;
+        }
         return true;
       });
-      if (!admitted) continue;
+      if (!admitted) {
+        await blocked("workspace_busy");
+        continue;
+      }
       const attachments = await prepareAttachments(
         pool,
         o.session_id,
@@ -1115,35 +1508,13 @@ async function tick() {
         workspacePath,
         !!c.HARBOR_FIXTURE_MODE,
       );
-      const credentialVersion = await credentials.version();
-      let r = runtimes.get(o.session_id);
-      if (
-        r &&
-        (r.permissionProfile !== o.payload.permissionProfile ||
-          r.credentialVersion !== credentialVersion)
-      ) {
-        runtimes.delete(o.session_id);
-        if (!(await retire(r.adapter)))
-          throw Error("Previous runtime termination unconfirmed");
-        r = undefined;
-      }
+      let r = existing;
       if (!r) {
-        const runtimeGeneration = Number(
-          (
-            await pool.query(
-              "SELECT nextval('runtime_generation_seq') AS generation",
-            )
-          ).rows[0].generation,
-        );
-        await pool.query("UPDATE sessions SET generation=$2 WHERE id=$1", [
-          o.session_id,
-          runtimeGeneration,
-        ]);
-
-        await pool.query(
-          "UPDATE workspaces SET writer_generation=$2 WHERE id=$1 AND writer_session_id=$3",
-          [o.workspace_id, runtimeGeneration, o.session_id],
-        );
+        if (!personal)
+          await pool.query(
+            "UPDATE workspaces SET writer_generation=$2 WHERE id=$1 AND writer_session_id=$3",
+            [o.workspace_id, runtimeGeneration, o.session_id],
+          );
         let captured: RuntimeState;
         const mailbox = new RuntimeMailbox((reason) => {
           const current = captured && runtimes.get(o.session_id) === captured;
@@ -1152,7 +1523,8 @@ async function tick() {
           if (captured) {
             if (!operation && !captured.retiring)
               void retireSessionRuntime(o.session_id, captured).catch(() => {});
-            else void retire(captured.adapter);
+            else
+              void retireSessionRuntime(o.session_id, captured).catch(() => {});
           }
           // Terminal persistence is independent of normal notification processing.
           if (operation)
@@ -1160,6 +1532,7 @@ async function tick() {
               terminalRepairs.set(operation, reason);
             });
         });
+        runtimeCreationAttempted = true;
         const adapter = await createRuntime({
           sessionId: o.session_id,
           projectId: o.project_id,
@@ -1180,6 +1553,16 @@ async function tick() {
           instanceId: process.env.HARBOR_INSTANCE_ID ?? "harbor",
           permissionProfile: o.payload.permissionProfile,
           fixture: !!c.HARBOR_FIXTURE_MODE,
+          onOwnedIdentity: personal
+            ? async (identity) => {
+                const saved = await pool.query(
+                  "UPDATE conversation_runtimes SET native_identity=$3 WHERE session_id=$1 AND generation=$2 AND state='starting' RETURNING session_id",
+                  [o.session_id, runtimeGeneration, JSON.stringify(identity)],
+                );
+                if (!saved.rowCount)
+                  throw Error("Runtime membership changed before launch");
+              }
+            : undefined,
           onTransport: (adapter) => {
             captured = {
               adapter,
@@ -1204,6 +1587,7 @@ async function tick() {
               credentials.mutating ||
               !alive ||
               mailbox.poisoned ||
+              captured.retiring ||
               runtimes.get(o.session_id) !== captured
             )
               throw Error("Runtime authority lost");
@@ -1247,6 +1631,7 @@ async function tick() {
                 uncertain.rowCount ||
                 !alive ||
                 mailbox.poisoned ||
+                captured.retiring ||
                 runtimes.get(o.session_id) !== captured
               )
                 throw Error("Runtime generation invalid");
@@ -1262,6 +1647,7 @@ async function tick() {
                       ? undefined
                       : captured.permissionProfile,
                 });
+              await verifyWorkspace(o);
               const result = send();
               await fence.query("COMMIT");
               return result;
@@ -1363,6 +1749,10 @@ async function tick() {
         r.generation,
       ]);
       r.operation = o.id;
+      if (personal)
+        await transaction(pool, (db) =>
+          runtimeState(db, o.session_id, r!.generation, "active", true),
+        );
       r.authorityActor = o.actor_hash;
       r.authorityScope = "execute";
       // Native notifications/requests can precede the turn/start response. Hold
@@ -1410,16 +1800,56 @@ async function tick() {
         }
       });
     } catch (error) {
-      await update(o.id, "uncertain", {
-        reason: "Dispatch failed or acknowledgement uncertain",
-        databaseCode:
-          typeof (error as any)?.code === "string" &&
-          /^[0-9A-Z]{5}$/.test((error as any).code)
-            ? (error as any).code
-            : null,
-      });
-      runtimes.get(o.session_id)?.adapter.close();
-      runtimes.delete(o.session_id);
+      const failed = runtimes.get(o.session_id);
+      const provenUnstarted =
+        personal &&
+        !failed &&
+        (!runtimeCreationAttempted ||
+          error instanceof PersonalRuntimeNotStartedError);
+      const dispatched =
+        (await pool.query("SELECT state FROM operations WHERE id=$1", [o.id]))
+          .rows[0]?.state !== "queued";
+      await update(
+        o.id,
+        dispatched && !provenUnstarted ? "uncertain" : "failed",
+        {
+          reason: provenUnstarted
+            ? "Runtime did not start; no native request was dispatched"
+            : dispatched
+              ? "Dispatch failed or acknowledgement uncertain"
+              : "Queued workspace admission failed",
+          databaseCode:
+            typeof (error as any)?.code === "string" &&
+            /^[0-9A-Z]{5}$/.test((error as any).code)
+              ? (error as any).code
+              : null,
+        },
+      );
+      if (failed) await retireSessionRuntime(o.session_id, failed);
+      else if (
+        personal &&
+        Number.isSafeInteger(Number(o.generation)) &&
+        Number(o.generation) > 0
+      ) {
+        if (provenUnstarted)
+          await transaction(pool, async (db) => {
+            await db.query("SELECT id FROM sessions WHERE id=$1 FOR UPDATE", [
+              o.session_id,
+            ]);
+            const released = await db.query(
+              "DELETE FROM conversation_runtimes WHERE session_id=$1 AND generation=$2 AND state='starting' AND native_identity IS NULL RETURNING session_id",
+              [o.session_id, Number(o.generation)],
+            );
+            if (released.rowCount)
+              await event(db, o.session_id, "runtime.not-started", {
+                generation: Number(o.generation),
+              });
+          });
+        else
+          await transaction(pool, (db) =>
+            runtimeState(db, o.session_id, Number(o.generation), "unknown"),
+          );
+      }
     }
   }
 }
@@ -1449,8 +1879,7 @@ async function stop() {
   clearInterval(timer);
   discoveryTransport?.close();
   for (const [id, r] of runtimes) {
-    if (!r.operation) await retireSessionRuntime(id, r);
-    else await retire(r.adapter);
+    await retireSessionRuntime(id, r);
   }
   await retireActiveFiles();
   await filesTick;

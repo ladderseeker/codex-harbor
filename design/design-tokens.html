@@ -1183,6 +1183,13 @@
           prototype sizes, not a claim of accessibility conformance.
         </p>
       </section>
+      <section class="section" id="attachments-and-scroll">
+        <h2>Attachments and continuous chat scrolling</h2>
+        <p>The chat scroll surface fills the main pane below the header. Its full-height flex content holds transcript, notices and composer; short conversations keep the composer at the bottom. Sticky composer height supplies measured scroll padding for focused messages and approvals; remove this reservation while a composer control owns focus so browser focus scrolling does not shift the transcript. Streaming follows only within 100px of the bottom; reading above preserves position. Observe both transcript and composer size.</p>
+        <p>The plus control accepts multiple files, drop and clipboard File items. Text-only paste stays native. PNG/JPEG images and general opaque files use 10 MiB each, four files / 20 MiB per message. Model image capability is required for images. Queue at most the remaining message slots and show explicit rejection for extra files, including selections during upload. Preserve pause and exact retry.</p>
+        <p>Attachment rows occupy a real wrapper capped at 180px with its own overflow. Progress, queue state and errors remain outside that wrapper. Reuse neutral borders, 48px previews and existing focus/touch controls. The compact 24–160px textarea and existing mobile inset remain unchanged. Sent attachments form a separate list beneath message text, with 12px top spacing and 12px between rows. Each row keeps its 48px image preview beside the filename, size and download link with the existing 10px preview gap. Rows fit the message bubble; long filenames wrap anywhere without colliding with other files or causing horizontal overflow.</p>
+        <p>Visible actions: Archive, Unarchive, Status, Stop processes, Cancel turn, Cancel, Retry upload. Icon accessible names retain their descriptive meaning; Retry same request retains its recovery meaning. The <a href="prototypes/harbor-redesign.html">interactive prototype</a> demonstrates attachment loading, error, disabled and populated states.</p>
+      </section>
       <section class="section" id="layout">
         <div class="section-header">
           <span>04</span>
@@ -1280,14 +1287,13 @@
               <tr>
                 <td>Conversation region</td>
                 <td>
-                  Padding <code>26px 34px 20px</code>; scrolls independently
+                  Padding <code>26px 34px 20px</code>; shares one vertical scroll surface with notices and composer below the fixed header
                 </td>
               </tr>
               <tr>
                 <td>Composer region</td>
                 <td>
-                  Padding <code>15px 34px 18px</code>; remains below the
-                  scrolling conversation
+                  Padding <code>15px 34px 18px</code>; participates in normal flow, sticky at the bottom with an opaque canvas background
                 </td>
               </tr>
               <tr>
@@ -1599,6 +1605,10 @@
           reservation, not connection health or generation. Supply accessible text
           and a tooltip; a neutral mark must not claim confirmed idle when unknown.
           Status details describe ownership and release behavior.</p>
+        <h3>Personal conversation runtime states · 21 September 2026</h3>
+        <p>Several conversations may share the same directory and display confirmed green resource dots independently. Preserve query ordering, loaded depth and quiet refresh. Active, approval/input, ordinary idle and protected runtimes use the existing green dot; starting, retiring and unknown remain neutral. Unknown never means confirmed absence or idle. Show the state in accessible dot text and in Conversation status, with no normal-chat banner.</p>
+        <p>Reuse the existing neutral status explanation and Workspace details disclosure. Explain shared files and independent conversations without an extra confirmation. List each retained conversation and its state in workspace details. Ordinary idle can be reclaimed earlier for capacity and has a maximum 30-minute retention target; show its deadline only when supplied. Protected background processes and unknown inspection have no automatic expiry. Starting and retiring still occupy capacity; retirement requires confirmed process absence. Stop background processes targets only the selected conversation and preserves history; disable it during active-answer work, pending stop or retirement. Active-answer cancellation stays separate.</p>
+        <p>Queued activity uses one concise reason: this conversation is busy; active-turn capacity; runtime capacity; protected resources; unconfirmed retirement; workspace reservation; or maintenance. An unavailable reason says Waiting to start. These are explanations, not new settings or confirmation steps.</p>
         <p>Search uses a top sidebar magnifier and an explicitly labelled current-project
           search dialog (600px maximum, 16px inset) with a prominent 16px input, leading magnifier and close control. Its accessible title and input label are visually hidden. A compact secondary row shows the project with a folder icon and active/archived/all select; archived-project visibility sits beneath. Results are borderless rows with an 18px leading conversation icon, 10px gap and left-aligned labels; use neutral hover/selected fill. Initial focus goes to the input, and results have their own pagination. Search never filters the active sidebar; Escape/backdrop dismiss and restore focus. Expanded project history starts at five rows ordered by latest accepted query time, falling back to conversation creation time, with ID descending as the tie-breaker. Selection only changes the highlight; clicks, direct links and search navigation preserve row order, cursor and loaded depth. Sending accepted input refreshes the retained depth and moves that conversation to its durable position. Draft typing, rename, assistant/tool output, completion and resource/status changes do not reorder rows. Search keeps creation order. Show more adds five; loading disables that control and failure retains rows with Retry. Initial loading is visually quiet, with no sidebar history loading row, spinner or placeholder. Pagination and background refresh retain existing rows at the same positions while the history region remains accessibility-busy. Sidebar empty, error, retry and Show more text share the session-title inset: 24px list inset + 12px row padding + 4px dot + 6px gap = 46px from history origin. Search results keep their separate layout and may show loading feedback. Project rows order label, New chat, ellipsis; project/session and Projects-heading trailing padding is 4px so the plus and ellipsis centers align; the heading plus uses the same 30px slot (36px on touch). Conversation and project ellipsis buttons use
           centered 16px glyphs from the existing icon system, three filled 1.8px-radius circles, muted neutral contrast and 30px targets (36px on touch). Center glyphs explicitly inside both button and native summary targets with inline-flex alignment; the visible plus-text and ellipsis centers share the trailing column, not just their target boxes. Menu rows have a fixed 18px leading icon column, 10px gap and left-aligned labels.

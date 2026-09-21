@@ -261,7 +261,7 @@ export async function p014({
   const more = page.locator(`[data-rename-focus="${first.id}"]`);
   await more.focus();
   await more.press("Enter");
-  await page.getByRole("button", { name: "View status", exact: true }).click();
+  await page.getByRole("button", { name: "Status", exact: true }).click();
   const status = page.getByRole("dialog", {
     name: "Conversation status",
     exact: true,
@@ -286,16 +286,12 @@ export async function p014({
   await page.getByLabel("Search conversations", { exact: true }).fill("");
   await expect(searchMore).toBeVisible();
   await searchMore.click();
-  await page
-    .getByRole("button", { name: "Archive conversation", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Archive", exact: true }).click();
   await expect(searchMore).toHaveCount(0);
   await page.locator(".history-filters select").selectOption("archived");
   await expect(searchMore).toBeVisible();
   await searchMore.click();
-  await page
-    .getByRole("button", { name: "Restore conversation", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Unarchive", exact: true }).click();
   await expect(searchMore).toHaveCount(0);
   await expect(
     page.getByLabel("Search conversations", { exact: true }),

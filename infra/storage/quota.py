@@ -68,7 +68,10 @@ def verify(quota_root,profile,headroom=True):
 
 def main():
     if sys.platform!='linux'or os.getuid()!=0:raise ValueError('trusted Linux storage authority required')
-    profile=json.loads(os.environ['HARBOR_XFS_PROFILE']);request=json.loads(sys.stdin.read(800001))
+    profile=json.loads(os.environ['HARBOR_XFS_PROFILE'])
+    raw=sys.stdin.read(29*1024*1024+1)
+    if len(raw)>29*1024*1024:raise ValueError('attachment request limit')
+    request=json.loads(raw)
     root=next(r for r in profile['roots']if r['id']==request['rootId'])
     trusted(root['path']);trusted(root['pool']);state=os.environ['HARBOR_LAUNCHER_STATE_DIR'];trusted(state)
     relative=request['relativePath'];parts=relative.split('/')

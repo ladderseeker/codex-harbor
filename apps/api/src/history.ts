@@ -1,3 +1,4 @@
+import { runtimeProjection } from "../../../packages/storage/src/conversation-runtimes.ts";
 import type { FastifyInstance } from "fastify";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
@@ -117,7 +118,7 @@ export function historyRoutes(
         : "";
       const rows = (
         await db.query(
-          `SELECT s.*,${priority} AS cursor_priority,to_char(${timestamp} AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp,left(coalesce((SELECT m.text FROM messages m WHERE m.session_id=s.id AND ($1='' OR strpos(lower(m.text),lower($1))>0) ORDER BY m.created_at,m.id LIMIT 1),''),240) AS snippet FROM sessions s${queryTime} WHERE ($2='all' OR s.archived=($2='archived')) AND ($3::uuid IS NULL OR s.project_id=$3) AND ($1='' OR strpos(lower(s.title),lower($1))>0 OR EXISTS(SELECT 1 FROM messages m WHERE m.session_id=s.id AND strpos(lower(m.text),lower($1))>0)) AND ($4::timestamptz IS NULL OR ${keyset}) ORDER BY ${updated ? "cursor_priority DESC," : ""}${timestamp} DESC,s.id DESC LIMIT $6`,
+          `SELECT s.*,${runtimeProjection("s")} AS runtime,${priority} AS cursor_priority,to_char(${timestamp} AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_timestamp,left(coalesce((SELECT m.text FROM messages m WHERE m.session_id=s.id AND ($1='' OR strpos(lower(m.text),lower($1))>0) ORDER BY m.created_at,m.id LIMIT 1),''),240) AS snippet FROM sessions s${queryTime} WHERE ($2='all' OR s.archived=($2='archived')) AND ($3::uuid IS NULL OR s.project_id=$3) AND ($1='' OR strpos(lower(s.title),lower($1))>0 OR EXISTS(SELECT 1 FROM messages m WHERE m.session_id=s.id AND strpos(lower(m.text),lower($1))>0)) AND ($4::timestamptz IS NULL OR ${keyset}) ORDER BY ${updated ? "cursor_priority DESC," : ""}${timestamp} DESC,s.id DESC LIMIT $6`,
           [
             query.q,
             query.state,

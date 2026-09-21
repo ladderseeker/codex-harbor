@@ -36,6 +36,9 @@
 
 ## VPS SSH handoff
 
+- Standing owner direction, confirmed 21 September 2026: Linux/VPS is the required deployment and performance target. Native macOS runtime lifecycle support is outside the current release scope; macOS may still host development and isolated Linux verification. Do not make native macOS parity a VPS release gate unless the owner selects it later.
+- The owner authorizes use of the existing VPS Codex login credential for Harbor work, including future bounded live verification, without asking again. For tests, copy only the credential into fresh private run-owned state, preserve the installed credential, use synthetic projects/data and remove copied credentials after confirmed owned retirement. This authorization does not permit copying ordinary history/configuration, exposing secrets or using live project data as test fixtures.
+
 - The current Hostinger VPS uses local SSH alias `harbor-vps`: host `187.77.140.226`, port `22`, user `root`, expected hostname `srv1464935`. The Harbor site is <https://harbor.seekworld.tech/>. These are deployment-specific connection details, not application defaults.
 - On the owner's Mac, `~/.ssh/config` defines the alias with `IdentityFile ~/.ssh/harbor_vps`, `IdentitiesOnly yes`, `AddKeysToAgent yes`, `UseKeychain yes`, and `ForwardAgent no`. The owner loaded the key with `ssh-add --apple-use-keychain ~/.ssh/harbor_vps`. Keep passwords, passphrases, and private-key contents out of this repository, chat, and logs. The alias, key, and agent state are local prerequisites; they are not automatically available on another machine or in every new session.
 - When a new session needs VPS access, begin with this read-only connectivity check:

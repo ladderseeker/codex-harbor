@@ -27,6 +27,14 @@ export interface WorkspaceCommand {
   revision?: string;
 }
 export interface WorkspaceView {
+  conversationRuntimes?: {
+    sessionId: string;
+    title: string;
+    state: string;
+    generation: number;
+    lastActivityAt: string;
+    idleUntil: string | null;
+  }[];
   id: string;
   projectId: string;
   name: string;

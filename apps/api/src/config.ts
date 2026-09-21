@@ -2,7 +2,19 @@ import path from "node:path";
 import { personalPreviewConfig } from "./personal-preview-config.ts";
 import { realpathSync, statSync } from "node:fs";
 import { z } from "zod";
+const limit = (maximum: number) =>
+  z.preprocess(
+    (value) =>
+      value === undefined
+        ? 4
+        : typeof value === "string" && /^[1-9][0-9]*$/.test(value)
+          ? Number(value)
+          : value,
+    z.number().int().min(1).max(maximum),
+  );
 const schema = z.object({
+  HARBOR_MAX_ACTIVE_TURNS: limit(16),
+  HARBOR_MAX_CONVERSATION_RUNTIMES: limit(32),
   HARBOR_PERSONAL_PREVIEWS: z.string().default("[]"),
   HARBOR_PERSONAL_PREVIEW_PORT: z.coerce
     .number()
@@ -63,6 +75,10 @@ const schema = z.object({
 });
 export function config(env = process.env) {
   const c = schema.parse(env);
+  if (c.HARBOR_MAX_CONVERSATION_RUNTIMES < c.HARBOR_MAX_ACTIVE_TURNS)
+    throw Error(
+      "Conversation runtime limit must be at least the active turn limit",
+    );
   if (
     c.HARBOR_LOCAL_MODE &&
     (c.HARBOR_PERSONAL_VPS_MODE ||

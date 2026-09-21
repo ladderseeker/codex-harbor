@@ -44,7 +44,15 @@ import {
   workspaceNames,
 } from "./Workspaces.tsx";
 import { Credentials } from "./Credentials.tsx";
-import { ApiError, mutate, newIntent, request, type Intent } from "./api.ts";
+import {
+  ApiError,
+  mutate,
+  newIntent,
+  request,
+  runtimeDescription,
+  queueDescription,
+  type Intent,
+} from "./api.ts";
 
 type Session = SessionRecord & { archivedAt?: string | null };
 
@@ -234,6 +242,7 @@ export function App() {
   const [permission, setPermission] = useState<PermissionProfile>("read-only");
   const transcriptRef = useRef<HTMLDivElement>(null);
   const followsBottom = useRef(true);
+  const [attachmentsBusy, setAttachmentsBusy] = useState(false);
   const visibleApproval = useRef<string | undefined>(undefined);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
@@ -247,6 +256,8 @@ export function App() {
     input.style.height = "24px";
     input.style.height = Math.min(160, input.scrollHeight) + "px";
     input.style.overflowY = input.scrollHeight > 160 ? "auto" : "hidden";
+    const scroll = transcriptRef.current;
+    if (scroll && followsBottom.current) scroll.scrollTop = scroll.scrollHeight;
   }, []);
   useEffect(resizeComposer, [
     richDraft.draft.text,
@@ -602,6 +613,23 @@ export function App() {
     visibleApproval.current = approvalId;
   }, [snapshot]);
 
+  useEffect(() => {
+    const scroll = transcriptRef.current;
+    const composer = scroll?.querySelector<HTMLElement>(".composer-region");
+    const transcript = scroll?.querySelector<HTMLElement>(".transcript-inner");
+    if (!scroll || !composer || !transcript) return;
+    const observer = new ResizeObserver(() => {
+      scroll.style.setProperty(
+        "--composer-scroll-padding",
+        `${composer.offsetHeight + 20}px`,
+      );
+      if (followsBottom.current) scroll.scrollTop = scroll.scrollHeight;
+    });
+    observer.observe(composer);
+    observer.observe(transcript);
+    return () => observer.disconnect();
+  }, [selectedId, snapshot?.session.id]);
+
   function selectSession(id: string) {
     const url = new URL(location.href);
     if (id) url.searchParams.set("conversation", id);
@@ -758,12 +786,13 @@ export function App() {
     event.preventDefault();
     if (
       !current ||
-      !text.trim() ||
+      (!text.trim() && !richDraft.draft.attachmentIds.length) ||
       blocked ||
       active ||
       uncertain ||
       !settingsReady ||
       !richDraft.ready ||
+      attachmentsBusy ||
       richDraft.saving ||
       !!richDraft.error ||
       !workspaceWritable
@@ -1155,577 +1184,611 @@ export function App() {
             </span>
           )}
         </header>
-        {(error || pending) && (
-          <div className="notice error" role="alert">
-            <div>
-              <strong>
-                {pending
-                  ? `${pending.intent.label}: result not confirmed`
-                  : "Unable to complete request"}
-              </strong>
-              <p>
-                {error ||
-                  "The request may have been accepted. Retry the same request to check its result."}
-              </p>
-            </div>
-            {pending ? (
-              <button
-                onClick={() => void execute(pending.intent, pending.complete)}
-                disabled={sending}
-              >
-                Retry same request
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  setError("");
-                  void (selectedId
-                    ? refreshSnapshot(selectedId).catch(report)
-                    : load());
-                }}
-                disabled={sending}
-              >
-                Reconnect
-              </button>
-            )}
-          </div>
-        )}
-        {replayGap && (
-          <div className="notice" role="status">
-            <div>
-              <strong>Live update gap</strong>
-              <p>
-                Some live updates are no longer available. Harbor is refreshing
-                from the saved conversation; earlier updates may be missing.
-              </p>
-            </div>
-            <button onClick={() => setReplayGap(false)}>Dismiss</button>
-          </div>
-        )}
-        {notice && (
-          <div className="notice" role="status">
-            {notice}
-          </div>
-        )}
-        {stopped && (
-          <div className="notice error" role="status">
-            <div>
-              <strong>Emergency stop is active</strong>
-              <p>
-                New work is paused. Check running work and restore service
-                through your administrator configuration.
-              </p>
-            </div>
-          </div>
-        )}
-        {loading ? (
-          <div className="empty-state" role="status">
-            <h2>Opening Harbor…</h2>
-            <p>Loading your projects and conversations.</p>
-          </div>
-        ) : !identity ? (
-          <div className="empty-state">
-            <h2>Harbor could not connect</h2>
-            <p>Check your connection and try again.</p>
-            <button onClick={() => void load()}>Try again</button>
-          </div>
-        ) : !selectedId ? (
-          <div className="empty-state">
-            <svg
-              className="empty-symbol"
-              aria-hidden="true"
-              viewBox="0 0 80 80"
-            >
-              <path d="M19 52V28a21 21 0 0 1 42 0v24M9 57c8 8 16 8 24 0 8 8 16 8 24 0 5 5 10 7 14 5" />
-            </svg>
-            <h2>
-              {projects.length
-                ? `Start work in ${project?.name ?? "a project"}`
-                : "Add your first project"}
-            </h2>
-            <p>
-              {projects.length
-                ? "Open a conversation from the sidebar, or start a new one. Your work and replies stay here when you return."
-                : "Choose a folder within an approved root. Harbor keeps your conversations with the project they belong to."}
-            </p>
-            {model === "gpt-6-astra" &&
-              ["low", "medium", "high", "xhigh", "max"].some(
-                (level) =>
-                  !capabilities?.models
-                    .find((entry) => entry.id === model)
-                    ?.efforts.includes(level),
-              ) && (
-                <p className="field-help">
-                  Some GPT-6 Astra reasoning levels are unavailable in this
-                  runtime. Only supported levels are offered.
-                </p>
-              )}
-            {!projects.length ? (
-              <button
-                className="primary"
-                disabled={blocked}
-                onClick={() => setShowProjectForm(true)}
-              >
-                Add project
-              </button>
-            ) : settingsReady ? (
-              <button
-                className="primary"
-                disabled={blocked || creating || !canCreateConversation}
-                onClick={() => void newSession()}
-              >
-                New conversation
-              </button>
-            ) : (
-              <div className="setup-next">
-                <h3>
-                  {!capabilities?.account?.authenticated
-                    ? "Connect your Codex account"
-                    : "Checking available models"}
-                </h3>
-                <p>
-                  {!capabilities?.account?.authenticated
-                    ? "Set up an API key, then Harbor will check account access and available models in this project."
-                    : "Harbor is discovering the models available for this project. This can take a few seconds. If none appear, check your account and server model policy."}
-                </p>
-                <button onClick={() => setAccountOpen(true)}>
-                  Open account setup
-                </button>
-                <button
-                  className="quiet-button"
-                  onClick={() => void refreshCapabilities().catch(report)}
-                >
-                  Check again
-                </button>
+        <div
+          className="chat-scroll"
+          ref={transcriptRef}
+          onScroll={() => {
+            const element = transcriptRef.current;
+            if (element)
+              followsBottom.current =
+                element.scrollHeight -
+                  element.scrollTop -
+                  element.clientHeight <
+                100;
+          }}
+        >
+          <div className="chat-content">
+            {(error || pending) && (
+              <div className="notice error" role="alert">
+                <div>
+                  <strong>
+                    {pending
+                      ? `${pending.intent.label}: result not confirmed`
+                      : "Unable to complete request"}
+                  </strong>
+                  <p>
+                    {error ||
+                      "The request may have been accepted. Retry the same request to check its result."}
+                  </p>
+                </div>
+                {pending ? (
+                  <button
+                    onClick={() =>
+                      void execute(pending.intent, pending.complete)
+                    }
+                    disabled={sending}
+                  >
+                    Retry same request
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setError("");
+                      void (selectedId
+                        ? refreshSnapshot(selectedId).catch(report)
+                        : load());
+                    }}
+                    disabled={sending}
+                  >
+                    Reconnect
+                  </button>
+                )}
               </div>
             )}
-          </div>
-        ) : !current ? (
-          <div className="empty-state" role="status">
-            <h2>Opening conversation…</h2>
-          </div>
-        ) : (
-          <>
-            <div
-              className="transcript"
-              ref={transcriptRef}
-              onScroll={() => {
-                const element = transcriptRef.current;
-                if (element)
-                  followsBottom.current =
-                    element.scrollHeight -
-                      element.scrollTop -
-                      element.clientHeight <
-                    100;
-              }}
-              aria-label="Conversation messages"
-            >
-              <div className="transcript-inner">
-                {project?.archivedAt && (
-                  <p className="writer-notice">
-                    This project is archived. Source folders and conversation
-                    history remain available.
+            {replayGap && (
+              <div className="notice" role="status">
+                <div>
+                  <strong>Live update gap</strong>
+                  <p>
+                    Some live updates are no longer available. Harbor is
+                    refreshing from the saved conversation; earlier updates may
+                    be missing.
                   </p>
-                )}
-                {!snapshot?.messages.length && (
-                  <div className="conversation-start">
-                    <h2>What would you like to work on?</h2>
-                    <p>
-                      Describe the task, the context, and what a good result
-                      looks like.
+                </div>
+                <button onClick={() => setReplayGap(false)}>Dismiss</button>
+              </div>
+            )}
+            {notice && (
+              <div className="notice" role="status">
+                {notice}
+              </div>
+            )}
+            {stopped && (
+              <div className="notice error" role="status">
+                <div>
+                  <strong>Emergency stop is active</strong>
+                  <p>
+                    New work is paused. Check running work and restore service
+                    through your administrator configuration.
+                  </p>
+                </div>
+              </div>
+            )}
+            {loading ? (
+              <div className="empty-state" role="status">
+                <h2>Opening Harbor…</h2>
+                <p>Loading your projects and conversations.</p>
+              </div>
+            ) : !identity ? (
+              <div className="empty-state">
+                <h2>Harbor could not connect</h2>
+                <p>Check your connection and try again.</p>
+                <button onClick={() => void load()}>Try again</button>
+              </div>
+            ) : !selectedId ? (
+              <div className="empty-state">
+                <svg
+                  className="empty-symbol"
+                  aria-hidden="true"
+                  viewBox="0 0 80 80"
+                >
+                  <path d="M19 52V28a21 21 0 0 1 42 0v24M9 57c8 8 16 8 24 0 8 8 16 8 24 0 5 5 10 7 14 5" />
+                </svg>
+                <h2>
+                  {projects.length
+                    ? `Start work in ${project?.name ?? "a project"}`
+                    : "Add your first project"}
+                </h2>
+                <p>
+                  {projects.length
+                    ? "Open a conversation from the sidebar, or start a new one. Your work and replies stay here when you return."
+                    : "Choose a folder within an approved root. Harbor keeps your conversations with the project they belong to."}
+                </p>
+                {model === "gpt-6-astra" &&
+                  ["low", "medium", "high", "xhigh", "max"].some(
+                    (level) =>
+                      !capabilities?.models
+                        .find((entry) => entry.id === model)
+                        ?.efforts.includes(level),
+                  ) && (
+                    <p className="field-help">
+                      Some GPT-6 Astra reasoning levels are unavailable in this
+                      runtime. Only supported levels are offered.
                     </p>
+                  )}
+                {!projects.length ? (
+                  <button
+                    className="primary"
+                    disabled={blocked}
+                    onClick={() => setShowProjectForm(true)}
+                  >
+                    Add project
+                  </button>
+                ) : settingsReady ? (
+                  <button
+                    className="primary"
+                    disabled={blocked || creating || !canCreateConversation}
+                    onClick={() => void newSession()}
+                  >
+                    New conversation
+                  </button>
+                ) : (
+                  <div className="setup-next">
+                    <h3>
+                      {!capabilities?.account?.authenticated
+                        ? "Connect your Codex account"
+                        : "Checking available models"}
+                    </h3>
+                    <p>
+                      {!capabilities?.account?.authenticated
+                        ? "Set up an API key, then Harbor will check account access and available models in this project."
+                        : "Harbor is discovering the models available for this project. This can take a few seconds. If none appear, check your account and server model policy."}
+                    </p>
+                    <button onClick={() => setAccountOpen(true)}>
+                      Open account setup
+                    </button>
+                    <button
+                      className="quiet-button"
+                      onClick={() => void refreshCapabilities().catch(report)}
+                    >
+                      Check again
+                    </button>
                   </div>
                 )}
-                {groupConversationMessages(snapshot?.messages ?? []).map(
-                  (entry) => {
-                    if (entry.kind === "activity")
-                      return (
-                        <ConversationActivity
-                          key={entry.id}
-                          messages={entry.messages}
-                        />
-                      );
-                    const message = entry.message;
-                    return (
-                      <article
-                        key={message.id}
-                        className={`message message-${message.role}`}
-                        aria-label={`${message.role === "user" ? "You" : message.role === "assistant" ? "Codex" : "Harbor"} message`}
-                      >
-                        <div
-                          className={
-                            message.role === "user" ? "user-bubble" : undefined
-                          }
-                        >
-                          <div className="message-heading">
-                            <strong>
-                              {message.role === "user"
-                                ? "You"
-                                : message.role === "assistant"
-                                  ? "Codex"
-                                  : "Harbor"}
-                            </strong>
-                            <time dateTime={message.createdAt}>
-                              {new Date(message.createdAt).toLocaleTimeString(
-                                [],
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                },
-                              )}
-                            </time>
-                          </div>
-                          {message.role === "assistant" ? (
-                            <MarkdownMessage text={message.text} />
-                          ) : (
-                            <div className="message-text">{message.text}</div>
-                          )}
-                          {richDraft.files
-                            .filter(
-                              (a) =>
-                                a.operationId === message.operationId &&
-                                message.role === "user",
-                            )
-                            .map((a) => (
-                              <AttachmentPreview key={a.id} attachment={a} />
-                            ))}
-                        </div>
-                        {message.role === "user" && (
-                          <MessageActions text={message.text} />
-                        )}
-                        {message.role === "assistant" &&
-                          responseTexts.has(message.id) && (
-                            <MessageActions
-                              key={`${current.id}:${message.id}`}
-                              text={responseTexts.get(message.id)!}
-                              assistant
-                            />
-                          )}
-                        {message.status === "streaming" && (
-                          <span className="streaming-label">Writing…</span>
-                        )}
-                      </article>
-                    );
-                  },
-                )}
-                {pendingApprovals.map((approval) => (
-                  <ApprovalCard
-                    key={approval.id}
-                    approval={approval}
-                    disabled={blocked}
-                    answer={(decision, answers) =>
-                      void execute(
-                        newIntent(
-                          `/approvals/${encodeURIComponent(approval.id)}/answer`,
-                          {
-                            generation: approval.generation,
-                            decision,
-                            ...(answers ? { answers } : {}),
-                          },
-                          decision === "decline"
-                            ? "Decline request"
-                            : "Answer request",
-                        ),
-                      )
-                    }
-                  />
-                ))}
-                {uncertain &&
-                  (capabilities?.local || capabilities?.personalVps) && (
-                    <p className="state-explanation">
-                      Native runtime delivery is uncertain. Stop this instance
-                      and inspect its processes before using a new conversation;
-                      automatic recovery is unavailable.
-                    </p>
-                  )}
-                {uncertain &&
-                  !(capabilities?.local || capabilities?.personalVps) && (
-                    <Recovery
-                      key={`recovery:${current.id}`}
-                      id={current.id}
-                      cursor={snapshot?.cursor ?? 0}
-                      disabled={blocked}
-                      settings={{
-                        model,
-                        effort,
-                        permissionProfile: permission,
-                      }}
-                      execute={execute}
-                    />
-                  )}
-                {current.state === "interrupted" && (
-                  <div className="state-explanation">
-                    <h2>Work was interrupted</h2>
-                    <p>
-                      Completed changes remain. Review the conversation before
-                      continuing.
-                    </p>
-                    <h3>Processes observed after interruption</h3>
-                    <p>
-                      Some listed processes may belong to the runtime itself.
-                    </p>
-                    {snapshot?.processes?.status === "known" ? (
-                      snapshot.processes.processes.length ? (
-                        <ul aria-label="Processes observed after interruption">
-                          {snapshot.processes.processes.map((process) => (
-                            <li key={process.pid}>
-                              PID {process.pid}: {process.executable}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p>No other processes were observed in the runner.</p>
-                      )
-                    ) : snapshot?.processes?.status === "runtime_gone" ? (
-                      <p>
-                        The runtime has exited. Its earlier process state is no
-                        longer available.
+              </div>
+            ) : !current ? (
+              <div className="empty-state" role="status">
+                <h2>Opening conversation…</h2>
+              </div>
+            ) : (
+              <>
+                <div className="transcript" aria-label="Conversation messages">
+                  <div className="transcript-inner">
+                    {project?.archivedAt && (
+                      <p className="writer-notice">
+                        This project is archived. Source folders and
+                        conversation history remain available.
                       </p>
-                    ) : (
-                      <p>
-                        Process inspection is unavailable. Background processes
-                        may still be running.
+                    )}
+                    {!snapshot?.messages.length && (
+                      <div className="conversation-start">
+                        <h2>What would you like to work on?</h2>
+                        <p>
+                          Describe the task, the context, and what a good result
+                          looks like.
+                        </p>
+                      </div>
+                    )}
+                    {groupConversationMessages(snapshot?.messages ?? []).map(
+                      (entry) => {
+                        if (entry.kind === "activity")
+                          return (
+                            <ConversationActivity
+                              key={entry.id}
+                              messages={entry.messages}
+                            />
+                          );
+                        const message = entry.message;
+                        return (
+                          <article
+                            key={message.id}
+                            className={`message message-${message.role}`}
+                            aria-label={`${message.role === "user" ? "You" : message.role === "assistant" ? "Codex" : "Harbor"} message`}
+                          >
+                            <div
+                              className={
+                                message.role === "user"
+                                  ? "user-bubble"
+                                  : undefined
+                              }
+                            >
+                              <div className="message-heading">
+                                <strong>
+                                  {message.role === "user"
+                                    ? "You"
+                                    : message.role === "assistant"
+                                      ? "Codex"
+                                      : "Harbor"}
+                                </strong>
+                                <time dateTime={message.createdAt}>
+                                  {new Date(
+                                    message.createdAt,
+                                  ).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </time>
+                              </div>
+                              {message.role === "assistant" ? (
+                                <MarkdownMessage text={message.text} />
+                              ) : (
+                                <div className="message-text">
+                                  {message.text}
+                                </div>
+                              )}
+                              {message.role === "user" && (
+                                <div
+                                  className="message-attachments"
+                                  role="list"
+                                  aria-label="Message attachments"
+                                >
+                                  {richDraft.files
+                                    .filter(
+                                      (a) =>
+                                        a.operationId === message.operationId,
+                                    )
+                                    .map((a) => (
+                                      <div role="listitem" key={a.id}>
+                                        <AttachmentPreview attachment={a} />
+                                      </div>
+                                    ))}
+                                </div>
+                              )}
+                            </div>
+                            {message.role === "user" && (
+                              <MessageActions text={message.text} />
+                            )}
+                            {message.role === "assistant" &&
+                              responseTexts.has(message.id) && (
+                                <MessageActions
+                                  key={`${current.id}:${message.id}`}
+                                  text={responseTexts.get(message.id)!}
+                                  assistant
+                                />
+                              )}
+                            {message.status === "streaming" && (
+                              <span className="streaming-label">Writing…</span>
+                            )}
+                          </article>
+                        );
+                      },
+                    )}
+                    {pendingApprovals.map((approval) => (
+                      <ApprovalCard
+                        key={approval.id}
+                        approval={approval}
+                        disabled={blocked}
+                        answer={(decision, answers) =>
+                          void execute(
+                            newIntent(
+                              `/approvals/${encodeURIComponent(approval.id)}/answer`,
+                              {
+                                generation: approval.generation,
+                                decision,
+                                ...(answers ? { answers } : {}),
+                              },
+                              decision === "decline"
+                                ? "Decline request"
+                                : "Answer request",
+                            ),
+                          )
+                        }
+                      />
+                    ))}
+                    {uncertain &&
+                      (capabilities?.local || capabilities?.personalVps) && (
+                        <p className="state-explanation">
+                          Native runtime delivery is uncertain. This
+                          conversation needs attention; automatic recovery is
+                          unavailable. Other conversations can continue when
+                          capacity permits.
+                        </p>
+                      )}
+                    {uncertain &&
+                      !(capabilities?.local || capabilities?.personalVps) && (
+                        <Recovery
+                          key={`recovery:${current.id}`}
+                          id={current.id}
+                          cursor={snapshot?.cursor ?? 0}
+                          disabled={blocked}
+                          settings={{
+                            model,
+                            effort,
+                            permissionProfile: permission,
+                          }}
+                          execute={execute}
+                        />
+                      )}
+                    {current.state === "interrupted" && (
+                      <div className="state-explanation">
+                        <h2>Work was interrupted</h2>
+                        <p>
+                          Completed changes remain. Review the conversation
+                          before continuing.
+                        </p>
+                        <h3>Processes observed after interruption</h3>
+                        <p>
+                          Some listed processes may belong to the runtime
+                          itself.
+                        </p>
+                        {snapshot?.processes?.status === "known" ? (
+                          snapshot.processes.processes.length ? (
+                            <ul aria-label="Processes observed after interruption">
+                              {snapshot.processes.processes.map((process) => (
+                                <li key={process.pid}>
+                                  PID {process.pid}: {process.executable}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p>
+                              No other processes were observed in the runner.
+                            </p>
+                          )
+                        ) : snapshot?.processes?.status === "runtime_gone" ? (
+                          <p>
+                            The runtime has exited. Its earlier process state is
+                            no longer available.
+                          </p>
+                        ) : (
+                          <p>
+                            Process inspection is unavailable. Background
+                            processes may still be running.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {current.state === "failed" && (
+                      <div className="state-explanation">
+                        <h2>This turn could not finish</h2>
+                        <p>
+                          Review the reported error above. You can adjust your
+                          request and send a new message.
+                        </p>
+                      </div>
+                    )}
+                    {active && !pendingApprovals.length && (
+                      <p className="activity" role="status">
+                        <span className="activity-dot" aria-hidden="true" />
+                        {current.state === "queued"
+                          ? queueDescription(activeOperation?.queueReason)
+                          : "Codex is working. You can leave and return later."}
                       </p>
                     )}
                   </div>
-                )}
-                {current.state === "failed" && (
-                  <div className="state-explanation">
-                    <h2>This turn could not finish</h2>
-                    <p>
-                      Review the reported error above. You can adjust your
-                      request and send a new message.
-                    </p>
-                  </div>
-                )}
-                {active && !pendingApprovals.length && (
-                  <p className="activity" role="status">
-                    <span className="activity-dot" aria-hidden="true" />
-                    {current.state === "queued"
-                      ? "Waiting to start…"
-                      : "Codex is working. You can leave and return later."}
-                  </p>
-                )}
-              </div>
-            </div>
-            {!settingsReady && (
-              <div className="notice" role="status">
-                <div>
-                  <strong>Account or model setup needs attention</strong>
-                  <p>
-                    Open account setup to check authentication and available
-                    models.
-                  </p>
                 </div>
-                <button onClick={() => setAccountOpen(true)}>
-                  Account setup
-                </button>
-              </div>
-            )}
-            <section className="composer-region" aria-label="Message composer">
-              <form
-                className={`composer ${uncertain ? "recovery-settings" : ""}`}
-                onSubmit={send}
-              >
-                {uncertain && (
-                  <p className="recovery-settings-label">
-                    Settings for the separate new operation
-                  </p>
-                )}
-                <label className="sr-only" htmlFor="message">
-                  Message Codex
-                </label>
-                <textarea
-                  id="message"
-                  ref={composerRef}
-                  value={text}
-                  placeholder="Describe your task…"
-                  onChange={(event) =>
-                    richDraft.edit({ text: event.target.value })
-                  }
-                  maxLength={capabilities?.limits?.maxInputBytes ?? 32768}
-                  disabled={
-                    sending ||
-                    !!pending ||
-                    expired ||
-                    uncertain ||
-                    !richDraft.ready
-                  }
-                  rows={1}
-                  onKeyDown={(event) => {
-                    if (
-                      !event.shiftKey &&
-                      event.key === "Enter" &&
-                      !event.nativeEvent.isComposing
-                    ) {
-                      event.preventDefault();
-                      event.currentTarget.form?.requestSubmit();
-                    }
-                  }}
-                />
-                {identity &&
-                  !(capabilities?.local || capabilities?.personalVps) && (
-                    <AttachmentPicker
-                      key={selectedId}
-                      state={richDraft}
-                      csrf={identity.csrfToken}
-                      session={selectedId}
-                      modalities={
-                        capabilities?.models.find((m) => m.id === model)
-                          ?.inputModalities ?? []
-                      }
-                      disabled={blocked || !richDraft.ready}
-                    />
-                  )}
-                <div className="composer-bottom">
-                  <div className="settings">
-                    <label>
-                      Model
-                      <select
-                        aria-label="Model"
-                        value={model}
-                        disabled={active || blocked}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          setModel(value);
-                          const efforts =
-                            capabilities?.models.find(
-                              (item) => item.id === value,
-                            )?.efforts ?? [];
-                          if (!efforts.includes(effort))
-                            setEffort(
-                              efforts.includes("medium")
-                                ? "medium"
-                                : (efforts[0] ?? ""),
-                            );
-                        }}
-                      >
-                        {capabilities?.models.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Effort
-                      <select
-                        aria-label="Effort"
-                        value={effort}
-                        disabled={active || blocked}
-                        onChange={(event) => setEffort(event.target.value)}
-                      >
-                        {capabilities?.models
-                          .find((item) => item.id === model)
-                          ?.efforts.map((item) => (
-                            <option key={item} value={item}>
-                              {item === "xhigh"
-                                ? "Extra High"
-                                : item[0]?.toUpperCase() + item.slice(1)}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
-                    <label>
-                      Permissions
-                      <select
-                        aria-label="Permissions"
-                        value={permission}
-                        disabled={active || blocked}
-                        onChange={(event) =>
-                          setPermission(event.target.value as PermissionProfile)
-                        }
-                      >
-                        {capabilities?.permissionProfiles.map((item) => (
-                          <option key={item} value={item}>
-                            {permissionNames[item] ?? item}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  {activeOperation ? (
-                    <button
-                      type="button"
-                      className="stop-button"
-                      disabled={sending || !!pending || cancellationRequested}
-                      onClick={() =>
-                        void execute(
-                          newIntent(
-                            `/turns/${encodeURIComponent(activeOperation.id)}/cancel`,
-                            {},
-                            "Stop turn",
-                          ),
-                          () =>
-                            setNotice(
-                              "Stop requested. Waiting for confirmation that work has stopped.",
-                            ),
-                        )
-                      }
-                    >
-                      <span aria-hidden="true">■</span>{" "}
-                      {cancellationRequested ? "Stopping…" : "Stop turn"}
+                {!settingsReady && (
+                  <div className="notice" role="status">
+                    <div>
+                      <strong>Account or model setup needs attention</strong>
+                      <p>
+                        Open account setup to check authentication and available
+                        models.
+                      </p>
+                    </div>
+                    <button onClick={() => setAccountOpen(true)}>
+                      Account setup
                     </button>
-                  ) : (
-                    <button
-                      className="primary send-button"
-                      type="submit"
+                  </div>
+                )}
+                <section
+                  className="composer-region"
+                  aria-label="Message composer"
+                >
+                  <form
+                    className={`composer ${uncertain ? "recovery-settings" : ""}`}
+                    onSubmit={send}
+                  >
+                    {uncertain && (
+                      <p className="recovery-settings-label">
+                        Settings for the separate new operation
+                      </p>
+                    )}
+                    <label className="sr-only" htmlFor="message">
+                      Message Codex
+                    </label>
+                    <textarea
+                      id="message"
+                      ref={composerRef}
+                      value={text}
+                      placeholder="Describe your task…"
+                      onChange={(event) =>
+                        richDraft.edit({ text: event.target.value })
+                      }
+                      maxLength={capabilities?.limits?.maxInputBytes ?? 32768}
                       disabled={
-                        blocked ||
-                        active ||
+                        sending ||
+                        !!pending ||
+                        expired ||
                         uncertain ||
-                        !text.trim() ||
-                        !settingsReady ||
-                        !richDraft.ready ||
-                        richDraft.saving ||
-                        !!richDraft.error ||
-                        richDraft.files.some(
-                          (a) =>
-                            richDraft.draft.attachmentIds.includes(a.id) &&
-                            !(
-                              capabilities?.models.find((m) => m.id === model)
-                                ?.inputModalities ?? []
-                            ).includes(
-                              a.mediaType === "image/png" ? "image" : "text",
-                            ),
-                        ) ||
-                        !workspaceWritable ||
-                        Boolean(current?.backgroundStopRequested)
+                        !richDraft.ready
                       }
-                    >
-                      {sending ? "Sending…" : "Send"}
-                      <span aria-hidden="true">↑</span>
-                    </button>
-                  )}
-                </div>
-              </form>
-              {model === "gpt-6-astra" &&
-                ["low", "medium", "high", "xhigh", "max"].some(
-                  (level) =>
-                    !capabilities?.models
-                      .find((entry) => entry.id === model)
-                      ?.efforts.includes(level),
-                ) && (
-                  <p className="field-help">
-                    Some GPT-6 Astra reasoning levels are unavailable in this
-                    runtime. Only supported levels are offered.
-                  </p>
-                )}
-              <div className="composer-help">
-                <span>
-                  {active
-                    ? "Wait for this turn to finish before sending another message."
-                    : permission === "read-only"
-                      ? "Codex can read this project. File edits require a different permission."
-                      : "Codex can edit files in this project."}
-                </span>
-                <span className="shortcut">
-                  Enter to send · Shift Enter for a new line
-                </span>
-              </div>
-            </section>
-          </>
-        )}
+                      rows={1}
+                      onKeyDown={(event) => {
+                        if (
+                          !event.shiftKey &&
+                          event.key === "Enter" &&
+                          !event.nativeEvent.isComposing
+                        ) {
+                          event.preventDefault();
+                          event.currentTarget.form?.requestSubmit();
+                        }
+                      }}
+                    />
+                    {identity && (
+                      <AttachmentPicker
+                        key={selectedId}
+                        onBusyChange={setAttachmentsBusy}
+                        state={richDraft}
+                        csrf={identity.csrfToken}
+                        session={selectedId}
+                        modalities={
+                          capabilities?.models.find((m) => m.id === model)
+                            ?.inputModalities ?? []
+                        }
+                        disabled={blocked || !richDraft.ready}
+                      />
+                    )}
+                    <div className="composer-bottom">
+                      <div className="settings">
+                        <label>
+                          Model
+                          <select
+                            aria-label="Model"
+                            value={model}
+                            disabled={active || blocked}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setModel(value);
+                              const efforts =
+                                capabilities?.models.find(
+                                  (item) => item.id === value,
+                                )?.efforts ?? [];
+                              if (!efforts.includes(effort))
+                                setEffort(
+                                  efforts.includes("medium")
+                                    ? "medium"
+                                    : (efforts[0] ?? ""),
+                                );
+                            }}
+                          >
+                            {capabilities?.models.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          Effort
+                          <select
+                            aria-label="Effort"
+                            value={effort}
+                            disabled={active || blocked}
+                            onChange={(event) => setEffort(event.target.value)}
+                          >
+                            {capabilities?.models
+                              .find((item) => item.id === model)
+                              ?.efforts.map((item) => (
+                                <option key={item} value={item}>
+                                  {item === "xhigh"
+                                    ? "Extra High"
+                                    : item[0]?.toUpperCase() + item.slice(1)}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+                        <label>
+                          Permissions
+                          <select
+                            aria-label="Permissions"
+                            value={permission}
+                            disabled={active || blocked}
+                            onChange={(event) =>
+                              setPermission(
+                                event.target.value as PermissionProfile,
+                              )
+                            }
+                          >
+                            {capabilities?.permissionProfiles.map((item) => (
+                              <option key={item} value={item}>
+                                {permissionNames[item] ?? item}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      {activeOperation ? (
+                        <button
+                          type="button"
+                          className="stop-button"
+                          disabled={
+                            sending || !!pending || cancellationRequested
+                          }
+                          onClick={() =>
+                            void execute(
+                              newIntent(
+                                `/turns/${encodeURIComponent(activeOperation.id)}/cancel`,
+                                {},
+                                "Cancel turn",
+                              ),
+                              () =>
+                                setNotice(
+                                  "Stop requested. Waiting for confirmation that work has stopped.",
+                                ),
+                            )
+                          }
+                        >
+                          <span aria-hidden="true">■</span>{" "}
+                          {cancellationRequested ? "Stopping…" : "Cancel turn"}
+                        </button>
+                      ) : (
+                        <button
+                          className="primary send-button"
+                          type="submit"
+                          disabled={
+                            blocked ||
+                            active ||
+                            uncertain ||
+                            (!text.trim() &&
+                              !richDraft.draft.attachmentIds.length) ||
+                            !settingsReady ||
+                            !richDraft.ready ||
+                            richDraft.saving ||
+                            !!richDraft.error ||
+                            attachmentsBusy ||
+                            richDraft.files.some(
+                              (a) =>
+                                richDraft.draft.attachmentIds.includes(a.id) &&
+                                !(
+                                  capabilities?.models.find(
+                                    (m) => m.id === model,
+                                  )?.inputModalities ?? []
+                                ).includes(
+                                  a.mediaType.startsWith("image/")
+                                    ? "image"
+                                    : "text",
+                                ),
+                            ) ||
+                            !workspaceWritable ||
+                            Boolean(current?.backgroundStopRequested)
+                          }
+                        >
+                          {sending ? "Sending…" : "Send"}
+                          <span aria-hidden="true">↑</span>
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                  {model === "gpt-6-astra" &&
+                    ["low", "medium", "high", "xhigh", "max"].some(
+                      (level) =>
+                        !capabilities?.models
+                          .find((entry) => entry.id === model)
+                          ?.efforts.includes(level),
+                    ) && (
+                      <p className="field-help">
+                        Some GPT-6 Astra reasoning levels are unavailable in
+                        this runtime. Only supported levels are offered.
+                      </p>
+                    )}
+                  <div className="composer-help">
+                    <span>
+                      {active
+                        ? "Wait for this turn to finish before sending another message."
+                        : permission === "read-only"
+                          ? "Codex can read this project. File edits require a different permission."
+                          : "Codex can edit files in this project."}
+                    </span>
+                    <span className="shortcut">
+                      Enter to send · Shift Enter for a new line
+                    </span>
+                  </div>
+                </section>
+              </>
+            )}
+          </div>
+        </div>
       </main>
       {projectDetailsOpen && project && (
         <Modal
@@ -1733,6 +1796,16 @@ export function App() {
           close={() => setProjectDetailsOpen(false)}
         >
           <p>{project.path ?? project.relativePath ?? project.name}</p>
+          {(capabilities?.local || capabilities?.personalVps) && (
+            <WorkspaceSummary
+              workspace={workspaceData.workspaces.find(
+                (workspace) => workspace.id === newWorkspaceId,
+              )}
+              sessionId={current?.id ?? ""}
+              queued={false}
+              shared
+            />
+          )}
           {projectId && (
             <div className="rail-workspaces">
               <label>
@@ -1833,10 +1906,11 @@ export function App() {
           }
         >
           <h3>{current.title}</h3>
-          {current.backgroundUntil && (
+          {(current.runtime || current.backgroundUntil) && !active && (
             <p>
-              Archiving this conversation also stops its retained background
-              processes. The conversation history is preserved.
+              Archiving this conversation also requests retirement of its
+              retained background processes. The conversation history is
+              preserved.
             </p>
           )}
           <State state={current.state} />
@@ -1848,12 +1922,14 @@ export function App() {
                 ? "Connecting"
                 : "Reconnecting"}
           </p>
-          <p>
-            {current.backgroundUntil
-              ? "This conversation retains runtime resources."
-              : boundWorkspace?.writerSessionId === current.id
-                ? "This conversation holds the workspace writer reservation."
-                : "No retained background runtime is reported. Workspace and process details are shown below."}
+          <p aria-label="Conversation runtime">
+            {current.runtime
+              ? runtimeDescription(current.runtime)
+              : current.backgroundUntil
+                ? "This conversation retains runtime resources."
+                : boundWorkspace?.writerSessionId === current.id
+                  ? "This conversation holds the workspace writer reservation."
+                  : "No retained background runtime is reported. Workspace and process details are shown below."}
           </p>
           <details>
             <summary>Storage and limits</summary>
@@ -1877,25 +1953,34 @@ export function App() {
             workspace={boundWorkspace}
             sessionId={current.id}
             queued={current.state === "queued"}
+            shared={!!(capabilities?.local || capabilities?.personalVps)}
           />
-          {current.backgroundUntil && !active && (
+          {(current.runtime || current.backgroundUntil) && !active && (
             <div className="state-explanation" role="status">
-              <h2>Development processes are available</h2>
+              <h2>Retained processes</h2>
               <p>
-                Your development server can stay available until{" "}
-                {new Date(current.backgroundUntil).toLocaleTimeString()}.
-                Continue here to keep working. Stop these processes before using
-                this project in another conversation.
+                Stop only this conversation’s retained processes. History is
+                preserved; sibling conversations keep running. Capacity is
+                released after processes are confirmed stopped.
               </p>
               <button
                 className="quiet-button"
-                disabled={blocked || current.backgroundStopRequested}
+                disabled={
+                  blocked ||
+                  current.backgroundStopRequested ||
+                  current.runtime?.state === "retiring"
+                }
                 onClick={() =>
                   void execute(
                     newIntent(
                       `/sessions/${current.id}/background-stop`,
-                      { generation: current.generation ?? 0 },
-                      "Stop background processes",
+                      {
+                        generation:
+                          current.runtime?.generation ??
+                          current.generation ??
+                          0,
+                      },
+                      "Stop processes",
                     ),
                     async () => {
                       await refreshSnapshot(current.id);
@@ -1905,7 +1990,7 @@ export function App() {
               >
                 {current.backgroundStopRequested
                   ? "Stopping background processes…"
-                  : "Stop background processes"}
+                  : "Stop processes"}
               </button>
             </div>
           )}

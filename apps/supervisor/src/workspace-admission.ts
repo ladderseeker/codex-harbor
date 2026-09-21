@@ -4,12 +4,26 @@ import {
   selectedWorkspace,
   verifyWorkspace,
 } from "../../../packages/workspaces/src/service.ts";
+/** Revalidation lost its captured runtime; undo every reservation and retry later. */
+export class WorkspaceAdmissionChanged extends Error {}
+export async function workspaceAdmission(
+  pool: Pool,
+  claim: (db: PoolClient) => Promise<boolean>,
+) {
+  try {
+    return await transaction(pool, claim);
+  } catch (error) {
+    if (error instanceof WorkspaceAdmissionChanged) return false;
+    throw error;
+  }
+}
 export async function claimWorkspace(
   db: PoolClient,
   workspaceId: string,
   sessionId: string,
   generation: number,
   continuingOwnedRuntime = false,
+  sharedPersonal = false,
 ) {
   const w = await selectedWorkspace(db, workspaceId, true);
   if (w.state !== "ready" || w.project_archived)
@@ -36,6 +50,16 @@ export async function claimWorkspace(
       await db.query(
         "SELECT 1 FROM workspace_storage_operations WHERE project_id=$1 AND state IN ('queued','dispatching')",
         [w.project_id],
+      )
+    ).rowCount
+  )
+    return false;
+  if (sharedPersonal) return true;
+  if (
+    (
+      await db.query(
+        "SELECT 1 FROM conversation_runtimes WHERE workspace_id=$1 LIMIT 1",
+        [workspaceId],
       )
     ).rowCount
   )

@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 import type { Pool } from "pg";
 import { createHash, randomUUID } from "node:crypto";
@@ -183,6 +184,25 @@ export async function attachmentWorkspaces(
       )
     ).status(),
   ).toBe(200);
+  const uncertainDownload = await context.request.get(
+    origin + `/api/v1/attachments/${uncertainAttachment.id}/content`,
+  );
+  expect(uncertainDownload.status()).toBe(200);
+  const normalizedUncertain = await uncertainDownload.body();
+  expect(
+    await sharp(normalizedUncertain).ensureAlpha().raw().toBuffer(),
+  ).toEqual(Buffer.from([255, 0, 0, 255]));
+  expect(
+    (
+      await db.query(
+        "SELECT digest,expected_hash FROM attachments WHERE id=$1",
+        [uncertainAttachment.id],
+      )
+    ).rows[0],
+  ).toEqual({
+    digest: createHash("sha256").update(normalizedUncertain).digest("hex"),
+    expected_hash: hash2,
+  });
   const { operation: original } = await command(
     `/sessions/${session.id}/turns`,
     {
@@ -293,7 +313,7 @@ export async function attachmentWorkspaces(
         origin + `/api/v1/attachments/${uncertainAttachment.id}/content`,
       )
     ).body(),
-  ).toEqual(image2);
+  ).toEqual(normalizedUncertain);
   console.log(
     "P003/P005/P007 derived attachment association, exact inputs, session isolation, deliberate recovery continuation and archive preservation passed.",
   );

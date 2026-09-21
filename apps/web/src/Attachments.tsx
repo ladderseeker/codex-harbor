@@ -1,3 +1,4 @@
+import { ATTACHMENT_LIMITS } from "../../../packages/contracts/src/attachments.ts";
 import { Icon } from "./Icons.tsx";
 import { useEffect, useRef, useState } from "react";
 import { ApiError, mutate, newIntent, request, type Intent } from "./api.ts";
@@ -16,11 +17,16 @@ type Draft = { text: string; attachmentIds: string[]; revision: number };
 const blank: Draft = { text: "", attachmentIds: [], revision: 0 };
 export function useRichDraft(session: string, csrf: string | undefined) {
   const [draft, setDraft] = useState<Draft>(blank),
-    [files, setFiles] = useState<Attachment[]>([]),
+    [files, updateFiles] = useState<Attachment[]>([]),
     [ready, setReady] = useState(false),
     [error, setError] = useState(""),
     [saving, setSaving] = useState(false),
     [dirty, setDirty] = useState(false);
+  const filesRef = useRef(files);
+  function setFiles(next: Attachment[]) {
+    filesRef.current = next;
+    updateFiles(next);
+  }
   const current = useRef(session);
   const epoch = useRef(0);
   if (current.current !== session) {
@@ -132,15 +138,15 @@ export function useRichDraft(session: string, csrf: string | undefined) {
     return () => clearTimeout(timer);
   }, [draft, ready, dirty, error, saving]);
   function edit(change: Partial<Draft>) {
-    setDraft((d) => {
-      const next = { ...d, ...change };
-      latest.current = next;
-      return next;
-    });
+    const next = { ...latest.current, ...change };
+    latest.current = next;
+    setDraft(next);
     setDirty(true);
   }
   return {
     draft,
+    getDraft: () => latest.current,
+    getFiles: () => filesRef.current,
     files,
     ready,
     error,
@@ -167,14 +173,20 @@ export function AttachmentPicker({
   session,
   modalities,
   disabled,
+  onBusyChange,
 }: {
   state: RichDraft;
   csrf: string;
   session: string;
   modalities: string[];
   disabled: boolean;
+  onBusyChange: (busy: boolean) => void;
 }) {
-  const fileBusy = useRef(false);
+  const queue = useRef<File[]>([]);
+  const held = useRef<File | undefined>(undefined);
+  const draining = useRef(false);
+  const [queued, setQueued] = useState(0);
+  const [selectionError, setSelectionError] = useState("");
   const paused = useRef(false);
   const latestState = useRef(state);
   latestState.current = state;
@@ -184,43 +196,34 @@ export function AttachmentPicker({
   const [progress, setProgress] = useState<number | null>(null),
     [error, setError] = useState(""),
     [retry, setRetry] = useState<(() => Promise<void>) | undefined>(undefined);
+  const retryRef = useRef(false);
   const [drag, setDrag] = useState(false);
+  useEffect(() => {
+    onBusyChange(progress !== null || queued > 0 || !!retry);
+  }, [progress, queued, retry, onBusyChange]);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
       upload.current?.abort();
+      onBusyChange(false);
     };
   }, []);
   async function choose(file: File) {
-    if (disabled || fileBusy.current || progress !== null) return;
+    if (!mounted.current) return false;
+    retryRef.current = false;
     const type =
-      file.type === "image/png" || file.name.toLowerCase().endsWith(".png")
+      file.type === "image/png" || /\.png$/i.test(file.name)
         ? "image/png"
-        : file.type === "text/plain" || file.name.toLowerCase().endsWith(".txt")
-          ? "text/plain"
-          : "";
-    if (!type) {
-      setError("Supported files: PNG images and UTF-8 .txt files.");
-      return;
-    }
-    if (!modalities.includes(type === "image/png" ? "image" : "text")) {
+        : file.type === "image/jpeg" || /\.jpe?g$/i.test(file.name)
+          ? "image/jpeg"
+          : "application/octet-stream";
+    if (!modalities.includes(type.startsWith("image/") ? "image" : "text")) {
       setError(
-        `The selected model does not advertise ${type === "image/png" ? "image" : "text"} input.`,
+        `The selected model does not advertise ${type.startsWith("image/") ? "image" : "text"} input for ${file.name}.`,
       );
-      return;
+      return false;
     }
-    if (!file.size || file.size > (type === "image/png" ? 262144 : 65536)) {
-      setError(
-        "PNG limit: 256 KiB. Text limit: 64 KiB. Empty files are not accepted.",
-      );
-      return;
-    }
-    if (state.draft.attachmentIds.length >= 4) {
-      setError("Select up to four files per message.");
-      return;
-    }
-    fileBusy.current = true;
     paused.current = false;
     setError("");
     setProgress(0);
@@ -233,16 +236,19 @@ export function AttachmentPicker({
         (b) => b.toString(16).padStart(2, "0"),
       ).join("");
     } catch {
-      fileBusy.current = false;
       setProgress(null);
       setError("The file could not be read. Choose it again.");
-      return;
+      return false;
     }
-    if (!mounted.current) return;
-    let attachment = state.files.find(
-      (f) =>
-        f.state === "uploading" && f.digest === digest && f.size === file.size,
-    );
+    if (!mounted.current) return false;
+    let attachment = latestState.current
+      .getFiles()
+      .find(
+        (f) =>
+          f.state === "uploading" &&
+          f.digest === digest &&
+          f.size === file.size,
+      );
     const stage = newIntent(
       `/sessions/${session}/attachments`,
       { name: file.name, mediaType: type, size: file.size, sha256: digest },
@@ -251,12 +257,12 @@ export function AttachmentPicker({
     const binaryKey = `${Date.now()}:${crypto.randomUUID()}`;
     let transferring = false;
     async function run() {
-      if (transferring || !mounted.current) return;
+      if (transferring || !mounted.current) return false;
       transferring = true;
-      fileBusy.current = true;
       setProgress(0);
       setError("");
       setRetry(undefined);
+      retryRef.current = false;
       try {
         if (paused.current) throw Error("Upload paused. Retry the same file.");
         if (!attachment)
@@ -298,32 +304,122 @@ export function AttachmentPicker({
           xhr.send(buffer);
         });
         if (!mounted.current) return;
-        await state.refreshFiles();
+        const authoritativeFiles = await latestState.current.refreshFiles();
         if (!mounted.current) return;
+        const selectedIds = latestState.current.getDraft().attachmentIds;
+        const total = authoritativeFiles
+          .filter((a) => selectedIds.includes(a.id) || a.id === id)
+          .reduce((sum, a) => sum + a.size, 0);
+        if (
+          total > ATTACHMENT_LIMITS.turnBytes ||
+          (!selectedIds.includes(id) &&
+            selectedIds.length >= ATTACHMENT_LIMITS.turnCount)
+        ) {
+          throw new ApiError(
+            "Uploaded file is ready, but normalized files exceed this message's four-file / 20 MiB limit. Remove a selection before adding it.",
+            413,
+          );
+        }
         state.edit({
           attachmentIds: [
-            ...new Set([...latestState.current.draft.attachmentIds, id]),
+            ...new Set([...latestState.current.getDraft().attachmentIds, id]),
           ],
         });
         setRetry(undefined);
+        held.current = undefined;
+        return true;
       } catch (e) {
         if (mounted.current) {
           setError(e instanceof Error ? e.message : "Upload failed");
-          if (!(e instanceof ApiError) || e.status === 0 || e.status >= 500)
+          if (!(e instanceof ApiError) || e.status === 0 || e.status >= 500) {
+            held.current = file;
+            retryRef.current = true;
             setRetry(() => async () => {
               paused.current = false;
-              await run();
+              if (await run()) void drain();
+              else if (!retryRef.current) {
+                held.current = undefined;
+                void drain();
+              }
             });
+          }
           void state.refreshFiles().catch(() => {});
         }
+        return false;
       } finally {
         transferring = false;
         if (mounted.current) setProgress(null);
-        fileBusy.current = false;
         upload.current = undefined;
       }
     }
-    await run();
+    return await run();
+  }
+  async function drain() {
+    if (draining.current || held.current || !mounted.current) return;
+    draining.current = true;
+    try {
+      while (queue.current.length && mounted.current && !held.current) {
+        const file = queue.current.shift()!;
+        setQueued(queue.current.length);
+        held.current = file;
+        // The current file remains reserved while hashing/transferring.
+        const accepted = await choose(file);
+        if (!mounted.current) return;
+        if (!accepted) {
+          // Retryable transfers retain their exact intent and block the queue.
+          if (retryRef.current) break;
+          held.current = undefined;
+          setSelectionError(
+            (previous) =>
+              `${previous ? previous + " " : ""}${file.name} was not added. Choose it again to retry.`,
+          );
+        }
+      }
+    } finally {
+      draining.current = false;
+    }
+  }
+  function chooseBatch(files: File[]) {
+    if (disabled) {
+      setSelectionError(
+        "Attachments are unavailable while this conversation is busy.",
+      );
+      return;
+    }
+    const current = latestState.current;
+    const selected = current
+      .getFiles()
+      .filter((a) => current.getDraft().attachmentIds.includes(a.id));
+    let count =
+      current.getDraft().attachmentIds.length +
+      queue.current.length +
+      (held.current ? 1 : 0);
+    let bytes =
+      selected.reduce((sum, a) => sum + a.size, 0) +
+      queue.current.reduce((sum, f) => sum + f.size, 0) +
+      (held.current?.size ?? 0);
+    const rejected: string[] = [];
+    for (const file of files) {
+      if (
+        !file.size ||
+        file.size > ATTACHMENT_LIMITS.fileBytes ||
+        count >= ATTACHMENT_LIMITS.turnCount ||
+        bytes + file.size > ATTACHMENT_LIMITS.turnBytes
+      ) {
+        rejected.push(file.name);
+      } else {
+        queue.current.push(file);
+        count++;
+        bytes += file.size;
+      }
+    }
+    setSelectionError(
+      rejected.length
+        ? `Not added: ${rejected.slice(0, 4).join(", ") + (rejected.length > 4 ? ` and ${rejected.length - 4} more files` : "")}. Limits: 10 MiB per file, four files / 20 MiB per message; empty files are not accepted.`
+        : "",
+    );
+    setQueued(queue.current.length);
+    void drain();
   }
   async function remove(a: Attachment) {
     const intent = newIntent(`/attachments/${a.id}`, {}, "Remove attachment");
@@ -342,8 +438,8 @@ export function AttachmentPicker({
       setError(e instanceof Error ? e.message : "Removal failed");
     }
   }
-  const latestChoose = useRef(choose);
-  latestChoose.current = choose;
+  const latestChoose = useRef(chooseBatch);
+  latestChoose.current = chooseBatch;
   useEffect(() => {
     // The attachment section uses display:contents; the composer owns the
     // complete drop surface, including its textarea and empty padding.
@@ -369,8 +465,8 @@ export function AttachmentPicker({
       if (!isFileDrag(dragEvent)) return;
       dragEvent.preventDefault();
       setDrag(false);
-      const file = dragEvent.dataTransfer?.files[0];
-      if (file) void latestChoose.current(file);
+      const files = Array.from(dragEvent.dataTransfer?.files ?? []);
+      if (files.length) latestChoose.current(files);
     };
     const end = () => setDrag(false);
     composer.addEventListener("dragover", over, true);
@@ -397,7 +493,7 @@ export function AttachmentPicker({
           className="icon-button attachment-trigger"
           aria-label="Attach file"
           title="Attach file"
-          disabled={disabled || progress !== null}
+          disabled={disabled}
           onClick={() => input.current?.click()}
         >
           <Icon name="plus" />
@@ -406,8 +502,8 @@ export function AttachmentPicker({
           <summary aria-label="Attachment limits" title="Attachment limits">
             <Icon name="more" />
           </summary>
-          Drop or paste one file at a time · PNG 256 KiB · UTF-8 text 64 KiB · 4
-          files / 512 KiB
+          Select, drop or paste files · PNG/JPEG images and general files · 10
+          MiB each · 4 files / 20 MiB per message
         </details>
       </div>
       <input
@@ -415,14 +511,21 @@ export function AttachmentPicker({
         className="sr-only"
         type="file"
         aria-label="Choose attachment"
-        accept="image/png,text/plain,.txt"
+        multiple
+        disabled={disabled}
         onChange={(e) => {
-          const f = e.target.files?.[0];
+          const files = Array.from(e.target.files ?? []);
           e.target.value = "";
-          if (f) void choose(f);
+          chooseBatch(files);
         }}
       />
-      <PasteCapture choose={choose} />
+      <PasteCapture choose={chooseBatch} disabled={disabled} />
+      {queued > 0 && (
+        <p role="status">
+          {queued} file{queued === 1 ? "" : "s"} queued
+        </p>
+      )}
+      {selectionError && <p role="alert">{selectionError}</p>}
       {progress !== null && (
         <div role="status">
           Uploading <progress max={100} value={progress} />
@@ -441,60 +544,90 @@ export function AttachmentPicker({
         <p role="alert">
           {error}{" "}
           {retry && (
-            <button type="button" onClick={() => void retry()}>
-              Retry same upload
-            </button>
+            <>
+              <button type="button" onClick={() => void retry()}>
+                Retry upload
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  held.current = undefined;
+                  retryRef.current = false;
+                  setRetry(undefined);
+                  setError("");
+                  void drain();
+                }}
+              >
+                Cancel
+              </button>
+            </>
           )}
         </p>
       )}
       {state.files.some(
         (a) =>
           state.draft.attachmentIds.includes(a.id) &&
-          !modalities.includes(a.mediaType === "image/png" ? "image" : "text"),
+          !modalities.includes(
+            a.mediaType.startsWith("image/") ? "image" : "text",
+          ),
       ) && (
         <p role="alert">
           The selected model cannot receive one or more selected attachments.
           Choose a compatible model or remove those files.
         </p>
       )}
-      {state.files
-        .filter((a) => ["staged", "uploading"].includes(a.state))
-        .map((a) => (
-          <div className="attachment-row" key={a.id}>
-            <AttachmentPreview attachment={a} />
-            <span>
-              {a.state === "uploading"
-                ? "Upload incomplete: choose the same file to resume"
-                : state.draft.attachmentIds.includes(a.id)
-                  ? "Selected for this message"
-                  : "Ready to attach"}
-            </span>
-            {a.state === "staged" &&
-              !state.draft.attachmentIds.includes(a.id) && (
-                <button
-                  type="button"
-                  disabled={disabled || state.draft.attachmentIds.length >= 4}
-                  onClick={() =>
-                    state.edit({
-                      attachmentIds: [...state.draft.attachmentIds, a.id],
-                    })
-                  }
-                >
-                  Select
-                </button>
-              )}
-            <button
-              type="button"
-              disabled={
-                disabled || state.dirty || state.saving || progress !== null
-              }
-              onClick={() => void remove(a)}
-              aria-label={`Remove ${a.name}`}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
+      <div className="attachment-list" aria-label="Selected and staged files">
+        {state.files
+          .filter((a) => ["staged", "uploading"].includes(a.state))
+          .map((a) => (
+            <div className="attachment-row" key={a.id}>
+              <AttachmentPreview attachment={a} />
+              <span>
+                {a.state === "uploading"
+                  ? "Upload incomplete: choose the same file to resume"
+                  : state.draft.attachmentIds.includes(a.id)
+                    ? "Selected for this message"
+                    : "Ready to attach"}
+              </span>
+              {a.state === "staged" &&
+                !state.draft.attachmentIds.includes(a.id) && (
+                  <button
+                    type="button"
+                    disabled={
+                      disabled ||
+                      progress !== null ||
+                      queued > 0 ||
+                      !!retry ||
+                      state.draft.attachmentIds.length >=
+                        ATTACHMENT_LIMITS.turnCount ||
+                      state.files
+                        .filter((f) => state.draft.attachmentIds.includes(f.id))
+                        .reduce((sum, f) => sum + f.size, 0) +
+                        a.size >
+                        ATTACHMENT_LIMITS.turnBytes
+                    }
+                    onClick={() =>
+                      state.edit({
+                        attachmentIds: [...state.draft.attachmentIds, a.id],
+                      })
+                    }
+                  >
+                    Select
+                  </button>
+                )}
+              <button
+                type="button"
+                disabled={
+                  disabled || state.dirty || state.saving || progress !== null
+                }
+                onClick={() => void remove(a)}
+                aria-label={`Remove ${a.name}`}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+      </div>
       <p className="field-help draft-status" role="status">
         {state.error
           ? state.error
@@ -525,17 +658,23 @@ export function AttachmentPicker({
     </section>
   );
 }
-function PasteCapture({ choose }: { choose: (file: File) => Promise<void> }) {
-  const latest = useRef(choose);
-  latest.current = choose;
+function PasteCapture({
+  choose,
+  disabled,
+}: {
+  choose: (files: File[]) => void;
+  disabled: boolean;
+}) {
+  const latest = useRef({ choose, disabled });
+  latest.current = { choose, disabled };
   useEffect(() => {
     const paste = (e: ClipboardEvent) => {
       if (!(e.target instanceof HTMLElement) || !e.target.closest(".composer"))
         return;
-      const file = e.clipboardData?.files[0];
-      if (file) {
+      const files = Array.from(e.clipboardData?.files ?? []);
+      if (files.length && !latest.current.disabled) {
         e.preventDefault();
-        void latest.current(file);
+        latest.current.choose(files);
       }
     };
     document.addEventListener("paste", paste);
@@ -550,15 +689,16 @@ export function AttachmentPreview({
 }) {
   return (
     <span className="attachment-preview">
-      {a.mediaType === "image/png" && a.state !== "uploading" && (
-        <img
-          loading="lazy"
-          src={`/api/v1/attachments/${a.id}/preview`}
-          alt={`Attachment: ${a.name}`}
-          width={48}
-          height={48}
-        />
-      )}
+      {(a.mediaType === "image/png" || a.mediaType === "image/jpeg") &&
+        a.state !== "uploading" && (
+          <img
+            loading="lazy"
+            src={`/api/v1/attachments/${a.id}/preview`}
+            alt={`Attachment: ${a.name}`}
+            width={48}
+            height={48}
+          />
+        )}
       <span>
         {a.name} <small>{Math.ceil(a.size / 1024)} KiB</small>
         {a.state !== "uploading" && (

@@ -55,3 +55,28 @@ test("confirmed retirement releases only after transport confirmation", async ()
   );
   assert.deepEqual(sequence, ["retired", "released"]);
 });
+
+test("P018-06 failed retirement reconciliation is scoped to its exact transport", async () => {
+  const registry = new RetirementRegistry();
+  const unrelated = {
+    async closeAndWait() {
+      throw Error("unknown sibling");
+    },
+    async inspectProcesses() {
+      return { status: "unavailable" };
+    },
+  };
+  const selected = {
+    async closeAndWait() {
+      throw Error("lost close reply");
+    },
+    async inspectProcesses() {
+      return { status: "runtime_gone" };
+    },
+  };
+  assert.equal(await registry.retire(unrelated), false);
+  assert.equal(await registry.retire(selected), false);
+  assert.equal(await registry.confirmed(selected), true);
+  assert.equal(await registry.confirmed(unrelated), false);
+  assert.equal(await registry.confirmed(), false);
+});

@@ -78,3 +78,60 @@ export function mutate<T>(intent: Intent, csrf: string): Promise<T> {
     body: JSON.stringify(intent.body),
   });
 }
+
+export const runtimeNames: Record<string, string> = {
+  starting: "Starting runtime",
+  active: "Runtime active",
+  waiting_approval: "Runtime waiting for approval",
+  waiting_input: "Runtime waiting for your answer",
+  idle: "Runtime idle",
+  protected: "Background processes retained",
+  retiring: "Stopping runtime",
+  unknown: "Runtime state unknown",
+};
+export function confirmedRuntime(runtime?: { state: string } | null) {
+  return (
+    !!runtime &&
+    [
+      "active",
+      "waiting_approval",
+      "waiting_input",
+      "idle",
+      "protected",
+    ].includes(runtime.state)
+  );
+}
+export function runtimeDescription(runtime: {
+  state: string;
+  idleUntil: string | null;
+}) {
+  switch (runtime.state) {
+    case "idle":
+      return `Runtime idle. It may be reclaimed earlier for capacity${runtime.idleUntil ? `; retention target ends at ${new Date(runtime.idleUntil).toLocaleTimeString()}` : "; maximum retention target is 30 minutes"}.`;
+    case "protected":
+      return "Background processes retained. No automatic expiry while protected.";
+    case "unknown":
+      return "Runtime state unknown. Capacity remains reserved; no automatic expiry. Stop this conversation’s retained processes to request confirmed retirement.";
+    case "retiring":
+      return "Stopping runtime. Capacity remains reserved until processes are confirmed stopped.";
+    case "starting":
+      return "Starting runtime. Capacity is reserved.";
+    default:
+      return `${runtimeNames[runtime.state] ?? "Runtime status unavailable"}.`;
+  }
+}
+export function queueDescription(reason?: string | null) {
+  const descriptions: Record<string, string> = {
+    session_busy: "Waiting for this conversation’s current turn.",
+    active_capacity: "Waiting for an active-turn slot.",
+    runtime_capacity: "Waiting for runtime capacity.",
+    protected_capacity:
+      "Waiting for capacity held by active or protected resources.",
+    retirement_unknown: "Waiting for runtime retirement to be confirmed.",
+    workspace_busy: "Waiting for the workspace reservation.",
+    maintenance: "Waiting for maintenance to finish.",
+  };
+  return reason
+    ? (descriptions[reason] ?? "Waiting to start…")
+    : "Waiting to start…";
+}

@@ -20,8 +20,9 @@ export class RetirementRegistry<T extends Retirable> {
       .catch(() => settle(false));
     return pending;
   }
-  async confirmed() {
+  async confirmed(only?: T) {
     for (const [transport, pending] of this.entries) {
+      if (only && transport !== only) continue;
       if (await pending) continue;
       try {
         if ((await transport.inspectProcesses()).status === "runtime_gone") {

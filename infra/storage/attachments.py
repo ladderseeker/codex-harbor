@@ -24,7 +24,7 @@ def publish(target,request):
         results=[];total=0
         for item in files:
             name=item['id'];data=base64.b64decode(item['content'],validate=True);total+=len(data)
-            if not UUID.fullmatch(name)or len(data)>262144 or total>524288 or hashlib.sha256(data).hexdigest()!=item['digest']:raise ValueError('attachment content identity')
+            if not UUID.fullmatch(name)or len(data)>10485760 or total>20971520 or hashlib.sha256(data).hexdigest()!=item['digest']:raise ValueError('attachment content identity')
             # A stable private temporary name makes crash residue bounded. Never overwrite a published inode.
             try:
                 f=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=fd)
@@ -50,7 +50,7 @@ def publish(target,request):
                     os.unlink(name+'.pending',dir_fd=fd);os.fsync(fd);s=os.fstat(f)
                 if not stat.S_ISREG(s.st_mode)or s.st_uid!=0 or s.st_mode&0o222 or s.st_nlink!=1 or s.st_size!=len(data):raise ValueError('attachment file ownership')
                 if item.get('device')and(str(s.st_dev)!=item['device']or str(s.st_ino)!=item['inode']):raise ValueError('attachment file identity')
-                if os.read(f,262145)!=data:raise ValueError('attachment file content')
+                if os.read(f,10485761)!=data:raise ValueError('attachment file content')
                 results.append({'id':name,'device':str(s.st_dev),'inode':str(s.st_ino)})
             finally:os.close(f)
         os.fsync(fd)

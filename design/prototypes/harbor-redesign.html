@@ -1149,6 +1149,26 @@
       .search-results button:hover {background:var(--selected);}
       .app,.prototype-dialog {-webkit-tap-highlight-color:var(--selected);}
       .search-results svg {width:18px; height:18px; flex:none; color:var(--muted);}
+    /* Sent attachments retain distinct rows inside the message bubble. */
+      .message-attachments { display: grid; gap: 12px; margin-top: 12px; min-width: 0; }
+      .message-attachments > [role="listitem"] { min-width: 0; }
+      .message-attachments .attachment-preview { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+      .message-attachments .attachment-preview > span { min-width: 0; }
+      .message-attachments img { flex: none; object-fit: contain; border: 1px solid var(--selected); border-radius: 5px; }
+      .message-attachments small { display: block; color: var(--muted); }
+      .message-attachments a { display: block; font-size: 12px; color: inherit; text-underline-offset: 3px; }
+      /* P024: one scroll surface and bounded attachments. */
+      .scroll-area { min-height: 0; padding: 0 !important; scroll-behavior: auto; overflow-anchor: none; }
+      .scroll-area > .conversation { padding: 26px 34px 20px; width: 100%; max-width: 828px; flex: 1 0 auto; }
+      .scroll-area { display: flex; flex-direction: column; scroll-padding-bottom: var(--composer-scroll-padding, 0px); }
+      .scroll-area:has(.composer-area :focus) { scroll-padding-bottom: 0; }
+      .composer-area { position: sticky; bottom: 0; z-index: 2; margin-top: auto; }
+      .attachment-list { max-height: 180px; overflow: auto; }
+      .attachment-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 12px; overflow-wrap: anywhere; }
+      .attachment-item span { flex: 1; min-width: 0; }
+      #attachmentState { max-width: 76px; font-size: 10px; }
+      #attachmentStatus, #attachmentError { font-size: 12px; }
+      @media(max-width:700px) { .scroll-area > .conversation { padding: 20px 18px; } }
     </style>
   </head>
   <body>
@@ -1322,7 +1342,6 @@
             id="conversation"
             aria-label="Conversation"
           ></div>
-        </div>
         <div class="composer-area">
           <div class="composer-wrap">
             <form class="composer" id="composer">
@@ -1332,7 +1351,13 @@
                 aria-label="Message"
                 placeholder="Ask anything, or describe a task…"
               ></textarea>
+              <div class="attachment-list" id="attachmentList" aria-label="Selected files"></div>
+              <p id="attachmentStatus" role="status" hidden></p>
+              <p id="attachmentError" role="alert" hidden></p>
               <div class="composer-tools">
+                <button type="button" class="icon-button" id="attachFile" aria-label="Attach file">+</button>
+                <input type="file" id="attachmentInput" multiple hidden>
+                <select id="attachmentState" aria-label="Attachment specimen state"><option value="ready">Files</option><option value="loading">Uploading</option><option value="error">Error</option><option value="disabled">Disabled</option></select>
                 <label class="select-wrap"
                   ><svg><use href="#shield" /></svg
                   ><select id="permissions" aria-label="Permissions">
@@ -1366,6 +1391,7 @@
               ><span>Enter to send · Shift Enter for a new line</span>
             </div>
           </div>
+        </div>
         </div>
       </main>
     </div>
@@ -1456,10 +1482,11 @@
               title: "A quieter workspace",
               sample: true,
               occupied: true,
+              runtime: "idle",
               messages: [],
             },
-            { id: 2, title: "Understand the project", messages: [] },
-            { id: 3, title: "Plan the next release", messages: [] },
+            { id: 2, title: "Understand the project", occupied: true, runtime: "protected", messages: [] },
+            { id: 3, title: "Plan the next release", runtime: "unknown", messages: [] },
             ...Array.from({length: 8}, (_, i) => ({id: i + 10, title: `Earlier conversation ${i + 1}`, messages: []})),
           ],
         },
@@ -1603,7 +1630,7 @@
             const initialLoading = historyState === "loading";
             const pending = ["loading", "loading-more", "refreshing"].includes(historyState);
             const chats = ["loading", "empty"].includes(historyState) ? [] : activeChats.slice(0, p.depth || 5);
-            return `<div class="project"><div class="project-row"><button class="project-toggle" data-toggle="${p.id}" aria-expanded="${p.open}" title="${escapeHTML(p.name)}">${icon("folder")}<span class="project-name">${escapeHTML(p.name)}</span></button><div class="project-actions"><button class="icon-button" data-new="${p.id}" aria-label="New chat in ${escapeHTML(p.name)}" title="New chat">${icon("compose")}</button><button class="icon-button" data-project="${p.id}" aria-label="Project details for ${escapeHTML(p.name)}" title="Project details">${icon("more")}</button></div></div>${p.open ? `<div class="sessions" aria-busy="${pending}">${chats.map((c) => `<div class="session-row ${c.id === activeId ? "active" : ""}"><button class="session" ${c.id === activeId ? 'aria-current="page"' : ""} data-chat="${c.id}" title="${escapeHTML(c.title)}"><span class="resource-dot ${c.occupied ? "occupied" : ""}" role="img" aria-label="${c.occupied ? "Runtime resources retained" : "No retained runtime resources"}" title="${c.occupied ? "Runtime resources retained" : "No retained runtime resources"}"></span><span class="session-title">${escapeHTML(c.title)}</span></button><button class="icon-button session-rename" data-options="${c.id}" aria-label="More actions for ${escapeHTML(c.title)}" title="More actions">${icon("more")}</button></div>`).join("") || (initialLoading ? '' : '<p class="history-state">No matching conversations</p>')}${historyState === "error" ? '<div class="history-state" role="alert"><p>History unavailable</p><button data-history-retry>Retry history</button></div>' : ""}${!["empty", "loading"].includes(historyState) && activeChats.length > chats.length ? `<button ${pending ? "disabled" : ""} class="history-more" data-more="${p.id}">Show more</button>` : ''}</div>` : ""}</div>`;
+            return `<div class="project"><div class="project-row"><button class="project-toggle" data-toggle="${p.id}" aria-expanded="${p.open}" title="${escapeHTML(p.name)}">${icon("folder")}<span class="project-name">${escapeHTML(p.name)}</span></button><div class="project-actions"><button class="icon-button" data-new="${p.id}" aria-label="New chat in ${escapeHTML(p.name)}" title="New chat">${icon("compose")}</button><button class="icon-button" data-project="${p.id}" aria-label="Project details for ${escapeHTML(p.name)}" title="Project details">${icon("more")}</button></div></div>${p.open ? `<div class="sessions" aria-busy="${pending}">${chats.map((c) => `<div class="session-row ${c.id === activeId ? "active" : ""}"><button class="session" ${c.id === activeId ? 'aria-current="page"' : ""} data-chat="${c.id}" title="${escapeHTML(c.title)}"><span class="resource-dot ${c.occupied ? "occupied" : ""}" role="img" aria-label="${c.runtime ? runtimeText[c.runtime] : "No retained runtime resources"}" title="${c.runtime ? runtimeText[c.runtime] : "No retained runtime resources"}"></span><span class="session-title">${escapeHTML(c.title)}</span></button><button class="icon-button session-rename" data-options="${c.id}" aria-label="More actions for ${escapeHTML(c.title)}" title="More actions">${icon("more")}</button></div>`).join("") || (initialLoading ? '' : '<p class="history-state">No matching conversations</p>')}${historyState === "error" ? '<div class="history-state" role="alert"><p>History unavailable</p><button data-history-retry>Retry history</button></div>' : ""}${!["empty", "loading"].includes(historyState) && activeChats.length > chats.length ? `<button ${pending ? "disabled" : ""} class="history-more" data-more="${p.id}">Show more</button>` : ''}</div>` : ""}</div>`;
           })
           .join("");
       }
@@ -1634,7 +1661,7 @@
         return `<div class="message-actions" role="group" aria-label="${assistant ? "Response actions" : "Message actions"}">${copyButton(key, text, assistant ? "Copy response" : "Copy message")}${assistant ? ["up", "down"].map((vote) => `<button class="icon-button" data-vote="${vote}" data-response="${key}" aria-label="${vote === "up" ? "Like" : "Dislike"} response" title="${vote === "up" ? "Like" : "Dislike"} response" aria-pressed="${votes.get(key) === vote}">${icon("thumb-" + vote)}</button>`).join("") : ["up", "down"].map(vote => `<span class="icon-button decorative-reaction" aria-hidden="true">${icon("thumb-" + vote)}</span>`).join("")}</div>`;
       }
       function sampleHTML() {
-        return `<div class="user-message"><div class="user-bubble">${escapeHTML(sampleUser)}</div>${messageActions("sample-user", sampleUser)}</div><article class="assistant-message"><div class="assistant-label">${icon("harbor")}Harbor</div><p>Start with the conversation. Everything else should make it easier to get back to your work.</p><h2>A little less interface. A lot more room.</h2><p>Keep projects and their chats together in the sidebar. Bring everyday actions closer to where you need them.</p><ul><li><strong>One place to start.</strong> New chat is always within reach.</li><li><strong>Projects, kept together.</strong> Open a folder, pick up a chat, or start another.</li><li><strong>A composer that fits.</strong> One line to begin with. More room when you need it.</li></ul><details class="conversation-activity"><summary>3 commands · Completed</summary><pre>pwd
+        return `<div class="user-message"><div class="user-bubble">${escapeHTML(sampleUser)}<div class="message-attachments" role="list" aria-label="Message attachments"><div role="listitem"><span class="attachment-preview"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==" alt="Attachment: sample-image.png" width="48" height="48"><span>sample-image.png<small>1 KiB</small><a href="data:application/octet-stream;base64,Zml4dHVyZQ==" download="sample-image.png">Download</a></span></span></div><div role="listitem"><span class="attachment-preview"><span>release-notes.pdf<small>1 KiB</small><a href="data:application/octet-stream;base64,Zml4dHVyZQ==" download="release-notes.pdf">Download</a></span></span></div><div role="listitem"><span class="attachment-preview"><span>a-very-long-unbroken-filename-for-mobile-layout-012345678901234567890123456789012345678901234567890123456789.csv<small>1 KiB</small><a href="data:application/octet-stream;base64,Zml4dHVyZQ==" download="a-very-long-unbroken-filename-for-mobile-layout-012345678901234567890123456789012345678901234567890123456789.csv">Download</a></span></span></div></div></div>${messageActions("sample-user", sampleUser)}</div><article class="assistant-message"><div class="assistant-label">${icon("harbor")}Harbor</div><p>Start with the conversation. Everything else should make it easier to get back to your work.</p><h2>A little less interface. A lot more room.</h2><p>Keep projects and their chats together in the sidebar. Bring everyday actions closer to where you need them.</p><ul><li><strong>One place to start.</strong> New chat is always within reach.</li><li><strong>Projects, kept together.</strong> Open a folder, pick up a chat, or start another.</li><li><strong>A composer that fits.</strong> One line to begin with. More room when you need it.</li></ul><details class="conversation-activity"><summary>3 commands · Completed</summary><pre>pwd
 /workspace/project
 
 rg --files
@@ -1683,6 +1710,7 @@ Checks passed</pre></details><section class="markdown-body" aria-label="Markdown
         input.style.height = Math.min(160, input.scrollHeight) + "px";
         input.style.overflowY = input.scrollHeight > 160 ? "auto" : "hidden";
         $("send").disabled = !input.value.trim();
+        if(followBottom) $("scrollArea").scrollTop = $("scrollArea").scrollHeight;
       }
       $("projects").addEventListener("click", (event) => {
         const more = event.target.closest("[data-more]");
@@ -1998,11 +2026,30 @@ Checks passed</pre></details><section class="markdown-body" aria-label="Markdown
         if (dialogOpener?.isConnected) dialogOpener.focus();
         else if (mobileQuery.matches) $("openSidebar").focus();
       });
+      const runtimeText = {
+        starting: "Starting runtime. Capacity is reserved.",
+        active: "Runtime active.",
+        waiting_approval: "Runtime waiting for approval.",
+        waiting_input: "Runtime waiting for your answer.",
+        idle: "Runtime idle. It may be reclaimed for capacity, with a maximum 30-minute retention target.",
+        protected: "Background processes retained. No automatic expiry while protected.",
+        retiring: "Stopping runtime. Capacity remains reserved until processes are confirmed stopped.",
+        unknown: "Runtime state unknown. Capacity remains reserved; no automatic expiry.",
+      };
+      const queueText = {
+        session_busy: "Waiting for this conversation’s current turn.",
+        active_capacity: "Waiting for an active-turn slot.",
+        runtime_capacity: "Waiting for runtime capacity.",
+        protected_capacity: "Waiting for capacity held by active or protected resources.",
+        retirement_unknown: "Waiting for runtime retirement to be confirmed.",
+        workspace_busy: "Waiting for the workspace reservation.",
+        maintenance: "Waiting for maintenance to finish.",
+      };
       function showSession(id, opener) {
         const chat = projects.flatMap((p) => p.chats).find((c) => c.id === id);
         showDialog(
           chat.title,
-          `<div class="action-list"><button id="renameSession">${icon("compose")}Rename</button><button id="archiveSession">${icon("folder")}${chat.archived ? "Unarchive" : "Archive"}</button><button id="statusSession">${icon("search")}View status</button><button id="releaseSession" ${chat.occupied ? "" : "disabled"}>${icon("more")}Stop background processes</button></div>`,
+          `<div class="action-list"><button id="renameSession">${icon("compose")}Rename</button><button id="archiveSession">${icon("folder")}${chat.archived ? "Unarchive" : "Archive"}</button><button id="statusSession">${icon("search")}Status</button><button id="releaseSession" ${["idle", "protected", "unknown"].includes(chat.runtime) ? "" : "disabled"}>${icon("more")}Stop processes</button></div>`,
           opener,
         );
         $("renameSession").onclick = () => {
@@ -2023,7 +2070,7 @@ Checks passed</pre></details><section class="markdown-body" aria-label="Markdown
         };
         $("archiveSession").onclick = () => {
           chat.archived = !chat.archived;
-          if (chat.archived) chat.occupied = false;
+          if (chat.archived && ["idle", "protected", "unknown"].includes(chat.runtime)) {chat.occupied = false; chat.runtime = null;}
           $("actionDialog").close();
           renderProjects();
           notify(
@@ -2032,20 +2079,23 @@ Checks passed</pre></details><section class="markdown-body" aria-label="Markdown
               : "Chat unarchived.",
           );
         };
-        $("statusSession").onclick = () =>
+        $("statusSession").onclick = () => {
           showDialog(
             "Conversation status",
-            `<p>${escapeHTML(chat.title)}</p><p>Turn: finished. Connection: connected.</p><p>${chat.occupied ? "Runtime resources retained. This conversation holds the workspace writer reservation." : "No retained runtime resources. The workspace is available."}</p><p>Conversation storage: 4 KiB of 2048 KiB. Attachment limits: four files per message.</p><p>These are sample values for this design preview.</p>`,
+            `<p>${escapeHTML(chat.title)}</p><p>Turn: finished. Connection: connected.</p><p>${chat.runtime ? runtimeText[chat.runtime] : "No retained runtime resources."}</p><p>Conversations share this directory and run independently. Coordinate edits to shared files.</p><label class="example-field">Queue specimen<select id="queueState"><option value="">Not queued</option>${Object.keys(queueText).map(key => `<option value="${key}">${key.replaceAll("_", " ")}</option>`).join("")}</select></label><p id="queueReason" role="status">Not queued.</p><p>Conversation storage: 4 KiB of 2048 KiB. Attachment limits: four files per message.</p><p>These are sample values for this design preview.</p>`,
             opener,
           );
+          $("queueState").onchange = () => {$("queueReason").textContent = queueText[$("queueState").value] || "Not queued.";};
+        };
         $("releaseSession").onclick = () => {
           showDialog(
-            "Stop background processes?",
-            `<p>This stops retained development processes and releases their workspace reservation. It does not archive the conversation or stop a current answer.</p><button id="confirmRelease">Stop background processes</button>`,
+            "Stop processes?",
+            `<p>This stops only this conversation’s retained processes. Capacity is released after confirmed absence. Sibling conversations and conversation history are preserved; active-answer cancellation is separate.</p><button id="confirmRelease">Stop processes</button>`,
             opener,
           );
           $("confirmRelease").onclick = () => {
             chat.occupied = false;
+            chat.runtime = null;
             $("actionDialog").close();
             renderProjects();
             notify("Background processes stopped. Runtime resources released.");
@@ -2056,7 +2106,7 @@ Checks passed</pre></details><section class="markdown-body" aria-label="Markdown
         const project = projects.find((p) => p.id === id);
         showDialog(
           "Project details",
-          `<p><strong>${escapeHTML(project.name)}</strong></p><p>Environment: Local · ready</p><p>Workspace: original project folder</p><p>Project storage: sample usage available.</p><p>Account and global configuration are available in Settings.</p>`,
+          `<p><strong>${escapeHTML(project.name)}</strong></p><p>Environment: Local · ready</p><p>Workspace: original project folder</p><p>Conversations share this directory and run independently. Coordinate edits to shared files.</p><ul aria-label="Shared directory conversations">${project.chats.filter(c => c.runtime).map(c => `<li>${escapeHTML(c.title)}: ${runtimeText[c.runtime]}</li>`).join("") || "<li>No retained conversation runtimes.</li>"}</ul><p>Project storage: sample usage available.</p><p>Account and global configuration are available in Settings.</p>`,
           opener,
         );
       }
@@ -2120,6 +2170,45 @@ Checks passed</pre></details><section class="markdown-body" aria-label="Markdown
       }
       $("model").onchange = updateEffort;
       updateEffort();
+      let selectedFiles = [];
+      function renderAttachments() {
+        $("attachmentList").replaceChildren();
+        selectedFiles.forEach((file, index) => {
+          const row = document.createElement("div"); row.className = "attachment-item";
+          const name = document.createElement("span"); name.textContent = file.name + " · " + Math.ceil(file.size / 1024) + " KiB";
+          const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "Remove"; remove.setAttribute("aria-label", "Remove " + file.name);
+          remove.onclick = () => {selectedFiles.splice(index, 1); renderAttachments();}; row.append(name, remove); $("attachmentList").append(row);
+        });
+      }
+      function addFiles(files) {
+        const rejected = [];
+        for(const file of files) {
+          if(!file.size || file.size > 10 * 1024 * 1024 || selectedFiles.length >= 4 || selectedFiles.reduce((sum,f) => sum+f.size,0)+file.size > 20*1024*1024) rejected.push(file.name);
+          else selectedFiles.push(file);
+        }
+        $("attachmentError").hidden = !rejected.length;
+        $("attachmentError").textContent = rejected.length ? "Not added: " + rejected.join(", ") + ". Limit: 10 MiB per file, four files / 20 MiB per message." : "";
+        renderAttachments();
+      }
+      $("attachFile").onclick = () => $("attachmentInput").click();
+      $("attachmentInput").onchange = event => {addFiles([...event.target.files]); event.target.value = "";};
+      $("composer").addEventListener("paste", event => {if(event.clipboardData.files.length && !$("attachFile").disabled) {event.preventDefault(); addFiles([...event.clipboardData.files]);}});
+      $("composer").addEventListener("dragover", event => {if(event.dataTransfer.types.includes("Files")) event.preventDefault();});
+      $("composer").addEventListener("drop", event => {event.preventDefault(); if(!$("attachFile").disabled) addFiles([...event.dataTransfer.files]);});
+      $("attachmentState").onchange = () => {
+        const value = $("attachmentState").value;
+        $("attachFile").disabled = value === "disabled";
+        $("attachmentStatus").hidden = value !== "loading";
+        $("attachmentStatus").innerHTML = 'Uploading <progress value="40" max="100"></progress> <button type="button" id="pauseUpload">Pause upload</button>';
+        $("attachmentError").hidden = value !== "error";
+        $("attachmentError").innerHTML = 'Upload paused. <button type="button" id="retryUpload">Retry upload</button>';
+        $("pauseUpload").onclick = () => {$("attachmentState").value = "error"; $("attachmentState").onchange();};
+        $("retryUpload").onclick = () => {$("attachmentState").value = "loading"; $("attachmentState").onchange();};
+      };
+      let followBottom = true;
+      $("scrollArea").addEventListener("scroll", () => {const e = $("scrollArea"); followBottom = e.scrollHeight-e.scrollTop-e.clientHeight < 100;});
+      new ResizeObserver(() => {const e = $("scrollArea"); e.style.setProperty("--composer-scroll-padding", (document.querySelector(".composer-area").offsetHeight+20)+"px"); if(followBottom)e.scrollTop = e.scrollHeight;}).observe($("conversation"));
+      new ResizeObserver(() => {const e = $("scrollArea"); e.style.setProperty("--composer-scroll-padding", (document.querySelector(".composer-area").offsetHeight+20)+"px"); if(followBottom)e.scrollTop=e.scrollHeight;}).observe(document.querySelector(".composer-area"));
       renderChat();
       syncSidebar();
       updateSidebarWidth();

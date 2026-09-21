@@ -1,3 +1,4 @@
+import { runtimeProjection } from "../../../packages/storage/src/conversation-runtimes.ts";
 import { reasoningEfforts } from "../../../packages/contracts/src/index.js";
 import {
   projectDirectoryRoutes,
@@ -156,7 +157,6 @@ export async function buildServer(c: Config) {
       if (
         (c.HARBOR_PERSONAL_VPS_MODE && /\/tokens(?:\/|$)/.test(route)) ||
         /\/(terminals|previews|files|schedules)(?:\/|$)/.test(route) ||
-        (req.method !== "GET" && /\/attachments(?:\/|$)/.test(route)) ||
         (req.method !== "GET" &&
           (/\/workspaces(?:\/|$)/.test(route) ||
             /\/(recover|recovery|release)(?:\/|$)/.test(route) ||
@@ -795,7 +795,7 @@ export async function buildServer(c: Config) {
   app.get("/api/v1/sessions", async (req) => ({
     sessions: (
       await pool.query(
-        "SELECT * FROM sessions WHERE NOT archived AND ($1::uuid[] IS NULL OR project_id=ANY($1)) ORDER BY updated_at DESC",
+        `SELECT s.*,${runtimeProjection("s")} AS runtime FROM sessions s WHERE NOT archived AND ($1::uuid[] IS NULL OR project_id=ANY($1)) ORDER BY updated_at DESC`,
         [auth.get(req)!.projectIds ?? null],
       )
     ).rows.map(publicRow),
@@ -858,7 +858,15 @@ export async function buildServer(c: Config) {
         await pruneReplay(db, req.params.id);
         const s = await session(db, req.params.id);
         return {
-          session: publicRow(s),
+          session: {
+            ...publicRow(s),
+            runtime: (
+              await db.query(
+                `SELECT ${runtimeProjection("s")} AS runtime FROM sessions s WHERE id=$1`,
+                [s.id],
+              )
+            ).rows[0].runtime,
+          },
           processes: s.process_inspection,
           storage: {
             conversationBytes: Number(
@@ -916,7 +924,7 @@ export async function buildServer(c: Config) {
     "/api/v1/sessions/:id/background-stop",
     async (req) =>
       command(req, async (db) => {
-        if (!c.HARBOR_PERSONAL_VPS_MODE)
+        if (!c.HARBOR_PERSONAL_VPS_MODE && !c.HARBOR_LOCAL_MODE)
           throw new HarborError(
             409,
             "PERSONAL_VPS_FEATURE_UNAVAILABLE",
@@ -950,7 +958,15 @@ export async function buildServer(c: Config) {
             "TURN_ACTIVE",
             "Stop or finish the active turn before stopping background processes",
           );
-        if (current.background_until && !current.background_stop_requested) {
+        if (
+          (
+            await db.query(
+              "SELECT 1 FROM conversation_runtimes WHERE session_id=$1 AND generation=$2",
+              [req.params.id, body.generation],
+            )
+          ).rowCount &&
+          !current.background_stop_requested
+        ) {
           await db.query(
             "UPDATE sessions SET background_stop_requested=true WHERE id=$1",
             [req.params.id],

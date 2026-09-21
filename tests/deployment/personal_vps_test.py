@@ -51,6 +51,35 @@ class PersonalVpsTests(unittest.TestCase):
         self.assertNotIn('HARBOR_CREDENTIAL_KEY_FILE=', env)
         self.assertIn('HARBOR_PERSONAL_VPS_STATE_DIR=', env)
 
+    def test_deployment_drain_counts_unconfirmed_conversation_membership(self):
+        import sys
+        sys.path.insert(0, str(SCRIPT.parent.parent / 'deploy'))
+        try:
+            import control
+        finally:
+            sys.path.pop(0)
+        status = dict.fromkeys(('active', 'pendingStorage', 'pendingRecovery', 'activeFiles', 'uncertainFiles', 'pendingFileInspections', 'activeTerminals', 'activeScheduleEffects', 'activePreviews'), 0)
+        status['activeConversationRuntimes'] = 1
+        with patch.object(control, 'selected', return_value=('/private/release', {})), patch.object(control, 'db', return_value=status), patch.object(control, 'service') as service:
+            with self.assertRaisesRegex(ValueError, 'Drain incomplete'):
+                control.maintenance({}, deadlineSeconds=-1)
+            service.assert_not_called()
+
+    def test_conversation_capacity_defaults_validation_and_environment(self):
+        personal.validate(self.c)
+        env = personal.environment(self.c, 'a' * 64, None)
+        self.assertIn('HARBOR_MAX_ACTIVE_TURNS="4"', env)
+        self.assertIn('HARBOR_MAX_CONVERSATION_RUNTIMES="4"', env)
+        self.c.update(maxActiveTurns=3, maxConversationRuntimes=7)
+        personal.validate(self.c)
+        env = personal.environment(self.c, 'a' * 64, None)
+        self.assertIn('HARBOR_MAX_ACTIVE_TURNS="3"', env)
+        self.assertIn('HARBOR_MAX_CONVERSATION_RUNTIMES="7"', env)
+        for active, runtimes in [(0, 4), (17, 32), (4, 3), (4, 33), (True, 4), ('3', 7), (3, 4.5)]:
+            invalid = dict(self.c, maxActiveTurns=active, maxConversationRuntimes=runtimes)
+            with self.assertRaises(ValueError):
+                personal.validate(invalid)
+
     def test_rendered_services_keep_admin_boundary_and_loopback_routing(self):
         files = personal.artifacts(self.c, 'a' * 64, None)
         compose = json.loads(files['compose.json'])
@@ -64,6 +93,12 @@ class PersonalVpsTests(unittest.TestCase):
             self.assertIn('ProtectSystem=strict', unit)
             self.assertIn('NoNewPrivileges=yes', unit)
             self.assertIn('KillMode=control-group', unit)
+            if role == 'supervisor':
+                self.assertIn('Delegate=yes', unit)
+                self.assertIn('ProtectControlGroups=no', unit)
+            else:
+                self.assertNotIn('Delegate=yes', unit)
+                self.assertIn('ProtectControlGroups=yes', unit)
             self.assertIn('MemoryMax=', unit)
             self.assertIn('CPUQuota=', unit)
             self.assertIn('TasksMax=', unit)

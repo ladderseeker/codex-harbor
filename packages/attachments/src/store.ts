@@ -93,7 +93,7 @@ export async function validateAttachmentModalities(
     catalog.find((m: any) => (m.model ?? m.id) === model)?.inputModalities ??
     [];
   if (
-    rows.some((a) => a.media_type === "image/png") &&
+    rows.some((a) => ["image/png", "image/jpeg"].includes(a.media_type)) &&
     !modalities.includes("image")
   )
     throw new HarborError(
@@ -102,7 +102,9 @@ export async function validateAttachmentModalities(
       "The selected model does not advertise image input",
     );
   if (
-    rows.some((a) => a.media_type === "text/plain") &&
+    rows.some((a) =>
+      ["text/plain", "application/octet-stream"].includes(a.media_type),
+    ) &&
     !modalities.includes("text")
   )
     throw new HarborError(
