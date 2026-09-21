@@ -5,6 +5,7 @@ import {
 import {
   runtimeState,
   queueReason,
+  repairReleasedPersonalSession,
 } from "../../../packages/storage/src/conversation-runtimes.ts";
 import { classifyIdle, capacityReason } from "./runtime-capacity.ts";
 import {
@@ -171,7 +172,8 @@ const generation = await transaction(pool, async (db) => {
     ),
   );
   await db.query(
-    "UPDATE operations SET state='failed',updated_at=now() WHERE kind<>'turn' AND state IN ('dispatching','running','waiting_approval','waiting_input','uncertain')",
+    "UPDATE operations SET state='failed',updated_at=now() WHERE kind<>'turn' AND state IN ('dispatching','running','waiting_approval','waiting_input','uncertain') AND (NOT $1::boolean OR state<>'uncertain' OR uncertainty_acknowledged_at IS NOT NULL)",
+    [personal],
   );
   const rows = await db.query(
     "UPDATE operations SET state='uncertain',updated_at=now() WHERE kind='turn' AND state IN ('dispatching','running','waiting_approval','waiting_input') RETURNING session_id",
@@ -198,6 +200,13 @@ const generation = await transaction(pool, async (db) => {
     ? (await db.query("SELECT * FROM conversation_runtimes")).rows
     : [];
   for (const member of retained) {
+    const current = (
+      await db.query("SELECT generation FROM sessions WHERE id=$1", [
+        member.session_id,
+      ])
+    ).rows[0];
+    if (!current || Number(current.generation) !== Number(member.generation))
+      continue;
     if (
       (await inspectRecoveredLocalRuntime(
         member.native_identity,
@@ -227,7 +236,8 @@ const generation = await transaction(pool, async (db) => {
     }
   }
   const abandonedBackground = await db.query(
-    "UPDATE sessions SET state='uncertain',background_until=NULL,background_stop_requested=true WHERE background_until IS NOT NULL RETURNING id",
+    "UPDATE sessions s SET state='uncertain',background_until=NULL,background_stop_requested=true WHERE background_until IS NOT NULL AND (NOT $1::boolean OR NOT EXISTS(SELECT 1 FROM conversation_runtimes cr WHERE cr.session_id=s.id AND cr.generation<>s.generation)) RETURNING id",
+    [personal],
   );
   for (const row of abandonedBackground.rows)
     await event(db, row.id, "runtime.uncertain", {
@@ -242,6 +252,27 @@ const generation = await transaction(pool, async (db) => {
     await event(db, row.session_id, "runtime.uncertain", {
       reason: "Supervisor restarted; dispatched effects are not replayed",
     });
+  }
+  if (personal) {
+    // Include already-released sessions left stale by older startup code. The
+    // guard requires committed absent ownership, never a missing cgroup alone.
+    for (const row of (
+      await db.query(
+        "SELECT id,generation FROM sessions WHERE state='uncertain' ORDER BY id",
+      )
+    ).rows) {
+      if (runtimes.has(row.id)) continue;
+      if (
+        (await repairReleasedPersonalSession(
+          db,
+          row.id,
+          Number(row.generation),
+        )) !== null
+      )
+        await event(db, row.id, "background.stopped", {
+          generation: Number(row.generation),
+        });
+    }
   }
   return g;
 });
@@ -734,6 +765,21 @@ async function retireSessionRuntime(
         await releaseWorkspace(pool, sessionId, runtime.generation);
       await transaction(pool, async (db) => {
         await lockSessionResource(db, sessionId);
+        if (personal) {
+          const current = (
+            await db.query(
+              "SELECT s.generation,cr.generation AS member_generation FROM sessions s LEFT JOIN conversation_runtimes cr ON cr.session_id=s.id WHERE s.id=$1",
+              [sessionId],
+            )
+          ).rows[0];
+          if (
+            !current ||
+            Number(current.generation) !== runtime.generation ||
+            (current.member_generation !== null &&
+              Number(current.member_generation) !== runtime.generation)
+          )
+            return;
+        }
         await db.query(
           "DELETE FROM conversation_runtimes WHERE session_id=$1 AND generation=$2",
           [sessionId, runtime.generation],
@@ -742,8 +788,15 @@ async function retireSessionRuntime(
           "UPDATE sessions SET background_until=NULL,background_stop_requested=false WHERE id=$1 AND generation=$2 RETURNING id",
           [sessionId, runtime.generation],
         );
-        if (saved.rowCount)
+        if (saved.rowCount) {
+          if (personal && !runtimes.has(sessionId))
+            await repairReleasedPersonalSession(
+              db,
+              sessionId,
+              runtime.generation,
+            );
           await event(db, sessionId, "background.stopped", {});
+        }
       });
       await runtime.adapter.cleanupRetiredOwnership().catch(() => {
         console.error(
@@ -1048,16 +1101,42 @@ async function tick() {
     for (const member of members) {
       const runtime = runtimes.get(member.session_id);
       if (!runtime) {
-        if (
-          (await inspectRecoveredLocalRuntime(
-            member.native_identity,
-            Number(member.generation),
-          )) === "absent"
-        )
-          await pool.query(
+        await transaction(pool, async (db) => {
+          await lockSessionResource(db, member.session_id);
+          const current = (
+            await db.query(
+              "SELECT cr.*,s.generation AS session_generation FROM conversation_runtimes cr JOIN sessions s ON s.id=cr.session_id WHERE cr.session_id=$1",
+              [member.session_id],
+            )
+          ).rows[0];
+          if (
+            !current ||
+            runtimes.has(member.session_id) ||
+            Number(current.generation) !== Number(member.generation) ||
+            Number(current.session_generation) !== Number(member.generation) ||
+            (await inspectRecoveredLocalRuntime(
+              current.native_identity,
+              Number(current.generation),
+            )) !== "absent"
+          )
+            return;
+          await db.query(
             "DELETE FROM conversation_runtimes WHERE session_id=$1 AND generation=$2",
             [member.session_id, member.generation],
           );
+          await db.query(
+            "UPDATE sessions SET background_until=NULL,background_stop_requested=false WHERE id=$1 AND generation=$2",
+            [member.session_id, member.generation],
+          );
+          await repairReleasedPersonalSession(
+            db,
+            member.session_id,
+            Number(member.generation),
+          );
+          await event(db, member.session_id, "background.stopped", {
+            generation: Number(member.generation),
+          });
+        });
         continue;
       }
       if (runtime.operation || runtime.retiring) continue;

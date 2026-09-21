@@ -16,6 +16,9 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { join } from "node:path";
+import { hostname } from "node:os";
+import { repairReleasedPersonalSession } from "../../packages/storage/src/conversation-runtimes.ts";
+import { lockSessionResource } from "../../packages/storage/src/session-lock.ts";
 
 /** Real Linux Harbor, PostgreSQL and supervisor. Only Codex/OIDC are external fixtures. */
 export type ConcurrencyContext = {
@@ -556,6 +559,545 @@ export async function runConcurrency(h: ConcurrencyContext) {
       "P018-07 archive retires the selected protected member and preserves sibling",
     );
     await stopAll();
+
+    // P024 R5: controlled durable-state fixtures reproduce the already-freed
+    // projection left by older code. These are synthetic conversations only.
+    const stale = await create("P024 released projection");
+    await state(
+      await send(stale, "P024 preserved completed history"),
+      "succeeded",
+    );
+    await stop(stale);
+    await select(stale);
+    const savedText = "P024 saved draft requires explicit browser send";
+    await h.page.getByLabel("Message Codex").fill(savedText);
+    await expect
+      .poll(async () => (await get(`/sessions/${stale}/draft`)).draft.text)
+      .toBe(savedText);
+    const savedDraft = (
+      await db.query("SELECT * FROM conversation_drafts WHERE session_id=$1", [
+        stale,
+      ])
+    ).rows;
+    const savedHistory = (
+      await db.query(
+        "SELECT * FROM messages WHERE session_id=$1 ORDER BY created_at,id",
+        [stale],
+      )
+    ).rows;
+    const savedOperations = (
+      await db.query(
+        "SELECT * FROM operations WHERE session_id=$1 ORDER BY created_at,id",
+        [stale],
+      )
+    ).rows;
+    const savedThread = await nativeThread(stale);
+    const staleGeneration = Number((await snapshot(stale)).session.generation);
+    const recovered = await create("P024 confirmed absent projection");
+    const mismatch = await create("P024 mismatched member generation");
+    const unknownSibling = await create("P024 unknown sibling");
+    const uncertainControl = await create("P024 uncertain control effect");
+    await state(
+      await send(
+        uncertainControl,
+        "P024 completed turn before uncertain control",
+      ),
+      "succeeded",
+    );
+    await stop(uncertainControl);
+    const uncertainControlId = randomUUID();
+    const injectedMembers = [recovered, mismatch, unknownSibling];
+    await h.stopSupervisor();
+    try {
+      // Unlike the rollback-only matrix below, this fault survives an actual
+      // supervisor restart. Personal startup must not erase a nonturn effect.
+      await db.query(
+        "INSERT INTO operations(id,session_id,kind,state,payload,actor_hash) VALUES($1,$2,'cancel','uncertain','{}','p024-restart-uncertain-control')",
+        [uncertainControlId, uncertainControl],
+      );
+      await db.query("UPDATE sessions SET state='uncertain' WHERE id=$1", [
+        uncertainControl,
+      ]);
+      const controlOperationsBefore = (
+        await db.query(
+          "SELECT * FROM operations WHERE session_id=$1 ORDER BY created_at,id",
+          [uncertainControl],
+        )
+      ).rows;
+      await db.query("UPDATE sessions SET state='uncertain' WHERE id=$1", [
+        stale,
+      ]);
+      const guard = await db.connect();
+      try {
+        const operationId = randomUUID();
+        const guardCases: Array<
+          [string, (client: typeof guard) => Promise<unknown>]
+        > = [
+          [
+            "generation mismatch",
+            (client) =>
+              client.query(
+                "UPDATE sessions SET generation=generation+1 WHERE id=$1",
+                [stale],
+              ),
+          ],
+          [
+            "background deadline",
+            (client) =>
+              client.query(
+                "UPDATE sessions SET background_until=clock_timestamp()+interval '1 hour' WHERE id=$1",
+                [stale],
+              ),
+          ],
+          [
+            "background stop",
+            (client) =>
+              client.query(
+                "UPDATE sessions SET background_stop_requested=true WHERE id=$1",
+                [stale],
+              ),
+          ],
+          [
+            "legacy partial writer",
+            (client) =>
+              client.query(
+                "UPDATE workspaces SET writer_generation=47 WHERE id=$1",
+                [h.workspaceId],
+              ),
+          ],
+          [
+            "workspace writer",
+            (client) =>
+              client.query(
+                "UPDATE workspaces SET writer_kind='file',writer_owner_id=$2 WHERE id=$1",
+                [h.workspaceId, randomUUID()],
+              ),
+          ],
+          ...["unknown", "protected"].map(
+            (
+              memberState,
+            ): [string, (client: typeof guard) => Promise<unknown>] => [
+              memberState + " member",
+              (client) =>
+                client.query(
+                  "INSERT INTO conversation_runtimes(session_id,workspace_id,generation,state,native_identity,permission_profile,credential_version) VALUES($1,$2,$3,$4,$5,'workspace-write','p024-guard-fixture')",
+                  [
+                    stale,
+                    h.workspaceId,
+                    staleGeneration,
+                    memberState,
+                    JSON.stringify({ host: "p024-unavailable-test-host" }),
+                  ],
+                ),
+            ],
+          ),
+          ...[
+            "uncertain",
+            "queued",
+            "dispatching",
+            "running",
+            "waiting_approval",
+            "waiting_input",
+          ].map(
+            (
+              operationState,
+            ): [string, (client: typeof guard) => Promise<unknown>] => [
+              operationState + " operation",
+              (client) =>
+                client.query(
+                  "INSERT INTO operations(id,session_id,kind,state,payload,actor_hash) VALUES($1,$2,'turn',$3,'{}','p024-guard-fixture')",
+                  [operationId, stale, operationState],
+                ),
+            ],
+          ),
+          [
+            "nonturn uncertain effect",
+            (client) =>
+              client.query(
+                "INSERT INTO operations(id,session_id,kind,state,payload,actor_hash) VALUES($1,$2,'cancel','uncertain','{}','p024-guard-fixture')",
+                [operationId, stale],
+              ),
+          ],
+          ...["pending", "answering"].map(
+            (
+              approvalState,
+            ): [string, (client: typeof guard) => Promise<unknown>] => [
+              approvalState + " approval",
+              (client) =>
+                client.query(
+                  "INSERT INTO approvals(id,session_id,operation_id,generation,request_id,kind,scope,state,deadline) VALUES($1,$2,$3,$4,'p024-guard-fixture','item/tool/requestUserInput','{}',$5,clock_timestamp()+interval '1 hour')",
+                  [
+                    randomUUID(),
+                    stale,
+                    savedOperations[0].id,
+                    staleGeneration,
+                    approvalState,
+                  ],
+                ),
+            ],
+          ),
+          ...["queued", "fencing", "ready"].map(
+            (
+              recoveryState,
+            ): [string, (client: typeof guard) => Promise<unknown>] => [
+              recoveryState + " recovery",
+              (client) =>
+                client.query(
+                  "INSERT INTO session_recoveries(id,session_id,actor_hash,expected_generation,state,uncertain_operation_ids,snapshot_cursor) VALUES($1,$2,'p024-guard-fixture',$3,$4,'{}',0)",
+                  [randomUUID(), stale, staleGeneration, recoveryState],
+                ),
+            ],
+          ),
+        ];
+        for (const [label, seed] of guardCases) {
+          await guard.query("BEGIN");
+          try {
+            await lockSessionResource(guard, stale);
+            await seed(guard);
+            const guardedState = async () =>
+              (
+                await guard.query(
+                  `SELECT json_build_object(
+                'session',(SELECT to_jsonb(s) FROM sessions s WHERE id=$1),
+                'writer',(SELECT json_build_array(writer_kind,writer_owner_id,writer_session_id,writer_generation) FROM workspaces WHERE id=$2),
+                'members',(SELECT json_agg(to_jsonb(cr) ORDER BY cr.session_id) FROM conversation_runtimes cr WHERE workspace_id=$2),
+                'operations',(SELECT json_agg(json_build_array(id,state,uncertainty_acknowledged_at) ORDER BY id) FROM operations WHERE session_id=$1),
+                'approvals',(SELECT json_agg(json_build_array(id,state) ORDER BY id) FROM approvals WHERE session_id=$1),
+                'recoveries',(SELECT json_agg(json_build_array(id,state) ORDER BY id) FROM session_recoveries WHERE session_id=$1)
+              ) AS state`,
+                  [stale, h.workspaceId],
+                )
+              ).rows;
+            const before = await guardedState();
+            expect(
+              await repairReleasedPersonalSession(
+                guard,
+                stale,
+                staleGeneration,
+              ),
+              label,
+            ).toBeNull();
+            expect(await guardedState(), label).toEqual(before);
+          } finally {
+            await guard.query("ROLLBACK");
+          }
+        }
+        // A protected sibling is not this conversation's ownership. Deriving
+        // only the freed session must leave every sibling/member byte intact.
+        await guard.query("BEGIN");
+        try {
+          await lockSessionResource(guard, stale);
+          await guard.query(
+            "INSERT INTO conversation_runtimes(session_id,workspace_id,generation,state,native_identity,permission_profile,credential_version) VALUES($1,$2,1,'protected',$3,'workspace-write','p024-guard-fixture')",
+            [
+              unknownSibling,
+              h.workspaceId,
+              JSON.stringify({ host: "p024-unavailable-test-host" }),
+            ],
+          );
+          const siblingBefore = (
+            await guard.query(
+              "SELECT * FROM conversation_runtimes WHERE session_id=$1",
+              [unknownSibling],
+            )
+          ).rows;
+          expect(
+            await repairReleasedPersonalSession(guard, stale, staleGeneration),
+          ).toBe("succeeded");
+          expect(
+            (
+              await guard.query(
+                "SELECT * FROM conversation_runtimes WHERE session_id=$1",
+                [unknownSibling],
+              )
+            ).rows,
+          ).toEqual(siblingBefore);
+          expect(
+            (
+              await guard.query(
+                "SELECT * FROM operations WHERE session_id=$1 ORDER BY created_at,id",
+                [stale],
+              )
+            ).rows,
+          ).toEqual(savedOperations);
+        } finally {
+          await guard.query("ROLLBACK");
+        }
+        checks.push(
+          "P024 R5 real PostgreSQL projection guards preserve unknown ownership, uncertain effects, unfinished work and protected siblings",
+        );
+      } finally {
+        guard.release();
+      }
+      const currentBoot = (
+        await readFile("/proc/sys/kernel/random/boot_id", "utf8")
+      ).trim();
+      let previousBoot = randomUUID();
+      while (previousBoot === currentBoot) previousBoot = randomUUID();
+      for (const id of injectedMembers) {
+        const memberGeneration = Number(
+          (
+            await db.query(
+              "SELECT nextval('runtime_generation_seq') AS generation",
+            )
+          ).rows[0].generation,
+        );
+        await db.query(
+          "UPDATE sessions SET generation=$2,state='uncertain',background_until=NULL,background_stop_requested=true WHERE id=$1",
+          [id, memberGeneration + (id === mismatch ? 1 : 0)],
+        );
+        // This injects a previous-boot durable identity, not an actual reboot or
+        // a live PID. Existing native contracts supply independent kernel proof.
+        const identity =
+          id === unknownSibling
+            ? { host: "p024-unavailable-test-host" }
+            : {
+                host: hostname(),
+                cgroup: {
+                  path: `/sys/fs/cgroup/p024-controlled-fixture/conversation-${id}-${memberGeneration}-${randomUUID()}`,
+                  generation: memberGeneration,
+                  bootId: previousBoot,
+                  device: "0",
+                  inode: "0",
+                },
+              };
+        await db.query(
+          "INSERT INTO conversation_runtimes(session_id,workspace_id,generation,state,native_identity,permission_profile,credential_version) VALUES($1,$2,$3,'unknown',$4,'workspace-write','p024-recovery-fixture')",
+          [id, h.workspaceId, memberGeneration, JSON.stringify(identity)],
+        );
+      }
+      await db.query(
+        "UPDATE sessions SET state='succeeded',background_until=clock_timestamp()+interval '1 hour',background_stop_requested=false WHERE id=$1",
+        [mismatch],
+      );
+      const successorBefore = (
+        await db.query(
+          "SELECT state,generation,background_until,background_stop_requested FROM sessions WHERE id=$1",
+          [mismatch],
+        )
+      ).rows;
+      await h.restartSupervisor();
+      expect(
+        (
+          await db.query(
+            "SELECT * FROM operations WHERE session_id=$1 ORDER BY created_at,id",
+            [uncertainControl],
+          )
+        ).rows,
+      ).toEqual(controlOperationsBefore);
+      expect(
+        (
+          await db.query("SELECT state FROM sessions WHERE id=$1", [
+            uncertainControl,
+          ])
+        ).rows[0].state,
+      ).toBe("uncertain");
+      await runtime(recovered, null);
+      const recoveredState = (
+        await db.query(
+          "SELECT state,background_until,background_stop_requested FROM sessions WHERE id=$1",
+          [recovered],
+        )
+      ).rows[0];
+      expect(recoveredState).toEqual({
+        state: "idle",
+        background_until: null,
+        background_stop_requested: false,
+      });
+      expect(
+        (await db.query("SELECT state FROM sessions WHERE id=$1", [stale]))
+          .rows[0].state,
+      ).toBe("succeeded");
+      await runtime(mismatch, "unknown");
+      expect(
+        (
+          await db.query(
+            "SELECT state,generation,background_until,background_stop_requested FROM sessions WHERE id=$1",
+            [mismatch],
+          )
+        ).rows,
+      ).toEqual(successorBefore);
+      await runtime(unknownSibling, "unknown");
+      const retainedBefore = (
+        await db.query(
+          "SELECT * FROM conversation_runtimes WHERE session_id=ANY($1::uuid[]) ORDER BY session_id",
+          [[mismatch, unknownSibling]],
+        )
+      ).rows;
+      await select(stale);
+      await expect(h.page.getByLabel("Message Codex")).toHaveValue(savedText);
+      await expect(
+        h.page.getByRole("button", { name: "Send", exact: true }),
+      ).toBeEnabled();
+      expect(
+        (
+          await db.query(
+            "SELECT * FROM conversation_drafts WHERE session_id=$1",
+            [stale],
+          )
+        ).rows,
+      ).toEqual(savedDraft);
+      expect(
+        (
+          await db.query(
+            "SELECT * FROM messages WHERE session_id=$1 ORDER BY created_at,id",
+            [stale],
+          )
+        ).rows,
+      ).toEqual(savedHistory);
+      expect(
+        (
+          await db.query(
+            "SELECT * FROM operations WHERE session_id=$1 ORDER BY created_at,id",
+            [stale],
+          )
+        ).rows,
+      ).toEqual(savedOperations);
+      expect(await nativeThread(stale)).toBe(savedThread);
+      const continuationResponse = h.page.waitForResponse(
+        (response) =>
+          response.url().endsWith(`/sessions/${stale}/turns`) &&
+          response.request().method() === "POST",
+      );
+      await h.page.getByRole("button", { name: "Send", exact: true }).click();
+      const continuation = await continuationResponse;
+      expect(continuation.status()).toBe(202);
+      await state((await continuation.json()).operation.id, "succeeded");
+      const afterOperations = (
+        await db.query(
+          "SELECT * FROM operations WHERE session_id=$1 ORDER BY created_at,id",
+          [stale],
+        )
+      ).rows;
+      expect(afterOperations).toHaveLength(savedOperations.length + 1);
+      expect(
+        afterOperations.filter((row) => row.payload.text === savedText),
+      ).toHaveLength(1);
+      expect(
+        (
+          await db.query(
+            "SELECT * FROM messages WHERE session_id=$1 AND id=ANY($2::uuid[]) ORDER BY created_at,id",
+            [stale, savedHistory.map((row) => row.id)],
+          )
+        ).rows,
+      ).toEqual(savedHistory);
+      expect(await nativeThread(stale)).toBe(savedThread);
+      expect(
+        (
+          await db.query(
+            "SELECT * FROM conversation_runtimes WHERE session_id=ANY($1::uuid[]) ORDER BY session_id",
+            [[mismatch, unknownSibling]],
+          )
+        ).rows,
+      ).toEqual(retainedBefore);
+      expect(
+        (
+          await db.query(
+            "SELECT * FROM operations WHERE session_id=$1 ORDER BY created_at,id",
+            [uncertainControl],
+          )
+        ).rows,
+      ).toEqual(controlOperationsBefore);
+      expect(
+        (
+          await db.query("SELECT state FROM sessions WHERE id=$1", [
+            uncertainControl,
+          ])
+        ).rows[0].state,
+      ).toBe("uncertain");
+      const liveRepair = await db.connect();
+      try {
+        await liveRepair.query("BEGIN");
+        await lockSessionResource(liveRepair, stale);
+        await liveRepair.query(
+          "UPDATE sessions SET state='uncertain' WHERE id=$1",
+          [stale],
+        );
+        await liveRepair.query("COMMIT");
+      } catch (error) {
+        await liveRepair.query("ROLLBACK");
+        throw error;
+      } finally {
+        liveRepair.release();
+      }
+      await stop(stale);
+      expect(
+        (await db.query("SELECT state FROM sessions WHERE id=$1", [stale]))
+          .rows[0].state,
+      ).toBe("succeeded");
+      const tickFixture = await db.connect();
+      try {
+        await tickFixture.query("BEGIN");
+        await lockSessionResource(tickFixture, recovered);
+        const tickGeneration = Number(
+          (
+            await tickFixture.query(
+              "SELECT generation FROM sessions WHERE id=$1",
+              [recovered],
+            )
+          ).rows[0].generation,
+        );
+        await tickFixture.query(
+          "UPDATE sessions SET state='uncertain',background_stop_requested=true WHERE id=$1",
+          [recovered],
+        );
+        await tickFixture.query(
+          "INSERT INTO conversation_runtimes(session_id,workspace_id,generation,state,native_identity,permission_profile,credential_version) VALUES($1,$2,$3,'unknown',$4,'workspace-write','p024-recovery-fixture')",
+          [
+            recovered,
+            h.workspaceId,
+            tickGeneration,
+            JSON.stringify({
+              host: hostname(),
+              cgroup: {
+                path: `/sys/fs/cgroup/p024-controlled-fixture/conversation-${recovered}-${tickGeneration}-${randomUUID()}`,
+                generation: tickGeneration,
+                bootId: previousBoot,
+                device: "0",
+                inode: "0",
+              },
+            }),
+          ],
+        );
+        await tickFixture.query("COMMIT");
+      } catch (error) {
+        await tickFixture.query("ROLLBACK");
+        throw error;
+      } finally {
+        tickFixture.release();
+      }
+      await runtime(recovered, null);
+      expect(
+        (
+          await db.query(
+            "SELECT state,background_until,background_stop_requested FROM sessions WHERE id=$1",
+            [recovered],
+          )
+        ).rows[0],
+      ).toEqual({
+        state: "idle",
+        background_until: null,
+        background_stop_requested: false,
+      });
+      checks.push(
+        "P024 R5 startup/live-retirement/disconnected-tick projection repair; injected previous-boot identity is not a physical reboot; draft/history persist without admission until one explicit browser continuation succeeds; mismatched and unknown members stay counted",
+      );
+      checks.push(
+        "P024 R5 actual supervisor restart preserves every field of an unacknowledged uncertain nonturn operation and keeps its session blocked without automatic input while an unrelated eligible session repairs",
+      );
+    } finally {
+      await h.stopSupervisor();
+      // Only synthetic durable fault records created above; no native identity
+      // is signaled, and no real or sibling runtime membership is deleted.
+      await db.query(
+        "DELETE FROM conversation_runtimes WHERE session_id=ANY($1::uuid[]) AND credential_version='p024-recovery-fixture'",
+        [injectedMembers],
+      );
+      await db.query(
+        "DELETE FROM operations WHERE id=$1 AND session_id=$2 AND actor_hash='p024-restart-uncertain-control'",
+        [uncertainControlId, uncertainControl],
+      );
+    }
 
     // A nondefault configuration travels through the real supervisor startup.
     await h.restartSupervisor({ active: 1, runtimes: 2 });

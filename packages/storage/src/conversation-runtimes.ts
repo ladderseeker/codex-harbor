@@ -1,6 +1,32 @@
 import type { PoolClient } from "pg";
-import { event } from "./index.ts";
+import { deriveSessionState, event } from "./index.ts";
 import { lockSessionResource } from "./session-lock.ts";
+/** Personal callers must exclude an in-memory runtime under their generation fence. */
+export async function repairReleasedPersonalSession(
+  db: PoolClient,
+  sessionId: string,
+  generation: number,
+) {
+  await lockSessionResource(db, sessionId);
+  const eligible = await db.query(
+    `SELECT s.id FROM sessions s JOIN workspaces w ON w.id=s.workspace_id
+     WHERE s.id=$1 AND s.generation=$2 AND s.state='uncertain'
+       AND s.background_until IS NULL AND NOT s.background_stop_requested
+       AND w.writer_owner_id IS NULL AND w.writer_kind IS NULL
+       AND w.writer_session_id IS NULL AND w.writer_generation IS NULL
+       AND NOT EXISTS(SELECT 1 FROM conversation_runtimes cr WHERE cr.session_id=s.id)
+       AND NOT EXISTS(SELECT 1 FROM operations o WHERE o.session_id=s.id
+         AND (o.state IN ('queued','dispatching','running','waiting_approval','waiting_input')
+           OR (o.state='uncertain' AND o.uncertainty_acknowledged_at IS NULL)))
+       AND NOT EXISTS(SELECT 1 FROM approvals a WHERE a.session_id=s.id AND a.state IN ('pending','answering'))
+       AND NOT EXISTS(SELECT 1 FROM session_recoveries r WHERE r.session_id=s.id AND r.state IN ('queued','fencing','ready'))`,
+    [sessionId, generation],
+  );
+  if (!eligible.rowCount) return null;
+  // Only the cached projection changes. Ownership and operation effects are not
+  // inferred, acknowledged, replayed or relabeled by this repair.
+  return deriveSessionState(db, sessionId);
+}
 export const runtimeProjection = (alias: string) =>
   `(SELECT json_build_object('state',cr.state,'generation',cr.generation,'lastActivityAt',cr.last_activity_at,'idleUntil',cr.idle_until) FROM conversation_runtimes cr WHERE cr.session_id=${alias}.id)`;
 export const workspaceRuntimeProjection = (alias: string) =>

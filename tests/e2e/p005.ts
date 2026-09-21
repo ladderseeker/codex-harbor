@@ -4,7 +4,7 @@ import { Agent as HttpAgent, request as httpRequest } from "node:http";
 import { ATTACHMENT_LIMITS } from "../../packages/contracts/src/attachments.ts";
 import { attachmentWorkspaces } from "./p005-workspaces.ts";
 import { expect, type Page, type BrowserContext } from "@playwright/test";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { randomUUID, createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -1364,6 +1364,30 @@ export async function p005({
       })
     ).status(),
   ).toBe(200);
+  let modalityFence: PoolClient | undefined;
+  let modalityFenceLost = false;
+  let modalityFailure: unknown;
+  const modalityEvidence: {
+    fixture: string;
+    model: string;
+    startedAt: string;
+    overrideCommittedAt?: string;
+    lockedAt?: string;
+    catalogUpdatedAt?: string;
+    xmin?: string;
+    inputModalities?: string[];
+    preconditionPassed: boolean;
+    assertionsPassed: boolean;
+    fenceLost: boolean;
+    finishedAt?: string;
+  } = {
+    fixture: "committed-text-only-catalog-with-shared-row-lock",
+    model: settings.model,
+    startedAt: new Date().toISOString(),
+    preconditionPassed: false,
+    assertionsPassed: false,
+    fenceLost: false,
+  };
   try {
     await db.query("UPDATE runtime_capabilities SET data=$1", [
       {
@@ -1374,6 +1398,51 @@ export async function p005({
         })),
       },
     ]);
+    modalityEvidence.overrideCommittedAt = new Date().toISOString();
+    modalityFence = await db.connect();
+    modalityFence.on("error", () => {
+      modalityFenceLost = true;
+    });
+    // The override must be committed so real API reads can see it. Hold SHARE
+    // afterwards to exclude discovery/runtime refresh writes during assertions.
+    // A refresh winning before this lock is a failed fixture precondition.
+    await modalityFence.query("BEGIN");
+    await modalityFence.query("SET LOCAL lock_timeout='5s'");
+    await modalityFence.query("SET LOCAL statement_timeout='10s'");
+    await modalityFence.query("SET LOCAL transaction_timeout='60s'");
+    const lockedCatalog = (
+      await modalityFence.query(
+        "SELECT data,updated_at,xmin::text AS xmin FROM runtime_capabilities WHERE id=true FOR SHARE",
+      )
+    ).rows[0];
+    modalityEvidence.lockedAt = new Date().toISOString();
+    if (lockedCatalog) {
+      modalityEvidence.catalogUpdatedAt = new Date(
+        lockedCatalog.updated_at,
+      ).toISOString();
+      modalityEvidence.xmin = /^\d+$/.test(lockedCatalog.xmin)
+        ? lockedCatalog.xmin
+        : undefined;
+      const selected = lockedCatalog.data?.data?.find(
+        (model: any) => (model.model ?? model.id) === settings.model,
+      );
+      const modalities = selected?.inputModalities;
+      modalityEvidence.inputModalities = Array.isArray(modalities)
+        ? modalities.filter(
+            (value: unknown): value is string =>
+              value === "text" || value === "image",
+          )
+        : [];
+      expect(
+        modalityEvidence.inputModalities,
+        "Text-only catalog fixture changed before the shared row lock; admission assertions have not run",
+      ).toEqual(["text"]);
+    }
+    expect(
+      Boolean(lockedCatalog),
+      "Text-only catalog fixture row missing before admission assertions",
+    ).toBe(true);
+    modalityEvidence.preconditionPassed = true;
     await page.goto(origin + "/?conversation=" + imageSession.id);
     await expect(
       page.getByText(
@@ -1384,6 +1453,9 @@ export async function p005({
     await expect(
       page.getByRole("button", { name: "Send", exact: true }),
     ).toBeDisabled();
+    // Verify the bounded transaction is still alive before attempting bypass.
+    await modalityFence.query("SELECT 1");
+    expect(modalityFenceLost).toBe(false);
     expect(
       (
         await command(`/sessions/${imageSession.id}/turns`, {
@@ -1401,8 +1473,34 @@ export async function p005({
         )
       ).rows[0].n,
     ).toBe(0);
+    await modalityFence.query("SELECT 1");
+    expect(modalityFenceLost).toBe(false);
+    modalityEvidence.assertionsPassed = true;
+  } catch (error) {
+    modalityFailure = error;
+    throw error;
   } finally {
-    await db.query("UPDATE runtime_capabilities SET data=$1", [capabilities]);
+    // Release the row fence before restoring the committed catalog. Destroy only
+    // this checked-out connection, including after a server transaction timeout.
+    if (modalityFence) {
+      await modalityFence.query("ROLLBACK").catch(() => {
+        modalityFenceLost = true;
+      });
+      modalityFence.release(true);
+    }
+    modalityEvidence.fenceLost = modalityFenceLost;
+    modalityEvidence.finishedAt = new Date().toISOString();
+    const cleanup = await Promise.allSettled([
+      db.query("UPDATE runtime_capabilities SET data=$1", [capabilities]),
+      writeFile(
+        path.join(artifacts, "p005-modality-fence.json"),
+        JSON.stringify(modalityEvidence, null, 2) + "\n",
+      ),
+    ]);
+    if (!modalityFailure) {
+      const failure = cleanup.find((result) => result.status === "rejected");
+      if (failure?.status === "rejected") throw failure.reason;
+    }
   }
 
   const countSession = await newSession("Retained attachment count");
