@@ -23,6 +23,11 @@ concurrency:
   group: deploy-vps
   cancel-in-progress: false
 
+# An explicit shell enables pipefail, so `ssh ... | tee` fails when ssh fails.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   deploy:
     runs-on: ubuntu-24.04
@@ -109,7 +114,7 @@ jobs:
             echo "### Harbor VPS ${ACTION}"
             echo "Revision: \`${REVISION}\`"
             for f in build.log promote.log; do
-              [ -f "$f" ] && { echo; echo "\`\`\`"; tail -n 5 "$f"; echo "\`\`\`"; }
+              if [ -f "$f" ]; then echo; echo "\`\`\`"; tail -n 5 "$f"; echo "\`\`\`"; fi
             done
           } >> "$GITHUB_STEP_SUMMARY"
 
