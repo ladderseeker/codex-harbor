@@ -4,6 +4,7 @@
 
 - ID: P021
 - Status: Draft
+- Priority: P3, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
 - Created: 2026-09-20
 - Owner: Main conversation; future implementation owner unassigned
 - Outcome: A conversation can continue beyond the initial per-conversation history limits while preserving useful history, bounded resource use and reliable control operations.
@@ -14,6 +15,10 @@
 - Design references: [Storage and retention](../architecture.md#release-retention-and-rollback-rules), [conversation/history/control bounds](../systems/001-conversations-and-access.md), [attachments/resources](../systems/002-workspaces-and-resources.md), [backup and profiles](../systems/004-deployment-and-profiles.md), [interface](../systems/006-interface.md).
 - Exact file fence: [Below](#exact-file-fence).
 - Acceptance IDs: P021-01–P021-09.
+
+## Review note — 25 September 2026
+
+The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority P3. [P028](028-live-conversation-streaming.md) now owns bounded snapshots, older-message pages and output counters, which is the retrieval part of flow 2 below. This plan keeps the lifetime limits, retention and search scope. The review also confirmed that a single assistant reply longer than 262,144 characters currently throws in output persistence and makes the turn uncertain; flow 4 below owns that failure.
 
 ## Problem, outcome and exclusions
 

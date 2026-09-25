@@ -48,6 +48,7 @@
   ```
 
   On 2026-09-14, this returned `root` and `srv1464935` without a password prompt after scoped network escalation. This verifies SSH connectivity only, not deployment readiness. If the sandbox blocks SSH, use the scoped network approval mechanism; do not disable host-key checking or other safeguards. If the key is locked or unavailable, have the owner unlock or configure it locally.
+- Cloud coding sessions (checked 25 September 2026) have HTTPS egress only and no SSH client, so they cannot reach `harbor-vps`. From such a session, VPS work goes through the manual [GitHub Actions deployment](docs/developer/github-actions-deploy.md) workflow, and only with the owner's go-ahead for that run.
 - For diagnosis and deployment, inspect the actual installed configuration, services, and artifact identity, then follow [the deployment workflow and SSH recovery documentation](docs/developer/deployment.md). Preserve the source/candidate/live boundaries above and follow existing user authorization; access as `root` does not authorize unrelated server changes. This handoff adds no separate approval gate and does not waive any deployment verification or release blocker.
 
 ## Verification and evidence

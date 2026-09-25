@@ -33,7 +33,7 @@ Reasoning options follow each model’s discovered runtime capabilities. GPT-6 A
 
 ## Approvals, cancellation, and uncertainty
 
-Review each approval or input request before answering. Another tab may already have answered it; only the current, authorized answer is accepted. Requests expire and do not receive unattended approval when the browser is absent.
+Review each approval or input request before answering. Another tab may already have answered it; only the current, authorized answer is accepted. A request that is not answered within five minutes expires, whether or not a browser is open: Harbor declines an expired approval and interrupts the turn for an expired input request. Nothing is ever approved without an answer. [P019](../../design/proposals/019-durable-approval-waiting-and-delivery.md) proposes letting requests wait for the owner instead.
 
 **Cancel turn** requests interruption. **Stopping** is not confirmation that execution has stopped; wait for the final state. After confirmed interruption, Harbor displays the observed process list when inspection succeeds. Some listed processes belong to the Codex runtime itself. An unavailable inspection is shown explicitly and must not be read as an empty process list.
 
@@ -43,7 +43,9 @@ If a submission loses its connection, use its retained retry action to submit th
 
 ## Account and access controls
 
-**Codex account** supports storing, replacing, and removing the server-held API credential. The key is not shown again after submission. Replacement/removal may return a conflict while work is active, and removal cannot be confirmed until the affected runtime and native credential copies have been handled. Removing Harbor's copy does not revoke a key at its provider.
+In managed installations, **Codex account** supports storing, replacing, and removing the server-held API credential. The key is not shown again after submission. Replacement/removal may return a conflict while work is active, and removal cannot be confirmed until the affected runtime and native credential copies have been handled. Removing Harbor's copy does not revoke a key at its provider.
+
+In the personal VPS profile, **Codex account** only shows whether the subscription sign-in is ready. Codex uses the login stored in the service account's private Codex home, which an administrator creates or replaces on the server as described in the [personal VPS guide](../developer/personal-vps.md#install-account-and-start). If that login stops working, the conversation setup prompt still says to set up an API key; that wording applies only to managed installations.
 
 **Sign out** revokes the browser session and closes its interactive access. Already-running authorized work continues; queued work cannot start using that revoked session's grant. **Emergency stop** separately requests interruption and prevents new dispatch. Neither action promises to undo changes already made by a tool.
 
@@ -83,4 +85,4 @@ A green dot indicates confirmed runtime resources or a workspace reservation; se
 
 Use **Stop processes** in the ellipsis menu or status dialog to stop only that conversation’s retained processes. History and sibling conversations remain intact; capacity is released only after the processes are confirmed stopped. Closing the browser does not stop work. The administrator configures separate active-turn and runtime limits, both four by default. Queued work explains whether it is waiting for its current turn, capacity, protected resources, a workspace or maintenance.
 
-Use [personal development previews](previews.md#personal-vps-development-preview) to view a server after the task completes. A graceful supervisor shutdown retires retained work. An abrupt crash or unconfirmed stop preserves uncertainty and the affected runtime’s capacity until exact process absence is established. Other conversations may continue within the remaining capacity. Use SSH recovery rather than assuming unknown effects did not occur or replaying work. Standalone terminal UI and managed uncertain-work recovery remain unavailable in the personal profile.
+Use [personal development previews](previews.md#personal-vps-development-preview) to view a server after the task completes. A graceful supervisor shutdown is designed to retire retained work, but a normal service stop has been observed to leave unknown runtime membership instead; see the [open issue](../../issues/2026-09-21-174500-personal-stop-retained-runtimes.md). An abrupt crash or unconfirmed stop preserves uncertainty and the affected runtime’s capacity until exact process absence is established. Other conversations may continue within the remaining capacity. Use SSH recovery rather than assuming unknown effects did not occur or replaying work. Standalone terminal UI and managed uncertain-work recovery remain unavailable in the personal profile.

@@ -1,6 +1,8 @@
 # GitHub Actions deployment to the personal VPS
 
-Added 25 September 2026. Cloud coding sessions have no SSH egress, so personal VPS updates run from GitHub-hosted runners through [deploy-vps.yml](../../.github/workflows/deploy-vps.yml). The runner uploads a Git bundle of the selected commit and runs [deploy-release](../../infra/personal-vps/deploy-release) as root on the VPS. The script codifies the build, stage and promotion procedure recorded in the [personal VPS guide](personal-vps.md#current-owner-installation) and the [P024 installed report](../reports/2026-09-21-p024-installed-attachment-fix.md#final-deployment-and-installed-acceptance). The earlier promotion helpers lived only in ignored run storage. This workflow has not yet run against the live host; its first run is its first live evidence.
+Added 25 September 2026. Cloud coding sessions have no SSH egress, so personal VPS updates run from GitHub-hosted runners through [deploy-vps.yml](../../.github/workflows/deploy-vps.yml). The runner uploads a Git bundle of the selected commit and runs [deploy-release](../../infra/personal-vps/deploy-release) as root on the VPS. The script codifies the build, stage and promotion procedure recorded in the [personal VPS guide](personal-vps.md#current-owner-installation) and the [P024 installed report](../reports/2026-09-21-p024-installed-attachment-fix.md#final-deployment-and-installed-acceptance). The earlier promotion helpers lived only in ignored run storage.
+
+Run history on 25 September 2026: [run 1](https://github.com/ladderseeker/codex-harbor/actions/runs/36178630130) at `a5e4a12` passed its preflight step, but its summary step failed; [#2](https://github.com/ladderseeker/codex-harbor/pull/2) fixed the step. [Run 2](https://github.com/ladderseeker/codex-harbor/actions/runs/36179135848) at `d0c505b` passed `preflight` end to end. `build` and `deploy` have not run against the live host yet. The installed release still matches the latest application source, because only deployment tooling has changed on `main` since `311f750`.
 
 ## One-time setup
 
@@ -33,7 +35,13 @@ A release adding migrations needs the `allow_new_migrations` input after reviewi
 
 ## Limits
 
-The workflow does not run `pnpm check`, `pnpm test` or E2E lanes, and it does not replace the development and review gates in the [workflow](../../design/workflow.md). A normal supervisor stop can still leave unknown runtime membership, as recorded in the [retained-runtime issue](../../issues/2026-09-21-174500-personal-stop-retained-runtimes.md); promotion then stops safely without switching, and recovery remains a manual decision. Staged releases and checkpoints accumulate and need deliberate pruning. Checkpoints are same-host copies, not off-host backups.
+The workflow does not run `pnpm check`, `pnpm test` or E2E lanes, and it does not replace the development and review gates in the [workflow](../../design/workflow.md). The repository has no other CI workflow yet, so nothing runs those checks automatically. Staged releases and checkpoints accumulate and need deliberate pruning. Checkpoints are same-host copies, not off-host backups.
+
+A normal supervisor stop can still leave unknown runtime membership, as recorded in the [retained-runtime issue](../../issues/2026-09-21-174500-personal-stop-retained-runtimes.md). Its [25 September source analysis](../../issues/2026-09-21-174500-personal-stop-retained-runtimes.md#source-analysis--25-september-2026) identifies the likely cause, and [P025](../../design/proposals/025-clean-supervisor-shutdown-and-restart.md) proposes the correction. Until that lands, treat recent use as a deploy hazard:
+
+- A conversation keeps idle Codex processes for up to 30 minutes after its last turn, and `preflight` reports them as `idleRuntimes`. Promotion stops the supervisor while they exist, which is the path that has left unknown membership.
+- Before `deploy`, run `preflight`. If `idleRuntimes` is not zero, use **Stop processes** on each conversation that shows a green dot, or wait 30 minutes after the last turn, then run `preflight` again.
+- If a promotion does stop on leftover ownership, the old release restarts, but the unknown members count as busy runtimes, so every later `deploy` refuses with "Work is active" until they are resolved. The only verified recovery so far is a host reboot, which needs the owner's approval and SSH access from the owner's machine.
 
 ## Switching to automatic deployment
 

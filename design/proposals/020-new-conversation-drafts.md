@@ -4,6 +4,7 @@
 
 - ID: P020
 - Status: Draft
+- Priority: P2, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
 - Created: 2026-09-20
 - Owner: Main conversation; future implementation owner unassigned
 - Outcome: Opening a new conversation and sending nothing leaves no empty formal conversation, while meaningful unsent work is preserved.
@@ -14,6 +15,10 @@
 - Design references: [Conversation identity and history](../systems/001-conversations-and-access.md), [attachments](../systems/002-workspaces-and-resources.md), [profile capabilities](../systems/004-deployment-and-profiles.md), [composer/navigation](../systems/006-interface.md), [state/API invariants](../architecture.md#api-events-and-state-transitions).
 - Exact file fence: [Below](#exact-file-fence).
 - Acceptance IDs: P020-01–P020-08.
+
+## Review note — 25 September 2026
+
+The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority P2. [P024](archive/024-attachments-and-chat-composer.md) added personal attachments on 21 September, so the statement below that attachments stay disabled in personal profiles is outdated, and drafts must handle personal attachments. Before acceptance, consider a lighter design first: keep an untouched or unsent draft in the browser and create the conversation together with its first turn in one request, adding server-side drafts only if cross-device recovery is required.
 
 ## Problem, outcome and exclusions
 

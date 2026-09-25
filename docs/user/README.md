@@ -14,3 +14,7 @@ Harbor's conversation, attachment, API-token, workspace and history/recovery fea
 - [Scheduled work](schedules.md): timing previews, bounded grants, standalone results and explicit attention/recovery; implemented with live and protected-restore verification pending.
 - [Private project previews](previews.md): existing package scripts on separate authenticated origins; implemented with protected restore and upstream verification pending.
 - [Developer setup](../developer/development.md): disposable local instance and current runtime prerequisites.
+
+## Which guides apply to the personal VPS
+
+The owner's deployed instance uses the [personal VPS profile](../developer/personal-vps.md). In that profile, the conversation, attachment and [personal development preview](previews.md#personal-vps-development-preview) guides apply. API tokens, Git worktree or copy workspaces, the file editor, standalone terminals, schedules and managed previews belong to the managed profile and are unavailable there; the [profile design](../../design/systems/004-deployment-and-profiles.md) lists the exact exclusions. The other guides describe managed behavior.
