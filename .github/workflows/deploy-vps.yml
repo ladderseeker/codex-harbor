@@ -1,0 +1,122 @@
+name: Deploy personal VPS
+
+# Manual only for now. See docs/developer/github-actions-deploy.md before the
+# first run. To deploy every push to main, add a `push: branches: [main]`
+# trigger; runs without inputs default to `deploy` with no new migrations.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "preflight = read-only check; build = stage a release only; deploy = build, drain, checkpoint and promote"
+        type: choice
+        options: [preflight, build, deploy]
+        default: preflight
+      allow_new_migrations:
+        description: "Permit a release that adds database migrations (review them first; rollback then needs the checkpoint)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment: vps-production
+    timeout-minutes: 90
+    env:
+      INSTANCE: ${{ vars.HARBOR_INSTANCE }}
+      VPS_HOST: ${{ vars.VPS_HOST }}
+      VPS_PORT: ${{ vars.VPS_PORT || '22' }}
+      VPS_USER: ${{ vars.VPS_USER || 'root' }}
+      REVISION: ${{ github.sha }}
+      ACTION: ${{ inputs.action || 'deploy' }}
+      ALLOW_NEW_MIGRATIONS: ${{ inputs.allow_new_migrations || false }}
+    steps:
+      - name: Check configuration
+        env:
+          HAS_KEY: ${{ secrets.VPS_SSH_KEY != '' }}
+          HAS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS != '' }}
+        run: |
+          missing=""
+          [ -n "$INSTANCE" ] || missing="$missing HARBOR_INSTANCE(variable)"
+          [ -n "$VPS_HOST" ] || missing="$missing VPS_HOST(variable)"
+          [ "$HAS_KEY" = true ] || missing="$missing VPS_SSH_KEY(secret)"
+          [ "$HAS_KNOWN_HOSTS" = true ] || missing="$missing VPS_KNOWN_HOSTS(secret)"
+          if [ -n "$missing" ]; then echo "::error::Missing:$missing"; exit 1; fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure SSH with a pinned host key
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host harbor-vps
+            HostName $VPS_HOST
+            Port $VPS_PORT
+            User $VPS_USER
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            ForwardAgent no
+            ConnectTimeout 15
+            ServerAliveInterval 30
+          EOF
+          ssh harbor-vps 'whoami; hostname'
+
+      - name: Upload source bundle
+        run: |
+          git bundle create harbor.bundle HEAD
+          INCOMING="/var/lib/harbor-deploy/incoming/${REVISION}-${GITHUB_RUN_ID}"
+          echo "INCOMING=$INCOMING" >> "$GITHUB_ENV"
+          ssh harbor-vps "install -d -m 0755 /var/lib/harbor-deploy /var/lib/harbor-deploy/incoming && install -d -m 0755 '$INCOMING'"
+          ssh harbor-vps "cat > '$INCOMING/harbor.bundle' && chmod 0644 '$INCOMING/harbor.bundle'" < harbor.bundle
+          ssh harbor-vps "set -e; cd '$INCOMING'; git clone -q --no-checkout harbor.bundle tools; git -C tools checkout -q --detach '$REVISION'; test \"\$(git -C tools rev-parse HEAD)\" = '$REVISION'"
+
+      - name: Preflight (read-only)
+        run: ssh harbor-vps "python3 '$INCOMING/tools/infra/personal-vps/deploy-release' preflight --instance '$INSTANCE'"
+
+      - name: Build and stage release
+        if: env.ACTION != 'preflight'
+        run: |
+          ssh harbor-vps "python3 '$INCOMING/tools/infra/personal-vps/deploy-release' build --instance '$INSTANCE' --bundle '$INCOMING/harbor.bundle' --revision '$REVISION'" | tee build.log
+          echo "RELEASE=/opt/harbor-personal/releases/gha-${REVISION:0:12}" >> "$GITHUB_ENV"
+
+      - name: Drain, checkpoint and promote
+        if: env.ACTION == 'deploy'
+        run: |
+          extra=""
+          [ "$ALLOW_NEW_MIGRATIONS" = true ] && extra="--allow-new-migrations"
+          ssh harbor-vps "python3 '$INCOMING/tools/infra/personal-vps/deploy-release' promote --instance '$INSTANCE' --release '$RELEASE' $extra" | tee promote.log
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Harbor VPS ${ACTION}"
+            echo "Revision: \`${REVISION}\`"
+            for f in build.log promote.log; do
+              [ -f "$f" ] && { echo; echo "\`\`\`"; tail -n 5 "$f"; echo "\`\`\`"; }
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove run-owned upload
+        if: always() && env.INCOMING != ''
+        run: ssh harbor-vps "rm -rf -- '$INCOMING'" || true
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
