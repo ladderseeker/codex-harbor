@@ -1,0 +1,451 @@
+#!/usr/bin/env python3
+"""Build, stage and promote a personal VPS release on the host itself.
+
+Runs as root on the VPS, normally from the GitHub Actions deploy workflow.
+It changes only the selected instance's release path; configuration, secrets,
+site drop-ins, previews and state are preserved. Every promotion drains work
+and writes a private matched checkpoint first.
+"""
+import argparse
+import datetime
+import hashlib
+import importlib.machinery
+import importlib.util
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import ssl
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+
+loader = importlib.machinery.SourceFileLoader('personal_installer', str(Path(__file__).with_name('harbor-personal')))
+spec = importlib.util.spec_from_loader(loader.name, loader)
+installer = importlib.util.module_from_spec(spec)
+loader.exec_module(installer)
+require = installer.require
+
+RELEASES = Path('/opt/harbor-personal/releases')
+BACKUPS = Path('/var/lib/harbor-personal-backups')
+WORK = Path('/var/lib/harbor-deploy')
+BUSY = "('queued','dispatching','running','waiting_approval','waiting_input','uncertain')"
+MIGRATIONS = 'packages/storage/src/migrations'
+RELEASE_ROOT_ENTRIES = {'apps', 'packages', 'infra', 'node_modules', 'toolchain', 'package.json',
+                        'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'artifact.json'}
+
+
+def log(message):
+    print('[deploy] ' + message, flush=True)
+
+
+def sha256(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as stream:
+        for block in iter(lambda: stream.read(1 << 20), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def systemctl(*args, check=True):
+    return subprocess.run(['/usr/bin/systemctl', *args], check=check, capture_output=True, text=True)
+
+
+def instance(name):
+    require(re.fullmatch(r'[a-z][a-z0-9-]{0,23}', name), 'Invalid instance name')
+    unit, etc, state = installer.layout({'instance': name})
+    config = Path(etc) / 'config.json'
+    require(config.is_file(), 'Instance configuration not found: ' + str(config))
+    c = json.loads(config.read_text())
+    require(c['instance'] == name, 'Configuration instance mismatch')
+    return c, unit, Path(etc), Path(state)
+
+
+def psql(c, sql):
+    _, etc, _ = installer.layout(c)
+    result = subprocess.run(['/usr/bin/docker', 'compose', '-f', etc + '/compose.json', 'exec', '-T', 'postgres',
+                             'psql', '-U', 'harbor', '-d', 'harbor', '-Atqc', sql],
+                            check=True, capture_output=True, text=True)
+    return result.stdout.strip()
+
+
+def ownership(c):
+    """Counts that must be zero before stopping (idle runtimes excepted) and all zero after."""
+    counts = {'busyOperations': int(psql(c, 'SELECT count(*) FROM operations WHERE state IN ' + BUSY))}
+    if psql(c, "SELECT to_regclass('conversation_runtimes') IS NOT NULL") == 't':
+        counts['busyRuntimes'] = int(psql(c, "SELECT count(*) FROM conversation_runtimes WHERE state <> 'idle'"))
+        counts['idleRuntimes'] = int(psql(c, "SELECT count(*) FROM conversation_runtimes WHERE state = 'idle'"))
+    if psql(c, "SELECT count(*) FROM information_schema.columns WHERE table_name='sessions' AND column_name='background_until'") == '1':
+        counts['backgroundSessions'] = int(psql(c, 'SELECT count(*) FROM sessions WHERE background_until IS NOT NULL OR background_stop_requested'))
+    return counts
+
+
+def processes_from(release):
+    found = []
+    for entry in Path('/proc').iterdir():
+        if entry.name.isdigit():
+            try:
+                exe = os.readlink(entry / 'exe')
+            except OSError:
+                continue
+            if exe == str(release) or exe.startswith(str(release) + '/'):
+                found.append(int(entry.name))
+    return found
+
+
+def migrations(release):
+    directory = Path(release) / MIGRATIONS
+    return {p.name: sha256(p) for p in sorted(directory.glob('*.sql')) if re.fullmatch(r'\d{3}_[a-z_]+\.sql', p.name)}
+
+
+def verify_release(release, revision=None):
+    """Authenticate a staged release against its own complete file manifest."""
+    release = installer.absolute(str(release))
+    manifest = json.loads((release / 'artifact.json').read_text())
+    require(manifest.get('profile') == 'personal-vps', 'Not a personal VPS release')
+    require(revision is None or manifest.get('baseRevision') == revision, 'Release revision mismatch')
+    expected = dict(manifest['files'])
+    seen = set()
+    for directory, dirs, files in os.walk(release):
+        for name in dirs + files:
+            path = Path(directory) / name
+            info = path.lstat()
+            require(info.st_uid == 0 and info.st_gid == 0, 'Release must be root-owned: ' + str(path))
+            if path.is_symlink():
+                require(path.resolve().is_relative_to(release), 'Release symlink escapes: ' + str(path))
+                continue
+            require(info.st_mode & 0o022 == 0, 'Release must not be group/world writable: ' + str(path))
+            if path.is_file():
+                relative = str(path.relative_to(release))
+                if relative == 'artifact.json':
+                    continue
+                require(relative in expected and sha256(path) == expected[relative], 'Release file differs from manifest: ' + relative)
+                seen.add(relative)
+    require(seen == set(expected), 'Release is missing manifest files')
+    installer.validate_native_distribution(release)
+    env = {'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent'}
+    for command, version in (('bin/node', 'v24.11.1'), ('bin/codex', 'codex-cli 0.153.4'), ('bin/pnpm', '12.3.4')):
+        out = subprocess.run([str(release / command), '--version'], env=env, check=True, capture_output=True, text=True).stdout.strip()
+        require(out == version, 'Pinned version required for ' + command)
+    return manifest
+
+
+def native_inputs(current, target):
+    """Rebuild the exact pinned native inputs from the installed release manifest."""
+    manifest = json.loads((current / 'artifact.json').read_text())
+    vendor, pnpm = target / 'vendor', target / 'pnpm'
+    for relative, digest in manifest['files']:
+        top = relative.split('/', 1)[0]
+        if relative.startswith('toolchain/pnpm/') and relative != 'toolchain/pnpm/pnpm-native':
+            destination = pnpm / relative[len('toolchain/pnpm/'):]
+        elif top in RELEASE_ROOT_ENTRIES or relative in ('bin/node', 'bin/pnpm', 'bin/pnpx', 'toolchain/pnpm/pnpm-native'):
+            continue
+        else:
+            destination = vendor / relative
+        source = current / relative
+        require(sha256(source) == digest, 'Installed release differs from its manifest: ' + relative)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+    # Symlinks inside the vendor tree (for example PATH helpers) are not in the file list.
+    for directory, dirs, files in os.walk(current):
+        if Path(directory) == current:
+            dirs[:] = [d for d in dirs if d not in RELEASE_ROOT_ENTRIES]
+        for name in dirs + files:
+            path = Path(directory) / name
+            relative = str(path.relative_to(current))
+            top = relative.split('/', 1)[0]
+            if path.is_symlink() and top not in RELEASE_ROOT_ENTRIES and not relative.startswith('bin/pnp'):
+                (vendor / relative).parent.mkdir(parents=True, exist_ok=True)
+                os.symlink(os.readlink(path), vendor / relative)
+    shutil.copy2(current / 'bin/node', target / 'node')
+    shutil.copy2(current / 'toolchain/pnpm/pnpm-native', target / 'pnpm-native')
+    (target / 'bin').mkdir()
+    shutil.copy2(current / 'bin/node', target / 'bin/node')
+    (target / 'bin/pnpm').write_text('#!/bin/sh\nexec ' + str(target / 'pnpm-native') + ' "$@"\n')
+    for path in [target] + list(target.rglob('*')):
+        if not path.is_symlink():
+            path.chmod(0o755 if path.is_dir() or path.stat().st_mode & 0o111 or path.parent.name == 'bin' else 0o644)
+    installer.validate_native_distribution(vendor, require_root=False)
+
+
+def build(args):
+    c, _, _, _ = instance(args.instance)
+    require(re.fullmatch(r'[0-9a-f]{40}', args.revision), 'Full commit SHA required')
+    name = 'gha-' + args.revision[:12]
+    release = RELEASES / name
+    if release.exists():
+        verify_release(release, args.revision)
+        log('Release already staged and verified: ' + str(release))
+        print(json.dumps({'release': str(release), 'reused': True}))
+        return
+    current = Path(c['release'])
+    verify_release(current)
+    bundle = installer.absolute(args.bundle)
+    run_id = name + '-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    inputs = WORK / 'inputs' / run_id
+    inputs.mkdir(parents=True, mode=0o755)
+    for parent in (WORK, WORK / 'inputs'):
+        parent.chmod(0o755)
+    state_name = 'harbor-deploy-build/' + run_id
+    state = Path('/var/lib/private') / state_name
+    try:
+        native_inputs(current, inputs)
+        log('Building ' + args.revision + ' as a transient unprivileged user')
+        script = ('set -eu; cd "$STATE_DIRECTORY"; '
+                  'git clone -q --no-checkout "$BUNDLE" source; cd source; git checkout -q --detach "$REVISION"; '
+                  'test "$(git rev-parse HEAD)" = "$REVISION"; '
+                  'pnpm install --frozen-lockfile; pnpm build; '
+                  'python3 infra/personal-vps/package-release.py --source . --node "$INPUTS/node" '
+                  '--vendor "$INPUTS/vendor" --pnpm-package "$INPUTS/pnpm" --pnpm-binary "$INPUTS/pnpm-native" '
+                  '--output "$STATE_DIRECTORY/package"')
+        subprocess.run(['/usr/bin/systemd-run', '--quiet', '--wait', '--pipe', '--collect',
+                        '--unit=harbor-deploy-build-' + args.revision[:12],
+                        '-p', 'DynamicUser=yes', '-p', 'StateDirectory=' + state_name,
+                        '-p', 'CacheDirectory=harbor-deploy-cache', '-p', 'NoNewPrivileges=yes',
+                        '-p', 'MemoryMax=6G', '-p', 'RuntimeMaxSec=3600',
+                        '--setenv=PATH=' + str(inputs / 'bin') + ':/usr/bin:/bin',
+                        '--setenv=HOME=/var/lib/' + state_name, '--setenv=CI=true',
+                        '--setenv=npm_config_store_dir=/var/cache/harbor-deploy-cache/pnpm-store',
+                        '--setenv=BUNDLE=' + str(bundle), '--setenv=REVISION=' + args.revision,
+                        '--setenv=INPUTS=' + str(inputs),
+                        '/bin/sh', '-c', script], check=True)
+        package = state / 'package'
+        result = json.loads((package / 'package-result.json').read_text())
+        require(sha256(result['archive']) == result['sha256'], 'Package archive hash mismatch')
+        staging = RELEASES / ('.staging-' + name)
+        require(not staging.exists(), 'Staging path exists; inspect it first: ' + str(staging))
+        shutil.copytree(package / 'release', staging, symlinks=True)
+        for directory, dirs, files in os.walk(staging):
+            for entry in [Path(directory)] + [Path(directory) / n for n in dirs + files]:
+                os.lchown(entry, 0, 0)
+        verify_release(staging, args.revision)
+        staging.rename(release)
+        manifest_sha = sha256(release / 'artifact.json')
+        log('Staged ' + str(release))
+        print(json.dumps({'release': str(release), 'revision': args.revision, 'archiveSha256': result['sha256'],
+                          'fileCount': result['fileCount'], 'manifestSha256': manifest_sha, 'reused': False}))
+    finally:
+        shutil.rmtree(inputs, ignore_errors=True)
+        shutil.rmtree(state, ignore_errors=True)
+
+
+def switched_files(c, unit, etc):
+    """Map installed generated files to their exact expected contents for this configuration."""
+    password = (etc / 'database.password').read_text().strip()
+    secret = Path(c['oidcSecretFile']).read_text().strip() if c['oidcSecretFile'] else None
+    files = {}
+    for filename, content in installer.artifacts(c, password, secret).items():
+        if filename.endswith('.service'):
+            files[Path('/etc/systemd/system') / filename] = content
+        elif filename.endswith('.apparmor'):
+            files[Path('/etc/apparmor.d') / filename] = content
+        elif filename == 'service.env':
+            files[etc / filename] = content
+    files[etc / 'config.json'] = json.dumps(c, indent=2) + '\n'
+    return files
+
+
+def generated_drift(files):
+    # config.json formatting is not significant; its parsed content is the configuration itself.
+    return [str(p) for p, content in files.items() if p.name != 'config.json' and not (p.is_file() and p.read_text() == content)]
+
+
+def write_files(files):
+    for path, content in files.items():
+        temporary = path.with_name('.' + path.name + '.deploy')
+        mode = path.stat().st_mode & 0o777
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
+        with os.fdopen(fd, 'w') as stream:
+            stream.write(content)
+        os.chmod(temporary, mode)
+        os.replace(temporary, path)
+
+
+def activate(c, unit, files):
+    write_files(files)
+    for path in files:
+        if path.suffix == '.apparmor':
+            subprocess.run(['/usr/sbin/apparmor_parser', '-Q', '-K', str(path)], check=True)
+            subprocess.run(['/usr/sbin/apparmor_parser', '-r', str(path)], check=True)
+    systemctl('daemon-reload')
+    systemctl('start', unit + '-api.service', unit + '-supervisor.service')
+
+
+def drop_ins(unit):
+    found = {}
+    for role in ('api', 'supervisor'):
+        directory = Path('/etc/systemd/system') / (unit + '-' + role + '.service.d')
+        if directory.is_dir():
+            for path in sorted(directory.iterdir()):
+                found[str(path)] = sha256(path)
+    return found
+
+
+def http_status(url):
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, method='GET'), timeout=10,
+                                    context=ssl.create_default_context()) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+    except (urllib.error.URLError, OSError):
+        return None
+
+
+def installed_check(c, unit, release):
+    deadline = time.time() + 120
+    while True:
+        states = [systemctl('is-active', unit + '-' + r + '.service', check=False).stdout.strip() for r in ('api', 'supervisor')]
+        health = http_status(c['origin'] + '/health')
+        if states == ['active', 'active'] and health == 200:
+            break
+        require(time.time() < deadline, 'Installed readiness failed: services ' + ','.join(states) + ', health ' + str(health))
+        time.sleep(3)
+    for role in ('api', 'supervisor'):
+        pid = systemctl('show', '-p', 'MainPID', '--value', unit + '-' + role + '.service').stdout.strip()
+        require(pid != '0' and os.readlink('/proc/' + pid + '/exe') == str(release / 'bin/node'), role + ' is not running from the new release')
+    for path in ('/', '/api/v1/me'):
+        require(http_status(c['origin'] + path) == 401, 'Anonymous request was not refused: ' + path)
+
+
+def checkpoint(c, unit, etc, state, name):
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    BACKUPS.mkdir(mode=0o700, exist_ok=True)
+    target = BACKUPS / (name + '-' + stamp)
+    target.mkdir(mode=0o700)
+    dump = target / 'database.dump'
+    with open(dump, 'wb') as stream:
+        subprocess.run(['/usr/bin/docker', 'compose', '-f', str(etc / 'compose.json'), 'exec', '-T', 'postgres',
+                        'pg_dump', '-U', 'harbor', '-d', 'harbor', '-Fc'], check=True, stdout=stream)
+    with open(dump, 'rb') as stream:
+        subprocess.run(['/usr/bin/docker', 'compose', '-f', str(etc / 'compose.json'), 'exec', '-T', 'postgres',
+                        'pg_restore', '--list'], check=True, stdin=stream, stdout=subprocess.DEVNULL)
+    subprocess.run(['/bin/cp', '-a', str(etc), str(target / 'etc')], check=True)
+    units = target / 'systemd'
+    units.mkdir()
+    for path in Path('/etc/systemd/system').glob(unit + '-*'):
+        subprocess.run(['/bin/cp', '-a', str(path), str(units / path.name)], check=True)
+    apparmor = Path('/etc/apparmor.d') / (unit + '.apparmor')
+    if apparmor.exists():
+        subprocess.run(['/bin/cp', '-a', str(apparmor), str(target / 'apparmor')], check=True)
+    (target / 'state').mkdir(mode=0o711)
+    for child in sorted(state.iterdir()):
+        if child.name != 'postgres':
+            subprocess.run(['/bin/cp', '-a', str(child), str(target / 'state' / child.name)], check=True)
+    receipt = {'release': c['release'], 'databaseSha256': sha256(dump), 'createdAt': stamp}
+    (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    log('Checkpoint ' + str(target) + ' database SHA256 ' + receipt['databaseSha256'])
+    return target
+
+
+def promote(args):
+    require(os.geteuid() == 0, 'Promotion requires root')
+    c, unit, etc, state = instance(args.instance)
+    installer.validate(c)
+    old = Path(c['release'])
+    new = installer.absolute(args.release)
+    require(new.parent == RELEASES and new != old, 'Candidate must be a different release under ' + str(RELEASES))
+    manifest = verify_release(new)
+    log('Candidate ' + str(new) + ' revision ' + manifest['baseRevision'])
+
+    before, after = migrations(old), migrations(new)
+    changed = [n for n in before if after.get(n) != before[n]]
+    require(not changed, 'Candidate changes or removes existing migrations: ' + ', '.join(changed))
+    added = sorted(set(after) - set(before))
+    require(not added or args.allow_new_migrations,
+            'Candidate adds migrations ' + ', '.join(added) + '; rerun with allow_new_migrations after reviewing them')
+    applied = dict(line.split('|') for line in psql(c, 'SELECT version,digest FROM harbor_migrations ORDER BY version').splitlines())
+    require(applied == before, 'Applied database migrations do not match the installed release')
+
+    new_config = dict(c, release=str(new))
+    installer.validate(new_config)
+    old_files, new_files = switched_files(c, unit, etc), switched_files(new_config, unit, etc)
+    require(not generated_drift(old_files), 'Installed files differ from their generated form; refusing: ' + ', '.join(generated_drift(old_files)))
+    sites = drop_ins(unit)
+
+    counts = ownership(c)
+    require(not any(v for k, v in counts.items() if k != 'idleRuntimes'), 'Work is active; nothing was changed. Counts: ' + json.dumps(counts))
+    log('Idle: ' + json.dumps(counts) + '. Stopping API admission.')
+    systemctl('stop', unit + '-api.service')
+    counts = ownership(c)
+    if any(v for k, v in counts.items() if k != 'idleRuntimes'):
+        systemctl('start', unit + '-api.service')
+        raise ValueError('Work started during drain; API restarted on the old release. Counts: ' + json.dumps(counts))
+    systemctl('stop', unit + '-supervisor.service')
+    counts, leftovers = ownership(c), processes_from(old)
+    if any(counts.values()) or leftovers:
+        systemctl('start', unit + '-api.service', unit + '-supervisor.service')
+        raise ValueError('Supervisor stop left runtime ownership or processes; old release restarted and nothing was promoted. '
+                         'Counts: ' + json.dumps(counts) + ', processes: ' + str(len(leftovers)))
+
+    try:
+        backup = checkpoint(c, unit, etc, state, new.name)
+    except Exception:
+        systemctl('start', unit + '-api.service', unit + '-supervisor.service')
+        log('Checkpoint failed; old release restarted and nothing was promoted.')
+        raise
+
+    log('Switching ' + old.name + ' -> ' + new.name)
+    try:
+        activate(new_config, unit, new_files)
+        installed_check(new_config, unit, new)
+        require(drop_ins(unit) == sites, 'Site drop-ins changed during promotion')
+    except Exception:
+        systemctl('stop', unit + '-api.service', unit + '-supervisor.service', check=False)
+        if added:
+            log('New release failed after migrations may have run. Services are stopped; the old release must not open '
+                'this database. Recover over SSH from checkpoint ' + str(backup) + '.')
+            raise
+        log('New release failed; restoring the previous release files.')
+        activate(c, unit, old_files)
+        installed_check(c, unit, old)
+        log('Previous release ' + old.name + ' is running again.')
+        raise
+    log('Promoted ' + str(new))
+    print(json.dumps({'release': str(new), 'previous': str(old), 'revision': manifest['baseRevision'],
+                      'manifestSha256': sha256(new / 'artifact.json'), 'checkpoint': str(backup),
+                      'addedMigrations': added}))
+
+
+def preflight(args):
+    c, unit, etc, state = instance(args.instance)
+    report = {'hostname': os.uname().nodename, 'release': c['release'],
+              'services': {r: systemctl('is-active', unit + '-' + r + '.service', check=False).stdout.strip()
+                           for r in ('dependencies', 'api', 'supervisor')},
+              'ownership': ownership(c), 'dropIns': sorted(drop_ins(unit)),
+              'generatedFileDrift': generated_drift(switched_files(c, unit, etc)),
+              'freeBytes': shutil.disk_usage('/opt').free,
+              'health': http_status(c['origin'] + '/health')}
+    verify_release(Path(c['release']))
+    report['releaseVerified'] = True
+    print(json.dumps(report, indent=2))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest='action', required=True)
+    for action in ('preflight', 'build', 'promote'):
+        p = sub.add_parser(action)
+        p.add_argument('--instance', required=True)
+    sub.choices['build'].add_argument('--bundle', required=True)
+    sub.choices['build'].add_argument('--revision', required=True)
+    sub.choices['promote'].add_argument('--release', required=True)
+    sub.choices['promote'].add_argument('--allow-new-migrations', action='store_true')
+    args = parser.parse_args()
+    require(os.geteuid() == 0, 'Run as root on the VPS')
+    {'preflight': preflight, 'build': build, 'promote': promote}[args.action](args)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (ValueError, OSError, KeyError, subprocess.CalledProcessError) as error:
+        # Never print configuration values or subprocess environments; they can hold secrets.
+        detail = str(error) if isinstance(error, ValueError) else type(error).__name__
+        if isinstance(error, subprocess.CalledProcessError):
+            detail += ': ' + Path(str(error.cmd[0])).name + ' exited ' + str(error.returncode)
+        print('Deploy failed: ' + detail, file=sys.stderr)
+        sys.exit(1)

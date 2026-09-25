@@ -83,7 +83,7 @@ Stopping/restarting the supervisor interrupts active work and can leave unknown 
 
 Managed worktrees/copies, file-editor tools, standalone terminals, schedules, managed previews, API tokens and explicit uncertain-work recovery are unavailable in this profile. Personal attached previews use the configured separate-origin gateway. Conversation tools remain the file-editing path. Account settings explain SSH onboarding and show native readiness.
 
-No automatic update/rollback or verified off-host backup is promised by this installer. Preserve PostgreSQL and private native state before migrations; an older release must not open incompatible state. P009's separate managed restore gates remain open. Keep SSH administration available independently of Harbor.
+No automatic update/rollback or verified off-host backup is promised by this installer. Updates of an existing installation can run from GitHub Actions as described in [GitHub Actions deployment](github-actions-deploy.md). Preserve PostgreSQL and private native state before migrations; an older release must not open incompatible state. P009's separate managed restore gates remain open. Keep SSH administration available independently of Harbor.
 
 ## Verification
 
