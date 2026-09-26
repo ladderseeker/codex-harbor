@@ -4,17 +4,17 @@
 
 - ID: P031
 - Status: Draft
-- Priority: P2, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
+- Priority: Medium, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
 - Created: 2026-09-25
 - Owner: Main conversation; future implementation owner unassigned
 - Outcome: In the personal VPS profile the owner can find, preview and download files in a conversation's project folder, including reports that Codex wrote, without SSH.
 - Authorization: Proposal writing only. Implementation, commits to `main` and deployment need the owner's separate go-ahead.
 - Baseline: Source inspection of `d0c505b8b58b6ba8d9597d867f14b36f832b0529`.
-- Dependencies: None required. When [P029](029-complete-conversation-transcript.md) is Implemented, its file-change rows link to this plan's download route; whichever of the two plans executes second adds that link.
+- Dependencies: None required. Linking [P029](029-complete-conversation-transcript.md)'s file-change rows to this plan's route belongs to whichever of the two plans executes second: if P029 is already Implemented, this plan adds the links (P031-09); otherwise P029 does.
 - Source issues: [Conversation report downloads](../../issues/2026-09-20-120000-conversation-report-downloads.md), every obligation except artifact discoverability in the transcript, which P029 owns.
-- Design references: [D011](../decisions/011-personal-vps-workspace.md), [D012](../decisions/012-personal-vps-development.md), [workspaces and resources](../systems/002-workspaces-and-resources.md), [deployment and profiles](../systems/004-deployment-and-profiles.md), [interface](../systems/006-interface.md).
+- Design references: [D011](../decisions/011-personal-vps-workspace.md), [D012](../decisions/012-personal-vps-development.md), [workspaces and resources](../systems/002-workspaces-and-resources.md), [deployment and profiles](../systems/004-deployment-and-profiles.md#personal-vps-profile), [interface](../systems/006-interface.md), [API route table](../architecture.md#api-events-and-state-transitions).
 - Exact file fence: [Below](#exact-file-fence).
-- Acceptance IDs: P031-01–P031-09.
+- Acceptance IDs: P031-01–P031-10.
 
 ## Problem, outcome and exclusions
 
@@ -26,11 +26,13 @@ Excluded: editing, uploading into the project, deleting or renaming files; rende
 
 ## Dependencies and current design
 
-D011 excludes the interactive file editor from the personal VPS profile, and the profile design lists managed files among the unavailable features. This plan keeps that exclusion and adds a narrower capability through a dated D011 amendment: authenticated, read-only listing, preview and download within a registered project folder. The managed files module stays unchanged and unused by this profile.
+The [profile design](../systems/004-deployment-and-profiles.md#personal-vps-profile) excludes the interactive file editor from the personal VPS profile, D011 disables unsupported managed capabilities in the UI and API, and the API refuses every managed file route in the personal profiles. This plan keeps those exclusions and adds a narrower capability, recorded in the profile design and as a dated D011 amendment: authenticated, read-only listing, preview and download within a registered project folder. The managed files module stays unchanged and unused by this profile.
+
+The architecture's `/api/v1/workspaces/{id}/files` contract belongs to managed workspaces, with revision-checked writes and managed Git review. This plan uses project-scoped read-only routes instead, because a personal project has exactly one Local workspace bound to its original folder and needs none of the managed write contract; the architecture's route table gains them.
 
 ## Source issues
 
-The source issue's obligations map as follows: authenticated session and project scoped resolution, bounded identity and bytes, safe filenames and path denial to P031-02 to P031-05; missing or changed files to P031-06; download UI and API with reload persistence to P031-01 and P031-07; HTML isolation to P031-04; mobile behavior to P031-08. Discoverable references in the conversation belong to P029. On completion of both plans the issue can close; if only P031 completes, the issue stays open for the P029 part.
+The source issue's obligations map as follows: authenticated session and project scoped resolution, bounded identity and bytes, safe filenames and path denial to P031-02 to P031-05; missing or changed files to P031-06; download UI and API with reload persistence to P031-01 and P031-07; HTML isolation to P031-04; mobile behavior to P031-08. Discoverable references in the conversation belong to P029; linking them to downloads belongs to whichever plan executes second, covered by P031-09 when that is this plan. The plan that executes second archives the issue once both plans are Implemented; if only this plan completes, the issue stays open for the P029 part with a dated note.
 
 ## User and API flows
 
@@ -48,7 +50,7 @@ The panel is a new interface state and must appear in the UI guide and prototype
 - **Bounds.** Listings return at most 1,000 entries per directory with an explicit truncation notice. Previews read at most 1 MiB; downloads stream files up to 50 MiB. Hidden files are listed; `.git` internals are listed but not previewed.
 - **Headers.** Downloads use `Content-Disposition: attachment` with an RFC 6266 encoded filename, `X-Content-Type-Options: nosniff` and `application/octet-stream` for types outside the preview allowlist. Harbor's existing Content Security Policy applies to previews.
 - **Identity.** Responses include size and modification time. If the file changes between listing and download, the download serves the current content and the panel shows the new metadata.
-- **Authority.** Owner session and CSRF rules match other read routes; rate limits apply. The API reads with the service account's existing access and gains no new filesystem permission.
+- **Authority.** Owner session and CSRF rules match other read routes; rate limits apply. The API reads with the service account's existing access and gains no new filesystem permission. The personal-profile request filter, which today refuses every path containing `/files`, gains an exception for exactly these two routes; the managed file routes stay refused.
 
 ## Implementation brief
 
@@ -57,6 +59,7 @@ Write the D011 amendment and interface specification first. Implement the confin
 ## Exact file fence
 
 - `design/proposals/031-project-file-downloads.md`
+- `design/architecture.md`
 - `design/decisions/011-personal-vps-workspace.md`
 - `design/systems/002-workspaces-and-resources.md`
 - `design/systems/004-deployment-and-profiles.md`
@@ -67,6 +70,7 @@ Write the D011 amendment and interface specification first. Implement the confin
 - `apps/api/src/project-files.ts`
 - `apps/web/src/App.tsx`
 - `apps/web/src/ProjectFiles.tsx`
+- `apps/web/src/TranscriptItems.tsx`
 - `apps/web/src/api.ts`
 - `apps/web/src/styles.css`
 - `packages/contracts/src/index.ts`
@@ -79,6 +83,8 @@ Write the D011 amendment and interface specification first. Implement the confin
 - `issues/2026-09-20-120000-conversation-report-downloads.md`
 - `issues/archive/2026-09-20-120000-conversation-report-downloads.md`
 
+`TranscriptItems.tsx`, P029's transcript component, changes only when P029 is already Implemented.
+
 ## Verification and acceptance
 
 - **P031-01:** Through the real browser, API and a run-owned project, the owner lists folders, previews Markdown, text and an image, and downloads a file whose bytes match the source.
@@ -89,7 +95,8 @@ Write the D011 amendment and interface specification first. Implement the confin
 - **P031-06:** A file deleted or changed after listing gives a clear not-found or updated result.
 - **P031-07:** Listing and download state survives a page reload, and the panel works with the keyboard.
 - **P031-08:** The panel works on a phone-sized viewport with touch.
-- **P031-09:** `pnpm build`, `pnpm check`, `pnpm test`, the design E2E lane with P031's scenarios, the personal VPS Linux lane and the P024 attachment lane pass.
+- **P031-09:** If P029 is Implemented when this plan executes, each file-change row for an existing file inside the project links to its download, and a row for a deleted file shows the missing-file state.
+- **P031-10:** `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:e2e --design` with P031's scenarios, the full critical `pnpm test:e2e`, the personal VPS Linux lane and the P024 attachment lane pass.
 
 Gate: behavioral, plus actual Linux verification for the filesystem confinement boundary.
 

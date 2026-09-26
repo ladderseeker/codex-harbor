@@ -6,7 +6,6 @@ The sections below group the same guides and reports by audience. The deployed p
 
 ## Start here
 
-- [Project review, 25 September 2026](reports/2026-09-25-project-review.md): architecture verdict, user-experience findings, documentation corrections and the prioritized proposal set.
 - [User guides](user/README.md): available conversation and account controls, with current verification limits.
 - [Developer workflow](developer/development.md): working on the repository now, command availability, and verification prerequisites.
 - [Design index](../design/README.md): current architecture, subsystem contracts, decisions and bounded plans.
@@ -40,6 +39,7 @@ These features exist in source for the managed profile. They are unavailable in 
 
 Reports are historical records of the scope, source and evidence they name.
 
+- [Project review, 25 September 2026](reports/2026-09-25-project-review.md): architecture verdict, user-experience walkthrough, documentation corrections and recommended proposal priorities as of that date.
 - [Workflow migration report](reports/2026-09-20-workflow-migration.md): documentation migration scope, observed checks, independent reviews and evidence limits.
 - [Frontend redesign delivery](reports/2026-09-13-frontend-redesign.md): completed P014 implementation, review and verification evidence.
 - [Personal VPS development delivery](reports/2026-09-14-personal-development.md): development environment, titles/replies, private preview and reviewed verification evidence.
@@ -71,7 +71,6 @@ Reports are historical records of the scope, source and evidence they name.
 - [P012 native capability spike](reports/2026-09-08-p012-protocol-spike.md): account-free skill discovery/disable and local MCP call/form checks on pinned Codex; feature, Linux and live evidence remain pending.
 - [P011 headless capability spike](reports/2026-09-08-p011-protocol-spike.md): historical account-free exact command identity acknowledgement and termination prerequisite; application and Linux evidence are recorded separately below.
 - [P011 implementation and review](reports/2026-09-08-p011-development.md): main acceptance after two review rounds, actual private preview UI/API, Linux and installed checkpoints, recovered evidence and cumulative critical checks; protected/fresh-host restore and upstream gates remain explicit. See the current [preview guide](user/previews.md) and [developer setup](developer/previews.md).
-
 - [P024 installed attachment correction](reports/2026-09-21-p024-installed-attachment-fix.md): the reviewed correction deployed as `311f750`, installed checks and the retained-runtime recovery.
 - [P024 attachments and composer](reports/2026-09-21-p024-attachments-and-composer.md): initial execution record, later reopened by the installed correction above.
 - [P018 concurrent conversations](reports/2026-09-21-p018-concurrency.md): personal VPS concurrency, live acceptance and deployment record.

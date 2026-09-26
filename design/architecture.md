@@ -65,9 +65,9 @@ For host-run API services, select a fixed proxy template appropriate to the envi
 
 Give every environment an instance ID that namespaces ports, URLs, database names/roles, networks, volumes, Codex homes, upload roots, and test artifacts. Compose project names help separate resource names; they are not security boundaries. Enforce actual isolation through mounts, credentials, networks, and broker policy. Test startup provisions empty storage and known fixtures. Cleanup is restricted to the exact instance manifest; it cannot remove another instance's resources. A failed startup reports the failed dependency and leaves unrelated services alone. [Compose project names](https://docs.docker.com/compose/how-tos/project-name/)
 
-The same command names are the developer and automation contract. All of them except `pnpm test:e2e:self` exist today:
+The same command names are the developer and automation contract. The table gives their intended behavior. Some current entry points, such as `pnpm build` and `pnpm check`, do less; `package.json` defines what each runs today, and the [developer guide](../docs/developer/development.md#command-availability) describes their use:
 
-| Command | Behavior |
+| Command | Intended behavior once implemented |
 | --- | --- |
 | `pnpm dev` | Start or attach to the real local development stack; report URLs and prerequisite failures. |
 | `pnpm build` | Build versioned application/runner artifacts without touching a live deployment. |

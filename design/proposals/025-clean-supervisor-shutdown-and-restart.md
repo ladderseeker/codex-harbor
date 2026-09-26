@@ -4,14 +4,14 @@
 
 - ID: P025
 - Status: Draft
-- Priority: P0, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
+- Priority: Urgent, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
 - Created: 2026-09-25
 - Owner: Main conversation; future implementation owner unassigned
 - Outcome: Stopping, restarting or redeploying the personal VPS supervisor leaves no unknown runtime membership, so a deploy soon after use succeeds and a crash restart recovers capacity without a host reboot.
 - Authorization: Proposal writing only. Implementation, commits to `main`, deployment and any live-host action need the owner's separate go-ahead.
 - Baseline: Source inspection of `d0c505b8b58b6ba8d9597d867f14b36f832b0529`; no reproduction has run.
 - Dependencies: Delegated cgroup ownership from [P018](archive/018-concurrent-conversations-and-runtime-capacity.md) is implemented and deployed. Acceptance needs an actual Linux host with systemd, cgroup v2 and delegation, which a disposable VM or a GitHub-hosted runner may provide; missing Linux evidence blocks completion. No dependency on other drafts.
-- Source issues: [Personal service stop retains runtimes](../../issues/2026-09-21-174500-personal-stop-retained-runtimes.md), all obligations.
+- Source issues: [Personal service stop retains runtimes](../../issues/2026-09-21-174500-personal-stop-retained-runtimes.md): all obligations if P025-02 reproduces the failure; otherwise all except determining the mechanism.
 - Design references: [D014 idle classification and retirement](../decisions/014-personal-conversation-concurrency.md#idle-classification-and-retirement), [personal runtime capacity](../systems/001-conversations-and-access.md#personal-runtime-capacity), [deployment and profiles](../systems/004-deployment-and-profiles.md), [GitHub Actions deployment](../../docs/developer/github-actions-deploy.md).
 - Exact file fence: [Below](#exact-file-fence).
 - Acceptance IDs: P025-01–P025-08.
@@ -33,33 +33,35 @@ Excluded: explicit uncertain-work recovery for personal profiles, replaying inte
 
 D014 requires that a retiring member holds capacity until `cgroup.kill`, `populated=0` and a committed release, and that restart release membership only for a verified empty generation cgroup or a changed boot. It explicitly rejects a missing path alone as proof. This plan keeps both rules and adds one proof, recorded as a dated D014 amendment:
 
-- **Empty delegated subtree.** At startup, before the supervisor creates any conversation leaf, it reads its own delegated root. If the root and the supervisor's own manager leaf contain no process other than the supervisor, and every other descendant cgroup reports `populated 0`, then no process from any earlier invocation of this unit remains. A recorded member whose identity names this same delegated root is then absent, whether its leaf path is empty or missing. Processes cannot leave a delegated subtree without write access outside it, which the service account lacks, and the native sandbox already denies cgroup writes. Leftover processes that systemd failed to kill stay inside the subtree, so the proof fails closed. Escapes through host services such as cron are outside both the existing leaf proof and this one.
+- **Empty delegated subtree.** At startup, before the supervisor creates any conversation leaf, it reads its own delegated root. If the root and the supervisor's own manager leaf contain no process other than the supervisor, and every other descendant cgroup reports `populated 0`, then no process from any earlier invocation of this unit remains. A covered member, as defined below, is then absent, whether its leaf path is empty or missing. Processes cannot leave a delegated subtree without write access outside it, which the service account lacks, and the native sandbox already denies cgroup writes. Leftover processes that systemd failed to kill stay inside the subtree, so the proof fails closed. Escapes through host services such as cron are outside both the existing leaf proof and this one.
+
+A member's delegated root is the parent of its recorded leaf path, which every existing ownership identity already stores. The proof covers a member only when that parent equals the supervisor's current delegated root, read from `/proc/self/cgroup`, and the member's recorded host and boot match the current ones. The same rule applies to members written by earlier releases, so no new identity field is needed.
 
 A member recorded under a different delegated root, a different host or an unreadable tree keeps today's `unknown` handling.
 
 ## Source issues
 
-The single source issue transfers completely on acceptance: its normal-stop cause maps to P025-01 and P025-02, its restart recovery to P025-03 to P025-05, its promotion blockage to P025-06, and its fail-closed constraints to P025-04 and P025-07. Its severity (High) and the requirement for real supported-Linux regression evidence are retained.
+The source issue transfers completely only if P025-02 reproduces the failure. Its normal-stop cause then maps to P025-01 and P025-02, its restart recovery to P025-03 to P025-05, its promotion blockage to P025-06, and its fail-closed constraints to P025-04 and P025-07. If the failure cannot be reproduced, the correction still needs every other acceptance ID, but the obligation to determine the mechanism stays in the issue as a partial transfer, with a dated note of the attempts. Its severity (High) and the requirement for real supported-Linux regression evidence are retained.
 
 ## User and API flows
 
 No API or browser flow changes. The owner-visible effects are:
 
-- A deploy through the [GitHub Actions workflow](../../docs/developer/github-actions-deploy.md) no longer needs the manual "Stop processes, then deploy" workaround once the installed supervisor unit uses the new stop behavior.
+- Once the installed supervisor unit uses the new stop behavior, a deploy through the [GitHub Actions workflow](../../docs/developer/github-actions-deploy.md) no longer waits for idle runtimes to expire. Conversations with background processes still need **Stop processes** first.
 - After a supervisor crash, conversations without an active turn return to a usable state after restart. A turn that was running shows the existing uncertain state.
-- `preflight` and `promote` report unknown members, idle members and active work as separate counts.
+- `preflight` and `promote` report busy operations and unknown, protected and idle runtimes as separate counts.
 
 ## Contracts, state and security
 
 1. **Unit.** The supervisor unit uses `KillMode=mixed`. As the [systemd.kill documentation](https://www.freedesktop.org/software/systemd/man/latest/systemd.kill.html) describes that mode, only the main process receives SIGTERM, and systemd sends SIGKILL to the rest of the control group after the main process exits or `TimeoutStopSec` expires. The implementation confirms this on the target host's systemd version. The stop budget must exceed the supervisor's own retirement deadline.
 2. **Shutdown sequence.** On SIGTERM the supervisor stops new dispatch and discovery, waits for the running tick with a bound, then retires every retained runtime in parallel, including the discovery probe and any retirement already started by a mailbox failure. A single registry tracks all in-flight retirements, and shutdown awaits it before stopping pg-boss, releasing the fence and ending the pool. A retirement that is unconfirmed at the deadline is recorded as `unknown` while the pool is still open, so the durable state is honest.
-3. **Startup proof.** Add the empty-subtree proof above to recovered-member inspection. Record the delegated root path in new ownership identities; members without it use the existing rules.
-4. **Promotion.** `deploy-release` reports `unknownRuntimes` separately. While the installed supervisor unit still reports `KillMode=control-group`, promotion refuses when idle runtimes exist and tells the owner to stop them first; this protects the deploy that installs this change. With `KillMode=mixed`, idle runtimes are allowed because the stop retires them. The post-stop all-zero check is unchanged.
-5. **Compatibility.** No schema change is expected. Existing unknown rows are released on the first start after upgrade only when the proof holds.
+3. **Startup proof.** Add the empty-subtree proof above to recovered-member inspection, for covered members only. Every other member keeps today's handling.
+4. **Promotion.** `deploy-release` reports busy operations and unknown, protected and idle runtimes separately, alongside background marks. While the installed supervisor unit still reports `KillMode=control-group`, promotion keeps today's rule, refusing while any runtime or background mark remains, and names the counts; this protects the deploy that installs this change. With `KillMode=mixed`, idle runtimes and their background marks no longer block, because the stop retires them in order. Busy operations and protected or unknown runtimes still block: stopping a background process such as a development server stays the owner's decision. The post-stop all-zero check is unchanged.
+5. **Compatibility.** No schema change is expected. Unknown rows written by earlier releases follow the same covered-member rule as new ones.
 
 ## Implementation brief
 
-Read D014, the personal runtime capacity section, the source issue and its analysis first. Reproduce the retained-membership failure on actual Linux with the existing unit properties before changing code, and record the timing. Then change the unit template, the shutdown sequence, the retirement registry, recovered-member inspection and the promotion counts together, and update the Linux lane that currently asserts `KillMode=control-group`. The new proof's containment argument is a security decision; any deviation returns to main.
+Read D014, the personal runtime capacity section, the source issue and its analysis first. Reproduce the retained-membership failure on actual Linux with the existing unit properties before changing code, and record the timing. A disposable Linux VM or a GitHub-hosted runner through the new workflow below provides systemd, cgroup v2 and delegation. Then change the unit template, the shutdown sequence, the retirement registry, recovered-member inspection and the promotion counts together, and update the Linux lane that currently asserts `KillMode=control-group`. The new proof's containment argument is a security decision; any deviation returns to main.
 
 ## Exact file fence
 
@@ -73,9 +75,11 @@ Read D014, the personal runtime capacity section, the source issue and its analy
 - `packages/codex-adapter/src/local-runtime.ts`
 - `infra/personal-vps/harbor-personal`
 - `infra/personal-vps/deploy-release`
+- `.github/workflows/personal-vps-linux.yml`
 - `tests/deployment/personal_vps_test.py`
 - `tests/integration/personal-cgroup.test.ts`
 - `tests/integration/retirement.test.ts`
+- `tests/contract/local-runtime.test.ts`
 - `tests/personal-vps/e2e.ts`
 - `tests/personal-vps/concurrency.ts`
 - `docs/developer/personal-vps.md`
@@ -90,20 +94,20 @@ Main adds the delivery report path when execution starts. Scratch evidence uses 
 
 All IDs run on actual Linux with systemd, cgroup v2 and delegated units using the installed unit properties, fresh run-owned state and the Codex fixture unless stated.
 
-- **P025-01:** Two conversations finish turns and keep idle runtimes, one with a protected background child. `systemctl stop` of the supervisor leaves zero `conversation_runtimes` rows, no process in the unit subtree and no uncertain session; restart shows no unknown member.
-- **P025-02:** Before the fix, the same scenario reproduces unknown membership at least once in a bounded number of attempts, and the timing is recorded; if it cannot be reproduced, main records the attempts and the fix still needs P025-01.
+- **P025-01:** Two conversations finish turns and keep their runtimes, one idle and one protected by a background child. `systemctl stop` of the supervisor leaves zero `conversation_runtimes` rows, no process in the unit subtree and no uncertain session; restart shows no unknown member.
+- **P025-02:** Before the fix, the same scenario reproduces unknown membership at least once in a bounded number of attempts, and the timing is recorded; if it cannot be reproduced, main records the attempts in the issue, the diagnosis obligation stays there, and the fix still needs P025-01.
 - **P025-03:** SIGKILL of the supervisor main process with retained runtimes and one running turn. After restart, idle members are released through the empty-subtree proof, the running turn is uncertain and not replayed, and a new turn in an idle conversation succeeds.
 - **P025-04:** A process deliberately left in an old leaf, or in the unit root, keeps affected members unknown and counted after restart.
-- **P025-05:** Pre-existing unknown rows, created with the old identity format, are released by the first start of the new release when the subtree is empty and kept when it is not.
-- **P025-06:** On a candidate instance, `deploy-release promote` succeeds with idle runtimes present under `KillMode=mixed`, refuses with the new message under `KillMode=control-group`, and reports unknown members separately.
+- **P025-05:** Unknown rows written by the release installed before this change are released by the first start of the new release when their leaf's parent is the current delegated root and the subtree is empty, and kept when the subtree is not empty or the parent differs.
+- **P025-06:** On a candidate instance under `KillMode=mixed`, `deploy-release promote` succeeds with idle runtimes and their background marks present, and refuses while a protected or unknown runtime or a busy operation exists. Under `KillMode=control-group` it refuses whenever any runtime or background mark remains, as today. Every refusal names each count separately.
 - **P025-07:** A retirement that cannot be confirmed before the shutdown deadline is recorded as `unknown` before the pool closes, and systemd's final SIGKILL still applies.
-- **P025-08:** `pnpm build`, `pnpm check`, `pnpm test`, the updated personal VPS Linux lane, the P018 concurrency lane and the P024 attachment lane pass.
+- **P025-08:** `pnpm build`, `pnpm check`, `pnpm test`, the full critical `pnpm test:e2e`, the updated personal VPS Linux lane, the P018 concurrency lane and the P024 attachment lane pass. `pnpm test:contract` passes on Linux, including a retirement case that starts the pinned Codex binary with an empty private home and no account inside a delegated leaf and stops the supervisor. A bounded live smoke check of one turn followed by a supervisor stop uses the owner's standing authorization for the VPS Codex credential, copied into fresh run-owned state; if it cannot run, P025 stays Accepted with the [live runtime credentials issue](../../issues/2026-09-07-171225-live-runtime-credentials.md) linked.
 
-Gate: behavioral, with the actual Linux isolation lane for the changed launch and retirement boundary. Fixture or macOS evidence cannot substitute. A final bounded installed check on the owner's VPS needs the owner's go-ahead.
+Gate: behavioral, with the actual Linux isolation lane for the changed launch and retirement boundary, plus pinned-runtime contracts and a bounded live smoke check because adapter launch code changes. Fixture or macOS evidence cannot substitute. A final bounded installed check on the owner's VPS needs the owner's go-ahead.
 
 ## Rollout and recovery
 
-Before the deploy that installs this change, `preflight` must show zero idle and unknown runtimes, because the old supervisor still uses the old stop path; the new promotion check enforces this. No migration is expected, so a failed start restores the previous release automatically. If unknown membership already exists on the live instance, the first start of the new release may release it through the new proof; otherwise the reboot recovery remains available with the owner's approval.
+The deploy that installs this change still stops the old unit with `KillMode=control-group`, so promotion keeps today's rule and needs every retained runtime gone first; `preflight` shows when that holds. Unknown members that already exist block that deploy, as they do today. Only the new release carries the proof, so clearing them first needs the existing reboot recovery with the owner's approval. No migration is expected, so a failed start restores the previous release automatically.
 
 ## Review and findings
 

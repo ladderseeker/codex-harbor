@@ -4,7 +4,7 @@
 
 - ID: P022
 - Status: Draft
-- Priority: P3, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
+- Priority: Low, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
 - Created: 2026-09-20
 - Owner: Main conversation; future implementation owner unassigned
 - Outcome: Harbor uses a reliable native conversation name when available, retains a useful fallback and never overwrites the owner's manual title.
@@ -18,7 +18,7 @@
 
 ## Review note — 25 September 2026
 
-The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority P3. The plan is unchanged and stays conditional on the native naming capability investigation.
+The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority Low. The plan is unchanged and stays conditional on the native naming capability investigation.
 
 ## Problem, outcome and exclusions
 

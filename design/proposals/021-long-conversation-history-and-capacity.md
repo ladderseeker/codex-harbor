@@ -4,7 +4,7 @@
 
 - ID: P021
 - Status: Draft
-- Priority: P3, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
+- Priority: Low, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
 - Created: 2026-09-20
 - Owner: Main conversation; future implementation owner unassigned
 - Outcome: A conversation can continue beyond the initial per-conversation history limits while preserving useful history, bounded resource use and reliable control operations.
@@ -18,7 +18,9 @@
 
 ## Review note — 25 September 2026
 
-The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority P3. [P028](028-live-conversation-streaming.md) now owns bounded snapshots, older-message pages and output counters, which is the retrieval part of flow 2 below. This plan keeps the lifetime limits, retention and search scope. The review also confirmed that a single assistant reply longer than 262,144 characters currently throws in output persistence and makes the turn uncertain; flow 4 below owns that failure.
+The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority Low. [P028](028-live-conversation-streaming.md) proposes bounded snapshots, older-message pages and output counters, which are the retrieval part of flow 2 and the pagination part of P021-04 and P021-09 below, including their composition across an API restart and a stream resync. If P028 is Implemented first, main removes those parts, and fence paths that only they need, from this plan before acceptance. This plan keeps the lifetime limits, retention and search scope.
+
+Source inspection during the review also found that an assistant reply longer than 262,144 characters, or output that crosses the 2 MiB or 2,000-message limit during a turn, throws in output persistence and makes the turn uncertain; an [issue](../../issues/2026-09-25-120000-output-limit-uncertain-turn.md) now records it. P028 proposes truncating such output with a visible notice so that the turn completes. Flow 4 and P021-03 keep the further goal of preserving the complete reply beyond the old limits.
 
 ## Problem, outcome and exclusions
 

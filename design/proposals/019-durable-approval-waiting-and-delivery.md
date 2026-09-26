@@ -4,7 +4,7 @@
 
 - ID: P019
 - Status: Draft
-- Priority: P2, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
+- Priority: Medium, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
 - Created: 2026-09-20
 - Owner: Main conversation; future implementation owner unassigned
 - Outcome: An owner returning after an absence can answer a still-valid request and understand whether a decision was merely accepted, sent, confirmed, failed or left uncertain.
@@ -18,7 +18,7 @@
 
 ## Review note — 25 September 2026
 
-The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority P2. [P018](archive/018-concurrent-conversations-and-runtime-capacity.md) has since landed, so the "If P018 has landed" rule above applies: waiting turns stay non-idle and protected. [P030](030-composer-and-conversation-flow.md) adds attention signals, so the owner learns that a request is waiting; this plan still owns how long it waits and how answers are delivered. The baseline revision above is older than the current source; re-inspect before acceptance.
+The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority Medium. [P018](archive/018-concurrent-conversations-and-runtime-capacity.md) has since landed, so the "If P018 has landed" rule below applies: waiting turns stay non-idle and protected. [P030](030-composer-and-conversation-flow.md) adds attention marks, so the owner learns that a request is waiting; a waiting mark stays until the request is answered or no longer applies, and this plan's own attention records for decision outcomes stay separate. [P033](033-interface-clarity-and-phone-fit.md) shows the current expiry on the approval card. This plan still owns how long a request waits and how answers are delivered. The baseline revision above is older than the current source; re-inspect before acceptance.
 
 ## Problem, outcome and exclusions
 

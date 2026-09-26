@@ -37,11 +37,17 @@ A release adding migrations needs the `allow_new_migrations` input after reviewi
 
 The workflow does not run `pnpm check`, `pnpm test` or E2E lanes, and it does not replace the development and review gates in the [workflow](../../design/workflow.md). The repository has no other CI workflow yet, so nothing runs those checks automatically. Staged releases and checkpoints accumulate and need deliberate pruning. Checkpoints are same-host copies, not off-host backups.
 
-A normal supervisor stop can still leave unknown runtime membership, as recorded in the [retained-runtime issue](../../issues/2026-09-21-174500-personal-stop-retained-runtimes.md). Its [25 September source analysis](../../issues/2026-09-21-174500-personal-stop-retained-runtimes.md#source-analysis--25-september-2026) identifies the likely cause, and [P025](../../design/proposals/025-clean-supervisor-shutdown-and-restart.md) proposes the correction. Until that lands, treat recent use as a deploy hazard:
+### Retained runtimes block deploys
 
-- A conversation keeps idle Codex processes for up to 30 minutes after its last turn, and `preflight` reports them as `idleRuntimes`. Promotion stops the supervisor while they exist, which is the path that has left unknown membership.
-- Before `deploy`, run `preflight`. If `idleRuntimes` is not zero, use **Stop processes** on each conversation that shows a green dot, or wait 30 minutes after the last turn, then run `preflight` again.
-- If a promotion does stop on leftover ownership, the old release restarts, but the unknown members count as busy runtimes, so every later `deploy` refuses with "Work is active" until they are resolved. The only verified recovery so far is a host reboot, which needs the owner's approval and SSH access from the owner's machine.
+Promotion refuses before it stops anything while `preflight` reports any busy operation, non-idle runtime or background mark (`busyOperations`, `busyRuntimes`, `backgroundSessions`). Every successful turn keeps its Codex runtime for continuation and sets the conversation's background mark, which clears when that runtime is released. A `deploy` therefore refuses with "Work is active; nothing was changed" while any conversation still holds a runtime:
+
+- An idle runtime is released automatically within 30 minutes of its last turn, or earlier when capacity is needed.
+- A protected runtime, which keeps a background process such as a development server, never expires on its own. **Stop processes** on that conversation releases it once its processes are confirmed stopped. The sidebar marks these conversations with a green dot.
+- An unknown runtime, whose absence Harbor cannot prove, also never expires. Its sidebar dot has no green fill, and its tooltip reads "Runtime state unknown".
+
+Before `deploy`, run `preflight`. If any of those counts is above zero, use **Stop processes** on each conversation with a green dot, wait for the release, and run `preflight` again. The counts alone cannot tell protected from unknown runtimes; the sidebar tooltips can. The run-2 preflight at 19:21 UTC on 25 September reported `busyOperations 0`, `busyRuntimes 4`, `idleRuntimes 0` and `backgroundSessions 4`, so a deploy at that moment would have refused, and those four runtimes also filled the default budget of four.
+
+Unknown membership comes from a supervisor stop or crash while runtimes are retained, such as the stop made on 21 September by an earlier promotion helper, as recorded in the [retained-runtime issue](../../issues/2026-09-21-174500-personal-stop-retained-runtimes.md). Its [25 September source analysis](../../issues/2026-09-21-174500-personal-stop-retained-runtimes.md#source-analysis--25-september-2026) identifies the likely cause, and [P025](../../design/proposals/025-clean-supervisor-shutdown-and-restart.md) proposes the correction. Unknown members count as busy runtimes and hold capacity. Harbor keeps them until it can prove that their processes are gone, which neither **Stop processes** nor a service restart can do once their cgroups no longer exist, so every later `deploy` refuses until they are resolved. The only verified recovery so far is a host reboot, which needs the owner's approval and SSH access from the owner's machine.
 
 ## Switching to automatic deployment
 

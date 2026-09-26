@@ -4,7 +4,7 @@
 
 - ID: P026
 - Status: Draft
-- Priority: P0, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
+- Priority: Urgent, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
 - Created: 2026-09-25
 - Owner: Main conversation; future implementation owner unassigned
 - Outcome: Every pull request and every push to `main` runs the standard build, check, test and fixture browser gates on GitHub-hosted runners, and the deploy workflow cannot build or promote a revision whose gates failed.
@@ -14,7 +14,7 @@
 - Source issues: None.
 - Design references: [Workflow verification gate](../workflow.md#implementation-and-verification-gate), [architecture verification contract](../architecture.md#repeatable-verification-through-the-application), [developer guide command availability](../../docs/developer/development.md#command-availability), [GitHub Actions deployment](../../docs/developer/github-actions-deploy.md).
 - Exact file fence: [Below](#exact-file-fence).
-- Acceptance IDs: P026-01–P026-06.
+- Acceptance IDs: P026-01–P026-07.
 
 ## Problem, outcome and exclusions
 
@@ -66,9 +66,10 @@ If the fixture design lane needs a CI-specific prerequisite check, main amends t
 - **P026-03:** A deliberately failing commit on a scratch branch turns the status red, then green again after the revert.
 - **P026-04:** A `build` or `deploy` run of the deploy workflow stops before touching the VPS when CI fails, and `preflight` still runs without CI.
 - **P026-05:** The CI job has read-only permissions and no secrets, and its artifacts contain no credentials.
-- **P026-06:** The developer guide lists what CI covers and which lanes remain manual.
+- **P026-06:** With the owner's go-ahead, one `build` run of the changed deploy workflow on a revision with green CI completes and stages its release without changing services, which shows that the new CI dependency does not break the path to the VPS.
+- **P026-07:** The developer guide lists what CI covers and which lanes remain manual.
 
-Gate: documentation-only checks for the guides, plus observed workflow runs with their run links recorded.
+Gate: documentation-only checks for the guides, plus observed workflow runs with their run links recorded. P026-06 needs the owner's go-ahead for that run; without it, P026 stays Accepted.
 
 ## Rollout and recovery
 
