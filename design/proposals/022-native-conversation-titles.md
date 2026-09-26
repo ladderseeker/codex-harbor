@@ -8,7 +8,7 @@
 - Created: 2026-09-20
 - Owner: Main conversation; future implementation owner unassigned
 - Outcome: Harbor uses a reliable native conversation name when available, retains a useful fallback and never overwrites the owner's manual title.
-- Authorization: Write the proposal only. Capability experiments, application implementation, commits, pushes and deployment are not authorized by this request.
+- Authorization: On 27 September 2026 the owner authorized evaluation and revision of the open proposals, followed by commit and push of these document changes to `main`. Feature implementation, live experiments and deployment are outside this audit.
 - Baseline: Source/schema inspection of `bb85e1034e756d589d0d0c1c631616c5c9f2b7f7`, pinned Codex 0.153.4; no new real-model naming experiment.
 - Dependencies: Existing fallback/manual-title provenance is implemented. Reliable native automatic naming and its timing/source are unverified; that evidence blocks accepting a synchronization implementation. No hard dependency on P018–P021.
 - Source issues: None transferred; conditional improvement from the owner's discussion.
@@ -16,7 +16,11 @@
 - Exact file fence: [Below](#exact-file-fence).
 - Acceptance IDs: P022-01–P022-06.
 
-## Review note — 25 September 2026
+## Review note — 27 September 2026
+
+Read-only source review against `e6c2a138563139650af46fe51af44c6eb6c28743`; the original baseline in Metadata and dated evidence remain historical. Native naming remains conditional on an isolated pinned-runtime capability investigation. Schema fields and name-setting documentation do not establish automatic naming; no experiment ran in this audit. This audit runs documentation checks only and adopts no canonical feature contract, performs no application/runtime/Linux acceptance and closes no issue.
+
+## Historical review note — 25 September 2026
 
 The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority Low. The plan is unchanged and stays conditional on the native naming capability investigation. That investigation can use the owner's standing authorization, recorded in AGENTS.md, for the VPS Codex credential copied into fresh run-owned state, instead of a dedicated account.
 
@@ -30,9 +34,9 @@ First determine whether native names actually provide the intended improvement. 
 
 ## Dependencies and current design
 
-The [official app-server reference](https://learn.chatgpt.com/docs/app-server) describes native title fields and update notifications. It is supporting protocol context, not proof of automatic generation in pinned 0.153.4 or of behavior exercised by this proposal.
+The [official app-server reference](https://learn.chatgpt.com/docs/app-server), inspected on 27 September 2026, documents `thread/name/set` and hydration after a title is set. Together with the generated name field/update notification, that establishes protocol shape only, not autonomous naming by pinned 0.153.4.
 
-Before acceptance, a separately authorized, bounded capability investigation must use isolated native state and dedicated credentials to establish whether a name is automatically produced, its timing, which response/event carries it, its persistence across resume, and whether the observed producer is app-server or a separate client. Record the exact version, account/model configuration, commands, source and artifact identity. Do not use the owner's ordinary Codex state or infer automation from manually calling a name-setting method.
+Before acceptance, a selected bounded capability investigation must use isolated run-owned native state and either dedicated credentials or the standing authorized VPS credential copy described in AGENTS.md to establish whether a name is automatically produced, its timing, which response/event carries it, its persistence across resume, and whether the observed producer is app-server or a separate client. Record the exact version, account/model configuration, commands, source and artifact identity. Do not use the owner's ordinary Codex state or infer automation from manually calling a name-setting method.
 
 If reliable automatic names are absent, retain the current fallback and leave this draft conditional or explicitly withdraw it with the evidence. Do not build a second naming service to make the proposal appear complete. If the capability is reliable only for certain supported configurations, define honest capability gating and fallback behavior before acceptance.
 
@@ -40,7 +44,7 @@ Current canonical designs must be updated with the selected name source and prec
 
 ## Source issues
 
-No existing issue is closed or transferred. Existing real-runtime credential or compatibility limitations remain visible with their owners. A failed naming experiment is a capability result, not permission to borrow personal credentials or silently expand scope.
+No existing issue is closed or transferred. Existing real-runtime credential or compatibility limitations remain visible with their owners. A failed naming experiment is a capability result, not permission to copy ordinary history/configuration or silently expand scope. Standing permission to copy the VPS credential does not mean a probe ran or authorize an experiment during this document-only audit.
 
 ## User and API flows
 
@@ -66,7 +70,9 @@ Future main first commissions the narrowly scoped capability check if authorized
 
 ## Exact file fence
 
-**Only this proposal file may be edited now.** Proposed future paths follow. Any new capability-test, migration or report path requires exact allocation in the plan before that future work; generated protocol files must not be hand-edited to claim support.
+The paths below are a prospective feature-implementation fence, not authorization to edit them during this audit. The current audit edits only the fourteen selected Draft proposals. Main must settle any missing new paths and check provisional decision/migration numbering before acceptance.
+
+Exact new decision, migration, helper, probe and test paths needed by the selected design must be allocated before acceptance; generated protocol files are not hand-edited to claim support.
 
 - `design/proposals/022-native-conversation-titles.md`
 - `design/systems/001-conversations-and-access.md`
@@ -102,7 +108,7 @@ Use private, run-specific `.test-runs/p022/` evidence for an authorized future c
 - **P022-05:** Reconcile duplicate/out-of-order events, resume and stale metadata reads according to the accepted ordering policy. Preserve archived visibility and require no extra turn or runtime solely for naming.
 - **P022-06:** Migrate existing default/fallback/manual titles conservatively, verify authorization and idempotent metadata behavior, and check desktop/mobile text overflow and unchanged keyboard navigation.
 
-Future gate: `pnpm build`, `pnpm check`, `pnpm test`, selected real-stack E2E and critical regressions, pinned adapter contracts and bounded dedicated-account live naming smoke. UI-only fixture evidence cannot satisfy P022-01. Main must settle exact probe/test commands before any authorized experiment; no new command or completed test is implied here.
+Future gate: `pnpm build`, `pnpm check`, `pnpm test`, selected real-stack E2E and critical regressions, pinned adapter contracts and bounded live naming smoke using fresh run-owned state and the authorized credential source. UI-only fixture evidence cannot satisfy P022-01. Main must settle exact probe/test commands before any authorized experiment; no new command or completed test is implied here.
 
 ## Rollout and recovery
 
@@ -114,4 +120,4 @@ Drafting review can assess scope and evidence honesty while P022-01 is unavailab
 
 ## Closing record
 
-Pending. This is the conditional fifth proposal. No automatic naming reliability, capability experiment, synchronization implementation or feature completion is claimed.
+Pending. This proposal remains conditional on native capability evidence. No automatic naming reliability, capability experiment, synchronization implementation or feature completion is claimed.

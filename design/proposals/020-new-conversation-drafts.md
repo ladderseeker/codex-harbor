@@ -8,7 +8,7 @@
 - Created: 2026-09-20
 - Owner: Main conversation; future implementation owner unassigned
 - Outcome: Opening a new conversation and sending nothing leaves no empty formal conversation, while meaningful unsent work is preserved.
-- Authorization: Write this proposal only; no application implementation, commit, push or deployment.
+- Authorization: On 27 September 2026 the owner authorized evaluation and revision of the open proposals, followed by commit and push of these document changes to `main`. Feature implementation, live experiments and deployment are outside this audit.
 - Baseline: Source inspection of `bb85e1034e756d589d0d0c1c631616c5c9f2b7f7`; no new browser or persistence test.
 - Dependencies: Existing authenticated creation, turn idempotency and profile-aware composer are implemented. Existing attachment drafts are session-bound and need an explicit draft-to-session design before acceptance. No hard dependency on P018/P019/P021/P022.
 - Source issues: None transferred; owner-reported behavior initiates this draft.
@@ -16,9 +16,13 @@
 - Exact file fence: [Below](#exact-file-fence).
 - Acceptance IDs: P020-01–P020-08.
 
-## Review note — 25 September 2026
+## Review note — 27 September 2026
 
-The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority Medium. [P024](archive/024-attachments-and-chat-composer.md) added personal attachments on 21 September, so the statement below that attachments stay disabled in personal profiles is outdated, and drafts must handle personal attachments. Before acceptance, consider a lighter design first: keep an untouched or unsent draft in the browser and create the conversation together with its first turn in one request, adding server-side drafts only if cross-device recovery is required.
+Read-only source review against `e6c2a138563139650af46fe51af44c6eb6c28743`; the original baseline in Metadata and dated evidence remain historical. The proposed design now uses transient untouched pages and lazy server drafts for meaningful input, including personal attachments. Draft/upload accounting, exact schema/backup paths and the total serialized/storage budget must be settled before acceptance. This audit runs documentation checks only and adopts no canonical feature contract, performs no application/runtime/Linux acceptance and closes no issue.
+
+## Historical review note — 25 September 2026
+
+The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority Medium. [P024](archive/024-attachments-and-chat-composer.md) added personal attachments on 21 September, so the original drafting statement that personal attachments were disabled was outdated; the revised body includes them. That review suggested considering browser-only drafts. The 27 September proposal revision selects transient untouched browser state plus lazy server drafts for meaningful input, because refresh-safe personal attachments need an upload owner before a session exists; this remains a proposed design.
 
 ## Problem, outcome and exclusions
 
@@ -32,9 +36,9 @@ Excluded: deleting historical empty conversations automatically, changing archiv
 
 The [attachment store](../../packages/attachments/src/store.ts) and [rich-draft hook](../../apps/web/src/Attachments.tsx) assume a session identity. Hiding empty rows alone would leave quota use and upload ownership unresolved. Before implementation, update current conversation/workspace/interface designs for draft identity, staged attachment ownership and atomic publication.
 
-Proposed direction: create no PG draft for an untouched page; lazily persist an owner-bound draft after meaningful input or a supported upload. Keep drafts separate from formal `sessions`, history search, execution leases and session quota. Set a finite independent draft/storage budget. Preserve existing privacy/credential rules; browser state carries only draft identity and necessary transient editing state, not authentication secrets.
+Proposed design: create no PG draft for an untouched page; lazily persist an owner/project/workspace-bound server draft after meaningful text, explicit settings or a supported upload. Keep drafts separate from formal `sessions`, history search, execution leases and session quota. They preserve text, attachments and explicitly chosen model/effort/permission through refresh. P030 supplies defaults once for an untouched new draft; changed project preferences never overwrite explicit or restored settings. Browser state carries draft identity and transient editing state, not authentication secrets. Cross-device collaborative editing is excluded; revision CAS still protects concurrent tabs/devices.
 
-Before acceptance, settle the exact autosave/debounce and refresh-failure behavior, retention period and expiration notice, how multiple new drafts are resumed, and cleanup of unpublished uploads. These choices must preserve already-entered text and attachments or clearly explain expiration; they cannot be implemented as indiscriminate deletion of every session with zero messages. Draft limits and new endpoint/schema names below are proposed, not available APIs.
+Proposed retention is 24 hours of inactivity, matching current drafts/staged files, with at most 20 unconsumed drafts per owner and the existing 32 KiB UTF-8 text ceiling per draft, including the schema's JavaScript string-length guard. Current turn and draft validators enforce both checks. Main must separately settle a finite total serialized/storage budget for text, settings and metadata before acceptance. Draft files share existing instance/upload budgets and per-draft equivalents of current per-session limits; session and draft ownership cannot double-allocate capacity. No accepted reference expires. Before acceptance, settle autosave/debounce, save-failure and expiry presentation, multiple-draft resume and unpublished-upload cleanup, plus exact schema/route/backup paths. These choices must preserve already-entered text and attachments or clearly explain expiration; they cannot be implemented as indiscriminate deletion of every session with zero messages. Draft limits and new endpoint/schema names below are proposed, not available APIs.
 
 ## Source issues
 
@@ -44,18 +48,18 @@ No existing issue is transferred or closed. [Attachment regression evidence](../
 
 1. New chat opens a blank composer for the chosen project without an API session-create call. Leaving an untouched page creates no history row or runtime.
 2. Meaningful text/settings or a supported file upload creates/updates a draft with its own revision. Switching to another conversation and back preserves unsent content. Refresh restores the last acknowledged save; unsaved/save-failed state is visible rather than falsely marked saved.
-3. Proposed owner-authenticated draft endpoints provide create/read/update/discard and `POST /api/v1/conversation-drafts/:id/send`. Final route/schema names require acceptance. Every mutation keeps Origin/CSRF, current resource authorization and durable idempotency.
-4. First send validates input, project/workspace identity, permissions, model modalities, draft revision, attachments and normal admission. In one PG transaction, allocate the session, admit its first turn, associate validated uploads and store the consumed draft-to-session mapping.
-5. If acceptance fails, retain the draft and a retryable explanation; no orphan formal session or partial attachment move is published. If the response is lost after commit, retry the same intent and discover the same session/operation. A second tab cannot consume the draft twice.
+3. Proposed owner-authenticated draft endpoints provide create/read/update/discard and `POST /api/v1/conversation-drafts/:id/send`. Final route/schema names require acceptance. These endpoints remain owner-browser-only; no token scope is implied. Every mutation keeps Origin/CSRF, current resource authorization and durable idempotency.
+4. First send freezes the submitted intent with P024's synchronous reservation, then validates input, project/workspace identity, permissions, model/effort/modalities, draft revision, attachments and normal admission. Recheck current authority after ordered locks. An unavailable saved setting needs visible correction; never silently select stronger authority. In one PG transaction, allocate the session, admit its first turn, associate validated uploads and store the consumed draft-to-session mapping.
+5. If acceptance fails, retain the draft and a retryable explanation; no orphan formal session or partial attachment move is published. If the response is lost after commit, retry the same intent and discover the same session/operation. A second tab cannot consume the draft twice. A delayed acknowledgement clears only the accepted revision and cannot erase newer local or saved edits.
 6. After acceptance, display the formal conversation immediately, reconcile its title through the existing fallback rules and let the supervisor execute normally. A runtime startup failure after durable acceptance is a real failed/uncertain conversation, not a reason to hide or delete it.
 
 Unpublished drafts need a lightweight return path distinct from normal conversation history; reuse the existing navigation/composer patterns. Final presentation must be demonstrated in the UI guide/prototype before application changes. No new visual language or extra confirmation is needed for abandoning an untouched draft.
 
 ## Contracts, state and security
 
-Draft state is unconsumed, consumed with a durable session/operation mapping, explicitly discarded, or expired with an honest user-visible result where applicable. Revision conflicts preserve the local edit for deliberate reconciliation. Consumed mapping/idempotency retention must cover the supported retry window; cleanup must not make a lost-response retry create a second conversation.
+Draft state is unconsumed, consumed with a durable session/operation mapping, explicitly discarded, or expired with an honest user-visible result where applicable. Revision conflicts and expiry preserve unsaved local text/settings for explicit recovery; a failed/offline save never claims durable success. The UI distinguishes saved, unsaved and expired data, including that expiry is a retention action. Consumed mapping/idempotency retention must cover the supported retry window; cleanup must not make a lost-response retry create a second conversation.
 
-Associate each draft with the authenticated owner and exact selected project/workspace; changing target requires revalidation. Upload preparation keeps existing size, media, hash, ownership and expiration checks. Staged uploads can reference a draft before session publication; the consume transaction establishes their formal references without making files public. Attachments remain disabled in personal profiles where they are currently unsupported.
+Associate each draft with the authenticated owner and exact selected project/workspace; changing target requires revalidation. Upload preparation keeps existing size, media, hash, ownership and expiration checks. Staged uploads can reference a draft before session publication; the consume transaction establishes their formal references without making files public. P024's delivered personal attachments are included. Only capabilities that the current profile actually lacks remain disabled.
 
 Separate limits for draft count/bytes and staged files prevent using drafts to bypass existing storage protection. Garbage collection marks eligibility, rechecks revision/consumption and upload references, and removes only owned expired/discarded draft resources. It cannot delete an accepted operation, attachment reference or pre-existing empty conversation. Logout, revoked authority or project archival cannot publish a draft under stale rights.
 
@@ -65,7 +69,9 @@ Future main settles draft persistence, endpoint and retention decisions, then up
 
 ## Exact file fence
 
-**Current edits are limited to this proposal.** Proposed future paths below require selection and acceptance; exact new migration, route/component and test filenames must be added before execution.
+The paths below are a prospective feature-implementation fence, not authorization to edit them during this audit. The current audit edits only the fourteen selected Draft proposals. Main must settle any missing new paths and check provisional decision/migration numbering before acceptance.
+
+Exact new decision, migration, helper, probe and test paths needed by the selected design must be allocated before acceptance; generated protocol files are not hand-edited to claim support.
 
 - `design/proposals/020-new-conversation-drafts.md`
 - `design/systems/001-conversations-and-access.md`
@@ -102,12 +108,12 @@ Future evidence uses run-specific `.test-runs/p020/` paths and isolated fixtures
 ## Verification and acceptance
 
 - **P020-01:** Click New chat repeatedly, switch projects, leave and reload without typing. Verify no new formal sessions/history rows, no session-quota consumption and no runtime startup through actual UI/API/PG/supervisor.
-- **P020-02:** Enter text and change supported settings, switch away and return, then reload. Restore acknowledged content and selections; failed/pending save and expired-draft states are explicit. Existing conversation drafts are unaffected.
+- **P020-02:** Enter text and change supported settings, switch away and return, then reload. Restore acknowledged content and selections; failed/pending save and expired-draft states are explicit. Existing conversation drafts are unaffected. Offline or failed saves block publication and retain local work; expired drafts and CAS conflicts preserve local text for deliberate recovery. P030 defaults before or after this plan never replace explicit/restored choices.
 - **P020-03:** First valid send atomically creates one session, one first operation and correct message/settings. Validation/admission failure leaves the draft intact without an empty session. Intentional legacy API creation remains compatible.
-- **P020-04:** Double-click, concurrent-tab consumption, API restart and dropped accepted response return the same published conversation/operation. Changed-payload reuse conflicts; cleanup cannot reopen a consumed identity.
-- **P020-05:** In attachment-capable profiles, stage files/images before first send, refresh, publish and verify exact associations. Test invalid media, expired uploads and failed send without data loss or leaked files. Unsupported profiles still deny upload capability.
-- **P020-06:** Expire/discard and garbage-collect unconsumed draft resources with concurrent autosave/consume. Preserve accepted references and pre-existing empty sessions; enforce independent draft quotas.
-- **P020-07:** Revoke identity, archive the project or replace the workspace before publication. Reject stale/cross-owner/project references without publishing partial state. Runtime failure after accepted publication remains visible as a formal conversation.
+- **P020-04:** Double-click, concurrent-tab consumption, API restart and dropped accepted response return the same published conversation/operation. Changed-payload reuse conflicts; cleanup cannot reopen a consumed identity. Delayed first-send acknowledgements preserve newer edits and P024 attachment/send reservations.
+- **P020-05:** In every delivered attachment-capable profile, including personal VPS, stage files/images before first send, refresh, publish and verify exact associations. Test invalid media, expired uploads and failed send without data loss or leaked files. Unsupported profiles still deny upload capability.
+- **P020-06:** Expire/discard and garbage-collect unconsumed draft resources with concurrent autosave/consume. Preserve accepted references and pre-existing empty sessions; enforce independent draft quotas and shared byte/upload budgets under contention with ordinary session uploads.
+- **P020-07:** Revoke identity, archive the project or replace the workspace before publication. Recheck authority after locks and reject stale/cross-owner/project references and a switched target without publishing partial state. Unavailable saved model/effort/permission choices need explicit correction. Runtime failure after accepted publication remains visible as a formal conversation.
 - **P020-08:** Inspect desktop/mobile, keyboard/touch and IME behavior, save/error indicators and returning to multiple drafts. Guide/prototype match the real flow. Validate the new schema's migration and module backup registration where applicable.
 
 Future gate: `pnpm build`, `pnpm check`, `pnpm test`, selected real-stack E2E and critical regressions. Reuse identified unchanged runtime/isolation evidence; if implementation changes those boundaries, add the applicable pinned-runtime/live/Linux gates. No tests or endpoint implementations are introduced by this document.
