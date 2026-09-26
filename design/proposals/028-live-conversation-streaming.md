@@ -35,7 +35,7 @@ After this change:
 3. The event stream wakes on PostgreSQL `LISTEN/NOTIFY` and keeps only a slow fallback poll. Snapshots read from one consistent database snapshot without write locks, and replay pruning moves to supervisor maintenance, so reading a conversation never writes.
 4. A snapshot returns a bounded recent window plus a cursor. The transcript loads older messages when the owner scrolls up.
 5. Discovery runs at startup, after account changes, on the owner's "Check again", and when the stored result is older than six hours, never inside the dispatch loop. Runtime starts run as tracked tasks, so approvals and cancellations are handled on every tick.
-6. An idle open conversation makes no snapshot request and causes no database write. Capability and workspace changes reach the browser as events or through a poll of a minute or more, and hidden tabs stop polling until they are visible again.
+6. An idle open conversation makes no snapshot request and causes no database write. Capability and workspace changes reach the browser as events or through a poll of a minute or more, and hidden tabs stop polling until they are visible again, apart from the notification refresh that [P030](030-composer-and-conversation-flow.md) adds.
 7. Output that would cross a storage limit is truncated at the limit with a visible notice, and the turn continues to its native end instead of becoming uncertain. Admission keeps refusing new turns in a full conversation, as today.
 
 Excluded: new transcript item types, owned by P029; changing the lifetime history limits of 2 MiB and 2,000 messages, owned by [P021](021-long-conversation-history-and-capacity.md), since this plan only stops those limits from making a turn uncertain; session-list pagination; and changes to runtime isolation.
@@ -55,7 +55,7 @@ The [output-limit issue](../../issues/2026-09-25-120000-output-limit-uncertain-t
 1. Opening a conversation shows its newest messages immediately. Scrolling to the top loads the previous page, keeping the reading position; a visible control does the same for keyboard users.
 2. During a turn, text appears progressively with no full refetch. After a reconnect, the stream resumes from the browser's cursor; after a replay gap, the browser reloads the recent window.
 3. The model list stays available between discoveries, marked stale only when discovery has failed for longer than the documented bound. "Check again" requests a refresh.
-4. The snapshot route accepts `limit`, and a new `GET /api/v1/sessions/{id}/messages?before={cursor}&limit={n}` returns older pages with the same authorization as the snapshot.
+4. The snapshot route accepts `limit`, and a new `GET /api/v1/sessions/{id}/messages?before={cursor}&limit={n}` returns older pages with the same authorization as the snapshot, including for read-scoped API tokens.
 
 The "load earlier messages" state is new and must appear in the UI guide and prototype before the application uses it.
 
@@ -66,7 +66,7 @@ The "load earlier messages" state is new and must appear in the UI guide and pro
 - **Snapshots.** The window is bounded by count and bytes, for example 200 messages and 512 KiB, and always includes unresolved operations and pending approvals. Page cursors bind the session and the `(created_at, id)` order. A snapshot reads its rows and its event cursor in one read-only `REPEATABLE READ` transaction. A conversation's event sequence advances only under its row lock and in the same transaction as the rows that the event describes, so the cursor never runs ahead of the rows returned, and every later change arrives through the stream with a higher sequence.
 - **Limits.** Truncation happens inside the flush that would cross a limit: the stored text ends at the limit, and later text for that item, including any excess in its final item, is dropped. Once the conversation's byte or message limit is reached, later items of the turn are dropped too. One system notice per turn records the omission; it may take the conversation past a limit by that one notice, after which admission refuses further turns as it does today. The operation's state follows the native turn, never the truncation.
 - **Notifications.** The API holds one listener connection per process and fans out wakeups to its streams. Missed notifications are covered by a fallback poll of a few seconds. Stream limits per owner are unchanged.
-- **Security.** Authorization, CSRF and rate limits for new routes match the snapshot route. Appended text keeps the existing literal and Markdown rendering rules.
+- **Security.** Authorization, CSRF and rate limits for new routes match the snapshot route. Read-scoped API tokens may use the older-pages route, as they may use the snapshot, and the programmatic API guide describes the window and its pages. Appended text keeps the existing literal and Markdown rendering rules.
 
 ## Implementation brief
 
@@ -83,6 +83,7 @@ Read the architecture's event section, the conversation design and the current o
 - `apps/supervisor/src/main.ts`
 - `apps/supervisor/src/conversation-output.ts`
 - `apps/api/src/server.ts`
+- `apps/api/src/token-access.ts`
 - `apps/web/src/App.tsx`
 - `apps/web/src/api.ts`
 - `apps/web/src/Workspaces.tsx`
@@ -102,23 +103,24 @@ Read the architecture's event section, the conversation design and the current o
 - `tests/personal-vps/concurrency.ts`
 - `tests/personal-vps/e2e.ts`
 - `docs/user/conversations.md`
+- `docs/developer/programmatic-api.md`
 - `issues/2026-09-25-120000-output-limit-uncertain-turn.md`
 - `issues/archive/2026-09-25-120000-output-limit-uncertain-turn.md`
 
-If another plan claims migration 021 first, main renames the new migration to the next free number before execution.
+The migration number is provisional: main gives it the next unused number when execution starts, so migrations always land in numeric order.
 
 ## Verification and acceptance
 
 - **P028-01:** In a conversation already holding 1.5 MiB in 1,500 messages, the fixture streams a 200 KiB reply as 4,000 deltas. After the initial load the browser makes no snapshot request during the stream, and the final text equals the native final item.
 - **P028-02:** Database work per flush is bounded: one message write and one event per item, with no whole-conversation aggregate. The test counts statements.
 - **P028-03:** On the local stack, the 95th percentile time from fixture delta to rendered text is at most 750 ms.
-- **P028-04:** Opening the same conversation transfers at most 512 KiB for the snapshot and shows the newest messages. Loading older pages while a reply streams gives the correct order with no duplicates or gaps.
+- **P028-04:** Opening the same conversation transfers at most 512 KiB for the snapshot and shows the newest messages. Loading older pages while a reply streams gives the correct order with no duplicates or gaps. A read-scoped API token reads the same window and older pages.
 - **P028-05:** Dropping the stream mid-reply resumes from the cursor without duplicates. A forced replay gap reloads the window. After an API restart, and after a stream resync, the pages already loaded and the pages loaded next compose without duplicates or gaps.
 - **P028-06:** Over ten idle minutes the supervisor starts no Codex process. Models remain listed, and "Check again" refreshes them.
 - **P028-07:** With the fixture delaying runtime start for one conversation by five seconds, an approval answer and a cancellation in another conversation reach their runtime within one second.
 - **P028-08:** Conversations created before the migration display, stream and paginate correctly.
 - **P028-09:** With the P028-01 conversation open and idle for ten minutes, the browser makes no snapshot request and averages under 50 KB a minute, and the stream route performs no write. Each event causes at most one snapshot request, and only on a revision mismatch or gap. Starting and messaging eight conversations in quick succession from one browser produces no HTTP 429.
-- **P028-10:** A fixture reply of 300,000 characters is stored truncated at the per-message limit with one visible notice, the turn completes, and the next turn is accepted. A turn whose output crosses 2 MiB, and one whose new items would exceed 2,000 messages, also complete with one notice, and the next turn is refused with the storage-limit explanation. The personal VPS lane repeats the first case.
+- **P028-10:** A fixture reply of 300,000 characters is stored truncated at the per-message limit with one visible notice, the turn completes, and the next turn is accepted. A turn whose output crosses 2 MiB, and one whose new items would exceed 2,000 messages, also complete with one notice, and the next turn is refused with the storage-limit explanation. The personal VPS Linux lane repeats all three cases.
 - **P028-11:** Two conversations in the same project stream replies at the same time. Neither conversation's flushes wait on the other's locks, and both meet the P028-03 latency bound.
 - **P028-12:** `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:e2e --design` with P028's scenarios, the full critical `pnpm test:e2e`, the personal VPS Linux lane, the P018 concurrency lane and the P024 attachment lane pass. The adapter is unchanged, so earlier contract evidence is reused with its tested revision.
 

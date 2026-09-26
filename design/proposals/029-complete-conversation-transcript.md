@@ -11,7 +11,7 @@
 - Authorization: Proposal writing only. Implementation, commits to `main` and deployment need the owner's separate go-ahead.
 - Baseline: Source inspection of `d0c505b8b58b6ba8d9597d867f14b36f832b0529` and the pinned Codex 0.153.4 generated protocol.
 - Dependencies: [P028](028-live-conversation-streaming.md) must be Implemented first, because each new item type streams through its incremental event contract. A pinned-runtime contract run must confirm which notifications 0.153.4 actually emits for each item type; items that are never emitted are dropped from scope, not simulated.
-- Source issues: [Conversation report downloads](../../issues/2026-09-20-120000-conversation-report-downloads.md), only its "discoverable conversation artifact references" obligation, shared with [P031](031-project-file-downloads.md); a partial transfer, so the issue stays in the inbox.
+- Source issues: [Conversation report downloads](../../issues/2026-09-20-120000-conversation-report-downloads.md), only its "discoverable conversation artifact references" obligation, shared with [P031](031-project-file-downloads.md); a partial transfer. Whichever of P029 and P031 executes second archives the issue once both are Implemented.
 - Design references: [Conversations and access](../systems/001-conversations-and-access.md), [interface](../systems/006-interface.md), [UI guide](../design-tokens.html), [prototype](../prototypes/harbor-redesign.html), [architecture compatibility boundary](../architecture.md#official-foundation-and-compatibility-boundary).
 - Exact file fence: [Below](#exact-file-fence).
 - Acceptance IDs: P029-01–P029-11.
@@ -41,7 +41,7 @@ Adapter parsing stays inside the adapter boundary. The contract run named in Dep
 
 ## Source issues
 
-From the report-download issue this plan takes only the obligation to make artifacts discoverable, covered by P029-03 and P029-10: a file-change row names each changed path, relative to the project when it is inside it. Linking those rows to downloads belongs to whichever of this plan and [P031](031-project-file-downloads.md) executes second: if P031 is already Implemented, this plan links each existing file row to P031's route; otherwise P031 adds the links. All other obligations stay with P031. This plan adds a dated note to the issue; the issue stays open until P031 completes the transfer.
+From the report-download issue this plan takes only the obligation to make artifacts discoverable, covered by P029-03 and P029-10: a file-change row names each changed path, relative to the project when it is inside it. Linking those rows to downloads belongs to whichever of this plan and [P031](031-project-file-downloads.md) executes second: if P031 is already Implemented, this plan links each existing file row to P031's route; otherwise P031 adds the links. All other obligations stay with P031. This plan adds a dated note to the issue. Whichever of the two plans executes second archives the issue once both are Implemented; until then it stays in the inbox.
 
 ## User and API flows
 
@@ -89,8 +89,9 @@ Run the pinned-runtime contract probe first and record the observed notification
 - `tests/e2e/p029.ts`
 - `docs/user/conversations.md`
 - `issues/2026-09-20-120000-conversation-report-downloads.md`
+- `issues/archive/2026-09-20-120000-conversation-report-downloads.md`
 
-Main renumbers the migration if another plan claims 022 first.
+The migration number is provisional: main gives it the next unused number when execution starts, so migrations always land in numeric order.
 
 ## Verification and acceptance
 
@@ -104,7 +105,7 @@ Main renumbers the migration if another plan claims 022 first.
 - **P029-08:** Conversations created before the migration still display.
 - **P029-09:** An approved, a declined and an expired approval, an answered input request, a cancelled turn and an interrupted turn each leave the matching record, live and after reload, and the records never include hidden request content beyond what the card showed.
 - **P029-10:** A file row names a path inside the project relative to the project, and any other path as reported, without a link. If P031 is Implemented when this plan executes, selecting a row for an existing file inside the project downloads it through P031's route, and a deleted file shows P031's missing-file state.
-- **P029-11:** `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:contract`, a bounded live smoke check with dedicated test credentials, `pnpm test:e2e --design` with P029's scenarios, the full critical `pnpm test:e2e`, and the P018 concurrency and P024 attachment lanes pass. A missing live credential leaves P029 Accepted, linked to the [live runtime credentials issue](../../issues/2026-09-07-171225-live-runtime-credentials.md).
+- **P029-11:** `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:contract`, a bounded live smoke check on the VPS host under the owner's standing authorization for the VPS Codex credential, copied into fresh run-owned state there, `pnpm test:e2e --design` with P029's scenarios, the full critical `pnpm test:e2e`, and the P018 concurrency and P024 attachment lanes pass. A missing live credential leaves P029 Accepted, linked to the [live runtime credentials issue](../../issues/2026-09-07-171225-live-runtime-credentials.md).
 
 Gate: behavioral plus adapter contract and live smoke, because the adapter changes.
 

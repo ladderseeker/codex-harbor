@@ -18,7 +18,7 @@
 
 ## Review note — 25 September 2026
 
-The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority Low. The plan is unchanged and stays conditional on the native naming capability investigation.
+The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority Low. The plan is unchanged and stays conditional on the native naming capability investigation. That investigation can use the owner's standing authorization, recorded in AGENTS.md, for the VPS Codex credential copied into fresh run-owned state, instead of a dedicated account.
 
 ## Problem, outcome and exclusions
 

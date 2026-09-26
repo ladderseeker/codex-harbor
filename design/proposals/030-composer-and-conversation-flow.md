@@ -18,18 +18,18 @@
 
 ## Problem, outcome and exclusions
 
-The review's [walkthrough](../../docs/reports/2026-09-25-project-review.md#user-experience-walkthrough) found three everyday workflow gaps, marked P030:
+The review's [walkthrough](../../docs/reports/2026-09-25-project-review.md#user-experience-walkthrough) lists three everyday workflow gaps, marked P030; the settings gap comes from source inspection:
 
 - While a turn runs, Send becomes Cancel turn and the help line says "Wait for this turn to finish before sending another message.", so a follow-up can be typed but not sent. The API already accepts such a turn and queues it with the `session_busy` reason; only the browser refuses.
-- Each new conversation starts from the first permission profile, `read-only`, and the default model and effort, so the owner re-selects "Edit project files" and other settings every time.
+- New chat copies the model, effort and permission selected for the open conversation, even when the new conversation is in another project, and after a fresh page load with no conversation open it starts from the first permission profile, `read-only`, and the default model and effort. A project's usual settings are therefore lost on reload and can carry over into other projects.
 - Nothing outside the open conversation shows that a turn finished, failed or needs an answer, while unanswered approvals expire after five minutes.
 
 After this change:
 
 1. **Queue follow-ups.** Sending while a turn runs creates a queued turn, shown as a queued message with a Cancel action that uses the existing cancellation route. Queued turns start in order.
-2. **Remembered settings.** A new conversation in a project starts with that project's last accepted model, effort and permission profile, within the server's current ceiling.
+2. **Remembered settings.** A new conversation in a project starts with that project's last accepted model, effort and permission profile, whichever conversation is open. A stored setting that the current ceiling or model list no longer allows falls back to today's default for that field.
 3. **Attention marks.** The sidebar marks a conversation whose latest turn finished or failed since the owner last viewed it, and one that waits for an approval or an answer. A waiting mark stays until the request is answered or no longer applies, even after the owner views the conversation. The tab title shows the number of marked conversations.
-4. **Notifications.** After the owner opts in, the browser shows a notification when a request needs an answer or a turn finishes, while any Harbor tab is open. Selecting it opens the conversation.
+4. **Notifications.** After the owner opts in, the browser shows a notification when a request needs an answer or a turn finishes, while any Harbor tab is open, including a hidden one, within about a minute. Selecting it opens the conversation.
 
 Excluded: steering a running turn, which needs adapter contract and live evidence and may follow as its own plan; push notifications with a service worker; how long approvals wait and how answers are delivered, owned by [P019](019-durable-approval-waiting-and-delivery.md); transcript records of approvals, answers and cancellations, owned by [P029](029-complete-conversation-transcript.md); the empty-conversation behavior of New chat, owned by [P020](020-new-conversation-drafts.md); and wording, hidden controls, sign-in pages, the approval card's expiry notice and phone layout, owned by [P033](033-interface-clarity-and-phone-fit.md).
 
@@ -56,8 +56,9 @@ The queued message, attention marks and the notification setting are new states 
 ## Contracts, state and security
 
 - **Queue.** No new route. The browser uses the existing turn and cancel routes and shows queue reasons from operation state.
-- **Preferences.** Projects store the model, effort and permission of their last accepted turn. Admission still validates them against the current ceiling and model list.
-- **Attention.** Sessions store the owner's viewed-through sequence, updated by an idempotent, CSRF-protected route when the owner views a conversation. Listings return an attention state derived on the server: waiting while an approval or input request is pending, otherwise finished or failed when the latest turn ended after the viewed-through sequence.
+- **Preferences.** Projects store the model, effort and permission of their last accepted turn. New chat pre-selects them; a field that the current ceiling or model list no longer allows falls back to today's default. Admission still validates every turn as today.
+- **Attention.** Sessions store the owner's viewed-through sequence. The browser advances it through a CSRF-protected route when the owner opens a conversation and when the owner leaves it, never per streamed event. The update only moves the sequence forward, so a retry or a stale request changes nothing. The route is an ordinary command with an idempotency key, so it counts toward the retained-intent limit of 10,000 per actor like other browser commands; sending it only on these navigation events keeps it to one or two requests per visit. Listings return an attention state derived on the server: waiting while an approval or input request is pending, otherwise finished or failed when the latest turn ended after the viewed-through sequence.
+- **Delivery.** Attention state arrives with the session list. While notifications are enabled, a hidden Harbor tab keeps refreshing the session list once a minute; otherwise hidden tabs stop refreshing it, as today. This is the only exception to [P028](028-live-conversation-streaming.md)'s hidden-tab rule. The open conversation's stream is unchanged.
 - **Notifications.** Use the browser Notification API only after an explicit opt-in. Notification text names only the event kind, such as "A conversation needs your answer". It never includes a conversation title, because automatic titles come from the owner's first message, or any message content.
 
 ## Implementation brief
@@ -87,15 +88,15 @@ Settle the attention rule and the preference storage with the UI guide and proto
 - `tests/e2e/p030.ts`
 - `docs/user/conversations.md`
 
-Main renumbers the migration if another plan claims 023 first.
+The migration number is provisional: main gives it the next unused number when execution starts, so migrations always land in numeric order.
 
 ## Verification and acceptance
 
 - **P030-01:** A follow-up sent during a running turn is queued, shown with Cancel and starts after the turn; a cancelled follow-up never starts.
-- **P030-02:** A new conversation uses the project's last accepted settings; a setting above the current ceiling is refused with an explanation.
+- **P030-02:** New chat pre-selects the project's last accepted settings whichever conversation is open, including after a reload; a stored setting that the current ceiling no longer allows falls back to the default for that field.
 - **P030-03:** A finished or failed conversation shows a mark and a title count, cleared on viewing, and the cleared state appears in a second browser context. A conversation waiting for an approval keeps its mark after viewing and loses it once answered or expired.
-- **P030-04:** With notifications allowed in the test browser, an approval request and a finished turn produce notifications that contain neither a conversation title nor message content; without opt-in, none appear.
-- **P030-05:** The attention route rejects a request without a valid CSRF token, repeating a request changes nothing, and a stale viewed-through sequence from another tab or device never moves the mark backwards.
+- **P030-04:** With notifications allowed and the Harbor tab hidden, an approval request and a finished turn in another conversation produce notifications within about a minute that contain neither a conversation title nor message content. Without opt-in, none appear and the hidden tab makes no session-list request.
+- **P030-05:** The attention route rejects a request without a valid CSRF token, repeating a request changes nothing, and a stale viewed-through sequence from another tab or device never moves the mark backwards. Opening and leaving a conversation during a streamed reply sends the route once each, not once per event.
 - **P030-06:** `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:e2e --design` with P030's scenarios, the full critical `pnpm test:e2e`, and the P018 concurrency and P024 attachment lanes pass.
 
 Gate: behavioral. No launch, sandbox or adapter change.

@@ -4,7 +4,7 @@
 
 - ID: P027
 - Status: Draft
-- Priority: High, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); decide it before the next plan starts, because it sets how much managed behavior and review each later plan carries. The owner confirms or changes the priority.
+- Priority: High, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); decide it alongside the Urgent plans and before the other High plans start, because it sets how much managed behavior and review each of them carries. The owner confirms or changes the priority.
 - Created: 2026-09-25
 - Owner: Main conversation; future implementation owner unassigned
 - Outcome: The repository's designs, guides, gates and delivery rules treat the personal VPS profile as the product, and the managed profile no longer adds scope to new work.
@@ -18,7 +18,7 @@
 
 ## Problem, outcome and exclusions
 
-Harbor has four runtime profiles: managed, fixture, personal local and personal VPS. Only the personal VPS runs for the owner. The [review](../../docs/reports/2026-09-25-project-review.md#scope-and-process-weight) measured about 14,200 lines of managed-only application code, 13,200 lines of managed infrastructure and 21,600 lines in managed-only test lanes, against about 1,200 lines of personal VPS infrastructure. About 200 profile checks are spread through the supervisor, API, web app and configuration. About 23 of the 29 open issues concern managed, self-development or extension work that the owner does not use. Every new feature must currently be designed and verified around all of it, and the delivery workflow adds a fresh implementer and two independent reviews to every change, including copy and styling fixes, and most changes add a dated report.
+Harbor has four runtime profiles: managed, fixture, personal local and personal VPS. Only the personal VPS runs for the owner. The [review](../../docs/reports/2026-09-25-project-review.md#scope-and-process-weight) measured about 14,200 lines of managed-only application code, 13,200 lines of managed infrastructure and 21,600 lines in managed-only test lanes, against about 1,200 lines of personal VPS infrastructure. About 200 profile checks are spread through the supervisor, API, web app and configuration. At `d0c505b`, 23 of the 29 open issues concerned managed, self-development or extension work that the owner does not use. Every new feature must currently be designed and verified around all of it, and the delivery workflow adds a fresh implementer and two independent reviews to every change, including copy and styling fixes, and most changes add a dated report.
 
 This plan records two owner decisions and applies them to the documents and gates. It changes no application behavior.
 
