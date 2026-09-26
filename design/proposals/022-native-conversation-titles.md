@@ -4,6 +4,7 @@
 
 - ID: P022
 - Status: Draft
+- Priority: Low, recommended by the [25 September 2026 project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities); the owner confirms or changes it.
 - Created: 2026-09-20
 - Owner: Main conversation; future implementation owner unassigned
 - Outcome: Harbor uses a reliable native conversation name when available, retains a useful fallback and never overwrites the owner's manual title.
@@ -14,6 +15,10 @@
 - Design references: [Conversation identity/history](../systems/001-conversations-and-access.md), [personal title behavior](../systems/004-deployment-and-profiles.md#conversation-driven-development-and-attached-previews), [interface](../systems/006-interface.md), [D012 history](../decisions/012-personal-vps-development.md).
 - Exact file fence: [Below](#exact-file-fence).
 - Acceptance IDs: P022-01–P022-06.
+
+## Review note — 25 September 2026
+
+The [project review](../../docs/reports/2026-09-25-project-review.md#recommended-priorities) recommends priority Low. The plan is unchanged and stays conditional on the native naming capability investigation. That investigation can use the owner's standing authorization, recorded in AGENTS.md, for the VPS Codex credential copied into fresh run-owned state, instead of a dedicated account.
 
 ## Problem, outcome and exclusions
 

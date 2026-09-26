@@ -65,9 +65,9 @@ For host-run API services, select a fixed proxy template appropriate to the envi
 
 Give every environment an instance ID that namespaces ports, URLs, database names/roles, networks, volumes, Codex homes, upload roots, and test artifacts. Compose project names help separate resource names; they are not security boundaries. Enforce actual isolation through mounts, credentials, networks, and broker policy. Test startup provisions empty storage and known fixtures. Cleanup is restricted to the exact instance manifest; it cannot remove another instance's resources. A failed startup reports the failed dependency and leaves unrelated services alone. [Compose project names](https://docs.docker.com/compose/how-tos/project-name/)
 
-The same command names are the planned developer and automation contract:
+The same command names are the developer and automation contract. The table gives their intended behavior. Some current entry points, such as `pnpm build` and `pnpm check`, do less; `package.json` defines what each runs today, and the [developer guide](../docs/developer/development.md#command-availability) describes their use:
 
-| Planned command | Intended behavior once implemented |
+| Command | Intended behavior once implemented |
 | --- | --- |
 | `pnpm dev` | Start or attach to the real local development stack; report URLs and prerequisite failures. |
 | `pnpm build` | Build versioned application/runner artifacts without touching a live deployment. |
@@ -190,6 +190,8 @@ Publish versioned JSON schemas and an OpenAPI contract independent of upstream C
 | `/api/v1/terminals` and `/terminals/{id}/stream` | Create bounded terminal sessions; authenticated WS carries input, resize, output, and exit messages. |
 | `/api/v1/schedules`, `/schedules/{id}/runs` | Create/pause schedules, inspect occurrences, and request run-now with an idempotency key. |
 | `/api/v1/capabilities` and `/api/v1/security/*` | Discover effective settings, manage owner credentials, and emergency-stop authorized work. |
+
+Implementation status on 25 September 2026: `/turns/{id}/steer` does not exist. The adapter has an unused `steerTurn` method, and later input is only queued. The API queues a turn submitted while another is active, but the browser composer does not offer that; see [P030](proposals/030-composer-and-conversation-flow.md).
 
 All abbreviated routes in this table, including `/projects`, `/sessions`, `/turns`, `/terminals`, and `/schedules`, are relative to `/api/v1`; no alternate unprotected endpoints exist. Authenticated domain mutation commands carry a client-generated idempotency key and, where applicable, an expected revision. OIDC login/callbacks use their own state/nonce/replay controls rather than this domain-command contract. Scope keys by actor and operation route. Persist the normalized request hash and dispatch intent transactionally before accepting asynchronous work with `202 Accepted` and an operation URL. A synchronous mutation can return its committed result with the documented successful status. Identical retries return the existing operation/result; differing payloads fail. Retain active keys and tombstones for the documented retry window; requests outside that window require an explicit new intent rather than treating an expired retry as new work.
 

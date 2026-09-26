@@ -28,6 +28,7 @@ These explain significant choices; follow later explicit supersession notes and 
 - [D011 — Personal VPS existing-project experience](decisions/011-personal-vps-workspace.md).
 - [D012 — Personal VPS development](decisions/012-personal-vps-development.md).
 - [D013 — Evidence-based delivery workflow](decisions/013-evidence-based-delivery-workflow.md).
+- [D014 — Personal conversation concurrency](decisions/014-personal-conversation-concurrency.md).
 
 ## Work and evidence
 

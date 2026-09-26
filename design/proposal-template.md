@@ -6,6 +6,7 @@ Copy to `design/proposals/<number>-<stable-name>.md` and replace every placehold
 
 - ID: `<stable P-number, never reused>`
 - Status: `Draft` initially; use the workflow's `Draft → Accepted → Implemented` states.
+- Priority: `<optional Urgent, High, Medium or Low, as set or confirmed by the owner, with its date and source>`
 - Created: `<date>`
 - Owner: `<main conversation / accountable owner>`
 - Outcome: `<one cohesive observable result>`

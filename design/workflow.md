@@ -18,7 +18,7 @@ There is no separate proposal delivery-state axis. An Accepted proposal remains 
 
 ## Discover and select one outcome
 
-Read the [proposal directory](proposals/README.md), [issue inbox](../issues/README.md) and their archive directories; search for the same need, finding and dependency. Directory README files explain navigation and rules, with no manually maintained per-record priority or status tables. Folder listings discover records; record metadata carries their facts. Do not create a standing roadmap from all inbox items.
+Read the [proposal directory](proposals/README.md), [issue inbox](../issues/README.md) and their archive directories; search for the same need, finding and dependency. Directory README files explain navigation and rules, with no manually maintained per-record priority or status tables. Folder listings discover records; record metadata carries their facts. A proposal may record a priority of Urgent, High, Medium or Low in its metadata when the owner sets or requests one; it informs the owner's selection and is not a queue position. Do not create a standing roadmap from all inbox items.
 
 The main conversation selects one complete user or developer outcome from the owner's need. Execute one proposal at a time unless the owner explicitly requests otherwise. A cohesive outcome includes its relevant UI, API, storage, authorization, execution lifecycle, failure behavior and acceptance. File count, complexity and frontend/backend boundaries do not justify splitting it. Unrelated outcomes receive separate plans when selected.
 

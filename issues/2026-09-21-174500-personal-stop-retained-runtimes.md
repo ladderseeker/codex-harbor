@@ -1,8 +1,8 @@
 # Personal service stop can leave unreconciled runtime membership
 
 - Severity: High; retained unknown members prevent the selected instance's clean promotion and can fence affected conversations.
-- Status: Open; observed on installed `817c3d097166`, normal-stop cause unproven.
-- Owner: Main for the current P024 deployment recovery; a product correction requires a separately selected bounded plan after diagnosis.
+- Status: Open; observed on installed `817c3d097166`, normal-stop cause unproven. A likely mechanism was identified by source analysis on 25 September 2026 (below); it has not been reproduced.
+- Owner: Main for the current P024 deployment recovery; a product correction requires a separately selected bounded plan after diagnosis. [P025](../design/proposals/025-clean-supervisor-shutdown-and-restart.md) is the proposed receiving plan (Draft, not yet selected).
 - Recorded: 21 September 2026, Asia/Shanghai.
 - Related: [P024 R5](../design/proposals/archive/024-attachments-and-chat-composer.md#follow-up-acceptance-gates), [D014](../design/decisions/014-personal-conversation-concurrency.md#idle-classification-and-retirement), [delivery evidence](../docs/reports/2026-09-21-p024-installed-attachment-fix.md#committed-candidate-and-interrupted-promotion).
 
@@ -21,3 +21,16 @@ The authenticated installed UI then exposed a separate consequence within the cu
 ## Projection correction deployed — 21 September 2026
 
 The P024 projection correction is deployed as `311f750a18bb8bc400ddfc497b82b0f5de6e9e25`. Both affected generations now derive to their settled turn state, and the requested installed conversation exposes an enabled composer and attachment control. Exact pre/post content fingerprints are unchanged. Hardened Linux startup/retirement/negative guards, actual restart preservation of nonturn uncertainty, explicit synthetic browser continuation, actual-model delivery and both independent reviews passed; [final evidence](../docs/reports/2026-09-21-p024-installed-attachment-fix.md#final-deployment-and-installed-acceptance) retains the receipts. This completes the projection obligation and operational recovery. This issue remains open because the earlier normal-stop retention cause is still unproven.
+
+## Source analysis — 25 September 2026
+
+This is a source-only review at `d0c505b`, whose application code is unchanged since the installed `311f750`. No reproduction ran: the reviewing cloud session had no systemd host and no VPS access. It identifies a likely mechanism, not a proven cause.
+
+1. The supervisor unit in [harbor-personal](../infra/personal-vps/harbor-personal) sets `KillMode=control-group`. Under that mode, per the [systemd.kill documentation](https://www.freedesktop.org/software/systemd/man/latest/systemd.kill.html), `systemctl stop` sends SIGTERM to every remaining process in the unit's control group, including the guardians and Codex runtimes in the delegated conversation leaves, not only to the supervisor.
+2. Each guardian in [local-runtime.ts](../packages/codex-adapter/src/local-runtime.ts) answers SIGTERM by sending SIGKILL to its own process group. The runtime's stdio closes, and the mailbox poison callback in [main.ts](../apps/supervisor/src/main.ts) deletes the runtime from the in-memory map and starts `retireSessionRuntime` without awaiting it.
+3. The supervisor's own `stop()` retires only runtimes still in that map, so it skips them. It then stops pg-boss, releases the fence and ends the database pool. A retirement that reaches its release transaction after `pool.end()` fails, so its `conversation_runtimes` row stays behind.
+4. After the unit stops, the delegated leaf cgroups are gone, as the 21 September inspection observed. On the next start during the same boot, `inspectRecoveredCgroup` in [personal-cgroup.ts](../packages/codex-adapter/src/personal-cgroup.ts) cannot open the recorded path and returns `unknown`. The supervisor then records unknown members and stop-requested sessions, which is the state observed on 21 September.
+
+The outcome depends on timing, which fits an intermittent observation. Every successful turn keeps its runtime, idle for up to 30 minutes or protected until stopped, so any stop soon after use is exposed. The current `deploy-release promote` refuses before stopping anything while any runtime or background mark remains, so the workflow's own path stops only an empty supervisor; the exposure is any other stop or crash restart while runtimes are retained, such as the earlier promotion helper's stop on 21 September. `deploy-release` counts unknown members as busy runtimes, so after one such stop every later promotion refuses until the members are resolved.
+
+[P025](../design/proposals/025-clean-supervisor-shutdown-and-restart.md) proposes the correction: `KillMode=mixed`, so that only the supervisor receives SIGTERM and retires its runtimes in order; a `stop()` that awaits every in-flight retirement before closing the pool; and a startup absence proof based on the whole delegated subtree rather than a single missing leaf. Until that plan is accepted and verified on actual Linux, the fail-closed rules above still apply. The [deployment guide](../docs/developer/github-actions-deploy.md#retained-runtimes-block-deploys) describes how retained runtimes block a deploy and how to clear them.
