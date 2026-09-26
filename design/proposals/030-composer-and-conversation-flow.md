@@ -55,7 +55,7 @@ The queued message, attention marks and the notification setting are new states 
 
 ## Contracts, state and security
 
-- **Queue.** No new route. The browser uses the existing turn and cancel routes and shows queue reasons from operation state.
+- **Queue.** No new route. The browser uses the existing turn and cancel routes and shows queue reasons from operation state. In the personal profiles an uncertain conversation cannot continue, and today a turn queued behind an uncertain turn waits forever and counts as active work for deploys. Such a follow-up is settled as never started, with a visible reason and its text kept for reuse, under [P025](025-clean-supervisor-shutdown-and-restart.md)'s contract 4; if P025 is not yet Implemented when this plan executes, this plan implements that rule.
 - **Preferences.** Projects store the model, effort and permission of their last accepted turn. New chat pre-selects them; a field that the current ceiling or model list no longer allows falls back to today's default. Admission still validates every turn as today.
 - **Attention.** Sessions store the owner's viewed-through sequence. The browser advances it through a CSRF-protected route when the owner opens a conversation and when the owner leaves it, never per streamed event. The update only moves the sequence forward, so a retry or a stale request changes nothing. The route is an ordinary command with an idempotency key, so it counts toward the retained-intent limit of 10,000 per actor like other browser commands; sending it only on these navigation events keeps it to one or two requests per visit. Listings return an attention state derived on the server: waiting while an approval or input request is pending, otherwise finished or failed when the latest turn ended after the viewed-through sequence.
 - **Delivery.** Attention state arrives with the session list. While notifications are enabled, a hidden Harbor tab keeps refreshing the session list once a minute; otherwise hidden tabs stop refreshing it, as today. This is the only exception to [P028](028-live-conversation-streaming.md)'s hidden-tab rule. The open conversation's stream is unchanged.
@@ -74,6 +74,7 @@ Settle the attention rule and the preference storage with the UI guide and proto
 - `design/prototypes/harbor-redesign.html`
 - `apps/api/src/server.ts`
 - `apps/api/src/history.ts`
+- `apps/supervisor/src/main.ts`
 - `apps/web/src/App.tsx`
 - `apps/web/src/History.tsx`
 - `apps/web/src/api.ts`
@@ -86,20 +87,21 @@ Settle the attention rule and the preference storage with the UI guide and proto
 - `tests/e2e/run.ts`
 - `tests/e2e/p014.ts`
 - `tests/e2e/p030.ts`
+- `tests/personal-vps/e2e.ts`
 - `docs/user/conversations.md`
 
 The migration number is provisional: main gives it the next unused number when execution starts, so migrations always land in numeric order.
 
 ## Verification and acceptance
 
-- **P030-01:** A follow-up sent during a running turn is queued, shown with Cancel and starts after the turn; a cancelled follow-up never starts.
+- **P030-01:** A follow-up sent during a running turn is queued, shown with Cancel and starts after the turn; a cancelled follow-up never starts. In the personal VPS lane, a follow-up queued behind a turn that becomes uncertain is shown as not sent with its text, never starts and no longer counts as active work.
 - **P030-02:** New chat pre-selects the project's last accepted settings whichever conversation is open, including after a reload; a stored setting that the current ceiling no longer allows falls back to the default for that field.
 - **P030-03:** A finished or failed conversation shows a mark and a title count, cleared on viewing, and the cleared state appears in a second browser context. A conversation waiting for an approval keeps its mark after viewing and loses it once answered or expired.
 - **P030-04:** With notifications allowed and the Harbor tab hidden, an approval request and a finished turn in another conversation produce notifications within about a minute that contain neither a conversation title nor message content. Without opt-in, none appear and the hidden tab makes no session-list request.
 - **P030-05:** The attention route rejects a request without a valid CSRF token, repeating a request changes nothing, and a stale viewed-through sequence from another tab or device never moves the mark backwards. Opening and leaving a conversation during a streamed reply sends the route once each, not once per event.
-- **P030-06:** `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:e2e --design` with P030's scenarios, the full critical `pnpm test:e2e`, and the P018 concurrency and P024 attachment lanes pass.
+- **P030-06:** `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:e2e --design` with P030's scenarios, the full critical `pnpm test:e2e`, the personal VPS Linux lane, and the P018 concurrency and P024 attachment lanes pass.
 
-Gate: behavioral. No launch, sandbox or adapter change.
+Gate: behavioral. No launch, sandbox or adapter change; the personal VPS Linux lane runs because supervisor dispatch changes.
 
 ## Rollout and recovery
 

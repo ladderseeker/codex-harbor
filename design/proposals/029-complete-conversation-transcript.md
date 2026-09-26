@@ -95,7 +95,7 @@ The migration number is provisional: main gives it the next unused number when e
 
 ## Verification and acceptance
 
-- **P029-01:** The pinned-runtime contract run records which item types and notifications 0.153.4 emits for a reasoning turn, a plan, a file edit, a web search and an MCP call, using isolated state and no personal credentials.
+- **P029-01:** The pinned-runtime contract run records which item types and notifications 0.153.4 emits for a reasoning turn, a plan, a file edit, a web search and an MCP call, using isolated run-owned state on the VPS host with only the VPS Codex credential copied in, under the owner's standing authorization.
 - **P029-02:** Through the real browser, API, PostgreSQL and supervisor with the fixture, each supported item type appears live in order and identically after reload.
 - **P029-03:** A turn that edits three files shows three file rows with correct diffs and a footer whose aggregate diff matches the fixture's `turn/diff/updated`.
 - **P029-04:** Oversized diffs and tool results are truncated with a notice, and the turn completes normally.

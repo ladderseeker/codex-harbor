@@ -22,7 +22,7 @@ The repository's gates run only when a person or agent remembers to run them loc
 
 After this change, GitHub shows a named status on every pull request and push to `main`: `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm check`, `pnpm test` and the fixture design lane `pnpm test:e2e --design`, which exercises the real API, PostgreSQL and supervisor with the Codex and identity-provider fixtures. The deploy workflow's `build` and `deploy` actions run the same gates first and stop when any fails; `preflight` stays read-only and immediate. CI run links can then serve as command evidence in delivery records.
 
-Excluded: the pinned-runtime contract, live-account, managed isolation, egress and personal VPS Linux lanes, which need a pinned Codex binary, credentials, XFS storage or root systemd access; automatic deployment on push; and branch protection, which is a repository setting only the owner can change. [P025](025-clean-supervisor-shutdown-and-restart.md) adds a separate workflow that runs the personal VPS Linux lane on a GitHub-hosted runner for its own evidence; making that lane a required check is left to a later change.
+Excluded: the pinned-runtime contract, live-account, managed isolation and egress lanes, which need a pinned Codex binary, credentials or XFS storage; the personal VPS Linux lane, which needs root systemd access and which [P025](025-clean-supervisor-shutdown-and-restart.md) adds as a separate workflow on a GitHub-hosted runner for its own evidence, so making it a required check is left to a later change; automatic deployment on push; and branch protection, which is a repository setting only the owner can change.
 
 ## Dependencies and current design
 
