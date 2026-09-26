@@ -1,0 +1,15 @@
+# An existing personal VPS instance has no supported way to change its configuration
+
+- Severity: Medium; every setting of the owner's instance, such as the runtime limits, the models list and the project roots, can change only through an unsupported manual edit, and a mismatched edit makes every later deploy refuse.
+- Owner: Inbox; awaiting owner selection. No proposal covers it. [P034](../design/proposals/034-timed-runtime-stop.md) adds two settings whose later change depends on it.
+- Status: Open; from source inspection of `c7dd784`, not reproduced.
+- Recorded: 26 September 2026.
+- Related: [personal VPS guide](../docs/developer/personal-vps.md#use-and-recover), [GitHub Actions deployment](../docs/developer/github-actions-deploy.md), [retained-runtime issue](2026-09-21-174500-personal-stop-retained-runtimes.md).
+
+[harbor-personal](../infra/personal-vps/harbor-personal) renders and installs a fresh instance and states that it never modifies an existing installation. Its `render` action refuses an existing output directory and generates a new random database password, and its `install` action refuses existing installation paths. [deploy-release](../infra/personal-vps/deploy-release) renders the unit, environment and AppArmor files from the installed `config.json` and the installed database password, and refuses promotion when any installed file differs from that rendering; `config.json` itself counts only through the files it generates. The [GitHub Actions workflow](../docs/developer/github-actions-deploy.md) offers only `preflight`, `build` and `deploy`, and no guide describes changing the configuration of an existing instance.
+
+Impact: to change a setting, the owner would have to edit `config.json` and the rendered `service.env` over SSH, exactly as the installer would render them, and restart the services while no runtime is retained. Any difference makes every later deploy refuse as generated-file drift. A restart while runtimes are retained can leave unknown members, as the [retained-runtime issue](2026-09-21-174500-personal-stop-retained-runtimes.md) records.
+
+A correction needs a supported action that validates the new configuration, renders the installed files with the installed release's template and the existing database password, and refuses while work or retained runtimes remain. It then applies the files, restarts the services, runs the installed checks and restores the previous files on failure. Running it from the GitHub Actions workflow would spare the owner an SSH session.
+
+Recheck: on a candidate instance, change one setting through the supported action, confirm that the services use the new value, and confirm that the next `preflight` reports no `generatedFileDrift`.
