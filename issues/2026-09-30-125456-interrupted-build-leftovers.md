@@ -19,7 +19,7 @@
 
 ## Impact
 
-A `build` from the GitHub Actions workflow, or the fresh install guide's `bootstrap`, that is interrupted by a reboot or a kill leaves the inputs and the build state on the host. Later runs do not count them, so a later refusal for lack of space can have no visible cause. P037 accepted a review finding to list these directories for the owner in the fresh VPS install guide. The GitHub Actions workflow does not list them.
+A `build` from the GitHub Actions workflow, or the fresh install guide's `bootstrap`, that is interrupted by a reboot or a kill leaves the inputs and the build state on the host. Later runs do not count them, so a later refusal for lack of space can have no visible cause. The fresh VPS install guide lists these directories for the owner in step 5's Check and in step 16. The GitHub Actions workflow does not list them.
 
 ## Recheck
 

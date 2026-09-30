@@ -10,20 +10,24 @@ Status, 30 September 2026: this guide has not yet run on a real host. Its first 
 - **The owner.** The owner supervises the run, answers the questions in [What the owner prepares](#what-the-owner-prepares), and does every part that names the owner.
 - **The revision.** The guide installs the revision of `origin/main` that the block below saves, and you read the guide from that same revision, so that its commands match the scripts they run.
 
-Before step 1, run this block once, from the root of the owner's clone. It saves the guide and its revision in your log directory, `~/harbor-install-log`. It changes nothing in the clone except the remote-tracking branch `origin/main`:
+Before step 1, run this block from the root of the owner's clone. It saves the guide and its revision in your log directory, `~/harbor-install-log`, and writes the revision last. It changes nothing in the clone except the remote-tracking branch `origin/main`. When a saved revision already exists, it changes nothing at all:
 
 ```bash
 bash -euo pipefail -s <<'LOCAL'
+saved="$HOME/harbor-install-log/guide-revision.txt"
+if [ -e "$saved" ]; then echo "STOP: the guide was already saved from revision $(cat "$saved"); follow ~/harbor-install-log/guide.md"; exit 1; fi
 mkdir -p "$HOME/harbor-install-log"
 git fetch -q origin main </dev/null
 revision=$(git rev-parse origin/main)
 git show "$revision:docs/developer/fresh-vps-install.md" > "$HOME/harbor-install-log/guide.md"
-echo "$revision" > "$HOME/harbor-install-log/guide-revision.txt"
+echo "$revision" > "$saved"
 echo "saved the guide from revision $revision"
 LOCAL
 ```
 
-Then follow `~/harbor-install-log/guide.md`. When you resume later, read that saved copy again, and do not run this block a second time. Step 5 builds the saved revision, even when `origin/main` has moved on since then, and stops if the saved revision is no longer `origin/main` or one of its ancestors.
+Then follow `~/harbor-install-log/guide.md`. When you resume later, read that saved copy again. Step 5 builds the saved revision, even when `origin/main` has moved on since then, and stops if the saved revision is no longer `origin/main` or one of its ancestors.
+
+**If not:** If the block prints `STOP: the guide was already saved from revision`, an earlier session saved the guide. The normal path is to continue with `~/harbor-install-log/guide.md`, at the first step that the progress block does not list. Starting over with a newer guide is the owner's decision. If the block fails before it prints `saved the guide from revision`, it has saved no revision, so run it again.
 
 ## Rules for the agent
 
@@ -34,7 +38,7 @@ Then follow `~/harbor-install-log/guide.md`. When you resume later, read that sa
    - a check fails;
    - the host differs from what this guide describes.
 
-   A block that checks for an expected refusal, such as a denied write, exits 0 only when the refusal happened, so a nonzero exit always means stop. A block that prints a line starting with `WAIT` is waiting for something that has not finished: run the same block again. While such a block waits, it prints a `still waiting` line at least once a minute. When the `ssh` of such a waiting block exits with status 255, the connection dropped: run the same block again, and stop if it cannot connect.
+   A block that checks for an expected refusal, such as a denied write, exits 0 only when the refusal happened, so a nonzero exit always means stop. A block that prints a line starting with `WAIT` is waiting for something that has not finished: run the same block again. While such a block waits, it prints a `still waiting` line at least once a minute. When the `ssh` of such a waiting block exits with status 255, the connection dropped: run the same block again, and stop if it cannot connect. The earlier run can stay active on the VPS for several minutes after the drop. The wait blocks of steps 5 and 12 let only one run work at a time: a new run waits up to 50 seconds for an earlier one, and prints `WAIT: an earlier run of this block is still active` if it is still active then. When the earlier run already finished the block's work, the new run says so and exits 0.
 3. **Never** improvise a command that changes the host, delete a path that this guide does not name, change a pinned version, hash or value to get past a failure, or edit or commit to the repository.
 4. **Secrets.** These files and texts hold secrets:
    - the Google client file and the client secret file;
@@ -51,7 +55,7 @@ Then follow `~/harbor-install-log/guide.md`. When you resume later, read that sa
    - the release check in `deploy-release`, which runs the release's `node`, `codex` and `pnpm` with `HOME=/nonexistent`, whenever `bootstrap` in step 5 or `preflight` in steps 14 and 15 runs. It creates a root-owned `/nonexistent` with `.codex` and `.local` in it, as the [release check issue](../../issues/2026-09-30-103816-release-check-home.md) records. Step 16 reports that tree and leaves it in place.
 
    The model listings also set `CODEX_HOME` and turn the plugins feature off, as Harbor's runtimes do.
-6. **Long steps.** The first-release build and the Codex login run as transient systemd units that write to a log under `/var/lib/harbor-install`, so a dropped SSH connection does not stop them. Their wait blocks poll for at most eight minutes; run them again until they finish.
+6. **Long steps.** The first-release build and the Codex login run as transient systemd units that write to a log under `/var/lib/harbor-install`, so a dropped SSH connection does not stop them. Their wait blocks poll for at most eight minutes; run them again until they finish. Each wait block holds a lock while it runs: `/run/lock/harbor-install-bootstrap.lock` in step 5 and `/run/lock/harbor-install-login.lock` in step 12. These empty files stay until the host restarts, and the guide does not remove them.
 7. **Resuming.** The VPS keeps `/var/lib/harbor-install/progress`, with one line for each finished step, such as `step 3 done 2026-10-01T09:30:00Z`. After an interruption, run the progress block below and continue at the first step that has no line. That step's Check says whether it was partly done. `install` and the owner enrollment cannot simply be repeated, so their steps say what a partial result looks like and when to stop for the owner.
 8. **Records.** Keep a step-by-step log in `~/harbor-install-log/log.md`, outside the repository. For each block, write the time, the step, the exit status and the output, with secrets removed. At the end, the VPS keeps a root-only record in `/var/lib/harbor-install/record.json`.
 
@@ -75,7 +79,7 @@ Every step has the same parts:
 
 The owner completes this checklist before the run, or when the named step reaches it:
 
-1. **Host.** The VPS runs Ubuntu 24.04 on x86_64, with either no Docker or the Docker Engine packages from Docker's own repository: `docker-ce`, `docker-ce-cli`, `containerd.io` and `docker-compose-plugin`. Step 1 checks it, and stops for any other Docker installation, such as a snap or an incomplete set of packages.
+1. **Host.** The VPS runs Ubuntu 24.04 on x86_64, with no Docker, Ubuntu's `docker.io` packages, or Docker's own Docker Engine packages (`docker-ce`, `docker-ce-cli`, `containerd.io` and `docker-compose-plugin`). Step 1 checks it, and stops for any other Docker installation, such as a snap or an incomplete set of packages.
 2. **Values.** Confirm the [values](#values), or tell the agent what to change, before step 1.
 3. **DNS record.** At the DNS provider for `seekworld.tech`, an A record for `harbor.seekworld.tech` that points at the VPS address `187.77.140.226`, and no AAAA record for that name. Step 2 checks it. The preview host is a `sslip.io` name, which resolves to the address it contains without any record.
 4. **Firewall.** In the hosting provider's panel, if it has a firewall for the VPS, allow inbound TCP 22, 80 and 443, before step 4.
@@ -86,7 +90,7 @@ The owner completes this checklist before the run, or when the named step reache
    - Harbor asks only for `openid`, and the enrollment only for `openid email`, so the consent screen can stay in Testing without a test-user list.
 7. **Owner email.** The Google account email that becomes Harbor's owner, before step 1.
 8. **Device code login.** Before step 12, turn on device code login for the ChatGPT account that Harbor will use. For a personal account, the owner turns it on in ChatGPT's security settings. For a ChatGPT workspace account, a workspace admin turns on device code login in the workspace's permissions.
-9. **Time.** In step 8, open the enrollment link within about 25 minutes of receiving it, and finish signing in within 10 minutes of opening it. In step 12, enter the Codex device code within 15 minutes of receiving it.
+9. **Time.** In step 8, finish signing in before the time that the agent gives with the enrollment link, and within 10 minutes of opening the link. In step 12, enter the Codex device code within 15 minutes of receiving it.
 
 ## Values
 
@@ -536,7 +540,7 @@ value() {
   printf '%s\n' "$found"
 }
 HOST=$(value HOST '[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+' 'a host name') || exit 1
-answer=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' "http://$HOST/")
+answer=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code} %{redirect_url}' "http://$HOST/") || { echo "STOP: no answer from http://$HOST/ within 20 seconds"; exit 1; }
 echo "http://$HOST/ answers: $answer"
 case "$answer" in
   "301 https://$HOST/"|"308 https://$HOST/") ;;
@@ -551,9 +555,15 @@ LOCAL
 
 The installed Traefik remains trusted with host-level power: a read-only mount of the Docker socket does not limit what Traefik can do through the Docker API, as the personal VPS guide already assumes. It has no API, dashboard or access log. With the access log off, the enrollment start URL and the sign-in callback stay out of the proxy's logs.
 
-**Expect:** Either `keeping the running Traefik:` with the container, or `Traefik listens on ports 80 and 443` followed by `http://harbor.seekworld.tech/ answers: 301 https://harbor.seekworld.tech/` (308 is also correct) and `REDIRECT OK`. When block 1 resumes an earlier run, it first prints `no Traefik runs; starting the Traefik that an earlier run of this block wrote to /opt/traefik`.
+**Expect:** One of these:
 
-**If not:** Stop. If `ufw` blocks the ports, the owner decides whether to allow them. If block 1 stops because `/opt/traefik` exists, it lists the directory and says whether `compose.yaml` is missing or differs; what happens to that directory is the owner's decision. If block 2 cannot connect, the owner checks the hosting firewall.
+- `keeping the running Traefik:` with the container;
+- `Traefik listens on ports 80 and 443`, followed by block 2's output: `http://harbor.seekworld.tech/ answers: 301 https://harbor.seekworld.tech/` (308 is also correct) and `REDIRECT OK`;
+- `the Traefik that this guide installed runs; run block 2`, followed by block 2's output.
+
+When block 1 resumes an earlier run, it first prints `no Traefik runs; starting the Traefik that an earlier run of this block wrote to /opt/traefik`.
+
+**If not:** Stop. If `ufw` blocks the ports, the owner decides whether to allow them. If block 1 stops because `/opt/traefik` exists, it lists the directory and says whether `compose.yaml` is missing or differs; what happens to that directory is the owner's decision. If block 2 cannot connect, the owner checks the hosting firewall. Before its `STOP` line, block 2 shows curl's reason: `curl: (28)` with `timed out` means that nothing answered within 20 seconds, and `curl: (7)` means that curl could not connect.
 
 ### Step 5. First release
 
@@ -574,6 +584,11 @@ else
 fi
 echo "build unit: $(systemctl show -p LoadState -p SubState -p ExecMainStatus harbor-install-bootstrap.service | tr '\n' ' ')"
 echo "releases: $(ls -A /opt/harbor-personal/releases 2>/dev/null | tr '\n' ' ')"
+for dir in /var/lib/harbor-deploy/inputs /var/lib/private/harbor-deploy-build; do
+  if [ -z "$(find "$dir" -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then echo "$dir: empty or absent"; continue; fi
+  echo "$dir holds:"
+  find "$dir" -mindepth 1 -maxdepth 1 -exec du -sh -- {} + 2>/dev/null || true
+done
 REMOTE
 ```
 
@@ -581,6 +596,7 @@ REMOTE
 - `upload: complete` and `LoadState=not-found`: run blocks 2 and 3.
 - `LoadState=loaded`: run block 3.
 - A `.staging-` entry under releases: stop for the owner.
+- Entries that the block lists, with their sizes, under `/var/lib/harbor-deploy/inputs` or `/var/lib/private/harbor-deploy-build`: while a build runs, its own directories appear there. Otherwise they are left from an interrupted build, as [Recovery](#recovery) describes. Report them to the owner, and continue.
 
 **Run:**
 
@@ -647,7 +663,7 @@ echo "started $unit for revision $revision"
 REMOTE
 ```
 
-**Block 3.** Wait for the build, which takes several minutes. Run this block again while it prints `WAIT`:
+**Block 3.** Wait for the build, which takes several minutes. Run this block again while it prints `WAIT`. The block holds the lock `/run/lock/harbor-install-bootstrap.lock` while it runs, so an earlier run of it that is still active cannot finish the step at the same time. When an earlier run already finished the step, the block prints the recorded release and changes nothing, apart from stopping the build unit if that earlier run could not:
 
 ```bash
 ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
@@ -655,13 +671,26 @@ unit=harbor-install-bootstrap.service
 log=/var/lib/harbor-install/bootstrap.log
 end=$((SECONDS + 480))
 beat=$((SECONDS + 40))
-while [ "$(systemctl show -p SubState --value "$unit")" = running ] && [ "$SECONDS" -lt "$end" ]; do
-  sleep 15
+exec 9>/run/lock/harbor-install-bootstrap.lock
+flock -w 50 9 || { echo "WAIT: an earlier run of this block is still active; run this block again"; exit 0; }
+if grep -q '^step 5 done' /var/lib/harbor-install/progress; then
+  set -a; . /var/lib/harbor-install/values.env; set +a
+  [ "$(systemctl show -p LoadState --value "$unit")" = not-found ] || systemctl stop "$unit"
+  echo "an earlier run of this block finished step 5: release $RELEASE, manifest SHA-256 $MANIFEST_SHA256"
+  exit 0
+fi
+read_unit() {
+  props=$(systemctl show -p LoadState -p SubState -p ExecMainStatus "$unit")
+  load=$(sed -n 's/^LoadState=//p' <<<"$props")
+  state=$(sed -n 's/^SubState=//p' <<<"$props")
+  status=$(sed -n 's/^ExecMainStatus=//p' <<<"$props")
+}
+read_unit
+while [ "$state" = running ] && [ "$SECONDS" -lt "$end" ]; do
   if [ "$SECONDS" -ge "$beat" ]; then echo "still waiting after $SECONDS seconds: the build is running"; beat=$((SECONDS + 40)); fi
+  sleep 15
+  read_unit
 done
-load=$(systemctl show -p LoadState --value "$unit")
-state=$(systemctl show -p SubState --value "$unit")
-status=$(systemctl show -p ExecMainStatus --value "$unit")
 echo "$unit: $load, $state, exit status $status"
 if [ "$load" = not-found ]; then echo "STOP: the build unit does not exist; run block 2 first"; exit 1; fi
 if [ "$state" = running ]; then tail -n 3 "$log"; echo "WAIT: the build is still running; run this block again"; exit 0; fi
@@ -687,8 +716,8 @@ values.write_text('\n'.join(lines) + '\n')
 print(json.dumps(result))
 print('release', release, 'manifest SHA-256', manifest)
 PY
-systemctl stop "$unit"
 echo "step 5 done $(date -u +%FT%TZ)" >> /var/lib/harbor-install/progress
+[ "$(systemctl show -p LoadState --value "$unit")" = not-found ] || systemctl stop "$unit"
 REMOTE
 ```
 
@@ -698,8 +727,9 @@ REMOTE
 - For a new build, block 3 prints four `Downloading` lines and four `Verified` lines, one each for `node-v24.11.1-linux-x64.tar.xz`, `codex-0.153.4-linux-x64.tgz`, `pnpm-12.3.4.tgz` and `exe.linux-x64-12.3.4.tgz`. Then it prints `Building` with the revision, and `Staged /opt/harbor-personal/releases/bootstrap-` followed by the first 12 characters of the revision. The JSON line has `release`, `revision`, `archiveSha256`, `fileCount`, `manifestSha256` and `"reused": false`.
 - When an earlier attempt already staged the release, `bootstrap` verifies it against the revision and reuses it, without downloading or building. Block 3 then prints one `[deploy]` line, `Release already staged and verified:` with the path, and the JSON line has only `release` and `"reused": true`.
 - The last line is `release /opt/harbor-personal/releases/bootstrap-` with the revision's first 12 characters, and the manifest SHA-256.
+- When you run block 3 again while an earlier run of it is still active, for example after an `ssh` exit status of 255, it waits up to 50 seconds for that run. If that run is still active then, block 3 prints `WAIT: an earlier run of this block is still active; run this block again`. When an earlier run already finished the step, block 3 prints only `an earlier run of this block finished step 5: release /opt/harbor-personal/releases/bootstrap-` with the revision's first 12 characters, then `, manifest SHA-256` and the SHA-256 that `values.env` records.
 
-**If not:** Stop. If block 1 stops because the saved revision is not `origin/main` or one of its ancestors, `main` was rewritten after you saved the guide; the owner decides how to continue. `bootstrap` refuses before it writes anything when the host has an instance configuration, when its staging directory exists, or when a filesystem that it writes to lacks space. [Recovery](#recovery) covers a refusal or a failed build.
+**If not:** Stop. If block 1 stops because the saved revision is not `origin/main` or one of its ancestors, `main` was rewritten after you saved the guide; the owner decides how to continue. `bootstrap` refuses before it writes anything when the host has an instance configuration, when its staging directory exists, or when a filesystem that it writes to lacks space. [Recovery](#recovery) covers a refusal or a failed build. If block 3 still prints `WAIT: an earlier run of this block is still active` ten minutes after the connection dropped, stop: no run of the block lasts that long.
 
 ### Step 6. Service account
 
@@ -969,11 +999,15 @@ done
 echo "the enrollment route answers 404 Not found over a verified certificate"
 for attempt in $(seq 1 30); do [ -f /var/lib/harbor-personal-onboarding/start-url ] && break; sleep 2; done
 [ -f /var/lib/harbor-personal-onboarding/start-url ] || { echo "STOP: the enrollment service wrote no start URL"; exit 1; }
+started=$(TZ=UTC systemctl show -p ActiveEnterTimestamp --value harbor-personal-enroll.service)
+[ -n "$started" ] || { echo "STOP: systemd reports no start time for the enrollment service"; exit 1; }
+started_at=$(date -u -d "$started" +%s)
 echo "START URL, FOR THE OWNER ONLY: $(cat /var/lib/harbor-personal-onboarding/start-url)"
+echo "the link stops working at $(date -u -d "@$((started_at + 1800))" '+%Y-%m-%d %H:%M UTC'), 30 minutes after the enrollment service started"
 REMOTE
 ```
 
-**Block 4, the owner.** Give the start URL only to the owner, and keep it out of your log. The owner opens it within about 25 minutes of receiving it, signs in with the Google account of `OWNER_EMAIL`, and finishes signing in within 10 minutes of opening it. The limits come from `infra/personal-vps/enroll-owner.ts`: the service's limit of 1800 seconds starts when the service starts, a few minutes before block 3 prints the link, and each sign-in attempt lasts 10 minutes. The page then says "Your account is verified. You can close this page; Harbor setup will continue."
+**Block 4, the owner.** Give the start URL only to the owner, with the time that block 3 printed after it, and keep the URL out of your log. The owner opens the link, signs in with the Google account of `OWNER_EMAIL`, and finishes signing in before that time and within 10 minutes of opening the link. The limits come from `infra/personal-vps/enroll-owner.ts`: the service's limit of 1800 seconds starts when the helper starts, and each sign-in attempt lasts 10 minutes. Block 3 counts the 1800 seconds from the moment that systemd started the service, just before the helper started, and drops the seconds, so the printed time is slightly early. The page then says "Your account is verified. You can close this page; Harbor setup will continue."
 
 **Block 5.** Wait for the result. Run this block again while it prints `WAIT`:
 
@@ -1039,7 +1073,7 @@ REMOTE
 
 - Block 1 prints `/etc/harbor-personal-onboarding/google-client.json root 600` and the file's size.
 - Block 2 prints `redirect URI https://harbor.seekworld.tech/auth/callback is listed in the file`, `secret file /etc/harbor-personal-oidc/seekworld.secret mode 0o600`, the client ID, and `postgres image postgres:17.6-bookworm@sha256:` followed by 64 hexadecimal characters. If the redirect URI is not listed, the file may be older than the URI: ask the owner to confirm that the client's authorized redirect URIs contain it exactly, then continue.
-- Block 3 prints `the enrollment route answers 404 Not found over a verified certificate` and the start URL. While it waits, a last answer of `000` means that no verified HTTPS connection was made yet.
+- Block 3 prints `the enrollment route answers 404 Not found over a verified certificate`, the start URL, and `the link stops working at` with a date and time in UTC, then `30 minutes after the enrollment service started`. When you run block 3 again while the service runs, it prints the same link and the same time. While it waits, a last answer of `000` means that no verified HTTPS connection was made yet.
 - Block 5 prints `enrolled`, the owner's email and `https://accounts.google.com`, then the copy line.
 - Block 6 prints the removal line.
 
@@ -1114,7 +1148,7 @@ REMOTE
 **Expect:**
 
 - `bundled models: gpt-6-astra,gpt-5.6-sol,gpt-5.6-terra,gpt-5.6-luna,gpt-5.5,gpt-5.2`, the list that Codex 0.153.4 printed on 30 September 2026.
-- `wrote /var/lib/harbor-install/seekworld.json`.
+- `wrote /var/lib/harbor-install/seekworld.json`, or, when an earlier run of the block already wrote it, `keeping the existing /var/lib/harbor-install/seekworld.json`.
 - `Configuration valid; installation and native sandbox acceptance still required.`
 
 **If not:** Stop. Every value must be right before step 10, because an installed instance cannot be reconfigured.
@@ -1235,7 +1269,7 @@ REMOTE
 
 **Block 2, the owner.** Give the owner the link and the one-time code, and keep the code out of your log. The code expires 15 minutes after Codex printed it. The owner opens `https://auth.openai.com/codex/device`, signs in to the ChatGPT account that Harbor will use, and enters the code. The owner cancels if anyone other than this agent supplied a code.
 
-**Block 3.** Wait for the login. Run this block again while it prints `WAIT`:
+**Block 3.** Wait for the login. Run this block again while it prints `WAIT`. The block holds the lock `/run/lock/harbor-install-login.lock` while it runs, so an earlier run of it that is still active cannot finish the login at the same time. When the login unit no longer exists and `auth.json` is not empty, an earlier run finished the login: the block then removes the login's log if one is left, prints the details of `auth.json`, and changes nothing else:
 
 ```bash
 ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
@@ -1245,13 +1279,25 @@ log=/var/lib/harbor-install/login.log
 auth=/var/lib/harbor-personal-$INSTANCE/codex-home/auth.json
 end=$((SECONDS + 480))
 beat=$((SECONDS + 40))
-while [ "$(systemctl show -p SubState --value "$unit")" = running ] && [ "$SECONDS" -lt "$end" ]; do
-  sleep 10
+exec 9>/run/lock/harbor-install-login.lock
+flock -w 50 9 || { echo "WAIT: an earlier run of this block is still active; run this block again"; exit 0; }
+read_unit() {
+  props=$(systemctl show -p LoadState -p SubState -p ExecMainStatus "$unit")
+  load=$(sed -n 's/^LoadState=//p' <<<"$props")
+  state=$(sed -n 's/^SubState=//p' <<<"$props")
+  status=$(sed -n 's/^ExecMainStatus=//p' <<<"$props")
+}
+read_unit
+if [ "$load" = not-found ] && [ -s "$auth" ]; then
+  rm -f -- "$log"
+  echo "an earlier run of this block finished the login; auth.json: $(stat -c '%U, mode %a, %s bytes' "$auth")"
+  exit 0
+fi
+while [ "$state" = running ] && [ "$SECONDS" -lt "$end" ]; do
   if [ "$SECONDS" -ge "$beat" ]; then echo "still waiting after $SECONDS seconds: the owner has not finished the login"; beat=$((SECONDS + 40)); fi
+  sleep 10
+  read_unit
 done
-load=$(systemctl show -p LoadState --value "$unit")
-state=$(systemctl show -p SubState --value "$unit")
-status=$(systemctl show -p ExecMainStatus --value "$unit")
 echo "$unit: $load, $state, exit status $status"
 if [ "$load" = not-found ]; then echo "STOP: the login unit does not exist; run block 1"; exit 1; fi
 if [ "$state" = running ]; then echo "WAIT: the owner has not finished the login; run this block again"; exit 0; fi
@@ -1265,7 +1311,7 @@ fi
 if [ "$clean" != 'no log' ]; then grep -q 'Successfully logged in' <<<"$clean" || { echo "STOP: the login printed no success line"; exit 1; }; fi
 [ -s "$auth" ] || { echo "STOP: $auth is missing or empty"; exit 1; }
 echo "Successfully logged in; auth.json: $(stat -c '%U, mode %a, %s bytes' "$auth")"
-systemctl stop "$unit"
+[ "$(systemctl show -p LoadState --value "$unit")" = not-found ] || systemctl stop "$unit"
 REMOTE
 ```
 
@@ -1304,10 +1350,11 @@ REMOTE
 **Expect:**
 
 - Block 1 prints Codex's instructions, with `https://auth.openai.com/codex/device` and a one-time code.
-- Block 3 prints `Successfully logged in; auth.json: harbor-personal, mode 600,` and a size.
+- Block 3 prints `Successfully logged in; auth.json: harbor-personal, mode 600,` and a size. When an earlier run of block 3 already finished the login, it prints only `an earlier run of this block finished the login; auth.json: harbor-personal, mode 600,` and a size.
+- When you run block 3 again while an earlier run of it is still active, for example after an `ssh` exit status of 255, it waits up to 50 seconds for that run. If that run is still active then, block 3 prints `WAIT: an earlier run of this block is still active; run this block again`.
 - Block 4 prints the model lists without `STOP`, and the size of `codex-home` before and after.
 
-**If not:** Stop. If a signed-in model is missing from the configuration, the fix before the first start is a teardown and reinstall, which is the owner's decision. For an expired code, see [Recovery](#recovery). If Codex says that device code login is not enabled, it must be turned on: for a personal account, the owner turns it on in ChatGPT's security settings; for a ChatGPT workspace account, a workspace admin turns on device code login in the workspace's permissions. Then follow the Recovery case for an expired code.
+**If not:** Stop. If a signed-in model is missing from the configuration, the fix before the first start is a teardown and reinstall, which is the owner's decision. For an expired code, see [Recovery](#recovery). If Codex says that device code login is not enabled, it must be turned on: for a personal account, the owner turns it on in ChatGPT's security settings; for a ChatGPT workspace account, a workspace admin turns on device code login in the workspace's permissions. Then follow the Recovery case for an expired code. If block 3 still prints `WAIT: an earlier run of this block is still active` ten minutes after the connection dropped, stop: no run of the block lasts that long.
 
 ### Step 13. Start
 
@@ -1356,10 +1403,10 @@ ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o Server
 set -a; . /var/lib/harbor-install/values.env; set +a
 cd /
 name=harbor-personal-$INSTANCE
-health=$(curl -sS -w ' %{http_code}' "$ORIGIN/health") || { echo "STOP: no verified HTTPS answer from $ORIGIN/health"; exit 1; }
+health=$(curl -sS --max-time 20 -w ' %{http_code}' "$ORIGIN/health") || { echo "STOP: no verified HTTPS answer from $ORIGIN/health within 20 seconds"; exit 1; }
 echo "health: $health"
 [ "$health" = '{"status":"ready"} 200' ] || { echo "STOP: unexpected health answer"; exit 1; }
-login=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' "$ORIGIN/auth/login")
+login=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code} %{redirect_url}' "$ORIGIN/auth/login") || { echo "STOP: no verified HTTPS answer from $ORIGIN/auth/login within 20 seconds"; exit 1; }
 python3 - "$login" <<'PY'
 import os
 import sys
@@ -1372,7 +1419,7 @@ if code != '302' or url.hostname != 'accounts.google.com' or query.get('redirect
     raise SystemExit('STOP: /auth/login answered ' + code + ' to ' + str(url.hostname) + url.path)
 print('login: 302 to', url.hostname + url.path, 'with redirect_uri', callback)
 PY
-anonymous=$(curl -sS -o /dev/null -w '%{http_code}' "$ORIGIN/")
+anonymous=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$ORIGIN/") || { echo "STOP: no verified HTTPS answer from $ORIGIN/ within 20 seconds"; exit 1; }
 echo "anonymous /: $anonymous"
 [ "$anonymous" = 401 ] || { echo "STOP: an anonymous request was not refused with 401"; exit 1; }
 preview=none
@@ -1460,7 +1507,7 @@ REMOTE
 - The owner signs in, adds the project and gets a reply with the token.
 - Block 3 prints `edit-me.txt: status: AFTER` and the conversation line.
 
-**If not:** Stop. The canary folder stays either way: it is a registered project now, so the owner decides whether to archive the project and remove the folder.
+**If not:** Stop. The canary folder stays either way: it is a registered project now, so the owner decides whether to archive the project and remove the folder. Before a `STOP: no verified HTTPS answer` line, block 1 shows curl's reason: `curl: (28)` with `timed out` means that nothing answered within 20 seconds, and `curl: (60)` means that the certificate could not be verified, which the Let's Encrypt case in [Recovery](#recovery) covers.
 
 ### Step 15. GitHub Actions deploys
 
@@ -1578,7 +1625,7 @@ REMOTE
 
 **Run:**
 
-**Block 1.** Remove the rendered bundle, the uploaded source and any scratch home left behind, report the `/nonexistent` tree that stays, and write the record:
+**Block 1.** Remove the rendered bundle, the uploaded source and any scratch home left behind, report the `/nonexistent` tree that stays, list what builds left under `/var/lib/harbor-deploy/inputs` and `/var/lib/private/harbor-deploy-build` without removing it, and write the record:
 
 ```bash
 ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
@@ -1590,6 +1637,11 @@ if [ -e /nonexistent ]; then
 else
   echo "no /nonexistent tree"
 fi
+for dir in /var/lib/harbor-deploy/inputs /var/lib/private/harbor-deploy-build; do
+  if [ -z "$(find "$dir" -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then echo "$dir: empty or absent"; continue; fi
+  echo "$dir holds:"
+  find "$dir" -mindepth 1 -maxdepth 1 -exec du -sh -- {} + 2>/dev/null || true
+done
 python3 - <<'PY'
 import datetime
 import json
@@ -1636,7 +1688,7 @@ Fresh VPS install finished on DATE (UTC), from the guide at REVISION.
 - Stops, deviations and anything left for the owner: none, or each one.
 ```
 
-**Expect:** `left in place: /nonexistent` with its entries, root-owned, such as `.codex/tmp/arg0` and `.local/share/pnpm`; the guide does not remove this tree, as rule 5 says. Then the record, then a listing of `/var/lib/harbor-install` with `values.env`, `progress`, `record.json`, `seekworld.json`, `owner.json`, `root-acl-before.txt`, `ssh-acl-before.txt`, `preflight.json` and `bootstrap.log`, and no `bundle` or `scratch-home`. Keep these files: the ACL backup reverses step 7, and the rest records the installation.
+**Expect:** `left in place: /nonexistent` with its entries, root-owned, such as `.codex/tmp/arg0` and `.local/share/pnpm`; the guide does not remove this tree, as rule 5 says. Then `/var/lib/harbor-deploy/inputs: empty or absent` and `/var/lib/private/harbor-deploy-build: empty or absent`, which is the normal result. If either line says `holds:` instead, the entries below it, with their sizes, are left from an interrupted build, as [Recovery](#recovery) describes: add them to the summary for the owner, whose decision their removal is, and continue. Then the record, then a listing of `/var/lib/harbor-install` with `values.env`, `progress`, `record.json`, `seekworld.json`, `owner.json`, `root-acl-before.txt`, `ssh-acl-before.txt`, `preflight.json` and `bootstrap.log`, and no `bundle` or `scratch-home`. Keep these files: the ACL backup reverses step 7, and the rest records the installation.
 
 **If not:** Stop.
 
@@ -1660,7 +1712,7 @@ REMOTE
 
 Expect `LoadState=not-found`.
 
-**The build failed.** `bootstrap` removes its staging directory, its inputs and its build state on every exit. If it could not remove the staging directory, its log names that directory after `Could not remove the partial staging directory`, and the directory is the owner's to inspect. A refusal before the build changes nothing. After the owner fixes the cause, such as free space or network access, clear the unit with this block, then run step 5's blocks 2 and 3 again:
+**The build failed.** When the `bootstrap` process ends, normally or with an error, it removes its staging directory, its inputs and its build state. If it could not remove the staging directory, its log names that directory after `Could not remove the partial staging directory`, and the directory is the owner's to inspect. A refusal before the build changes nothing. When the build is interrupted instead, because the host restarted or the process was killed, `bootstrap` removes nothing: the run's directories stay under `/var/lib/harbor-deploy/inputs` and `/var/lib/private/harbor-deploy-build`, where step 5's Check and step 16 list them with their sizes, and a `.staging-` entry may stay under `/opt/harbor-personal/releases`. Removing them is the owner's decision; this guide removes none of them. After the owner fixes the cause, such as free space or network access, clear the unit with this block, then run step 5's blocks 2 and 3 again:
 
 ```bash
 ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'

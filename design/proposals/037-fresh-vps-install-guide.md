@@ -187,7 +187,7 @@ The personal VPS guide already requires that conversation, because a version che
     - a `bin/pnpm` wrapper;
     - the same modes.
   - `validate_native_distribution(vendor, require_root=False)` passes on `vendor/` before the build starts.
-- **Build and staging.** `build` and `bootstrap` share one function that runs the transient build unit, stages the package, sets root ownership, verifies it against its manifest and renames it into place. It removes its inputs and build state on every exit, as `build` does now. The unit keeps `build`'s properties. `bootstrap`'s unit is `harbor-deploy-build-bootstrap-<rev12>`, and `build`'s keeps its name. The release is `bootstrap-<rev12>`.
+- **Build and staging.** `build` and `bootstrap` share one function that runs the transient build unit, stages the package, sets root ownership, verifies it against its manifest and renames it into place. It removes its inputs and build state whenever its process exits, as `build` does now; a reboot or a killed process leaves them, as the [interrupted build issue](../../issues/2026-09-30-125456-interrupted-build-leftovers.md) records. The unit keeps `build`'s properties. `bootstrap`'s unit is `harbor-deploy-build-bootstrap-<rev12>`, and `build`'s keeps its name. The release is `bootstrap-<rev12>`.
 - **Output.** One JSON line, as `build` prints: `release`, `revision`, `archiveSha256`, `fileCount`, `manifestSha256` and `reused`.
 - **Unchanged.** `build`, `promote`, `preflight` and `prune` behave as before. Prune already treats a `bootstrap-*` release like any other: it keeps the installed release.
 
@@ -196,7 +196,7 @@ The personal VPS guide already requires that conversation, because a version che
 - **Where commands run.** Every host command runs as root through the owner's `harbor-vps` SSH alias, as a quoted here-document to `bash -euo pipefail -s`, so that nothing expands locally. Commands for the owner's computer run in the owner's clone and never change its branch, index or working tree.
 - **Which scripts run.** `bootstrap` runs from a `tools` clone of the uploaded bundle, as the workflow runs `deploy-release`. Every later `harbor-personal` and `deploy-release` command runs from the new release, whose files its manifest covers.
 - **Homes.** Every command that may start Codex runs with `HOME` set to a root-only scratch home under `/var/lib/harbor-install`, which the step removes afterwards. That includes `install`, because it runs the release's `codex --version` with the caller's environment, and Codex may write into its home. The model listings also set `CODEX_HOME` and turn the plugins feature off, as Harbor's runtimes do. The exception is `deploy-release`'s release check, which sets `HOME=/nonexistent` itself and so leaves root-owned directories there; the guide names it, and the [release check issue](../../issues/2026-09-30-103816-release-check-home.md) tracks it.
-- **Long steps.** The first-release build and the Codex login run as transient systemd units that write to a log under `/var/lib/harbor-install`. A dropped SSH connection therefore does not stop them. The agent polls with a bounded loop that prints a line at least once a minute. SSH keepalives end a dead connection, and the agent then runs the same block again.
+- **Long steps.** The first-release build and the Codex login run as transient systemd units that write to a log under `/var/lib/harbor-install`. A dropped SSH connection therefore does not stop them. The agent polls with a bounded loop that prints a line at least once a minute. SSH keepalives end a dead connection, and the agent then runs the same block again. The earlier remote run of that block can stay active for minutes, so each of the two wait blocks holds its own lock under `/run/lock`. A new run waits up to 50 seconds for the lock, and otherwise says that an earlier run is still active. Once it has the lock, it reports a step that an earlier run already finished, instead of stopping.
 - **Secrets.** The guide lists the files that hold secrets:
   - the Google client file and the secret file;
   - the rendered bundle;
@@ -256,7 +256,7 @@ The personal VPS guide already requires that conversation, because a version che
    - the Google web client with the exact redirect URI, and its client JSON saved on the owner's computer. A lost secret is replaced with Add Secret. A new client is created only if none exists;
    - the Google account email to enroll;
    - device code login enabled, in ChatGPT's security settings for a personal account or by a workspace admin for a workspace account;
-   - time to approve the device code and to open the enrollment link, each within its expiry.
+   - time to finish the enrollment sign-in before the end time that step 8 prints, and to enter the device code within 15 minutes.
 4. **Values.** One table: the name, value and source of every value used later. Each host step reads them from `/var/lib/harbor-install/values.env`, which step 1 writes. The file holds no secrets. A block on the owner's computer copies the file and reads each value that it needs from that value's one `KEY='value'` line, checked against a pattern, and never sources the file.
 5. **Steps.** In this order:
    1. **Check the host.**
@@ -292,7 +292,7 @@ The personal VPS guide already requires that conversation, because a version che
         - record the revision in `values.env` once the clean `tools` checkout matches it.
       - On the host:
         - check that the upload is complete, then run `tools/infra/personal-vps/deploy-release bootstrap` in a transient unit that writes to a log under `/var/lib/harbor-install`;
-        - poll until the unit ends;
+        - poll until the unit ends, holding the step's lock, and report a step that an earlier run already finished;
         - expect the JSON line, and record the release path in `values.env`.
    6. **Service account.** `useradd --system --no-create-home --user-group --shell /usr/sbin/nologin harbor-personal`. Expect no supplementary groups.
    7. **Project folder and ACLs.**
@@ -316,7 +316,7 @@ The personal VPS guide already requires that conversation, because a version che
       - Pull `postgres:17.6-bookworm` and record its digest.
       - Create `harbor-enroll`, `enrollment.json`, the unit and the route. Start the route, then the service.
       - Poll for up to three minutes until an HTTPS request for `/enroll/invalid` returns the enrollment helper's own 404, with the body `Not found`, over a verified certificate. Traefik's own 404 does not count.
-      - Give the start URL only to the owner, who signs in with the enrolled email. The helper stops 1800 seconds after its service starts, and each sign-in attempt lasts 10 minutes, so the owner opens the link within about 25 minutes and finishes signing in within 10 minutes of opening it.
+      - Give the start URL only to the owner, who signs in with the enrolled email. The helper stops 1800 seconds after it starts, and each sign-in attempt lasts 10 minutes. So the step prints, with the URL, the time when the link stops working: the service's start time plus 1800 seconds, rounded down to the minute. The owner finishes signing in before that time and within 10 minutes of opening the link.
       - Poll until the result file exists and the service has stopped. Expect the Google issuer and the enrolled email in the result.
       - Copy the result to `/var/lib/harbor-install/owner.json` with mode `0600`. Then remove the route, the unit, the `harbor-enroll` account, `/var/lib/harbor-personal-onboarding` and `/etc/harbor-personal-onboarding`. The secret file keeps the only other copy of the secret.
    9. **Configuration.**
@@ -339,7 +339,7 @@ The personal VPS guide already requires that conversation, because a version che
    12. **Codex login.**
        - Run `harbor-personal login` in a transient unit that writes to a log.
        - Give the owner the URL and code within 15 minutes.
-       - Poll until the unit ends. Expect a successful login line and a nonempty `auth.json`, never printed. Then remove the log, which holds the used code.
+       - Poll until the unit ends, holding the step's lock. Expect a successful login line and a nonempty `auth.json`, never printed. Then remove the log, which holds the used code. Report a login that an earlier run already finished.
        - List the signed-in models as the service account, with the instance's homes. Stop if an ID there is missing from the configuration. Before the first start, the fix is a teardown and reinstall, which is the owner's decision.
        - List `codex-home/.tmp`. Remove only `plugins`, `plugins-clone-*` and `git-*` entries there, which the Codex login may leave and Harbor's runtimes never use, because they turn the plugins feature off. Report the home's size before and after.
    13. **Start.** Enable and start the three units. Expect all three active.
@@ -359,7 +359,7 @@ The personal VPS guide already requires that conversation, because a version che
        - The owner stores the secrets and variables.
        - The agent may then run the read-only `preflight` workflow.
    16. **Clean up and record.**
-       - Remove the rendered bundle, `/var/lib/harbor-deploy/incoming/bootstrap` and any scratch home left behind. Report the `/nonexistent` tree that the release check leaves, and keep it.
+       - Remove the rendered bundle, `/var/lib/harbor-deploy/incoming/bootstrap` and any scratch home left behind. Report the `/nonexistent` tree that the release check leaves, and keep it. List what interrupted builds left under `/var/lib/harbor-deploy/inputs` and `/var/lib/private/harbor-deploy-build`, for the owner.
        - Keep the ACL backup, `owner.json`, the configuration, `values.env` and the progress file.
        - Write `record.json`.
        - Give the owner a summary to share in the project thread, so that this plan can record the first run.
@@ -643,6 +643,50 @@ Main's dispositions:
     - It ran `unshare` with a private mount namespace. The tmpfs mount attempt created an empty directory, `/run/mount`, in this container.
     - The session's permission checks denied the reviewer's removal of that directory and a later bind mount. The reviewer then used a stub.
     - Main left the directory in place because the reviewer's removal had been denied. It disappears with the container.
+
+### Fix round 2, 30 September 2026
+
+The implementer again changed only the guide. The guide now has SHA-256 `672135d5…5b3` and 1,750 lines, and the tracked diff against `9ba6d53` is still `4dd63dff…a3b`.
+
+The fixes:
+
+- **Saving the guide.** The block before step 1 stops without changing anything when a saved revision exists. It still writes the revision last, so a first attempt that failed can run again.
+- **Wait blocks.** The wait blocks of steps 5 and 12 each hold a lock under `/run/lock`, which a restart empties.
+  - A new run waits up to 50 seconds for an earlier one. If the earlier run is still active, it prints a `WAIT` line.
+  - With the lock, a new run reports a step that an earlier run already finished.
+  - Each run reads the unit's state with one call, and stops the unit only if it still exists.
+  - Step 5 records its progress line before it stops the unit, so a run killed between the two leaves a state that the next run reports as finished.
+- **Enrollment link.** Step 8 prints the time when the enrollment link stops working: the service's start time plus 1800 seconds, rounded down to the minute. Block 4 and the owner's checklist use that time.
+- **Expect lines.** Step 4's and step 9's Expect lines name the outputs that were missing.
+- **Docker in the checklist.** The owner's checklist names Ubuntu's `docker.io`.
+- **Time limits.** Single `curl` calls have a 20-second limit and a `STOP` line.
+- **Interrupted builds.** Recovery says what an interrupted build leaves. Step 5's Check and step 16 list the two build directories, with sizes, for the owner.
+
+The implementer reported these results:
+
+- **Harness.** The P037-04 harness now has 670 checks, and all passed. It still runs 40 of the guide's 42 Bash blocks whole.
+- **Overlapping runs.**
+  - Two overlapping runs of each wait block, with real `flock` on relocated files, ended with one finish, one progress line and no `STOP`. The round 1 text of each block failed the same test.
+  - The end time was checked with sample `ActiveEnterTimestamp` values.
+- **Gate.** Each gate command's log records its exit code, working directory and the guide's SHA-256:
+  - `bash -n` passed on 94 scripts;
+  - `check-docs` passed over 204 files;
+  - `git diff --check` passed;
+  - `pnpm check` passed;
+  - the 34 unit tests passed.
+
+Main accepted one residual race. If two runs of step 8's block 5 copy the enrollment result at the same instant, one of them can stop. Nothing is damaged, and a rerun passes.
+
+Main then:
+- recomputed the identities and read every change;
+- checked that this Ubuntu 24.04 container has `/run/lock` and `flock`, and that GNU `date` computes the end time from `systemctl`'s timestamp format;
+- amended this plan to match: the shared build path's cleanup, the long-step contract, the owner's checklist, and steps 5, 8, 12 and 16;
+- updated the unverified gates issue and the interrupted build issue;
+- reran `check-docs`, `git diff --check`, the 34 unit tests and `pnpm check` on this commit's final text. Their logs record each exit code and the files' SHA-256 values.
+
+**Correction to the Fix round 1 record.** The helper's 1800 seconds start when the helper starts, just after systemd starts the service, not with the service.
+
+**Container changes.** The harness runs updated `/run/systemd/systemd-units-load` again. The gate's intent-to-add rewrote the implementer's index, as before.
 
 ## Closing record
 
