@@ -131,7 +131,7 @@ For the owner's later reuse request, an administrator can copy only a verified C
 
 ## Current owner installation
 
-On 30 September 2026 the owner uninstalled Harbor from the VPS, so no instance is installed and the release records below are history.
+On 30 September 2026 the owner uninstalled Harbor from the VPS, so no instance is installed. The rest of this section is history: it describes the installation before then.
 
 On 21 September 2026, the installed P018/P024 release is `/opt/harbor-personal/releases/p024-sendfix-311f750a18bb`, source commit `311f750a18bb8bc400ddfc497b82b0f5de6e9e25`, manifest SHA256 `0ad775d55a52d75cb7e95fd0bb475d3202d86f90df8a70ac9c3d61e259382795`. The [installed correction record](../reports/2026-09-21-p024-installed-attachment-fix.md#final-deployment-and-installed-acceptance) identifies its immutable package, all-zero drain, matched checkpoint, unchanged 18 migrations, service/account/HTTPS policy and usable conversation composer. Its immediate predecessor is `p024-sendfix-c7f2d26a552b`. The [initial P018/P024 release](../reports/2026-09-21-p018-concurrency.md#committed-release-and-vps-delivery), `p018-p024-817c3d097166`, introduced migrations 019/020; its attachment claim was subsequently corrected. Retained releases require deliberate compatibility and matched-state assessment before rollback; never restore over newer work without assessing it.
 

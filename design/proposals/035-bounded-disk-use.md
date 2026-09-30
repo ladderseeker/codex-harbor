@@ -82,7 +82,7 @@ After this change:
    - each release and checkpoint, with its size and whether `prune` would keep it;
    - the total bytes that `prune` would free.
 
-   When `prune` cannot run, the section says why and lists nothing to remove; the report itself still succeeds.
+   When `prune` cannot run, the section says why and lists no releases, checkpoints or removals; the report itself still succeeds.
 7. **Explicit prune.** A new `deploy-release prune --instance NAME [--keep-checkpoints N]` action, with N from 1 to 10 and a default of 2, runs as root.
    - It keeps the installed release, every release that a process runs from, the newest N checkpoints that `deploy-release` wrote, and the releases those checkpoints name.
    - It deletes every other release and every other checkpoint that `deploy-release` wrote.
@@ -285,7 +285,7 @@ Run-owned scratch goes under `.test-runs/p035-*`, which Git ignores, or the OS t
   - on a host with another instance configuration, it refuses and changes nothing;
   - it rejects N outside 1 to 10;
   - its printed plan equals what it deletes.
-- **P035-08:** The `preflight` disk report lists each filesystem once, with free, total and reserve bytes, the build and checkpoint needs and whether each fits, the Codex scratch size, each release and checkpoint with its size and keep decision, and the total bytes prune would free. When prune cannot run, because of another instance or a backup root that is a symbolic link, the report says why and lists no releases, checkpoints or removals. It modifies nothing.
+- **P035-08:** The `preflight` disk report lists each filesystem once, with free, total and reserve bytes, the build and checkpoint needs and whether each fits, the Codex scratch size, each release and checkpoint with its size and keep decision, and the total bytes prune would free. When prune cannot run, because of another instance configuration or a release or backup root that is a symbolic link, the report says why and lists no releases, checkpoints or removals. It modifies nothing.
 - **P035-09:** The installer renders PostgreSQL with the `json-file` log driver, `max-size` 10m and `max-file` 3, and leaves the routing service unchanged.
 - **P035-10:** The applicable gate passes:
   - `pnpm build`, `pnpm check` and `pnpm test`;
@@ -329,10 +329,25 @@ The design reviewer reported one blocker, one major and three minor findings, fi
   - Nits: the cleanup command also removes the complete catalog copy, the script's help mentions prune, the full-disk sentence names preflight, P035-02 asserts the pinned version, the P035-05 tests assert the mount point, and the two guides date the uninstall.
 - **Accepted, and fixed by main in `d050fa3`:** the proxy-less evidence row is relabeled, and P035-02 cites other discrimination evidence; the 35 GB a day is conditional, with the observed range and SIGKILL retirement; Dependencies states the smoke's authorization and scope; the baseline count and size conventions are corrected; and the source issue records the deploy build's pnpm cache and leftover upload directories.
 - **Evidence retention:** main copied the baseline, gate and reproduction logs into `.test-runs/p035-evidence/` and recorded the smoke's binary identity in `.test-runs/p035-live/smoke-identity.json`. Both are ignored storage in a disposable container, so the delivery entry keeps the identities and results that matter.
-- **Accepted limitation:** a checkpoint copies each top-level entry with its own `cp -a`, so a hard link between two entries becomes two files. Harbor's state has no such links today.
+- **Accepted limitation:** a checkpoint copies entry by entry, below `codex-home`, below `home` and for each kept project subdirectory, so a hard link between two copied entries becomes two files and the space estimate can undercount. Harbor is not expected to create such links, but with no installed instance this could not be checked. The deploy guide's Limits say so.
 - **Handled by [P036](036-cloud-agent-sessions.md):** `AGENTS.md` names only `build` and `deploy` as needing the owner's go-ahead. P036 extends that to every action other than `preflight`, which covers `prune`.
 - **Recorded as issues:** Codex's [other default features](../../issues/2026-09-30-033835-personal-runtime-default-features.md), the history contract [running the host's login profile](../../issues/2026-09-30-033836-contract-test-login-shell.md), and the managed helper's [capture-limit truncation](../../issues/2026-09-30-032022-deploy-run-capture-limit.md).
 - **Observation:** P006-01 failed once, after 319 ms, in the implementer's baseline copy under `/tmp`, and it passed in every run in the repository checkout. It is not attributed to this plan.
+
+### Round 2, 30 September 2026
+
+Both reviewers read `git diff d33487f 9da83f6`, including the record commits `cbf00ee` and `d050fa3`, and found every round-1 fix in place. The design reviewer ran the deploy-release tests (24 of 24) and `check-docs` on an export of `9da83f6`, and simulated the cleanup command. The provenance reviewer reran the gate at `9da83f6` with main's results: `pnpm build`, `pnpm check` and `pnpm test` (56 of 56) passed, the deployment contract failed only its baseline test, and the contract files failed only their five baseline tests. Both reviews were clear, with nits and one provenance correction:
+
+- **Accepted, and fixed by the implementer in round 3:**
+  - the report labelled a linked root with the link's path instead of its target's mount;
+  - the prune refusal now names the other instances, and the guide says where an instance configuration lives;
+  - the guide now says exactly what the report drops when prune cannot run, and that a hard link across copied entries can exceed the space estimate;
+  - the personal VPS guide dates its whole installation section;
+  - a test covers a linked release root.
+- **Accepted, and fixed by main in records:** the default-home attribution below; the `os.write` rows and the list of callers in the [capture-limit issue](../../issues/2026-09-30-032022-deploy-run-capture-limit.md); the range of partial clones in the source issue; Codex's `shell_snapshot` feature and the repeated `/opt` change in the [login-profile issue](../../issues/2026-09-30-033836-contract-test-login-shell.md); and the wording of the `cp -a` limitation above.
+- **Handled by [P036](036-cloud-agent-sessions.md):** `AGENTS.md` still names only `build` and `deploy`, as in round 1.
+
+Provenance correction: at 03:37:35 UTC, main's own command that recorded the credential-free warning probe's identity ran the pinned binary's `--version` once with the container's default Codex home, which holds the container's ChatGPT login. Codex created one helper directory under `/root/.codex/tmp/arg0` and may have removed stale ones. A traced `--version` run in a run-owned home opened only a missing `.env`, so the run read and copied no credential. The probe itself used run-owned homes. The directory is left for Codex to remove as stale, and every later Codex call uses a run-owned `HOME` and `CODEX_HOME`.
 
 ## Closing record
 

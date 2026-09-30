@@ -699,16 +699,51 @@ class DeployReleaseTests(unittest.TestCase):
             self.configure('other')
             self.assertEqual(deploy.configured_instances(), ['other', 'p035'])
             before = snapshot(self.base, strict=True)
-            with self.assertRaisesRegex(ValueError, 'single-instance hosts only.*nothing was changed'):
+            with self.assertRaisesRegex(ValueError, 'single-instance hosts only.*: other; nothing was changed'):
                 deploy.prune(argparse.Namespace(instance='p035', keep_checkpoints=2))
             disk = self.preflight()['disk']
         self.assertEqual(snapshot(self.base, strict=True), before)
         self.assertFalse(disk['pruneAvailable'])
         self.assertEqual(disk['pruneUnavailableReason'],
-                         'Prune supports single-instance hosts only, and this host has 1 other instance configuration')
+                         'Prune supports single-instance hosts only, and this host has 1 other instance configuration: other')
         for key in ('releases', 'checkpoints', 'pruneKeepCheckpoints', 'pruneWouldRemove', 'pruneWouldFreeBytes'):
             self.assertNotIn(key, disk)
         self.assertTrue(disk['buildFits'] and disk['checkpointFits'])
+        self.configure('zeta')
+        self.assertEqual(deploy.prune_refusal(self.c), 'Prune supports single-instance hosts only, and this host has '
+                                                       '2 other instance configurations: other, zeta')
+
+    @contextlib.contextmanager
+    def own_device(self, root):
+        """Report root and everything below it on a device of its own, like a separately mounted disk."""
+        real_stat = os.stat
+        def fake_stat(path, *args, **kwargs):
+            info = real_stat(path, *args, **kwargs)
+            resolved = None if isinstance(path, int) else os.path.realpath(path)
+            if resolved != str(root) and not (resolved or '').startswith(str(root) + os.sep):
+                return info
+            fields = list(info[:10])
+            fields[2] = -1  # st_dev: a device that no real path has
+            return os.stat_result(fields)
+        with patch.object(deploy.os, 'stat', side_effect=fake_stat):
+            yield
+
+    def assert_linked_root_blocks_prune(self, root, target):
+        """The report says why prune cannot run and labels root by its target's mount; prune refuses."""
+        before = snapshot(self.base, strict=True)
+        with patch.object(deploy, 'processes_from', return_value=[]), \
+                patch.object(deploy.shutil, 'disk_usage', return_value=Usage(80 * GIB, 50 * GIB, 30 * GIB)):
+            with self.own_device(target):
+                disk = self.preflight()['disk']
+            with self.assertRaisesRegex(ValueError, 'must be a real directory'):
+                deploy.prune(argparse.Namespace(instance='p035', keep_checkpoints=1))
+        self.assertEqual(snapshot(self.base, strict=True), before)
+        self.assertFalse(disk['pruneAvailable'])
+        self.assertEqual(disk['pruneUnavailableReason'], str(root) + ' must be a real directory')
+        for key in ('releases', 'checkpoints', 'pruneKeepCheckpoints', 'pruneWouldRemove', 'pruneWouldFreeBytes'):
+            self.assertNotIn(key, disk)
+        self.assertEqual([(fs['mount'], fs['paths']) for fs in disk['filesystems'] if str(root) in fs['paths']],
+                         [(str(target), [str(root)])])
 
     def test_p035_08_report_survives_a_linked_backup_root_and_prune_refuses(self):
         self.populate_state()
@@ -719,17 +754,18 @@ class DeployReleaseTests(unittest.TestCase):
         for name, created in (('r2-20260930T020000Z', '20260930T020000Z'), ('r1-20260929T010000Z', '20260929T010000Z'),
                               ('r0-20260928T010000Z', '20260928T010000Z')):
             self.checkpoint_dir(name, self.receipt('installed', created))
-        before = snapshot(self.base, strict=True)
-        with patch.object(deploy, 'processes_from', return_value=[]), \
-                patch.object(deploy.shutil, 'disk_usage', return_value=Usage(80 * GIB, 50 * GIB, 30 * GIB)):
-            disk = self.preflight()['disk']
-            with self.assertRaisesRegex(ValueError, 'must be a real directory'):
-                deploy.prune(argparse.Namespace(instance='p035', keep_checkpoints=1))
-        self.assertEqual(snapshot(self.base, strict=True), before)
-        self.assertFalse(disk['pruneAvailable'])
-        self.assertEqual(disk['pruneUnavailableReason'], str(self.backups) + ' must be a real directory')
-        self.assertNotIn('pruneWouldRemove', disk)
-        self.assertIn(str(self.backups), disk['filesystems'][0]['paths'])
+        self.assert_linked_root_blocks_prune(self.backups, target)
+
+    def test_p035_08_report_survives_a_linked_release_root_and_prune_refuses(self):
+        target = self.outside / 'releases'
+        target.parent.mkdir(parents=True)
+        os.rename(self.releases, target)
+        self.releases.symlink_to(target)
+        # Behind the link: releases that prune would otherwise remove; the installed one is reached through it.
+        for name in ('old-1', 'old-2'):
+            self.release(name)
+        self.assertTrue((self.releases / 'installed/bin/node').is_file())
+        self.assert_linked_root_blocks_prune(self.releases, target)
 
     def test_running_the_script_from_a_release_writes_no_bytecode(self):
         # A release holds infra/personal-vps without bytecode, and its manifest check refuses unlisted files.

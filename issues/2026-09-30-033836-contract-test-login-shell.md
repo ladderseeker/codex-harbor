@@ -10,7 +10,7 @@
 
 `tests/contract/history.test.ts` starts the real `codex app-server` with the ambient `PATH` and a run-owned `HOME` and `CODEX_HOME`. When a Codex runtime starts, it can run the user's login shell to capture a shell environment. A login shell reads host files such as `/etc/profile` and `/etc/profile.d/*`, which the test does not own.
 
-In the cloud container, `/etc/profile.d/rbenv.sh` runs `rbenv init -`, and each run of the test rewrote `/opt/rbenv/shims`. The directory's modification time changed to 03:15:39 UTC on 30 September 2026, during the review's contract runs, and the reviewer reproduced it twice with the history test alone. The login-shell step is inferred from that profile file and was not traced in Codex.
+In the cloud container, `/etc/profile.d/rbenv.sh` runs `rbenv init -`, and each run of the test rewrote `/opt/rbenv/shims`. The directory's modification time changed to 03:15:39 UTC on 30 September 2026, during the review's contract runs, and the reviewer reproduced it twice with the history test alone. It changed again at 03:45:26 UTC, during a full `pnpm test:contract` run in P035's second fix round, so every full contract run touches it until this is fixed. The login-shell step is inferred from that profile file and was not traced in Codex. Codex 0.153.4's `codex features list` shows `shell_snapshot` as stable and on by default, which is the likely source; that was not traced either.
 
 ## Impact
 
@@ -18,4 +18,4 @@ The repository requires tests to own their directories and state and to leave ho
 
 ## Recheck
 
-Record the modification time of `/opt/rbenv/shims`, or of whatever a host's login profile touches. Run `HARBOR_LOCAL_CONTRACT_BINARY=<pinned binary> node --import tsx --test tests/contract/history.test.ts` and compare. A fix gives the runtime a controlled shell environment, for example a minimal `PATH` and a run-owned shell profile, or turns the shell snapshot off if Codex offers that, with a check that host files stay unchanged.
+Record the modification time of `/opt/rbenv/shims`, or of whatever a host's login profile touches. Run `HARBOR_LOCAL_CONTRACT_BINARY=<pinned binary> node --import tsx --test tests/contract/history.test.ts` and compare. A fix gives the runtime a controlled shell environment, for example a minimal `PATH` and a run-owned shell profile, or turns off Codex's `shell_snapshot` feature, with a check that host files stay unchanged.

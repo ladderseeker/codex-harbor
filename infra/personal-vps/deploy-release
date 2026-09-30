@@ -241,7 +241,8 @@ def filesystem(path):
 
 
 def mount_point(path):
-    path = Path(path)
+    """Where the filesystem holding path is mounted; a symbolic link is labelled by its target's mount."""
+    path = Path(os.path.realpath(path))
     device = os.stat(path).st_dev
     while path != path.parent and os.stat(path.parent).st_dev == device:
         path = path.parent
@@ -680,11 +681,12 @@ def prune_refusal(c):
     """Why prune must not run on this host, or None.
 
     Releases and checkpoints are shared by every instance on the host, but prune keeps only the
-    selected instance's release and ranks all checkpoints together."""
+    selected instance's release and ranks all checkpoints together. The names are safe to print:
+    configured_instances accepts only names that match INSTANCE_NAME."""
     others = [name for name in configured_instances() if name != c['instance']]
     if others:
         return ('Prune supports single-instance hosts only, and this host has ' + str(len(others))
-                + ' other instance configuration' + ('s' if len(others) > 1 else ''))
+                + ' other instance configuration' + ('s' if len(others) > 1 else '') + ': ' + ', '.join(others))
     return None
 
 
