@@ -1,6 +1,6 @@
 # D015 — Direct delivery and cloud sessions
 
-- Decision: Accepted, 30 September 2026, on three messages from the owner that day and one default that main kept, all of which [P036](../proposals/036-cloud-agent-sessions.md) also summarizes:
+- Decision: Accepted, 30 September 2026, on three messages from the owner that day and one default that main kept, all of which [P036](../proposals/archive/036-cloud-agent-sessions.md) also summarizes:
   - On a decision card in this project's thread, posted during P035, the owner chose to allow branch commits. Main could then commit and push checkpoints to its working branch without asking, while merging to `main` still waited for the owner.
   - The owner asked for `AGENTS.md` and `CLAUDE.md` to be updated for the work agents can do in the cloud environment, following the project's best practice.
   - At 02:54 UTC the owner wrote that Harbor is their private work and needs no review: finished work goes straight to `main`, and the rules should say so. Once CI/CD exists, finishing something should also finish its deployment. This message replaces the first choice's reservation about merging.
@@ -13,7 +13,7 @@
   - the rest of D013, including the automatic design and provenance reviews, the three-round cap and the owner's decision on remaining blockers;
   - the owner's authority over deployment until a plan that delivers CI/CD is Implemented and changes these rules, and over credentials and host work;
   - every gate, which still decides Implemented.
-- Execution record: [P036](../proposals/036-cloud-agent-sessions.md).
+- Execution record: [P036](../proposals/archive/036-cloud-agent-sessions.md).
 - Current contract: the [workflow's commit rules](../workflow.md#proposal-completion-and-archive), [AGENTS.md](../../AGENTS.md#delivery-and-delegation) and the [cloud session guide](../../docs/developer/cloud-sessions.md#commits-and-delivery).
 
 ## Context

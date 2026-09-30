@@ -3,7 +3,9 @@
 ## Metadata
 
 - ID: P036
-- Status: Accepted
+- Status: Implemented
+- Archive disposition: Completed
+- Completed: 2026-09-30
 - Priority: Not set by the owner. The owner asked for this on 30 September 2026, while P035 was executing.
 - Created: 2026-09-30
 - Owner: Main conversation. A fresh-context implementer does the implementation in a separate checkout.
@@ -19,7 +21,7 @@
   - They asked for `AGENTS.md` and `CLAUDE.md` to be updated for the work agents can do in this cloud environment, following the project's best practice.
   - At 02:54 UTC they wrote that this is their private work and needs no review: finished work goes straight to `main`, and the rules should say so. Once CI/CD exists, finishing something should also finish its deployment.
 
-  Together these authorize this plan, its execution alongside P035 on disjoint files, branch commits and pushing finished work to `main`. The last message replaces the first choice's reservation about merging. Keeping the automatic design and provenance reviews is main's own default, not the owner's direction: main told the owner at 03:00 UTC that it kept them and that the owner could ask to skip them, and the owner has not asked. Tracked records paraphrase these messages, because the [workflow](../workflow.md#evidence-and-provenance) keeps conversation contents out of them. Every VPS workflow run other than `preflight` still needs the owner's go-ahead until a plan that delivers CI/CD is Implemented.
+  Together these authorize this plan, its execution alongside P035 on disjoint files, branch commits and pushing finished work to `main`. The last message replaces the first choice's reservation about merging. Keeping the automatic design and provenance reviews is main's own default, not the owner's direction: main told the owner at 03:00 UTC that it kept them and that the owner could ask to skip them, and the owner has not asked. Tracked records paraphrase these messages, because the [workflow](../../workflow.md#evidence-and-provenance) keeps conversation contents out of them. Every VPS workflow run other than `preflight` still needs the owner's go-ahead until a plan that delivers CI/CD is Implemented.
 - Baseline: the implementer started at `aa03191`, which is `main` at `9231078` plus P035's plan. After P035 reached `main` at `8cfa82f`, main moved the checkout to the commit that adds this plan's revision to `8cfa82f`, carrying the implementer's uncommitted changes. P035's commits change none of this plan's files except the two named under Dependencies.
 - Dependencies: None blocking.
   - The hook's real download and install are verified in this thread's cloud container.
@@ -27,10 +29,10 @@
   - The edits to `docs/developer/github-actions-deploy.md` and `.github/workflows/deploy-vps.yml` wait until P035, which also changes both files, is on `main`. P035 reached `main` at `8cfa82f` on 30 September 2026.
 - Source issues: None. The owner requested this directly.
 - Design references:
-  - the workflow's [proposal completion](../workflow.md#proposal-completion-and-archive), [evidence](../workflow.md#evidence-and-provenance), [gate](../workflow.md#implementation-and-verification-gate) and [review](../workflow.md#delegation-and-review) sections;
-  - [D013](../decisions/013-evidence-based-delivery-workflow.md) and [AGENTS.md](../../AGENTS.md);
-  - the [developer guide's command availability](../../docs/developer/development.md#command-availability);
-  - [P026](026-continuous-integration.md), which plans the hosted gates.
+  - the workflow's [proposal completion](../../workflow.md#proposal-completion-and-archive), [evidence](../../workflow.md#evidence-and-provenance), [gate](../../workflow.md#implementation-and-verification-gate) and [review](../../workflow.md#delegation-and-review) sections;
+  - [D013](../../decisions/013-evidence-based-delivery-workflow.md) and [AGENTS.md](../../../AGENTS.md);
+  - the [developer guide's command availability](../../../docs/developer/development.md#command-availability);
+  - [P026](../026-continuous-integration.md), which plans the hosted gates.
 - Exact file fence: [Below](#exact-file-fence).
 - Acceptance IDs: P036-01 to P036-06.
 
@@ -104,7 +106,7 @@ After this change:
 
 Excluded:
 
-- hosted continuous integration, which is [P026](026-continuous-integration.md), and any change to the deploy workflow's behavior; only its comment about adding a trigger changes;
+- hosted continuous integration, which is [P026](../026-continuous-integration.md), and any change to the deploy workflow's behavior; only its comment about adding a trigger changes;
 - the fresh-install deployment guide, which gets its own plan after P035;
 - installing Codex from the hook, which stays a manual step because the install is about 320 MB;
 - starting a Docker daemon, which this plan does not attempt;
@@ -113,9 +115,9 @@ Excluded:
 
 ## Dependencies and current design
 
-The [workflow](../workflow.md#proposal-completion-and-archive) and [D013](../decisions/013-evidence-based-delivery-workflow.md) say that the owner confirms each commit. The workflow also starts the automatic reviews only after the combined gate is green, with only an advisory review when a gate is unavailable. The owner's 30 September directions replace the first rule: agents commit checkpoints on working branches and push finished work straight to `main`, with no owner confirmation or review. With owner review gone, the automatic reviews must cover every delivery, so they now start once every gate that can run is green. A focused decision records both changes, D015 (`design/decisions/015-direct-delivery-and-cloud-sessions.md`), with a reciprocal metadata link from D013. D013's other rules and its history stay unchanged.
+The [workflow](../../workflow.md#proposal-completion-and-archive) and [D013](../../decisions/013-evidence-based-delivery-workflow.md) say that the owner confirms each commit. The workflow also starts the automatic reviews only after the combined gate is green, with only an advisory review when a gate is unavailable. The owner's 30 September directions replace the first rule: agents commit checkpoints on working branches and push finished work straight to `main`, with no owner confirmation or review. With owner review gone, the automatic reviews must cover every delivery, so they now start once every gate that can run is green. A focused decision records both changes, D015 (`design/decisions/015-direct-delivery-and-cloud-sessions.md`), with a reciprocal metadata link from D013. D013's other rules and its history stay unchanged.
 
-[P026](026-continuous-integration.md) plans hosted CI. The owner's direction that deployment follow each finished outcome applies once a plan that delivers CI and deployment automation is Implemented; that plan updates the deploy rules then. P026, still a Draft, assumes pull requests and required checks, which direct pushes to `main` would bypass, so it needs revising for direct delivery when it is selected. The deploy guide and the deploy workflow's comment currently suggest adding a `push` trigger after the first manual deploy. This plan changes both to leave that trigger to the plan that delivers CI/CD and to the owner.
+[P026](../026-continuous-integration.md) plans hosted CI. The owner's direction that deployment follow each finished outcome applies once a plan that delivers CI and deployment automation is Implemented; that plan updates the deploy rules then. P026, still a Draft, assumes pull requests and required checks, which direct pushes to `main` would bypass, so it needs revising for direct delivery when it is selected. The deploy guide and the deploy workflow's comment currently suggest adding a `push` trigger after the first manual deploy. This plan changes both to leave that trigger to the plan that delivers CI/CD and to the owner.
 
 P035 also changes `docs/developer/github-actions-deploy.md` and `.github/workflows/deploy-vps.yml`. This plan's edits to those two files wait until P035 is on `main`, and they are made on top of it. P035 reached `main` at `8cfa82f` on 30 September 2026.
 
@@ -436,9 +438,9 @@ Required content for each section:
   - A table of the implemented commands from `package.json`, saying for each whether it runs in a cloud session: Yes, Partly, Not checked or No, with notes.
   - The rows that need Docker say "Not checked here: needs a running Docker daemon, and none runs at session start", followed by their other needs. Those rows are `pnpm test:e2e`, `pnpm dev`, `pnpm test:workspaces`, `pnpm test:schedules` and `pnpm test:isolation`, plus the Linux gateway part of `pnpm test:egress`.
   - Record the results observed at `9231078`:
-    - `pnpm test:deployment:contract` failed one managed-tooling test, `review_test.Review.test_actual_process_capture_limit_timeout_and_failure`. The [capture-limit issue](../../issues/2026-09-30-032022-deploy-run-capture-limit.md) records it. The script joins its Python and Node halves with `&&`, so that failure skips the Node half. Run the Node half separately: `node --import tsx --test tests/deployment/storage-transport.test.ts tests/deployment/probe.test.ts`.
+    - `pnpm test:deployment:contract` failed one managed-tooling test, `review_test.Review.test_actual_process_capture_limit_timeout_and_failure`. The [capture-limit issue](../../../issues/2026-09-30-032022-deploy-run-capture-limit.md) records it. The script joins its Python and Node halves with `&&`, so that failure skips the Node half. Run the Node half separately: `node --import tsx --test tests/deployment/storage-transport.test.ts tests/deployment/probe.test.ts`.
     - `pnpm test:contract` with the pinned binary passed 23 of 28. Four of the five failures launch personal runtimes and need delegated cgroups. The fifth, the P024 attachment contract, needs a nonroot Linux user.
-  - The `pnpm test:contract` row also says that its history test rewrote `/opt/rbenv/shims` in the session that wrote this guide, apparently through the host's login profile, and links the [login-shell issue](../../issues/2026-09-30-033836-contract-test-login-shell.md).
+  - The `pnpm test:contract` row also says that its history test rewrote `/opt/rbenv/shims` in the session that wrote this guide, apparently through the host's login profile, and links the [login-shell issue](../../../issues/2026-09-30-033836-contract-test-login-shell.md).
   - The legend says that no Docker daemon was started in the session that wrote this guide, not in any cloud session.
 - **Gates that need another host.**
   - Open with "These gates did not run in the cloud session that wrote this guide." Then name, for each gate, the host or check it needs:
@@ -449,7 +451,7 @@ Required content for each section:
     - `pnpm test:live`: dedicated credentials and the supported Linux execution profile;
     - anything over SSH.
   - Keep the dated note about the blocked `dockerd` attempt, and say that the session that wrote this guide started no daemon afterwards and did not try a default one.
-  - Then say how to record them: unverified, with a linked issue. The result may still reach `main` with a dated delivery entry, and the proposal stays Accepted until the gate passes. They run in hosted CI once [P026](../../design/proposals/026-continuous-integration.md) delivers it, or on a supported Linux host run by the owner.
+  - Then say how to record them: unverified, with a linked issue. The result may still reach `main` with a dated delivery entry, and the proposal stays Accepted until the gate passes. They run in hosted CI once [P026](../026-continuous-integration.md) delivers it, or on a supported Linux host run by the owner.
 - **Commits and delivery.** D015 in practice:
   - use the configured identity, which signs commits, and never the owner's or another contributor's name or email;
   - include the attribution lines;
@@ -471,7 +473,7 @@ Required content for each section:
   - Use the GitHub Actions workflow.
   - `preflight` is read-only. Until a plan that delivers CI/CD is Implemented and changes these rules, every other action needs the owner's go-ahead for that run.
   - The owner does all SSH and host work.
-  - Link the [GitHub Actions deployment guide](../../docs/developer/github-actions-deploy.md) and the [personal VPS guide](../../docs/developer/personal-vps.md).
+  - Link the [GitHub Actions deployment guide](../../../docs/developer/github-actions-deploy.md) and the [personal VPS guide](../../../docs/developer/personal-vps.md).
 - **Optional environment setup script.** Give an owner-pasteable Bash script for the cloud environment's Setup script field. The script does four things:
   - installs Node 24.11.1 into the same `~/.cache/codex-harbor/node-v24.11.1-linux-x64` directory, after checking the pinned hash;
   - installs Codex 0.153.4 with `npm install -g`;
@@ -521,9 +523,9 @@ Required content for each section:
 Read these first:
 
 - this plan;
-- [AGENTS.md](../../AGENTS.md);
-- the workflow's [execution brief](../workflow.md#mains-execution-brief), [gate](../workflow.md#implementation-and-verification-gate) and [completion](../workflow.md#proposal-completion-and-archive) sections;
-- the [implementer role](../../docs/developer/agents/implementer.md);
+- [AGENTS.md](../../../AGENTS.md);
+- the workflow's [execution brief](../../workflow.md#mains-execution-brief), [gate](../../workflow.md#implementation-and-verification-gate) and [completion](../../workflow.md#proposal-completion-and-archive) sections;
+- the [implementer role](../../../docs/developer/agents/implementer.md);
 - D013 and D014 as models for D015;
 - the files in the fence.
 
@@ -667,7 +669,7 @@ Main's dispositions:
   - D015 said that outcomes on a shared branch reach `main` in the order they finish. They reach it in their order on the branch.
   - The guide now says that the fallback's merge commit is the only commit that the configured identity does not make.
   - The records presented keeping the automatic reviews as the owner's direction. It is main's default, which main told the owner at 03:00 UTC. The Authorization and D015 now say so.
-  - The guide recommended `pnpm test:contract` without saying that its history test runs the host's login profile. The table now says so and links the [login-shell issue](../../issues/2026-09-30-033836-contract-test-login-shell.md).
+  - The guide recommended `pnpm test:contract` without saying that its history test runs the host's login profile. The table now says so and links the [login-shell issue](../../../issues/2026-09-30-033836-contract-test-login-shell.md).
   - The guide said that every Codex start writes into its home. With a home under `/tmp`, Codex wrote nothing, so the guide now says that a start may write there.
   - The guide said that no Docker daemon had been started or tried in any cloud session. The evidence covers only the session that wrote it, and the guide now says so.
   - D015 said that the owner reviewed pull request #4. GitHub records no review, only a merge under the owner's account, which the agents' GitHub connection also uses. D015 and this plan now state only what GitHub records. The round 1 record above keeps its earlier wording.
@@ -705,6 +707,42 @@ Main's dispositions:
 
 Evidence limits: the design brief abbreviated one file hash with a typo, so that reviewer matched the file to the plan's block and the implementer's log instead. Neither reviewer saw Claude Code run the hook at session start. The full deployment contract last ran at `49aad4b` and `f921f1f`; the test file has changed only in a comment since, and the delivery gate reruns it.
 
+### Fix round 3, 30 September 2026
+
+The implementer applied the round 3 texts at `ef6f366` and left the hook unchanged. Its checks passed: `check-docs` over 200 files, `git diff --check` including the new files, the hook's four unit tests and `pnpm check`. The changed paths equal the fence, apart from this plan. Main found all 26 fenced settled blocks verbatim in the result, and a search of current documents, with the exclusions P036-03 names, found no remaining requirement for per-commit owner confirmation or owner review and no instruction to add a deploy trigger. Main's verification completes round 3, the last round the [review rules](../../workflow.md#delegation-and-review) allow.
+
+The tracked diff against `ef6f366` has SHA-256 `a09599f09a3855020718ba44260227b5e44a853614f0a5efabbf7d26e079207f`. The new files have these SHA-256 values:
+
+- `CLAUDE.md`: `4aec0b8533061ff917bb8a3b8eb5e46c235462f5ce68847eb4dee396dc7d98b6`;
+- `.claude/settings.json`: `9e8682679e77be060304dc496d0279a149b8087838ffa0a715b60c1c4ddb3989`;
+- `scripts/cloud-session-setup.sh`, mode 755: `0802903e7e956f45d33d31710a3ff6b20d7c28dd624ec129340450bc113433c3`;
+- `tests/deployment/cloud_session_setup_test.py`: `cb3dfd9e5c0eaa1a8e04e9bcc31cdcde61a25b978f358246852fe900e90918d8`;
+- `docs/developer/cloud-sessions.md`: `49d4d0b1bbede4412c8dbcb6abc444515fe0763164c38a72839c3d1f9175e93b`;
+- `design/decisions/015-direct-delivery-and-cloud-sessions.md`: `cea6adb0605f0cbd041294767257b52f3eb1818d6d2d004fd31ba2e4ddf85a49`.
+
 ## Closing record
 
-Pending until the [completion conditions](../workflow.md#proposal-completion-and-archive) pass.
+Completed on 30 September 2026 and archived as Completed. The rules now say how agent work is committed and delivered straight to `main`, what a cloud session has verified and where the other gates run, how a session prepares its toolchain through the repository hook, and how work and evidence survive a disposable container. `CLAUDE.md` loads them for Claude Code.
+
+- **Source.** Delivery commit `933702d600ae5ed8338f71b0281a536f04c7ae4b`, whose parent is `ef6f366`, changes exactly the 17 fenced paths other than this plan. Its diff has the identities listed under Fix round 3.
+- **Environment.** This thread's Claude Code cloud container, running Ubuntu 24.04.4 on Linux x86_64, with a run-owned Node 24.11.1, pnpm 12.3.4 and Python 3.11.15.
+- **Delivery gate.** Main ran it at 07:47 UTC on the working tree that became the delivery commit:
+  - `node scripts/check-docs.mjs`: 200 files, exit 0.
+  - `git add -N` for the six new files, then `git diff --check`: exit 0, over 17 files with 601 insertions and 22 deletions.
+  - `python3 -m unittest tests/deployment/cloud_session_setup_test.py`: 4 tests, OK.
+  - `pnpm check`: exit 0.
+  - `pnpm test:deployment:contract`: 70 Python tests with one failure, `test_actual_process_capture_limit_timeout_and_failure`, which is the baseline in the [capture-limit issue](../../../issues/2026-09-30-032022-deploy-run-capture-limit.md). That failure ends the command with exit 1 before its Node half, so main ran the Node half on its own: 3 tests passed, exit 0.
+- **Acceptance.** P036-01 to P036-06 passed:
+  - P036-01 to P036-04: main's checks under Fix round 3, the round 3 reviewers' checks of the guide's headings, commands and dated facts, and `AGENTS.md` and `CLAUDE.md` at 71 and 11 lines, under the 200-line limit together.
+  - P036-05: the hook's final version passed its four unit tests at the delivery gate. With that same version, at 06:20 UTC, a manual run with a fresh run-owned home and no `node_modules` downloaded Node, verified the pinned hash, wrote one PATH line, installed the locked dependencies and printed the ready line in 10 seconds. `pnpm check` then passed with that PATH line, and a second run took the fast path in under a second. The round 2 provenance reviewer repeated the real run from an empty cache.
+  - P036-06: the delivery gate above.
+- **Reviews.** Three rounds, recorded above. Round 3 left no blocker, and main verified every accepted fix.
+- **Limitations and follow-ups:**
+  - Nobody has yet seen Claude Code run the hook at a real session start. The first cloud session that starts from `main` after this delivery shows it, and `CLAUDE.md` says what to do if no status line appears.
+  - Environment caching, the setup script's Codex install, `pnpm test:contract` in a cloud session and the pull request fallback for delivery have not been exercised.
+  - Lanes that need Docker, systemd, delegated cgroup v2 or SSH remain unverified in cloud sessions. [P026](../026-continuous-integration.md) plans the hosted gates, and it needs revising for direct delivery when it is selected, as do the other draft plans that still start reviews after the green gate.
+  - Earlier versions of this plan in `main`'s history quote the owner, as Round 2 records.
+  - The [capture-limit issue](../../../issues/2026-09-30-032022-deploy-run-capture-limit.md) and the [login-shell issue](../../../issues/2026-09-30-033836-contract-test-login-shell.md) stay open.
+  - The implementer's and reviewers' raw logs and the delivery gate's logs were kept only in this container's scratch storage. They become unavailable when the container is reclaimed; this record keeps their identities, commands and results.
+- **Current documents:** [AGENTS.md](../../../AGENTS.md#cloud-agent-sessions), [CLAUDE.md](../../../CLAUDE.md), the [workflow](../../workflow.md#proposal-completion-and-archive), [D015](../../decisions/015-direct-delivery-and-cloud-sessions.md) and the [cloud session guide](../../../docs/developer/cloud-sessions.md).
+- **Delivery:** commit `933702d600ae5ed8338f71b0281a536f04c7ae4b`, pushed to `main` together with this record.
