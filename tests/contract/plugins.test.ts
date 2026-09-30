@@ -38,6 +38,18 @@ test(
     await mkdir(workspace);
     // No proxy, account or inherited configuration reaches the runtime.
     const env = { PATH: process.env.PATH, HOME: home, CODEX_HOME: home };
+    try {
+      // The contract holds for the pinned release only.
+      const { stdout } = await exec(binary, ["--version"], {
+        cwd: workspace,
+        env,
+        timeout: 20000,
+      });
+      assert.equal(stdout.trim(), "codex-cli 0.153.4");
+    } catch (error) {
+      await rm(root, { recursive: true, force: true });
+      throw error;
+    }
     const child = spawn(binary, [...PERSONAL_RUNTIME_ARGS], {
       cwd: workspace,
       env,

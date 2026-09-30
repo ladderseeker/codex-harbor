@@ -373,6 +373,7 @@ async function clearNativeCredentials() {
   }
 }
 const closeCredentials = await serveCredentials(credentials, c);
+// Attempt times come from performance.now(), a monotonic clock, so a wall-clock step cannot stall probes.
 let lastDiscovery: DiscoveryAttempt | undefined;
 async function discover() {
   if (
@@ -393,7 +394,7 @@ async function discover() {
     ).rows[0];
     if (
       !discoveryDue(
-        Date.now(),
+        performance.now(),
         lastDiscovery,
         stored
           ? {
@@ -412,7 +413,7 @@ async function discover() {
         : undefined);
     if (!project) return;
     // Recorded as failed until the capability write and retirement succeed.
-    attempt = lastDiscovery = { at: Date.now(), failed: true };
+    attempt = lastDiscovery = { at: performance.now(), failed: true };
     await pool.query(
       "INSERT INTO runtime_bootstrap(id,runtime_id) VALUES(true,$1) ON CONFLICT DO NOTHING",
       [randomUUID()],

@@ -81,11 +81,14 @@ After this change:
    - the size of the Codex scratch directory;
    - each release and checkpoint, with its size and whether `prune` would keep it;
    - the total bytes that `prune` would free.
+
+   When `prune` cannot run, the section says why and lists nothing to remove; the report itself still succeeds.
 7. **Explicit prune.** A new `deploy-release prune --instance NAME [--keep-checkpoints N]` action, with N from 1 to 10 and a default of 2, runs as root.
    - It keeps the installed release, every release that a process runs from, the newest N checkpoints that `deploy-release` wrote, and the releases those checkpoints name.
    - It deletes every other release and every other checkpoint that `deploy-release` wrote.
-   - It removes `state/codex-home/.tmp` from every checkpoint directory.
-   - It leaves unrecognized checkpoint directories, `.staging-*` directories and everything outside the release and backup directories untouched.
+   - It removes `state/codex-home/.tmp` from each kept checkpoint that `deploy-release` wrote.
+   - It leaves other backup directories, names starting with a dot, such as `.staging-*`, symbolic links and everything outside the release and backup directories untouched.
+   - Releases and checkpoints are shared by every instance on a host, so it runs only on a single-instance host. With another instance configuration present, it refuses and changes nothing.
    - It prints what it removed and the bytes freed.
    - The deploy workflow offers it as the `prune` action.
 8. **Container log limit.** The installer renders PostgreSQL's container log with the `json-file` driver, `max-size` 10m and `max-file` 3.
@@ -219,7 +222,7 @@ Work on the current branch without committing.
    - the logging assertion in `tests/deployment/personal_vps_test.py`.
 8. Documentation:
    - Update the Actions and Limits sections of `docs/developer/github-actions-deploy.md`: checkpoint content, space checks, the disk report and `prune`.
-   - Update `docs/developer/personal-vps.md`: the plugin catalog is off; discovery refreshes every 30 minutes; the log limit; how to remove leftover `plugins-clone-*` and `git-*` directories from an older Codex home while the supervisor is stopped.
+   - Update `docs/developer/personal-vps.md`: the plugin catalog is off; discovery refreshes every 30 minutes; the log limit; how to remove the leftover catalog copy and downloads (`.tmp/plugins*` and `.tmp/git-*`) from an older Codex home while the supervisor is stopped.
    - Update the personal VPS profile in `design/systems/004-deployment-and-profiles.md` with one short paragraph on bounded disk use.
    - Do not edit historical reports or archived records.
 
@@ -277,11 +280,12 @@ Run-owned scratch goes under `.test-runs/p035-*`, which Git ignores, or the OS t
 - **P035-07:** Given releases, checkpoints written by `deploy-release`, unrecognized checkpoints and a release with a simulated running process, `prune` must meet all of the following:
   - it keeps the installed release, the running release, the newest N recognized checkpoints and the releases they name;
   - it deletes only the other recognized checkpoints and releases;
-  - it strips `state/codex-home/.tmp` from every checkpoint;
-  - it leaves unrecognized checkpoints, `.staging-*` and symbolic links untouched;
+  - it strips `state/codex-home/.tmp` from each kept recognized checkpoint and from no other backup directory;
+  - it leaves unrecognized checkpoints, names starting with a dot, such as `.staging-*`, and symbolic links untouched;
+  - on a host with another instance configuration, it refuses and changes nothing;
   - it rejects N outside 1 to 10;
   - its printed plan equals what it deletes.
-- **P035-08:** The `preflight` disk report lists each filesystem once, with free, total and reserve bytes, the build and checkpoint needs and whether each fits, the Codex scratch size, each release and checkpoint with its size and keep decision, and the total bytes prune would free. It modifies nothing.
+- **P035-08:** The `preflight` disk report lists each filesystem once, with free, total and reserve bytes, the build and checkpoint needs and whether each fits, the Codex scratch size, each release and checkpoint with its size and keep decision, and the total bytes prune would free. When prune cannot run, because of another instance or a backup root that is a symbolic link, the report says why and lists no releases, checkpoints or removals. It modifies nothing.
 - **P035-09:** The installer renders PostgreSQL with the `json-file` log driver, `max-size` 10m and `max-file` 3, and leaves the routing service unchanged.
 - **P035-10:** The applicable gate passes:
   - `pnpm build`, `pnpm check` and `pnpm test`;
@@ -305,7 +309,7 @@ These ran on `9231078` on 30 September 2026. The environment was a cloud Linux c
 
 No installed instance exists: the owner removed Harbor from the VPS on 30 September 2026. The next installation uses this code from the start. The installer renders the log limit, and every runtime starts with plugins off.
 
-A Codex home carried over from an older installation may still hold `.tmp/plugins-clone-*` and `.tmp/git-*` directories. The personal VPS guide says how to remove them while the supervisor is stopped.
+A Codex home carried over from an older installation may still hold the plugin catalog copy and abandoned downloads, `.tmp/plugins*` and `.tmp/git-*`. The personal VPS guide says how to remove them while the supervisor is stopped.
 
 Nothing migrates. Reverting the commit restores the old behavior. Checkpoints written by this version restore the same way as before, without Codex scratch and package caches.
 

@@ -79,8 +79,13 @@ class DeployReleaseTests(unittest.TestCase):
         self.state.mkdir(mode=0o711)
         self.installed = self.release('installed', 64 * 1024)
         self.c = {'instance': 'p035', 'release': str(self.installed), 'origin': 'https://harbor.example.org'}
+        real_layout, host = deploy.installer.layout, str(self.base / 'host')
+        def layout(c):
+            # The installer's own naming, relocated below this test's directory.
+            return tuple(host + value if value.startswith('/') else value for value in real_layout(c))
         for patcher in (patch.multiple(deploy, RELEASES=self.releases, BACKUPS=self.backups, WORK=self.work,
                                        BUILD_STATE=self.build_state, BUILD_CACHE=self.build_cache),
+                        patch.object(deploy.installer, 'layout', new=layout),
                         patch.object(deploy, 'instance', side_effect=lambda name: (self.c, UNIT, self.etc, self.state)),
                         patch.object(deploy, 'http_status', return_value=200),
                         patch.object(deploy.os, 'geteuid', return_value=0)):
@@ -287,6 +292,7 @@ class DeployReleaseTests(unittest.TestCase):
                     for number in (need, reserve, free):
                         self.assertIn(str(number), message)
                     self.assertIn('nothing was changed', message)
+                    self.assertIn('mounted at ' + str(deploy.mount_point(self.base)) + ', which has', message)
                     inputs.assert_not_called()
                     self.assertEqual(snapshot(self.base, strict=True), before)
                 else:
@@ -355,6 +361,7 @@ class DeployReleaseTests(unittest.TestCase):
         message = str(caught.exception)
         for number in (need, reserve, free):
             self.assertIn(str(number), message)
+        self.assertIn('mounted at ' + str(deploy.mount_point(self.base)) + ', which has', message)
         self.assertEqual(snapshot(self.base, strict=True), before)
         self.assertFalse(self.backups.exists())
 
@@ -485,13 +492,24 @@ class DeployReleaseTests(unittest.TestCase):
         (self.backups / 'linked-state/state').symlink_to(self.outside / 'state')
         (self.backups / 'backup-link').symlink_to(self.backups / 'r2-20260930T020000Z')
         (self.backups / 'readme.txt').write_text('not a checkpoint')
+        # The newest valid receipt, but a name starting with a dot is left alone as under the release root.
+        self.checkpoint_dir('.hidden-20260930T110000Z', self.receipt('old-2', '20260930T110000Z'))
         scratch = '/state/codex-home/.tmp'
         return {str(self.releases / 'old-1'), str(self.releases / 'old-2'),
-                str(self.backups / 'r2-20260930T020000Z'), str(self.backups / 'r1-20260929T010000Z')} | {
-            str(self.backups / name) + scratch for name in (
-                'r4-20260930T040000Z', 'r3-20260930T030000Z', 'manual-backup', 'missing-field-20260930T050000Z',
-                'mismatch-20260930T060000Z', 'number-20260930T080000Z', 'badstamp-2026-09-30',
-                'invalid-date-20261399T990000Z', 'not-json-20260930T100000Z', 'linked-receipt-20260930T090000Z')}
+                str(self.backups / 'r2-20260930T020000Z'), str(self.backups / 'r1-20260929T010000Z'),
+                str(self.backups / 'r4-20260930T040000Z') + scratch, str(self.backups / 'r3-20260930T030000Z') + scratch}
+
+    # Backup directories that deploy-release did not write, or whose name starts with a dot: never touched.
+    UNRECOGNIZED = ('manual-backup', 'missing-field-20260930T050000Z', 'mismatch-20260930T060000Z',
+                    'number-20260930T080000Z', 'badstamp-2026-09-30', 'invalid-date-20261399T990000Z',
+                    'not-json-20260930T100000Z', 'linked-receipt-20260930T090000Z', '.hidden-20260930T110000Z')
+
+    def configure(self, name):
+        """An instance configuration where the (relocated) installer layout puts it."""
+        etc = Path(deploy.installer.layout({'instance': name})[1])
+        etc.mkdir(parents=True, exist_ok=True)
+        (etc / 'config.json').write_text(json.dumps({'instance': name}) + '\n')
+        return etc
 
     @staticmethod
     def running(release):
@@ -526,10 +544,16 @@ class DeployReleaseTests(unittest.TestCase):
         self.assertTrue((self.backups / 'backup-link').is_symlink())
         self.assertTrue((self.backups / 'r4-20260930T040000Z/state/codex-home/auth.json').is_file())
         self.assertTrue((self.backups / 'manual-backup/database.dump').is_file())
+        for name in self.UNRECOGNIZED:
+            self.assertTrue((self.backups / name / 'state/codex-home/.tmp/plugins-clone-x/pack').is_file(), name)
         reasons = {e['name']: e['reason'] for e in plan['releases']}
         self.assertEqual(reasons['installed'], 'installed release')
         self.assertEqual(reasons['running'], 'a process runs from it')
         self.assertEqual(reasons['kept-a'], 'named by a kept checkpoint')
+        checkpoints = {e['name']: e for e in plan['checkpoints']}
+        self.assertEqual((checkpoints['.hidden-20260930T110000Z']['keep'],
+                          checkpoints['.hidden-20260930T110000Z']['reason']), (True, 'hidden directory'))
+        self.assertEqual(checkpoints['manual-backup']['reason'], 'not a checkpoint written by deploy-release')
         with patch.object(deploy, 'processes_from', side_effect=self.running):
             self.assertEqual(deploy.prune_plan(self.c)['remove'], [])
 
@@ -608,6 +632,8 @@ class DeployReleaseTests(unittest.TestCase):
         self.assertEqual(snapshot(self.base, strict=True), before)
         self.assertEqual(report['freeBytes'], free)
         disk = report['disk']
+        self.assertTrue(disk['pruneAvailable'])
+        self.assertNotIn('pruneUnavailableReason', disk)
         self.assertEqual(len(disk['filesystems']), 1)
         filesystem = disk['filesystems'][0]
         self.assertEqual(filesystem['paths'], [str(p) for p in (self.releases, self.backups, self.state, self.work,
@@ -654,6 +680,56 @@ class DeployReleaseTests(unittest.TestCase):
         self.assertFalse(disk['buildFits'])
         self.assertTrue(disk['checkpointFits'])
         self.assertEqual(disk['pruneWouldRemove'], [])
+
+    def test_p035_07_prune_refuses_and_the_report_shows_it_unavailable_on_a_host_with_another_instance(self):
+        self.populate_state()
+        self.prune_layout()
+        root = self.configure('p035').parent
+        # Not instances: a file, a directory without a configuration and a name the installer never makes.
+        (root / 'harbor-personal-candidate.json').write_text('{}\n')
+        (root / 'harbor-personal-removed').mkdir()
+        (root / 'harbor-personal-Upper').mkdir()
+        (root / 'harbor-personal-Upper/config.json').write_text('{}\n')
+        usage = Usage(80 * GIB, 50 * GIB, 30 * GIB)
+        with patch.object(deploy, 'processes_from', side_effect=self.running), \
+                patch.object(deploy.shutil, 'disk_usage', return_value=usage):
+            self.assertEqual(deploy.configured_instances(), ['p035'])
+            self.assertIsNone(deploy.prune_refusal(self.c))
+            self.assertTrue(self.preflight()['disk']['pruneAvailable'])
+            self.configure('other')
+            self.assertEqual(deploy.configured_instances(), ['other', 'p035'])
+            before = snapshot(self.base, strict=True)
+            with self.assertRaisesRegex(ValueError, 'single-instance hosts only.*nothing was changed'):
+                deploy.prune(argparse.Namespace(instance='p035', keep_checkpoints=2))
+            disk = self.preflight()['disk']
+        self.assertEqual(snapshot(self.base, strict=True), before)
+        self.assertFalse(disk['pruneAvailable'])
+        self.assertEqual(disk['pruneUnavailableReason'],
+                         'Prune supports single-instance hosts only, and this host has 1 other instance configuration')
+        for key in ('releases', 'checkpoints', 'pruneKeepCheckpoints', 'pruneWouldRemove', 'pruneWouldFreeBytes'):
+            self.assertNotIn(key, disk)
+        self.assertTrue(disk['buildFits'] and disk['checkpointFits'])
+
+    def test_p035_08_report_survives_a_linked_backup_root_and_prune_refuses(self):
+        self.populate_state()
+        target = self.outside / 'backups'
+        target.mkdir(parents=True, mode=0o700)
+        self.backups.symlink_to(target)
+        # Behind the link: checkpoints that prune would otherwise remove or trim.
+        for name, created in (('r2-20260930T020000Z', '20260930T020000Z'), ('r1-20260929T010000Z', '20260929T010000Z'),
+                              ('r0-20260928T010000Z', '20260928T010000Z')):
+            self.checkpoint_dir(name, self.receipt('installed', created))
+        before = snapshot(self.base, strict=True)
+        with patch.object(deploy, 'processes_from', return_value=[]), \
+                patch.object(deploy.shutil, 'disk_usage', return_value=Usage(80 * GIB, 50 * GIB, 30 * GIB)):
+            disk = self.preflight()['disk']
+            with self.assertRaisesRegex(ValueError, 'must be a real directory'):
+                deploy.prune(argparse.Namespace(instance='p035', keep_checkpoints=1))
+        self.assertEqual(snapshot(self.base, strict=True), before)
+        self.assertFalse(disk['pruneAvailable'])
+        self.assertEqual(disk['pruneUnavailableReason'], str(self.backups) + ' must be a real directory')
+        self.assertNotIn('pruneWouldRemove', disk)
+        self.assertIn(str(self.backups), disk['filesystems'][0]['paths'])
 
     def test_running_the_script_from_a_release_writes_no_bytecode(self):
         # A release holds infra/personal-vps without bytecode, and its manifest check refuses unlisted files.

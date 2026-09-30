@@ -87,7 +87,7 @@ No automatic update/rollback or verified off-host backup is promised by this ins
 
 ## Disk use
 
-Harbor starts every personal runtime, local or VPS, with Codex's plugin feature off (`-c features.plugins=false`). Harbor has not assessed plugins. With the feature on, Codex 0.153.4 syncs OpenAI's plugin catalog, about 98 MB, into `CODEX_HOME/.tmp` when a runtime starts with a missing or stale copy, and a runtime that stops first leaves its partial download behind.
+Harbor starts every personal runtime, local or VPS, with Codex's plugin feature off (`-c features.plugins=false`). Harbor has not assessed plugins. With the feature on, Codex 0.153.4 syncs OpenAI's plugin catalog, about 100 MB on disk, into `CODEX_HOME/.tmp` when a runtime starts with a missing or stale copy, and a runtime that stops first leaves its partial download behind.
 
 The supervisor refreshes the stored model list and account readiness with a short-lived read-only runtime. It starts one when no capability record exists, every minute while the account is not signed in, and every 30 minutes while it is. After a failed attempt it waits a full minute. Supervisor startup deletes the stored record, so readiness refreshes on the first tick after a restart, for example after device login. The API still treats a model list older than one hour as unavailable.
 
@@ -95,11 +95,11 @@ The installer renders PostgreSQL's container log with Docker's `json-file` drive
 
 The deploy workflow's `preflight` reports disk use, and its `prune` action deletes old releases and checkpoints; see [GitHub Actions deployment](github-actions-deploy.md#actions).
 
-A Codex home that an older release used may still hold abandoned `.tmp/plugins-clone-*` and `.tmp/git-*` directories. Remove them only while the supervisor is stopped, because a running Codex process may be using `.tmp`. Stopping the supervisor interrupts active work, as described above. Replace `INSTANCE` with the instance name:
+A Codex home that an older release used may still hold the catalog copy (`.tmp/plugins`, `.tmp/plugins.sha` and `.tmp/plugins.sync.lock`) and abandoned downloads (`.tmp/plugins-clone-*` and `.tmp/git-*`), which Codex no longer uses with plugins off. Remove them only while the supervisor is stopped, because a running Codex process may be using `.tmp`. Stopping the supervisor interrupts active work, as described above. Replace `INSTANCE` with the instance name:
 
 ```sh
 sudo systemctl stop harbor-personal-INSTANCE-supervisor.service
-sudo find /var/lib/harbor-personal-INSTANCE/codex-home/.tmp -mindepth 1 -maxdepth 1 \( -name 'plugins-clone-*' -o -name 'git-*' \) -exec rm -rf -- {} +
+sudo find /var/lib/harbor-personal-INSTANCE/codex-home/.tmp -mindepth 1 -maxdepth 1 \( -name 'plugins*' -o -name 'git-*' \) -exec rm -rf -- {} +
 sudo systemctl start harbor-personal-INSTANCE-supervisor.service
 ```
 
@@ -130,6 +130,8 @@ After successful enrollment, configure Harbor's exact owner subject from the pri
 For the owner's later reuse request, an administrator can copy only a verified ChatGPT-mode `auth.json` into the stopped instance's empty private Codex home. Keep the original unchanged, set the destination to service ownership and 0600, and refuse an existing destination. Do not copy history or config, link homes, or display credentials. This is a trusted administrator operation, not a browser credential-upload feature or an automatic installer behavior. Verify the pinned runtime reads the imported account, then exercise a bounded subscription turn before claiming success. Separate homes may refresh the imported credentials independently; continued concurrent refresh compatibility is not established by the copy. If reuse fails, complete device authentication for the separate home.
 
 ## Current owner installation
+
+On 30 September 2026 the owner uninstalled Harbor from the VPS, so no instance is installed and the release records below are history.
 
 On 21 September 2026, the installed P018/P024 release is `/opt/harbor-personal/releases/p024-sendfix-311f750a18bb`, source commit `311f750a18bb8bc400ddfc497b82b0f5de6e9e25`, manifest SHA256 `0ad775d55a52d75cb7e95fd0bb475d3202d86f90df8a70ac9c3d61e259382795`. The [installed correction record](../reports/2026-09-21-p024-installed-attachment-fix.md#final-deployment-and-installed-acceptance) identifies its immutable package, all-zero drain, matched checkpoint, unchanged 18 migrations, service/account/HTTPS policy and usable conversation composer. Its immediate predecessor is `p024-sendfix-c7f2d26a552b`. The [initial P018/P024 release](../reports/2026-09-21-p018-concurrency.md#committed-release-and-vps-delivery), `p018-p024-817c3d097166`, introduced migrations 019/020; its attachment claim was subsequently corrected. Retained releases require deliberate compatibility and matched-state assessment before rollback; never restore over newer work without assessing it.
 

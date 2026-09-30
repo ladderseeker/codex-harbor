@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Build, stage and promote a personal VPS release on the host itself.
+"""Build, stage, promote and prune personal VPS releases on the host itself.
 
 Runs as root on the VPS, normally from the GitHub Actions deploy workflow.
-It changes only the selected instance's release path; configuration, secrets,
-site drop-ins, previews and state are preserved. Every promotion drains work
-and writes a private matched checkpoint first.
+Promotion changes only the selected instance's release path; configuration,
+secrets, site drop-ins, previews and state are preserved. Every promotion
+drains work and writes a private matched checkpoint first. Prune deletes old
+releases and checkpoints under a fixed retention rule, on single-instance
+hosts only.
 """
 import argparse
 import datetime
@@ -44,6 +46,7 @@ KEEP_CHECKPOINTS = 2
 # The XDG data, state and config homes of a development project; the rest is cache.
 DEVELOPMENT_KEEP = ('config', 'data', 'state')
 STAMP = re.compile(r'[0-9]{8}T[0-9]{6}Z')
+INSTANCE_NAME = re.compile(r'[a-z][a-z0-9-]{0,23}')
 BUSY = "('queued','dispatching','running','waiting_approval','waiting_input','uncertain')"
 MIGRATIONS = 'packages/storage/src/migrations'
 RELEASE_ROOT_ENTRIES = {'apps', 'packages', 'infra', 'node_modules', 'toolchain', 'package.json',
@@ -67,7 +70,7 @@ def systemctl(*args, check=True):
 
 
 def instance(name):
-    require(re.fullmatch(r'[a-z][a-z0-9-]{0,23}', name), 'Invalid instance name')
+    require(INSTANCE_NAME.fullmatch(name), 'Invalid instance name')
     unit, etc, state = installer.layout({'instance': name})
     config = Path(etc) / 'config.json'
     require(config.is_file(), 'Instance configuration not found: ' + str(config))
@@ -654,13 +657,44 @@ def codex_scratch(checkpoint_directory):
     return path
 
 
+def configured_instances():
+    """Every instance with a configuration on this host, found through the installer's layout naming."""
+    sample = 'a'
+    etc = Path(installer.layout({'instance': sample})[1])
+    root, prefix = etc.parent, etc.name[:-len(sample)]
+    try:
+        entries = sorted(os.listdir(root))
+    except FileNotFoundError:
+        return []
+    names = []
+    for entry in entries:
+        name = entry[len(prefix):]
+        if (entry.startswith(prefix) and INSTANCE_NAME.fullmatch(name)
+                and Path(installer.layout({'instance': name})[1]) == root / entry
+                and os.path.lexists(root / entry / 'config.json')):
+            names.append(name)
+    return names
+
+
+def prune_refusal(c):
+    """Why prune must not run on this host, or None.
+
+    Releases and checkpoints are shared by every instance on the host, but prune keeps only the
+    selected instance's release and ranks all checkpoints together."""
+    others = [name for name in configured_instances() if name != c['instance']]
+    if others:
+        return ('Prune supports single-instance hosts only, and this host has ' + str(len(others))
+                + ' other instance configuration' + ('s' if len(others) > 1 else ''))
+    return None
+
+
 def prune_plan(c, keep=KEEP_CHECKPOINTS, releases=None, backups=None):
     """What prune keeps and removes among the direct children of the release and backup directories.
 
     It keeps the installed release, releases a process runs from, the newest `keep` checkpoints that
     deploy-release wrote and the releases their receipts name. It removes the other recognized
-    checkpoints and releases, and Codex scratch from every checkpoint it keeps. Unrecognized
-    checkpoints, names starting with a dot and symbolic links are left alone."""
+    checkpoints and releases, and Codex scratch from each kept checkpoint that deploy-release wrote.
+    Other backup directories, names starting with a dot and symbolic links are left alone."""
     releases = RELEASES if releases is None else Path(releases)
     backups = BACKUPS if backups is None else Path(backups)
     require(type(keep) is int and 1 <= keep <= 10, 'Keep between 1 and 10 checkpoints')
@@ -668,17 +702,21 @@ def prune_plan(c, keep=KEEP_CHECKPOINTS, releases=None, backups=None):
     for directory in real_children(backups):
         entry = {'name': directory.name, 'path': str(directory), 'bytes': allocated(directory)}
         checkpoints.append(entry)
-        receipt = checkpoint_receipt(directory)
+        hidden = directory.name.startswith('.')
+        receipt = None if hidden else checkpoint_receipt(directory)
         if receipt:
             recognized.append((receipt['createdAt'], directory.name, receipt['release'], entry))
+        elif hidden:
+            entry.update(keep=True, reason='hidden directory')
         else:
             entry.update(keep=True, reason='not a checkpoint written by deploy-release')
     recognized.sort(key=lambda item: item[:2], reverse=True)
-    named = set()
+    named, trimmed = set(), set()
     for index, (_, _, release, entry) in enumerate(recognized):
         if index < keep:
             entry.update(keep=True, reason='one of the newest ' + str(keep) + ' checkpoints')
             named.add(os.path.normpath(release))
+            trimmed.add(entry['path'])
         else:
             entry.update(keep=False, reason='older than the newest ' + str(keep) + ' checkpoints')
     installed = os.path.normpath(c['release'])
@@ -699,7 +737,8 @@ def prune_plan(c, keep=KEEP_CHECKPOINTS, releases=None, backups=None):
     remove = [{'path': e['path'], 'kind': 'release', 'bytes': e['bytes']} for e in listed if not e['keep']]
     remove += [{'path': e['path'], 'kind': 'checkpoint', 'bytes': e['bytes']} for e in checkpoints if not e['keep']]
     for entry in checkpoints:
-        scratch = codex_scratch(Path(entry['path'])) if entry['keep'] else None
+        # Only kept checkpoints that deploy-release wrote; other backup directories stay untouched.
+        scratch = codex_scratch(Path(entry['path'])) if entry['path'] in trimmed else None
         if scratch:
             remove.append({'path': str(scratch), 'kind': 'codex-scratch', 'bytes': allocated(scratch)})
     return {'releases': listed, 'checkpoints': checkpoints, 'remove': remove}
@@ -747,15 +786,25 @@ def disk_report(c, etc, state, releases=None, backups=None, work=None, build_sta
     build_paths = build_locations(releases, work, build_state, build_cache)
     build_need = 4 * allocated(Path(c['release']))
     checkpoint_bytes = checkpoint_need(c, etc, state)
-    plan = prune_plan(c, KEEP_CHECKPOINTS, releases, backups)
+    report = {'filesystems': list(filesystems([releases, backups, Path(state)] + build_paths[:3]).values()),
+              'buildNeedBytes': build_need, 'buildFits': not shortfalls(build_paths, build_need),
+              'checkpointNeedBytes': checkpoint_bytes, 'checkpointFits': not shortfalls([backups], checkpoint_bytes),
+              'codexScratchBytes': allocated(Path(state) / 'codex-home' / '.tmp')}
+    try:
+        refusal = prune_refusal(c)
+        if refusal:
+            raise ValueError(refusal)
+        plan = prune_plan(c, KEEP_CHECKPOINTS, releases, backups)
+    except (ValueError, OSError) as error:
+        # The report never fails because prune cannot run; prune itself still refuses.
+        report.update(pruneAvailable=False,
+                      pruneUnavailableReason=str(error) if isinstance(error, ValueError) else type(error).__name__)
+        return report
     summary = lambda entries: [{k: e[k] for k in ('name', 'bytes', 'keep', 'reason')} for e in entries]
-    return {'filesystems': list(filesystems([releases, backups, Path(state)] + build_paths[:3]).values()),
-            'buildNeedBytes': build_need, 'buildFits': not shortfalls(build_paths, build_need),
-            'checkpointNeedBytes': checkpoint_bytes, 'checkpointFits': not shortfalls([backups], checkpoint_bytes),
-            'codexScratchBytes': allocated(Path(state) / 'codex-home' / '.tmp'),
-            'releases': summary(plan['releases']), 'checkpoints': summary(plan['checkpoints']),
-            'pruneKeepCheckpoints': KEEP_CHECKPOINTS, 'pruneWouldRemove': [item['path'] for item in plan['remove']],
-            'pruneWouldFreeBytes': sum(item['bytes'] for item in plan['remove'])}
+    report.update(pruneAvailable=True, releases=summary(plan['releases']), checkpoints=summary(plan['checkpoints']),
+                  pruneKeepCheckpoints=KEEP_CHECKPOINTS, pruneWouldRemove=[item['path'] for item in plan['remove']],
+                  pruneWouldFreeBytes=sum(item['bytes'] for item in plan['remove']))
+    return report
 
 
 def preflight(args):
@@ -779,6 +828,8 @@ def prune(args):
     keep = args.keep_checkpoints
     require(type(keep) is int and 1 <= keep <= 10, 'Keep between 1 and 10 checkpoints')
     c, _, _, _ = instance(args.instance)
+    refusal = prune_refusal(c)
+    require(not refusal, str(refusal) + '; nothing was changed')
     plan = prune_plan(c, keep)
     result = {'keepCheckpoints': keep, 'removed': [], 'freedBytes': 0, 'skipped': []}
     item = None
