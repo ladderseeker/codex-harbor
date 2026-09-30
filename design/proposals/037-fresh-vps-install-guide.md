@@ -3,7 +3,7 @@
 ## Metadata
 
 - ID: P037
-- Status: Draft
+- Status: Accepted
 - Priority: Not set by the owner. The owner asked for this on 30 September 2026, to follow the disk fix.
 - Created: 2026-09-30
 - Owner: Main conversation. A fresh-context implementer does the implementation in a separate checkout.
@@ -11,8 +11,9 @@
 - Authorization: On 30 September 2026 the owner reported that they had uninstalled everything from the VPS. They asked for a clear deployment document, written after the disk fix, that a local agent running an inexpensive model could follow. Tracked records paraphrase that message, as the [workflow](../workflow.md#evidence-and-provenance) requires. This plan writes the guide and a first-release command. It changes no host: the owner, or an agent the owner runs, follows the guide on the VPS.
 - Dependencies:
   - P035 reached `main` at `8cfa82f` on 30 September 2026, so a first install gets the bounded disk use. Satisfied.
-  - P036, which changes `AGENTS.md` and the delivery rules. Execution waits until P036 is on `main`, because this plan also edits `AGENTS.md`.
+  - P036, which changes `AGENTS.md` and the delivery rules. Execution waits until P036 is on `main`, because this plan also edits `AGENTS.md`. P036 reached `main` at `faa16ab` on 30 September 2026. Satisfied.
   - The VPS itself. The guide's run on the host cannot happen in a cloud session, so it blocks completion, not execution; see [Verification and acceptance](#verification-and-acceptance).
+- Baseline: the implementer starts at the commit that accepts this plan, on top of `faa16ab`.
 - Source issues: None. Related: the [personal VPS acceptance issue](../../issues/2026-09-13-130622-personal-vps-acceptance.md), whose gates a first install exercises again, and the [reconfiguration issue](../../issues/2026-09-26-074653-personal-vps-reconfiguration.md), which explains why every configuration value must be right before `render`.
 - Design references:
   - [deployment and profiles](../systems/004-deployment-and-profiles.md);
@@ -453,7 +454,7 @@ Run-owned scratch, which main creates and removes:
   `build`'s existing tests still pass.
 - **P037-02, real inputs.** In the cloud container, `bootstrap`'s input step downloads the four pinned files, their hashes match, and the layout passes `validate_native_distribution`. `node`, `codex` and `pnpm` report v24.11.1, `codex-cli 0.153.4` and 12.3.4 from a run-owned home.
 - **P037-03, real release.**
-  - With those inputs, the build script runs on a clone of the implementer's revision, with `sh` in place of the transient unit, which the container cannot start.
+  - With those inputs, the build script runs on a bundle of the implementer's baseline commit, because implementers do not commit, with `sh` in place of the transient unit, which the container cannot start.
   - Its output is staged in a scratch release directory, set to root ownership and passes `verify_release`.
   - The release's Codex, run in a run-owned home, lists the six bundled IDs with the guide's command.
   - The guide's configuration block, pointed at that release and at scratch paths, passes `harbor-personal validate` and `render`. `install` needs systemd and is not run.
