@@ -617,7 +617,7 @@ Main's dispositions:
 - **Outside scope:** P026 assumes pull requests and required checks. Dependencies records that it needs revising when selected.
 - **Not authorized:** a check of a default Docker daemon, which this plan excludes.
 
-Evidence limits: auto mode blocked the implementer's own script for comparing the settled texts. The reviewers compared those texts by reading and with their own read-only checks. The provenance reviewer found that `/root/.codex/tmp/arg0`, in the container's default Codex home, changed at 03:37:36 UTC. P035's provenance review traced it to main's own identity command for a credential-free probe, which ran `codex --version` once with the default home. Codex created a helper directory there and read no credential. The guide now tells agents to use a run-owned home even for version checks.
+Evidence limits: auto mode blocked the implementer's own script for comparing the settled texts. The reviewers compared those texts by reading and with their own read-only checks. The provenance reviewer found that `/root/.codex/tmp/arg0`, in the container's default Codex home, changed at 03:37:36 UTC. P035's provenance review traced it to main's own identity command for a credential-free probe, which ran `codex --version` once with the default home. Codex created a helper directory there, may have removed stale ones, and read no credential. The guide now tells agents to use a run-owned home even for version checks.
 
 ## Closing record
 

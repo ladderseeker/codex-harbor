@@ -317,7 +317,7 @@ Nothing migrates. Reverting the commit restores the old behavior. Checkpoints wr
 
 ### Round 1, 30 September 2026
 
-The design and provenance reviewers read `d33487f` against the baseline `9231078`, over this plan's fence. Both reproduced the runnable gate with main's results: `pnpm build`, `pnpm check` and `pnpm test` passed, and `pnpm test:contract` and `pnpm test:deployment:contract` failed only their baseline tests.
+The design and provenance reviewers read `d33487f` against the baseline `9231078`, over this plan's fence. The provenance reviewer reproduced the runnable gate with main's results: `pnpm build`, `pnpm check` and `pnpm test` passed, and `pnpm test:contract` and `pnpm test:deployment:contract` failed only their baseline tests. The design reviewer ran the new deploy-release tests (22 of 22) and the discovery test (5 of 5) from an export of `d33487f`, `check-docs`, `git diff --check` and scratch probes of the guardian template and prune; it did not run `pnpm build`, `pnpm check`, `pnpm test` or the contract suites.
 
 The design reviewer reported one blocker, one major and three minor findings, five nits and one unrelated observation. The provenance reviewer reported one major finding, the same as the design blocker, four minor findings, five nits and observations outside this plan. Main's dispositions:
 
@@ -336,7 +336,7 @@ The design reviewer reported one blocker, one major and three minor findings, fi
 
 ### Round 2, 30 September 2026
 
-Both reviewers read `git diff d33487f 9da83f6`, including the record commits `cbf00ee` and `d050fa3`, and found every round-1 fix in place. The design reviewer ran the deploy-release tests (24 of 24) and `check-docs` on an export of `9da83f6`, and simulated the cleanup command. The provenance reviewer reran the gate at `9da83f6` with main's results: `pnpm build`, `pnpm check` and `pnpm test` (56 of 56) passed, the deployment contract failed only its baseline test, and the contract files failed only their five baseline tests. Both reviews were clear, with nits and one provenance correction:
+Both reviewers read `git diff d33487f 9da83f6`, including the record commits `cbf00ee` and `d050fa3`, and found every round-1 fix in place. The design reviewer ran the deploy-release tests (24 of 24) and `check-docs` on an export of `9da83f6`, and simulated the cleanup command. The provenance reviewer reran the gate at `9da83f6` with main's results: `pnpm build`, `pnpm check` and `pnpm test` (56 of 56) passed, the deployment contract failed only its baseline test, and the contract files failed only their five baseline tests. It ran the contract files one by one and skipped `history.test.ts`, which rewrites `/opt`; main's and the implementer's full runs covered that file. Both reviews were clear, with nits and one provenance correction:
 
 - **Accepted, and fixed by the implementer in round 3:**
   - the report labelled a linked root with the link's path instead of its target's mount;
@@ -348,6 +348,24 @@ Both reviewers read `git diff d33487f 9da83f6`, including the record commits `cb
 - **Handled by [P036](036-cloud-agent-sessions.md):** `AGENTS.md` still names only `build` and `deploy`, as in round 1.
 
 Provenance correction: at 03:37:35 UTC, main's own command that recorded the credential-free warning probe's identity ran the pinned binary's `--version` once with the container's default Codex home, which holds the container's ChatGPT login. Codex created one helper directory under `/root/.codex/tmp/arg0` and may have removed stale ones. A traced `--version` run in a run-owned home opened only a missing `.env`, so the run read and copied no credential. The probe itself used run-owned homes. The directory is left for Codex to remove as stale, and every later Codex call uses a run-owned `HOME` and `CODEX_HOME`.
+
+### Round 3, 30 September 2026
+
+Both reviewers read `git diff 9da83f6 9372140`, which holds the round-3 fixes and main's record corrections. The design reviewer ran the deploy-release tests (25 of 25) and `check-docs` on an export of `9372140`, removed each of the two code fixes from a scratch copy and saw the tests fail, reran its mount-label probe, and reproduced the record claims about `os.write`, `shell_snapshot` and the partial clone. Its verdict was clear, with one correction to the round-1 wording above. The provenance reviewer reran the gate at `9b4d713`, whose P035 content equals `9372140`: `pnpm build`, `pnpm check` and `pnpm test` (56 of 56) passed; the deployment contract ran 66 tests and failed only its baseline test; and the contract files, run one by one without `history.test.ts`, failed only their five baseline tests. It found every round-2 finding fixed, confirmed that no Codex start had used the default home since 03:37:36 UTC, and reported the verdict clear. Its remaining nits are folded into this record.
+
+### Delivery, 30 September 2026
+
+This entry goes to `main` with the reviewed source, `9372140`. The proposal stays Accepted, because three mandatory checks could not run.
+
+- **Environment:** a Claude Code cloud container running Ubuntu 24.04.4 as root, with cgroup v1, no systemd and no Docker daemon; Node 24.11.1, pnpm 12.3.4, Python 3.11.15; and the pinned Codex 0.153.4 binary, SHA-256 `56ef98ab4032d317ab26e9b5e5a175650717351edb16ed9cde0cb6d1734d62da`.
+- **Gate results for `9372140`:**
+  - `pnpm build` and `pnpm check` exited 0, and `pnpm test` passed 56 of 56.
+  - `pnpm test:deployment:contract` ran 66 tests with one failure, the baseline `review_test.Review.test_actual_process_capture_limit_timeout_and_failure`, which the [capture-limit issue](../../issues/2026-09-30-032022-deploy-run-capture-limit.md) records. Its Node half, run separately, passed 3 of 3.
+  - `pnpm test:contract` with the pinned binary passed 24 of 29 at `9da83f6`, whose runtime and contract sources equal `9372140`'s. The five failures are the baseline ones, and P035-02 passed.
+  - `node scripts/check-docs.mjs` and `git diff --check` passed.
+- **Live smoke:** one real turn through the pinned binary with `PERSONAL_RUNTIME_ARGS`, at 02:50 UTC on 30 September. The owner allowed copying this container's ChatGPT login for that one turn, on the thread's decision card. The turn completed, the edited file matched the canary, the Codex home had no `.tmp`, and the copied credential was deleted. The driver spoke to the binary directly, without the guardian, supervisor, adapter or cgroups, so it satisfies only P035-10's live-smoke bullet. Result SHA-256 `e5e555fb662994560d85b950637200d281305ae522b0b89a922dbbe7e8dc68b7`; driver SHA-256 `a66815cba8e88b7acdc65309cb11ca6ba6327bfe439c76da6b23a232132539e9`. It ran on `8fecc0b` plus uncommitted files, and `packages/codex-adapter/src/local-runtime.ts`, SHA-256 `d73302f244dff2b503e3c7eb9389253ef9b0ec5a5b28aedc3d226f9c9a7cdd25`, is unchanged from there to `9372140`.
+- **Acceptance:** P035-02 to P035-09 are met. P035-01 is unverified. P035-10 is partly met: the critical `pnpm test:e2e` suite and the personal VPS Linux lanes are unverified. [An issue](../../issues/2026-09-30-040032-p035-unverified-gates.md) records all three with their recheck.
+- **Evidence limits:** the raw logs under `.test-runs/p035-*` and the reviewers' scratch folders exist only in this cloud container, and they become unavailable when it is reclaimed. The baseline logs carry no source revision; they were matched to `9231078` by content. The round-1 gate's environment file names `8fecc0b` plus uncommitted files, whose digests equal `cd119b7`.
 
 ## Closing record
 
