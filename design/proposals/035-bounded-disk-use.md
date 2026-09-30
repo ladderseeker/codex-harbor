@@ -18,7 +18,7 @@
 - Dependencies: Nothing blocks execution. Two gates need infrastructure that this thread's container lacks, and they block completion:
   - The real-stack end-to-end suite needs a Docker engine with Compose. Starting a Docker daemon in this container was refused.
   - The personal VPS Linux lane needs systemd and a delegated cgroup v2 subtree. This container has neither, so the personal runtime launch contracts fail here with "Personal cgroup delegation unavailable".
-  - [P026](026-continuous-integration.md) or another supported Linux host supplies them. They stay open until then.
+  - [P026](026-continuous-integration.md) or another supported Linux host supplies them. They stay open until then, with P035-01, which needs a personal launch. [An issue](../../issues/2026-09-30-040032-p035-unverified-gates.md) records all three.
 
   The bounded live smoke needed the owner's permission to copy this container's ChatGPT credential. The owner gave it on 30 September 2026, and the smoke ran; see [Review and findings](#review-and-findings).
 - Source issues: [Personal VPS disk growth](../../issues/2026-09-30-015210-personal-vps-disk-growth.md).
@@ -315,7 +315,24 @@ Nothing migrates. Reverting the commit restores the old behavior. Checkpoints wr
 
 ## Review and findings
 
-Pending. After the green gate, main starts the design and provenance reviewers, as the [review contract](../workflow.md#delegation-and-review) requires.
+### Round 1, 30 September 2026
+
+The design and provenance reviewers read `d33487f` against the baseline `9231078`, over this plan's fence. Both reproduced the runnable gate with main's results: `pnpm build`, `pnpm check` and `pnpm test` passed, and `pnpm test:contract` and `pnpm test:deployment:contract` failed only their baseline tests.
+
+The design reviewer reported one blocker, one major and three minor findings, five nits and one unrelated observation. The provenance reviewer reported one major finding, the same as the design blocker, four minor findings, five nits and observations outside this plan. Main's dispositions:
+
+- **Accepted, and fixed by the implementer in `9da83f6`:**
+  - `prune` stripped Codex scratch from backup directories that `deploy-release` did not write. It now strips only the kept checkpoints that it wrote, and it never reads a receipt under a name that starts with a dot.
+  - `prune` treated the host-wide release and backup directories as one instance's. It now refuses on a host with another instance configuration, and the report shows it unavailable.
+  - A backup directory that is a symbolic link made `preflight`, and so every workflow action, fail. The report now says why prune is unavailable instead.
+  - Discovery attempt times used the wall clock. They now use `performance.now()`.
+  - Nits: the cleanup command also removes the complete catalog copy, the script's help mentions prune, the full-disk sentence names preflight, P035-02 asserts the pinned version, the P035-05 tests assert the mount point, and the two guides date the uninstall.
+- **Accepted, and fixed by main in `d050fa3`:** the proxy-less evidence row is relabeled, and P035-02 cites other discrimination evidence; the 35 GB a day is conditional, with the observed range and SIGKILL retirement; Dependencies states the smoke's authorization and scope; the baseline count and size conventions are corrected; and the source issue records the deploy build's pnpm cache and leftover upload directories.
+- **Evidence retention:** main copied the baseline, gate and reproduction logs into `.test-runs/p035-evidence/` and recorded the smoke's binary identity in `.test-runs/p035-live/smoke-identity.json`. Both are ignored storage in a disposable container, so the delivery entry keeps the identities and results that matter.
+- **Accepted limitation:** a checkpoint copies each top-level entry with its own `cp -a`, so a hard link between two entries becomes two files. Harbor's state has no such links today.
+- **Handled by [P036](036-cloud-agent-sessions.md):** `AGENTS.md` names only `build` and `deploy` as needing the owner's go-ahead. P036 extends that to every action other than `preflight`, which covers `prune`.
+- **Recorded as issues:** Codex's [other default features](../../issues/2026-09-30-033835-personal-runtime-default-features.md), the history contract [running the host's login profile](../../issues/2026-09-30-033836-contract-test-login-shell.md), and the managed helper's [capture-limit truncation](../../issues/2026-09-30-032022-deploy-run-capture-limit.md).
+- **Observation:** P006-01 failed once, after 319 ms, in the implementer's baseline copy under `/tmp`, and it passed in every run in the repository checkout. It is not attributed to this plan.
 
 ## Closing record
 
