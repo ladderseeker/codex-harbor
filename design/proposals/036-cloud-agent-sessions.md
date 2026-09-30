@@ -20,11 +20,11 @@
   - At 02:54 UTC they wrote that this is their private work and needs no review: finished work goes straight to `main`, and the rules should say so. Once CI/CD exists, finishing something should also finish its deployment.
 
   Together these authorize this plan, its execution alongside P035 on disjoint files, branch commits and pushing finished work to `main`. The last message replaces the first choice's reservation about merging. Tracked records paraphrase these messages, because the [workflow](../workflow.md#evidence-and-provenance) keeps conversation contents out of them. Every VPS workflow run other than `preflight` still needs the owner's go-ahead until a plan that delivers CI/CD is Implemented.
-- Baseline: the implementer's checkout is `aa03191`, which is `main` at `9231078` plus P035's plan. The working branch `claude/project-thread-ob9jjx` has since gained P035's commits and this plan's own revisions. P035's commits change none of this plan's files except the two named under Dependencies.
+- Baseline: the implementer started at `aa03191`, which is `main` at `9231078` plus P035's plan. After P035 reached `main` at `8cfa82f`, main moved the checkout to the commit that adds this plan's revision to `8cfa82f`, carrying the implementer's uncommitted changes. P035's commits change none of this plan's files except the two named under Dependencies.
 - Dependencies: None blocking.
   - The hook's real download and install are verified in this thread's cloud container.
   - Other environments may differ, so the guide dates its facts and says how to recheck them.
-  - The edits to `docs/developer/github-actions-deploy.md` and `.github/workflows/deploy-vps.yml` wait until P035, which also changes both files, is on `main`.
+  - The edits to `docs/developer/github-actions-deploy.md` and `.github/workflows/deploy-vps.yml` wait until P035, which also changes both files, is on `main`. P035 reached `main` at `8cfa82f` on 30 September 2026.
 - Source issues: None. The owner requested this directly.
 - Design references:
   - the workflow's [proposal completion](../workflow.md#proposal-completion-and-archive), [evidence](../workflow.md#evidence-and-provenance), [gate](../workflow.md#implementation-and-verification-gate) and [review](../workflow.md#delegation-and-review) sections;
@@ -117,7 +117,7 @@ The [workflow](../workflow.md#proposal-completion-and-archive) and [D013](../dec
 
 [P026](026-continuous-integration.md) plans hosted CI. The owner's direction that deployment follow each finished outcome applies once a plan that delivers CI and deployment automation is Implemented; that plan updates the deploy rules then. P026, still a Draft, assumes pull requests and required checks, which direct pushes to `main` would bypass, so it needs revising for direct delivery when it is selected. The deploy guide and the deploy workflow's comment currently suggest adding a `push` trigger after the first manual deploy. This plan changes both to leave that trigger to the plan that delivers CI/CD and to the owner.
 
-P035 also changes `docs/developer/github-actions-deploy.md` and `.github/workflows/deploy-vps.yml`. This plan's edits to those two files wait until P035 is on `main`, and they are made on top of it.
+P035 also changes `docs/developer/github-actions-deploy.md` and `.github/workflows/deploy-vps.yml`. This plan's edits to those two files wait until P035 is on `main`, and they are made on top of it. P035 reached `main` at `8cfa82f` on 30 September 2026.
 
 The gate rules stay the same: a missing credential, runtime or infrastructure makes a gate unverified, never passed. The new text only says which gates a cloud session did not run and where they run instead.
 
@@ -137,8 +137,10 @@ This thread's cloud container was inspected on 30 September 2026. The guide's fa
 The Claude Code [cloud environment documentation](https://code.claude.com/docs/en/cloud-environments), read on 30 September 2026, adds three facts:
 
 - `git push` works only against the session's current working branch;
-- a session with several repositories starts above the clones and does not run repository hooks;
+- a session with several repositories, including a project thread, starts above the clones and does not run repository hooks;
 - Docker is available for running services.
+
+Two observations from this thread qualify the first two facts. At 06:09 UTC on 30 September 2026, this session delivered P035 with `git push origin HEAD:main`, which moved `main` from `9231078` to `8cfa82f`. This thread is a project thread with one repository; it started in the repository's directory and loaded `AGENTS.md`. Whether the hook runs in such a thread stays unverified until a thread starts after this plan reaches `main`.
 
 The pinned SHA-256 of `node-v24.11.1-linux-x64.tar.xz` is `60e3b0a8500819514aca603487c254298cd776de0698d3cd08f11dba5b8289a8`. It matches the official `SHASUMS256.txt` for v24.11.1 and the tarball downloaded in this container.
 
@@ -165,7 +167,7 @@ No browser page or public API changes.
 - **Node download.**
   - The tarball comes from `https://nodejs.org/dist`. A test may override that base URL through `HARBOR_NODE_DIST`, but the SHA-256 value stays pinned in the script, so any source must deliver the exact official tarball.
   - A download, checksum or extraction failure leaves any existing install untouched and removes its own temporary directory.
-- **Bounded time.** Each download attempt may take at most 90 seconds, with at most two retries within 180 seconds, and `pnpm install` runs under `timeout 240`. A stall therefore ends with a failure line within the hook's 600-second limit.
+- **Bounded time.** Each download attempt may take at most 90 seconds, with at most two retries within 180 seconds, and `pnpm install` runs under `timeout -k 10 240`, which kills the install 10 seconds after the stop signal if it is still running. A stall therefore ends with a failure line within the hook's 600-second limit.
 - **Session environment.** The script appends one `export PATH=...` line to `CLAUDE_ENV_FILE`, and only if that exact line is not already present. It never prints environment values, tokens or file contents.
 - **Failure behavior.** Every path exits 0 and prints at most one line. A failure line names the reason and the guide section.
 - **Commit identity.** Commits use the session's configured identity. The rules forbid using the owner's or another contributor's name or email.
@@ -177,6 +179,12 @@ No browser page or public API changes.
 The implementer applies these texts verbatim. It may adjust only a link path, and only if a check requires it.
 
 ### AGENTS.md
+
+Replace the Delivery and delegation bullet that begins "After a green gate" with:
+
+```markdown
+- Once every gate that can run is green, automatically start separate fresh-context [design](docs/developer/agents/design-reviewer.md) and [provenance](docs/developer/agents/provenance-reviewer.md) reviewers, naming any gate that could not run. Reviewers only report and run read-only checks; they do not author fixes.
+```
 
 Replace the Delivery and delegation bullet that begins "Implementers never commit." with:
 
@@ -377,7 +385,7 @@ It has these sections:
   The section also states these rules:
   - Finished means what the workflow says: every gate that can run passed, every other gate is recorded as unverified with an issue, both reviews are clear and the plan records the result. Work with remaining blockers stays off `main` until the owner decides.
   - An outcome is delivered only when every commit between `origin/main` and it is finished work or a plan or issue record.
-  - Where Git cannot push to `main`, as in Claude Code cloud sessions, a pull request merged at once with a merge commit delivers the reviewed commits unchanged. It is not a review request.
+  - Where Git cannot push to `main`, a pull request merged at once with a merge commit delivers the reviewed commits unchanged. It is not a review request.
   - Unavailable gates stay unverified, hosted CI or a supported host supplies them, and isolation is never weakened.
   - Deployment stays manual, with the owner's go-ahead for every run other than `preflight`, until a plan that delivers CI/CD is Implemented and changes these rules. Adding an automatic deploy trigger is the owner's decision. After that, finishing an outcome includes deploying it and checking the deployment, as the owner directed.
 - **Consequences:**
@@ -407,7 +415,7 @@ Required content for each section:
 
 - **Environment.**
   - The container facts listed under [Dependencies and current design](#dependencies-and-current-design), dated 30 September 2026.
-  - The three facts from the Claude Code cloud environment documentation, dated and linked.
+  - The three facts from the Claude Code cloud environment documentation, dated and linked, followed by the two observations that qualify them: the push to `main` and this project thread's start in the repository.
   - How to recheck them: `check-tools`, `node --version`, `command -v ssh gh`, and `docker info` failing while no daemon runs.
 - **Prepare a session.**
   - What the hook does, and that it installs Node under `~/.cache/codex-harbor`.
@@ -442,7 +450,7 @@ Required content for each section:
   - finished means what the workflow says: every gate that can run passed, apart from recorded baseline failures; every gate that cannot run is recorded as unverified with a linked issue; both reviews are clear; and the plan records the result, as a closing record or a dated delivery entry;
   - work that still has blockers after three review rounds stays off `main` until the owner decides;
   - deliver an outcome only when every commit between `origin/main` and it is finished work or a plan or issue record; otherwise wait for the earlier outcome, or cut a branch from `origin/main` that holds only finished commits and rerun the affected gate there;
-  - deliver with `git push origin HEAD:main` where Git allows it. The Claude Code documentation, read on 30 September 2026, says a cloud session can push only to its own branch. There, open a pull request from that branch and merge it at once with the GitHub tools, using a merge commit. The delivered commits and their signatures stay unchanged, and GitHub creates the merge commit under the account that the session's GitHub connection uses. That pull request is a delivery step, not a review request;
+  - deliver with `git push origin HEAD:main`. The Claude Code documentation, read on 30 September 2026, says a cloud session can push only to its own branch, but this project's session delivered P035 that way that day. If Git refuses the push, open a pull request from the session's branch and merge it at once with the GitHub tools, using a merge commit. The delivered commits and their signatures stay unchanged, and GitHub creates the merge commit under the account that the session's GitHub connection uses. That pull request is a delivery step, not a review request;
   - if `main` moved, merge `origin/main` into the branch, rerun the affected checks and deliver again, and never force-push `main`;
   - until a plan that delivers CI/CD is Implemented and changes these rules, deploy workflow runs other than `preflight` need the owner's go-ahead, and adding an automatic deploy trigger is the owner's decision.
 - **Keep evidence.** Ignored and scratch storage disappear with the container. Commit evidence records, and mark raw logs unavailable once they are gone.
@@ -491,7 +499,7 @@ Required content for each section:
   - **Platform:** it requires Linux x86_64.
   - **Node install:** it downloads, verifies and extracts into a temporary directory under the install root, then renames the result into place. `curl` runs with `--connect-timeout 20 --max-time 90 --retry 2 --retry-max-time 180`.
   - **Project directory:** it runs `pnpm install --frozen-lockfile` in `$CLAUDE_PROJECT_DIR`, falling back to the script's parent directory, and logs to `$HOME/.cache/codex-harbor/pnpm-install.log`.
-  - **pnpm lookup:** it uses `pnpm` when that is on PATH. Otherwise it runs `corepack pnpm` with `COREPACK_ENABLE_DOWNLOAD_PROMPT=0`. Either runs under `timeout 240`; when the `timeout` command is missing, the script prints a failure line that says so.
+  - **pnpm lookup:** it uses `pnpm` when that is on PATH. Otherwise it runs `corepack pnpm` with `COREPACK_ENABLE_DOWNLOAD_PROMPT=0`. Either runs under `timeout -k 10 240`; when the `timeout` command is missing, the script prints a failure line that says so.
   - **Output:** it prints exactly `Harbor cloud setup: Node v24.11.1 and locked dependencies ready.` on success. On failure it prints a line that begins `Harbor cloud setup failed:` and ends with `See docs/developer/cloud-sessions.md#prepare-a-session.`
 - `tests/deployment/cloud_session_setup_test.py` runs the script with a temporary `HOME`, `CLAUDE_ENV_FILE`, `CLAUDE_PROJECT_DIR` and PATH. Every failure case also asserts that the output contains none of the temporary `HOME`, environment file or project paths. It covers four cases:
   1. **Not a cloud session.** It exits 0 with no output, writes nothing and never calls pnpm.
@@ -618,6 +626,24 @@ Main's dispositions:
 - **Not authorized:** a check of a default Docker daemon, which this plan excludes.
 
 Evidence limits: auto mode blocked the implementer's own script for comparing the settled texts. The reviewers compared those texts by reading and with their own read-only checks. The provenance reviewer found that `/root/.codex/tmp/arg0`, in the container's default Codex home, changed at 03:37:36 UTC. P035's provenance review traced it to main's own identity command for a credential-free probe, which ran `codex --version` once with the default home. Codex created a helper directory there, may have removed stale ones, and read no credential. The guide now tells agents to use a run-owned home even for version checks.
+
+### Fix round 1 and the move to `main`, 30 September 2026
+
+The implementer applied the round 1 fixes at `aa03191`. Its gate passed, apart from the recorded capture-limit baseline and `check-docs`, which also stopped `pnpm check`: the guide and this plan link the capture-limit issue, which was added after `aa03191`. With that issue copied into a mirror of the checkout, `check-docs` passed. P035 then reached `main` at `8cfa82f`, and main moved the checkout to the commit that adds this revision to it. No file that the implementer changed differs between `aa03191` and `8cfa82f`, so its uncommitted changes carried over unchanged.
+
+Main's dispositions of the implementer's report:
+
+- **Accepted additions beyond the spec:**
+  - the documentation's phrase "including a project thread" in the guide's facts;
+  - a separate failure line when `pnpm install` times out, with a test for it;
+  - running `pnpm install --frozen-lockfile` when `node --version` is right but no status line appeared;
+  - a version-check example that sets both homes and removes them afterwards, and mentions the warning Codex prints for a home under `/tmp`;
+  - the hook's curl limits in the manual fallback and the setup script, the extra Git commands, the configured-mode needs of `pnpm dev` and the table's legend;
+  - D015's statement that no application, runtime, deployment or security behavior changes, and its mention of pull request #4, an agent branch that the owner reviewed and merged.
+- **Changed in this plan after the report:**
+  - `AGENTS.md` still started the reviews after a green gate. A new settled text replaces that bullet to match the workflow.
+  - The delivery texts assumed, following the documentation, that a cloud session cannot push to `main`. This session pushed P035 to `main` at 06:09 UTC. The guide now records that, D015 no longer names cloud sessions as unable to push, and a pull request remains the fallback when Git refuses the push.
+  - `timeout 240` could not stop an install that ignores the stop signal, so the hook would end at its 600-second limit without a failure line. The install now runs under `timeout -k 10 240`.
 
 ## Closing record
 
