@@ -25,6 +25,8 @@ GIB = 1 << 30
 Usage = collections.namedtuple('Usage', 'total used free')
 REAL_RUN = subprocess.run
 REVISION = 'abcdef0123456789abcdef0123456789abcdef01'
+# Tests patch os.geteuid for the script's root checks; ownership fixtures use the real identity.
+ROOT = os.geteuid() == 0
 UNIT = 'harbor-personal-p035-test-unit'
 
 
@@ -127,7 +129,7 @@ class DeployReleaseTests(unittest.TestCase):
         for index, relative in enumerate(self.rebuilt):
             path = s / relative
             os.chmod(path, (0o700, 0o750, 0o711, 0o755)[index])
-            if os.geteuid() == 0:
+            if ROOT:
                 os.chown(path, 4321 + index, 4331 + index)
             os.utime(path, ns=(1_600_000_000_000_000_000 + index, 1_700_000_000_000_000_000 + index * 1000))
 
@@ -198,7 +200,7 @@ class DeployReleaseTests(unittest.TestCase):
         for relative in expected:
             self.assertEqual(snapshot(target)[relative], source[relative], relative)
             info, original = os.lstat(target / relative), os.lstat(self.state / relative)
-            if os.geteuid() == 0:
+            if ROOT:
                 self.assertEqual((info.st_uid, info.st_gid), (original.st_uid, original.st_gid), relative)
             if not stat.S_ISLNK(info.st_mode):
                 self.assertEqual(stat.S_IMODE(info.st_mode), stat.S_IMODE(original.st_mode), relative)

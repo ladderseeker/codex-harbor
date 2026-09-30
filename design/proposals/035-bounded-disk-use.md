@@ -298,7 +298,7 @@ These ran on `9231078` on 30 September 2026. The environment was a cloud Linux c
 
 - `pnpm build`, `pnpm check` and `pnpm test` passed; `pnpm test` reported 51 passing.
 - `pnpm test:deployment:contract` failed one unrelated managed-tooling test, `review_test.Review.test_actual_process_capture_limit_timeout_and_failure` ("RuntimeError not raised").
-- `pnpm test:contract` with the pinned binary passed 23 of 28. The five failures all launch personal or Linux-native runtimes that need delegated cgroups or the Linux attachment lane. Three of them report "Personal cgroup delegation unavailable".
+- `pnpm test:contract` with the pinned binary passed 23 of 28. The five failures all launch personal or Linux-native runtimes that need delegated cgroups or the Linux attachment lane. Four of them report "Personal cgroup delegation unavailable". The fifth, the P024 attachment contract, reports "UNVERIFIED P024-03" because it needs a nonroot Linux host.
 
 ## Rollout and recovery
 
