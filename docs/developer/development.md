@@ -10,7 +10,7 @@ Historical reports retain bounded results at identified sources. The [foundation
 
 For the real local account experience, see the [personal local guide](local-personal.md). The [dated critical-regression addendum](../reports/2026-09-13-personal-local-experience.md#critical-regression-addendum--13-september-2026) records the later P014 pass and supersedes the report's earlier open-gate statement. That personal trial does not satisfy managed Linux/deployment/live gates. The fixture profile below remains separate and must not use real credentials.
 
-The tested macOS toolchain uses Node 24.11.1, pnpm 12.3.4, and a running Linux Docker engine with Compose. The repository pins JavaScript dependencies and the external Codex protocol baseline at 0.153.4. PostgreSQL 17.6 and Caddy 2.10.2 are provisioned by the run-specific Compose instance.
+The tested macOS toolchain uses Node 24.11.1, pnpm 12.3.4, and a running Linux Docker engine with Compose. Cloud sessions prepare Node and dependencies through the [session hook](cloud-sessions.md#prepare-a-session). The repository pins JavaScript dependencies and the external Codex protocol baseline at 0.153.4. PostgreSQL 17.6 and Caddy 2.10.2 are provisioned by the run-specific Compose instance.
 
 From the repository root:
 
@@ -46,13 +46,13 @@ The document script checks local Markdown paths/anchors and whitespace/final new
 
 ## Delivering a feature
 
-Use the [canonical workflow](../../design/workflow.md) and [proposal template](../../design/proposal-template.md). Main supplies a settled plan and self-contained brief; role instructions are [implementer](agents/implementer.md), [design reviewer](agents/design-reviewer.md) and [provenance reviewer](agents/provenance-reviewer.md). These plain documents do not install or configure runtime agents. The workflow owns automatic review after the green gate, finding adjudication, fix verification, the three-round cap and owner confirmation before a commit.
+Use the [canonical workflow](../../design/workflow.md) and [proposal template](../../design/proposal-template.md). Main supplies a settled plan and self-contained brief; role instructions are [implementer](agents/implementer.md), [design reviewer](agents/design-reviewer.md) and [provenance reviewer](agents/provenance-reviewer.md). These plain documents do not install or configure runtime agents. The workflow owns automatic review once every gate that can run is green, finding adjudication, fix verification, the three-round cap and the commit and delivery rules.
 
-Keep enduring verification assets and supported isolated checkouts in persistent ignored storage, such as `.test-runs/`. OS temporary storage is for recreatable scratch. Preserve unrelated Git changes and record ownership/recovery for unfinished edits and live resources. The [interruption recovery report](../reports/2026-09-13-interrupted-work-recovery.md) records historical recovery locations and limitations; inspect current availability before relying on them.
+Keep enduring verification assets and supported isolated checkouts in persistent ignored storage, such as `.test-runs/`. OS temporary storage is for recreatable scratch. In a cloud session both disappear with the container; see [Keep evidence](cloud-sessions.md#keep-evidence). Preserve unrelated Git changes and record ownership/recovery for unfinished edits and live resources. The [interruption recovery report](../reports/2026-09-13-interrupted-work-recovery.md) records historical recovery locations and limitations; inspect current availability before relying on them.
 
 ## Command availability
 
-The implemented entry points are `pnpm dev`, `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm test:contract`, `pnpm test:live`, `pnpm test:isolation`, and `pnpm test:egress`. Their results and unavailable gates are recorded in the foundation report. The canonical semantics and future feature ownership remain in the [design's command contract](../../design/architecture.md#local-first-development-and-portable-environments).
+The implemented entry points are `pnpm dev`, `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm test:contract`, `pnpm test:live`, `pnpm test:isolation`, `pnpm test:egress`, `pnpm test:workspaces`, `pnpm test:schedules` and `pnpm test:deployment:contract`. The foundation report records the results and unavailable gates of the first nine; the reports of the features that added the other three, such as the [scheduling report](../reports/2026-09-08-p008-development.md), record theirs. The canonical semantics and future feature ownership remain in the [design's command contract](../../design/architecture.md#local-first-development-and-portable-environments). The [cloud session guide](cloud-sessions.md#what-runs-here) says which of them run in a cloud session.
 
 `pnpm test:contract` requires the real pinned Codex 0.153.4 executable and uses fresh native homes without the developer's account state. `pnpm test:egress` exercises gateway policy, HTTP transport, DNS validation, and stream bounds. The corresponding Linux gateway test additionally requires built runner/gateway images:
 

@@ -65,7 +65,7 @@ Describe configuration, migrations, resource prerequisites, candidate validation
 
 ## Review and findings
 
-After the green gate, main automatically invokes separate fresh-context design and provenance reviewers using the [review contract](workflow.md#delegation-and-review). Record each round's findings, main's dispositions, original-implementer fixes, verified results and evidence limits. Stop at most after three rounds. Link unrelated findings and any remaining blocker to issues; do not silently expand scope or waive a missing gate.
+Once every gate that can run is green, main automatically invokes separate fresh-context design and provenance reviewers using the [review contract](workflow.md#delegation-and-review), naming any gate that could not run. Record each round's findings, main's dispositions, original-implementer fixes, verified results and evidence limits. Stop at most after three rounds. Link unrelated findings and any remaining blocker to issues; do not silently expand scope or waive a missing gate. When the result reaches `main` while a mandatory gate is still unverified, add a dated delivery entry here that names the delivered commit, the results, the dispositions and each unverified gate with its issue.
 
 ## Closing record
 
@@ -75,6 +75,6 @@ Keep pending until the [completion conditions](workflow.md#proposal-completion-a
 - Tested source revision or reproducible source/artifact digest and exact scope.
 - Commands, environment, results, review rounds/dispositions and linked report.
 - Current designs/docs, source-issue evidence, limitations and follow-up ownership.
-- Owner-facing uncommitted result for review and commit confirmation.
+- Delivery: the commit that put the finished result on `main`, pushed together with this record or named in an earlier dated delivery entry, under the [commit rules](workflow.md#proposal-completion-and-archive).
 
 Retain dated reopening or supersession history when needed. An intentionally retired plan keeps its actual state and evidence; it cannot acquire Implemented merely through archival.

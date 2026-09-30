@@ -1,8 +1,8 @@
 name: Deploy personal VPS
 
-# Manual only for now. See docs/developer/github-actions-deploy.md before the
-# first run. To deploy every push to main, add a `push: branches: [main]`
-# trigger; runs without inputs default to `deploy` with no new migrations.
+# Manual only. See docs/developer/github-actions-deploy.md before the first
+# run. An automatic trigger belongs to the plan that delivers CI/CD and needs
+# the owner's decision; runs without inputs default to `deploy` with no new migrations.
 on:
   workflow_dispatch:
     inputs:

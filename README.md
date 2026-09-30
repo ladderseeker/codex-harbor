@@ -6,7 +6,7 @@ The deployed product is the [personal VPS profile](docs/developer/personal-vps.m
 
 Historical reports record reviewed application, runtime and Linux checks at their identified source revisions. Managed installation and full protected restore/live acceptance remain incomplete. Self-development and managed extensions are deferred and unavailable on main; historical branch handoffs do not establish current integration or readiness. See the [deployment guide](docs/developer/deployment.md) and [development/extension design](design/systems/005-development-and-extensions.md).
 
-The [delivery workflow](design/workflow.md) selects one cohesive outcome from current need, with bounded plans, independent design and provenance review, and owner confirmation before committing. Legacy proposal records are reconciled into the archive under [D013](design/decisions/013-evidence-based-delivery-workflow.md); their unresolved obligations remain in the issue inbox. Archiving those records does not mean their full original plans passed.
+The [delivery workflow](design/workflow.md) selects one cohesive outcome from current need, with bounded plans, independent design and provenance review, and direct delivery of finished work to `main`. Legacy proposal records are reconciled into the archive under [D013](design/decisions/013-evidence-based-delivery-workflow.md); their unresolved obligations remain in the issue inbox. Archiving those records does not mean their full original plans passed.
 
 ## Start here
 

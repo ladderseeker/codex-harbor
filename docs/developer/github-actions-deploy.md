@@ -54,4 +54,4 @@ The unknown membership that blocks deploys indefinitely comes from a supervisor 
 
 ## Switching to automatic deployment
 
-After a manual `deploy` succeeds, add a `push: branches: [main]` trigger to the workflow. Runs without inputs default to `deploy` without new migrations, so a migration-adding change still needs a manual run.
+Automatic deployment belongs to the plan that delivers continuous integration and deployment. Until that plan is Implemented, the workflow stays manual: every run other than `preflight` needs the owner's go-ahead, and adding a `push` trigger is the owner's decision. Runs without inputs default to `deploy` without new migrations, so even with a trigger, a change that adds migrations needs a manual run.

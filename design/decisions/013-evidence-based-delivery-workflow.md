@@ -6,6 +6,7 @@
 - Retains: product/security/release acceptance obligations, historical evidence, owner authorization and [D009's common-use scope](009-common-use-release.md).
 - Execution record: [P017](../proposals/archive/017-evidence-based-delivery-workflow.md); [migration evidence](../../docs/reports/2026-09-20-workflow-migration.md).
 - Current contract: [delivery workflow](../workflow.md), [architecture](../architecture.md) and [subsystem designs](../systems/README.md).
+- Amended by: [D015](015-direct-delivery-and-cloud-sessions.md) on 30 September 2026, for agent commits, direct delivery to `main`, reviews when a gate cannot run and evidence in ephemeral environments.
 
 ## Context
 

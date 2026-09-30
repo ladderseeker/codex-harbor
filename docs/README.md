@@ -8,6 +8,7 @@ The sections below group the same guides and reports by audience. The deployed p
 
 - [User guides](user/README.md): available conversation and account controls, with current verification limits.
 - [Developer workflow](developer/development.md): working on the repository now, command availability, and verification prerequisites.
+- [Cloud agent sessions](developer/cloud-sessions.md): setup, what a cloud session can verify, commits and delivery to `main`, and where the other gates run.
 - [Design index](../design/README.md): current architecture, subsystem contracts, decisions and bounded plans.
 - [Repository instructions](../AGENTS.md): document ownership, implementation rules, and independent review.
 - [Issue index](../issues/README.md): concrete findings, ownership and recheck routes, with archive navigation.
