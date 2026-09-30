@@ -1,6 +1,6 @@
 # The deploy build's pnpm store setting has no effect
 
-- Severity: Low. Every build downloads all its packages again, which costs time and network traffic but no lasting disk space, because each build's state directory is removed afterwards.
+- Severity: Low. Every build downloads all its packages again, which costs time and network traffic but no lasting disk space, because each build's state directory is removed when the build ends.
 - Owner: Awaiting owner selection in this inbox.
 - Status: Open. Observed on 30 September 2026 in a cloud container during P037.
 - Recorded: 30 September 2026.
@@ -8,7 +8,7 @@
 
 ## Problem
 
-`build_and_stage` in [deploy-release](../infra/personal-vps/deploy-release), which `build` and `bootstrap` both use, runs the build in a transient unit with `CacheDirectory=harbor-deploy-cache`. It sets `npm_config_store_dir=/var/cache/harbor-deploy-cache/pnpm-store`, so that builds share one package store. The pinned pnpm 12.3.4 ignores that variable. It keeps its store under `HOME`, which is the unit's state directory, and the build removes that directory on every exit.
+`build_and_stage` in [deploy-release](../infra/personal-vps/deploy-release), which `build` and `bootstrap` both use, runs the build in a transient unit with `CacheDirectory=harbor-deploy-cache`. It sets `npm_config_store_dir=/var/cache/harbor-deploy-cache/pnpm-store`, so that builds share one package store. The pinned pnpm 12.3.4 ignores that variable. It keeps its store under `HOME`, which is the unit's state directory, and the build removes that directory when it ends. A reboot or a killed process leaves it, as the [interrupted build issue](2026-09-30-125456-interrupted-build-leftovers.md) records.
 
 ## Evidence
 

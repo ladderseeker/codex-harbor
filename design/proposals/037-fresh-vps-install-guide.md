@@ -291,6 +291,7 @@ The personal VPS guide already requires that conversation, because a version che
         - upload it to `/var/lib/harbor-deploy/incoming/bootstrap/` and clone `tools` from it there, with the workflow's modes and commands, replacing an incomplete earlier upload unless the build unit exists;
         - record the revision in `values.env` once the clean `tools` checkout matches it.
       - On the host:
+        - the read-only Check also lists, with sizes, what builds left under `/var/lib/harbor-deploy/inputs` and `/var/lib/private/harbor-deploy-build`, for the owner;
         - check that the upload is complete, then run `tools/infra/personal-vps/deploy-release bootstrap` in a transient unit that writes to a log under `/var/lib/harbor-install`;
         - poll until the unit ends, holding the step's lock, and report a step that an earlier run already finished;
         - expect the JSON line, and record the release path in `values.env`.
@@ -339,7 +340,7 @@ The personal VPS guide already requires that conversation, because a version che
    12. **Codex login.**
        - Run `harbor-personal login` in a transient unit that writes to a log.
        - Give the owner the URL and code within 15 minutes.
-       - Poll until the unit ends, holding the step's lock. Expect a successful login line and a nonempty `auth.json`, never printed. Then remove the log, which holds the used code. Report a login that an earlier run already finished.
+       - Poll until the unit ends, holding the step's lock. Expect a successful login line and a nonempty `auth.json`, never printed. Then remove the log, which holds the used code. Report a login that an earlier run already finished. The next block removes the log too, in case a restart left it after the login.
        - List the signed-in models as the service account, with the instance's homes. Stop if an ID there is missing from the configuration. Before the first start, the fix is a teardown and reinstall, which is the owner's decision.
        - List `codex-home/.tmp`. Remove only `plugins`, `plugins-clone-*` and `git-*` entries there, which the Codex login may leave and Harbor's runtimes never use, because they turn the plugins feature off. Report the home's size before and after.
    13. **Start.** Enable and start the three units. Expect all three active.
@@ -352,6 +353,7 @@ The personal VPS guide already requires that conversation, because a version che
        - The API and supervisor run as the service account.
        - The effective unit properties include the drop-ins.
        - `deploy-release preflight --instance seekworld` passes.
+       - A run that overlaps an earlier one after a dropped connection checks only its own preflight report and replaces `preflight.json` whole. Only the run that creates the canary folder writes its files.
        - Then the owner's browser checks from [User and API flows](#user-and-api-flows).
    15. **GitHub Actions deploys.**
        - Follow the [one-time setup](../../docs/developer/github-actions-deploy.md#one-time-setup).
@@ -687,6 +689,49 @@ Main then:
 **Correction to the Fix round 1 record.** The helper's 1800 seconds start when the helper starts, just after systemd starts the service, not with the service.
 
 **Container changes.** The harness runs updated `/run/systemd/systemd-units-load` again. The gate's intent-to-add rewrote the implementer's index, as before.
+
+### Round 3, 30 September 2026
+
+Two new reviewers, with fresh context, read commit `a7cc8df`, whose diff from `9ba6d53` has SHA-256 `fa33fb08…a66` over 13 files. Neither reported a blocker, a major finding or a minor finding. This was the last review round that the workflow allows.
+
+- **Design review.** The design reviewer found R2-1 to R2-7 resolved and every round 2 finding dispositioned. It also:
+  - ran two copies of step 5's block 3 at once, relocated, with real `flock`, and followed a run killed at each point of both wait blocks' finish paths;
+  - measured the longest silence in those blocks: 53.9 seconds in step 5 and about 45 seconds in step 12;
+  - checked that GNU `date` reads systemd 255's timestamps, including across midnight.
+
+  It reported four nits, two observations and one unrelated observation.
+- **Provenance review.** The provenance reviewer rechecked the identities. It reran `check-docs`, `git diff --check`, `bash -n` on 94 scripts, and the unit tests under Python 3.11.15 and 3.12.3. It also reran the P037-04 harness from a copy: all 670 checks passed, with the same 40 of 42 blocks run whole. For the race that main accepted in step 8's block 5, it ran 400 pairs of simultaneous `install` calls. 41 of them failed, and the file was intact every time. It reported four nits.
+
+Main's dispositions:
+
+- **Accepted, for the implementer to fix:**
+  - Step 14's block 1 had a second rerun race. Two overlapping runs wrote `preflight.json` at the same time, so one could read a mix of both reports and stop with a traceback. Both could also try to create the canary folder.
+  - After a restart that followed the owner's login, step 12's Check routes to block 4, which left the login's log, with the used code, in place.
+  - `build_and_stage`'s docstring said that its directories are removed on every exit.
+- **Accepted, and recorded here by main:**
+  - **Step 5's specification.** It left out the Check's listing of the build directories. It now names it.
+  - **Issue 103815.** The [pnpm store issue](../../issues/2026-09-30-103815-deploy-build-pnpm-store.md) said that the build removes its state directory on every exit. It now says that the directory is removed when the build ends.
+  - **Corrections to earlier records.** The corrections below.
+- **Not changed:**
+  - Steps 5 and 8 rewrite `values.env` in place. The write is a few hundred bytes, so a kill or a crash inside it is very unlikely. A shortened file makes the next block stop on a missing or unterminated value; it does not change the host.
+  - Every local account can write to `/run/lock`, so one could hold a wait block's lock file first. That takes code running under another local account, and the worst result is a stop.
+- **Recorded in an issue:** each `build` or `bootstrap` probably leaves a dangling link under `/var/lib/harbor-deploy-build`. systemd creates a `DynamicUser` unit's state directory under `/var/lib/private` and a link to it under `/var/lib`, and `build_and_stage` removes only the directory. The finding comes from reading the code and systemd's documentation, and the [interrupted build issue](../../issues/2026-09-30-125456-interrupted-build-leftovers.md) now records it.
+
+**Corrections to the round 2 records:**
+
+- **Overlap tests.** The Fix round 2 record said that both overlap tests ended with one progress line. Only step 5's test checked for exactly one. Step 12's block 3 writes no progress line; its test checked that one run finished the login, that the log was removed and that the unit was stopped once.
+- **Transcript search.** The Round 2 record of the implementer's transcript search was incomplete. In fix round 1 the implementer also searched main's transcript for main's edit of the space constant, and found none. In round 0 it had counted the transcript's lines. The round 2 provenance report named the first of these. Nothing from the transcript reached a tracked file.
+- **Container changes in fix round 2.**
+  - The gate's intent-to-add also refreshed the modification time of the empty blob in the main checkout's Git object store.
+  - The pinned Codex ran only under the harness, with fresh `HOME` and `CODEX_HOME` directories.
+  - The round 2 harness, its logs and main's gate logs exist only in this cloud container.
+- **Main's platform check.** Main's check of `/run/lock`, `flock` and GNU `date` in fix round 2 kept no log. The round 3 provenance reviewer observed the same facts again.
+
+**Footprints of the round 3 reviews:**
+
+- The provenance reviewer's harness rerun updated `/run/systemd/systemd-units-load` at 14:06 UTC.
+- Once, a `pgrep` pattern of the design reviewer matched the reviewer's own tool shell, and its `kill -9` ended that shell. The reviewer then identified its fixture's process through `/proc` and killed only that process.
+- Neither reviewer wrote outside its scratch directory, apart from the marker and a tool output file that the session's tool runner saved.
 
 ## Closing record
 
