@@ -19,7 +19,7 @@
   - They asked for `AGENTS.md` and `CLAUDE.md` to be updated for the work agents can do in this cloud environment, following the project's best practice.
   - At 02:54 UTC they wrote that this is their private work and needs no review: finished work goes straight to `main`, and the rules should say so. Once CI/CD exists, finishing something should also finish its deployment.
 
-  Together these authorize this plan, its execution alongside P035 on disjoint files, branch commits and pushing finished work to `main`. The last message replaces the first choice's reservation about merging. Tracked records paraphrase these messages, because the [workflow](../workflow.md#evidence-and-provenance) keeps conversation contents out of them. Every VPS workflow run other than `preflight` still needs the owner's go-ahead until a plan that delivers CI/CD is Implemented.
+  Together these authorize this plan, its execution alongside P035 on disjoint files, branch commits and pushing finished work to `main`. The last message replaces the first choice's reservation about merging. Keeping the automatic design and provenance reviews is main's own default, not the owner's direction: main told the owner at 03:00 UTC that it kept them and that the owner could ask to skip them, and the owner has not asked. Tracked records paraphrase these messages, because the [workflow](../workflow.md#evidence-and-provenance) keeps conversation contents out of them. Every VPS workflow run other than `preflight` still needs the owner's go-ahead until a plan that delivers CI/CD is Implemented.
 - Baseline: the implementer started at `aa03191`, which is `main` at `9231078` plus P035's plan. After P035 reached `main` at `8cfa82f`, main moved the checkout to the commit that adds this plan's revision to `8cfa82f`, carrying the implementer's uncommitted changes. P035's commits change none of this plan's files except the two named under Dependencies.
 - Dependencies: None blocking.
   - The hook's real download and install are verified in this thread's cloud container.
@@ -43,7 +43,7 @@ The rules assume a developer machine: the owner confirms every commit, ignored d
   - The environment's stop check asks, at the end of every turn, for work to be committed and pushed.
 - **A different toolchain.** Node 22 is on PATH, the repository requires Node 24.11.1, and Codex is not installed.
 - **Gates that did not run.** No Docker daemon runs at session start, there is no systemd or delegated cgroup v2, and there is no SSH client, so several mandatory gates did not run.
-- **Delivery.** The owner used to review agent work as pull requests from the agent's branch, as with pull request #4. On 30 September the owner allowed branch commits, then directed that finished work go straight to `main` without review, and that deployment become part of finishing once CI/CD exists.
+- **Delivery.** Agent work used to reach `main` through pull requests from the agent's branch, such as pull request #4, which GitHub records as merged under the owner's account. On 30 September the owner allowed branch commits, then directed that finished work go straight to `main` without review, and that deployment become part of finishing once CI/CD exists.
 
 After this change:
 
@@ -57,7 +57,7 @@ After this change:
      - the plan records the result.
    - When every mandatory gate passed, that record is the closing record and the proposal becomes Implemented. Otherwise it is a dated delivery entry, and the proposal stays Accepted, with its code on `main`, until the missing gates pass.
    - Work that still has blockers after the three review rounds stays off `main` until the owner decides.
-   - An outcome is delivered only when every commit between `origin/main` and it is finished work or a plan or issue record.
+   - An outcome is delivered only when every commit between `origin/main` and it belongs to a finished outcome or is a plan or issue record.
    - Where Git refuses the push to `main`, a pull request merged at once with a merge commit is the delivery step. It is not a review request.
    - Before delivery, main may commit coherent checkpoints to an assigned agent working branch and push them without asking. A checkpoint that has not passed its gate says `WIP`.
    - Until a plan that delivers CI/CD is Implemented and changes these rules, every deploy workflow run other than `preflight` needs the owner's go-ahead, and adding an automatic deploy trigger is the owner's decision. After that, finishing an outcome includes deploying it and checking the deployment.
@@ -189,7 +189,7 @@ Replace the Delivery and delegation bullet that begins "After a green gate" with
 Replace the Delivery and delegation bullet that begins "Implementers never commit." with:
 
 ```markdown
-- Implementers never commit. Main commits with the configured identity and delivers finished work directly to `main`, without owner review ([D015](design/decisions/015-direct-delivery-and-cloud-sessions.md)). Finished means every gate that can run passed, gates that cannot run are recorded as unverified with linked issues, both reviews are clear and the plan records the result; work with remaining blockers stays off `main` until the owner decides. Deliver only when every commit between `origin/main` and the outcome is finished work or a plan or issue record. Before that, main may push checkpoints to an assigned agent working branch, such as a cloud session's `claude/...` branch, without asking, marking unverified ones `WIP`. The [workflow](design/workflow.md#proposal-completion-and-archive) has the details. Until a plan that delivers CI/CD is Implemented and changes these rules, deploy only with the owner's go-ahead for that run and add no automatic deploy trigger; after that, finishing an outcome includes deploying it and checking the deployment.
+- Implementers never commit. Main commits with the configured identity and delivers finished work directly to `main`, without owner review ([D015](design/decisions/015-direct-delivery-and-cloud-sessions.md)). Finished means every gate that can run passed, gates that cannot run are recorded as unverified with linked issues, both reviews are clear and the plan records the result; work with review blockers left after three rounds stays off `main` until the owner decides. Deliver only when every commit between `origin/main` and the outcome belongs to a finished outcome or is a plan or issue record. Before that, main may push checkpoints to an assigned agent working branch, such as a cloud session's `claude/...` branch, without asking, marking any that has not passed its gate `WIP`. The [workflow](design/workflow.md#proposal-completion-and-archive) has the details. Until a plan that delivers CI/CD is Implemented and changes these rules, deploy only with the owner's go-ahead for that run and add no automatic deploy trigger; after that, finishing an outcome includes deploying it and checking the deployment.
 ```
 
 Replace the Implementation and safety bullet that begins "Keep enduring work and evidence" with:
@@ -230,7 +230,7 @@ Create `CLAUDE.md` with exactly this content:
 These notes add Claude Code specifics to the shared rules above. Where they seem to conflict with `AGENTS.md` or the [delivery workflow](design/workflow.md), those win; report the conflict.
 
 - **Session setup.** In cloud sessions, the SessionStart hook in `.claude/settings.json` runs `scripts/cloud-session-setup.sh` and prints one status line. If that line reports a failure, or no status line appears, follow [Prepare a session](docs/developer/cloud-sessions.md#prepare-a-session) before running checks.
-- **Git.** Commit with the configured Git identity, which signs commits in cloud sessions, and never with the owner's or another contributor's name or email. End commit messages and pull request descriptions with the attribution lines the session asks for. Push checkpoints to the branch the session assigns. The environment's stop check reports uncommitted or unpushed work at the end of each turn: commit and push a checkpoint, marked `WIP` when unverified. Deliver finished work to `main` as [Commits and delivery](docs/developer/cloud-sessions.md#commits-and-delivery) describes.
+- **Git.** Commit with the configured Git identity, which signs commits in cloud sessions, and never with the owner's or another contributor's name or email. End commit messages and pull request descriptions with the attribution lines the session asks for. Push checkpoints to the branch the session assigns. The environment's stop check reports uncommitted or unpushed work at the end of each turn: commit and push a checkpoint, marked `WIP` until it passes its gate. Deliver finished work to `main` as [Commits and delivery](docs/developer/cloud-sessions.md#commits-and-delivery) describes.
 - **GitHub.** Use the built-in GitHub tools; the `gh` CLI may be missing. Never open a pull request to ask the owner for review. When Git cannot push to `main`, deliver finished work through a pull request that you merge at once with a merge commit, which keeps the reviewed commits' identities.
 - **Roles.** Run the implementer and each reviewer as a fresh-context subagent whose self-contained brief names its role document. Subagents never commit. When a checkpoint commit includes a running implementer's files, tell the implementer which commit to diff against.
 - **Parallel work.** Give concurrent implementers disjoint file fences. Put a second implementer in its own worktree outside the repository directory, so that document checks do not scan another worker's unfinished files.
@@ -241,7 +241,7 @@ These notes add Claude Code specifics to the shared rules above. Where they seem
 In Proposal completion and archive, replace the paragraph that begins "Main presents the coherent uncommitted result" with:
 
 ```markdown
-Implementers never commit. Main commits with the configured or owner-provided identity and delivers finished work directly to the default branch, `main`, without owner review. Work is finished when every gate that can run has passed, apart from baseline failures already recorded in issues; every gate that cannot run is recorded as unverified with a linked issue; both reviews are clear, with every finding dispositioned and accepted fixes verified; and the plan records the result. When every mandatory gate passed, that record is the closing record and the proposal becomes Implemented. Otherwise it is a dated delivery entry under Review and findings that names the delivered commit, the results, the dispositions and each unverified gate with its issue; the proposal stays Accepted, and its closing record stays pending until those gates pass. Deliver an outcome only when every commit between `origin/main` and it is finished work or a coherent plan or issue record. Otherwise wait for the earlier outcome, or cut a branch from `origin/main` that holds only finished commits and rerun the affected gate there. Push with `git push origin HEAD:main` where the environment allows it. Where a pull request is the only route to `main`, open one and merge it at once with a merge commit, which keeps the reviewed commits' identities; it is a delivery step, not a review request. Before delivery, main may commit coherent checkpoints to an assigned agent working branch, such as a cloud session's branch, and push them there without further confirmation; a checkpoint that has not passed its gate says `WIP` in its subject. Main then reports the outcome, validation, review rounds and remaining issues to the owner. Until a plan that delivers continuous integration and deployment is Implemented and changes these rules, every deploy workflow run other than the read-only `preflight` needs the owner's go-ahead, and adding an automatic deploy trigger is the owner's decision. After that, finishing an outcome includes deploying it and checking the deployment, as the owner directed. Reconcile staged, unstaged and untracked contents and owned stashes with each commit; identify deferred work and its owner. [D015](decisions/015-direct-delivery-and-cloud-sessions.md) records this rule.
+Implementers never commit. Main commits with the configured or owner-provided identity and delivers finished work directly to the default branch, `main`, without owner review. Work is finished when every gate that can run has passed, apart from baseline failures already recorded in issues; every gate that cannot run is recorded as unverified with a linked issue; both reviews are clear, with every finding dispositioned and accepted fixes verified; and the plan records the result. When every mandatory gate passed, that record is the closing record and the proposal becomes Implemented. Otherwise it is a dated delivery entry under Review and findings that names the delivered commit, the results, the dispositions and each unverified gate with its issue; the proposal stays Accepted, and its closing record stays pending until those gates pass. Deliver an outcome only when every commit between `origin/main` and it belongs to a finished outcome or is a coherent plan or issue record. Otherwise wait for the earlier outcome, or cut a branch from `origin/main` that holds only finished outcomes and records, and rerun the affected gate there. Push with `git push origin HEAD:main` where the environment allows it. Where a pull request is the only route to `main`, open one and merge it at once with a merge commit, which keeps the reviewed commits' identities; it is a delivery step, not a review request. Before delivery, main may commit coherent checkpoints to an assigned agent working branch, such as a cloud session's branch, and push them there without further confirmation; a checkpoint that has not passed its gate says `WIP` in its subject. Main then reports the outcome, validation, review rounds and remaining issues to the owner. Until a plan that delivers continuous integration and deployment is Implemented and changes these rules, every deploy workflow run other than the read-only `preflight` needs the owner's go-ahead, and adding an automatic deploy trigger is the owner's decision. After that, finishing an outcome includes deploying it and checking the deployment, as the owner directed. Reconcile staged, unstaged and untracked contents and owned stashes with each commit; identify deferred work and its owner. [D015](decisions/015-direct-delivery-and-cloud-sessions.md) records this rule.
 ```
 
 In Evidence and provenance, after the sentence "Keep evidence that must survive interruption in persistent ignored storage and record ownership/recovery for unfinished changes and test resources.", insert:
@@ -291,7 +291,7 @@ In Delegation and review, three replacements:
   - [D015 — Direct delivery and cloud sessions](decisions/015-direct-delivery-and-cloud-sessions.md).
   ```
 
-- `docs/developer/development.md`, five edits:
+- `docs/developer/development.md`, six edits:
   - In Run the deterministic application locally, after the sentence that begins "The tested macOS toolchain uses", add:
 
     ```markdown
@@ -311,6 +311,7 @@ In Delegation and review, three replacements:
     ```
 
   - In Delivering a feature, replace "the three-round cap and owner confirmation before a commit." with "the three-round cap and the commit and delivery rules."
+  - In the same sentence, replace "automatic review after the green gate" with "automatic review once every gate that can run is green".
   - In the next paragraph, after "OS temporary storage is for recreatable scratch.", add:
 
     ```markdown
@@ -362,7 +363,7 @@ Write `design/decisions/015-direct-delivery-and-cloud-sessions.md`, titled "D015
 
 It has these metadata bullets:
 
-- **Decision:** Accepted on 30 September 2026, on the owner's three messages summarized in this plan's Authorization.
+- **Decision:** Accepted on 30 September 2026, on the owner's three messages summarized in this plan's Authorization. It names the decision card as one in this project's thread, posted during P035. It also says that keeping the automatic reviews is main's own default, which main told the owner at 03:00 UTC, and that the owner had not asked to skip them when the decision was recorded.
 - **Changes:** collaboration rules only.
 - **Amends:** two D013 rules.
   - The owner no longer confirms each commit. Agents deliver finished work straight to `main`, with no owner confirmation or review.
@@ -376,15 +377,15 @@ It has these metadata bullets:
 
 It has these sections:
 
-- **Context.** Harbor is the owner's private work. Cloud containers are disposable, the stop check asks for pushed work every turn, and per-commit confirmation stalled every turn. The owner first reviewed pull requests, then found that review unnecessary.
+- **Context.** Harbor is the owner's private work. Cloud containers are disposable, the stop check asks for pushed work every turn, and per-commit confirmation stalled every turn. Agent work used to reach `main` through pull requests from the agent's branch, such as pull request #4, which GitHub records as merged under the owner's account. Then the owner found review unnecessary.
 - **Options and decision.** Three options:
   - Keep per-commit confirmation. This loses work when a container is reclaimed and blocks every turn.
   - Commit on working branches and have the owner review each pull request. The owner chose this first, then rejected it at 02:54 UTC on 30 September, writing that this private work needs no review.
   - Commit checkpoints on working branches and push finished work straight to `main`. This option is selected.
 
   The section also states these rules:
-  - Finished means what the workflow says: every gate that can run passed, every other gate is recorded as unverified with an issue, both reviews are clear and the plan records the result. Work with remaining blockers stays off `main` until the owner decides.
-  - An outcome is delivered only when every commit between `origin/main` and it is finished work or a plan or issue record.
+  - Finished means what the workflow says: every gate that can run passed, every other gate is recorded as unverified with an issue, both reviews are clear and the plan records the result. Work with review blockers left after three rounds stays off `main` until the owner decides.
+  - An outcome is delivered only when every commit between `origin/main` and it belongs to a finished outcome or is a plan or issue record.
   - Where Git cannot push to `main`, a pull request merged at once with a merge commit delivers the reviewed commits unchanged. It is not a review request.
   - Unavailable gates stay unverified, hosted CI or a supported host supplies them, and isolation is never weakened.
   - Deployment stays manual, with the owner's go-ahead for every run other than `preflight`, until a plan that delivers CI/CD is Implemented and changes these rules. Adding an automatic deploy trigger is the owner's decision. After that, finishing an outcome includes deploying it and checking the deployment, as the owner directed.
@@ -392,7 +393,7 @@ It has these sections:
   - `main` history includes the `WIP` checkpoints of each delivered outcome, but `main`'s tip only ever holds finished work.
   - The automatic reviews are the only review before `main`, so they are never skipped. They start once every gate that can run is green.
   - A proposal can be on `main` while still Accepted, with a dated delivery entry, because a mandatory gate that could not run keeps it from Implemented.
-  - Outcomes that share a working branch are delivered in the order they finish, or from a branch cut from `origin/main` that holds only finished commits.
+  - Outcomes that share a working branch reach `main` in their order on the branch, because each waits for the outcomes below it, or from a branch cut from `origin/main` that holds only finished outcomes and records.
   - Reviewers get commit identities.
   - Evidence that must survive goes into tracked records.
 
@@ -420,10 +421,10 @@ Required content for each section:
 - **Prepare a session.**
   - What the hook does, and that it installs Node under `~/.cache/codex-harbor`.
   - When it runs: in a session that starts in this repository, when the session starts, resumes or forks. A session with several repositories starts above the clones and does not run it, and `/clear` and compaction do not rerun it.
-  - If no status line appears, run `node --version`. Anything other than `v24.11.1` means that the hook did not run or did not finish; follow the manual steps.
-  - The manual fallback commands, with the same pinned hash. They download and extract in a temporary directory under `~/.cache/codex-harbor`, then move the result into place, as the hook does.
+  - If no status line appears, or `node --version` prints anything other than `v24.11.1`, check the cached Node with `"$HOME/.cache/codex-harbor/node-v24.11.1-linux-x64/bin/node" --version`. If that prints `v24.11.1`, Node is installed: use the export line and run `pnpm install --frozen-lockfile` before checks. Otherwise the hook did not run or did not finish; follow the manual steps.
+  - The manual fallback commands, with the same pinned hash. Like the setup script, they change nothing while the cached Node reports `v24.11.1`, so they never remove a working Node or the Codex that the setup script installs inside it. They download and extract in a temporary directory under `~/.cache/codex-harbor`, then move the result into place, as the hook does.
   - How to install Codex 0.153.4 with `npm install -g @openai/codex@0.153.4`, and the path of its Linux x64 binary for `HARBOR_LOCAL_CONTRACT_BINARY`: `$(npm root -g)/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex`.
-  - Run Codex only with a run-owned `HOME` and `CODEX_HOME`, even for a version check such as `CODEX_HOME="$(mktemp -d)" codex --version`. Every Codex start writes into its home, and the default home may hold a login.
+  - Run Codex only with a run-owned `HOME` and `CODEX_HOME`, even for a version check such as `CODEX_HOME="$(mktemp -d)" codex --version`. A Codex start may write into its home, and the default home may hold a login.
   - Playwright uses the preinstalled Chromium, so never run `playwright install` in a cloud session.
 - **What runs here.**
   - A table of the implemented commands from `package.json`, saying for each whether it runs in a cloud session: Yes, Partly, Not checked or No, with notes.
@@ -431,26 +432,28 @@ Required content for each section:
   - Record the results observed at `9231078`:
     - `pnpm test:deployment:contract` failed one managed-tooling test, `review_test.Review.test_actual_process_capture_limit_timeout_and_failure`. The [capture-limit issue](../../issues/2026-09-30-032022-deploy-run-capture-limit.md) records it. The script joins its Python and Node halves with `&&`, so that failure skips the Node half. Run the Node half separately: `node --import tsx --test tests/deployment/storage-transport.test.ts tests/deployment/probe.test.ts`.
     - `pnpm test:contract` with the pinned binary passed 23 of 28. Four of the five failures launch personal runtimes and need delegated cgroups. The fifth, the P024 attachment contract, needs a nonroot Linux user.
+  - The `pnpm test:contract` row also says that its history test runs the host's login profile, which rewrote `/opt/rbenv/shims` in the session that wrote this guide, and links the [login-shell issue](../../issues/2026-09-30-033836-contract-test-login-shell.md).
+  - The legend says that no Docker daemon was started in the session that wrote this guide, not in any cloud session.
 - **Gates that need another host.**
-  - Open with "These gates have not run in a cloud session." Then name, for each gate, the host or check it needs:
+  - Open with "These gates did not run in the cloud session that wrote this guide." Then name, for each gate, the host or check it needs:
     - real-stack E2E: a running Docker daemon with Compose;
     - the personal VPS Linux lanes, `node --import tsx tests/personal-vps/e2e.ts` and its `--concurrency` form: root on a Linux host with systemd and delegated cgroup v2;
     - `pnpm test:isolation`: Docker, built images and the dedicated XFS storage of the Linux verification workflow;
     - `node tests/egress/linux.mjs`: Docker and its built images;
     - `pnpm test:live`: dedicated credentials and the supported Linux execution profile;
     - anything over SSH.
-  - Keep the dated note about the blocked `dockerd` attempt, and say that a default daemon has not been tried in a cloud session.
+  - Keep the dated note about the blocked `dockerd` attempt, and say that the session that wrote this guide did not try a default daemon.
   - Then say how to record them: unverified, with a linked issue. The result may still reach `main` with a dated delivery entry, and the proposal stays Accepted until the gate passes. They run in hosted CI once [P026](../../design/proposals/026-continuous-integration.md) delivers it, or on a supported Linux host run by the owner.
 - **Commits and delivery.** D015 in practice:
   - use the configured identity, which signs commits, and never the owner's or another contributor's name or email;
   - include the attribution lines;
-  - mark unverified checkpoints `WIP`;
+  - mark checkpoints that have not passed their gate `WIP`;
   - push each checkpoint to the session's branch;
   - implementers never commit, and a running implementer is told its diff base;
   - finished means what the workflow says: every gate that can run passed, apart from recorded baseline failures; every gate that cannot run is recorded as unverified with a linked issue; both reviews are clear; and the plan records the result, as a closing record or a dated delivery entry;
   - work that still has blockers after three review rounds stays off `main` until the owner decides;
-  - deliver an outcome only when every commit between `origin/main` and it is finished work or a plan or issue record; otherwise wait for the earlier outcome, or cut a branch from `origin/main` that holds only finished commits and rerun the affected gate there;
-  - deliver with `git push origin HEAD:main`. The Claude Code documentation, read on 30 September 2026, says a cloud session can push only to its own branch, but this project's session delivered P035 that way that day. If Git refuses the push, open a pull request from the session's branch and merge it at once with the GitHub tools, using a merge commit. The delivered commits and their signatures stay unchanged, and GitHub creates the merge commit under the account that the session's GitHub connection uses. That pull request is a delivery step, not a review request;
+  - deliver an outcome only when every commit between `origin/main` and it belongs to a finished outcome or is a plan or issue record; otherwise wait for the earlier outcome, or cut a branch from `origin/main` that holds only finished outcomes and records, and rerun the affected gate there;
+  - deliver with `git push origin HEAD:main`. The Claude Code documentation, read on 30 September 2026, says a cloud session can push only to its own branch, but this project's session delivered P035 that way that day. If Git refuses the push, open a pull request from the session's branch and merge it at once with the GitHub tools, using a merge commit. The delivered commits and their signatures stay unchanged, and GitHub creates the merge commit under the account that the session's GitHub connection uses; it is the only commit that the configured identity does not make. That pull request is a delivery step, not a review request;
   - if `main` moved, merge `origin/main` into the branch, rerun the affected checks and deliver again, and never force-push `main`;
   - until a plan that delivers CI/CD is Implemented and changes these rules, deploy workflow runs other than `preflight` need the owner's go-ahead, and adding an automatic deploy trigger is the owner's decision.
 - **Keep evidence.** Ignored and scratch storage disappear with the container. Commit evidence records, and mark raw logs unavailable once they are gone.
@@ -500,7 +503,7 @@ Required content for each section:
   - **Node install:** it downloads, verifies and extracts into a temporary directory under the install root, then renames the result into place. `curl` runs with `--connect-timeout 20 --max-time 90 --retry 2 --retry-max-time 180`.
   - **Project directory:** it runs `pnpm install --frozen-lockfile` in `$CLAUDE_PROJECT_DIR`, falling back to the script's parent directory, and logs to `$HOME/.cache/codex-harbor/pnpm-install.log`.
   - **pnpm lookup:** it uses `pnpm` when that is on PATH. Otherwise it runs `corepack pnpm` with `COREPACK_ENABLE_DOWNLOAD_PROMPT=0`. Either runs under `timeout -k 10 240`; when the `timeout` command is missing, the script prints a failure line that says so.
-  - **Output:** it prints exactly `Harbor cloud setup: Node v24.11.1 and locked dependencies ready.` on success. On failure it prints a line that begins `Harbor cloud setup failed:` and ends with `See docs/developer/cloud-sessions.md#prepare-a-session.`
+  - **Output:** it prints exactly `Harbor cloud setup: Node v24.11.1 and locked dependencies ready.` on success. On failure it prints a line that begins `Harbor cloud setup failed:` and ends with `See docs/developer/cloud-sessions.md#prepare-a-session.` A separate line says that the install did not finish within 240 seconds when `timeout` returns 124, after the install stops at the stop signal. Status 137, which `timeout` returns when it must kill the install and which an out-of-memory kill also produces, keeps the generic failure line.
 - `tests/deployment/cloud_session_setup_test.py` runs the script with a temporary `HOME`, `CLAUDE_ENV_FILE`, `CLAUDE_PROJECT_DIR` and PATH. Every failure case also asserts that the output contains none of the temporary `HOME`, environment file or project paths. It covers four cases:
   1. **Not a cloud session.** It exits 0 with no output, writes nothing and never calls pnpm.
   2. **Checksum mismatch.** A `file://` distribution with a fake tarball produces one failure line and exit 0. It leaves no install directory and no temporary directory, and it neither writes to the environment file nor calls pnpm.
@@ -644,6 +647,30 @@ Main's dispositions of the implementer's report:
   - `AGENTS.md` still started the reviews after a green gate. A new settled text replaces that bullet to match the workflow.
   - The delivery texts assumed, following the documentation, that a cloud session cannot push to `main`. This session pushed P035 to `main` at 06:09 UTC. The guide now records that, D015 no longer names cloud sessions as unable to push, and a pull request remains the fallback when Git refuses the push.
   - `timeout 240` could not stop an install that ignores the stop signal, so the hook would end at its 600-second limit without a failure line. The install now runs under `timeout -k 10 240`.
+
+### Round 2, 30 September 2026
+
+Both reviewers read the checkout at `f921f1f`, whose tracked diff has SHA-256 `c2ff1763…d799d10`, with the six new files, and found every round 1 finding fixed. The design reviewer reported two minor findings and four nits. The provenance reviewer reproduced the documentation gate, the hook's unit tests, a real hook run from an empty cache, its fast path, `pnpm check`, the deployment contract, the manual fallback and the optional setup script, and reported two minor findings and seven nits. Neither reported a blocker or a major finding.
+
+Main's dispositions:
+
+- **Accepted, and fixed in this plan's settled texts and specs:**
+  - The developer guide still started the reviews after the green gate. A sixth `development.md` edit now uses the new trigger.
+  - The guide's manual Node block deleted the cached Node, and with it any Codex that the optional setup script installed there, even when that Node worked. The guide now checks the cached Node first, and the block changes nothing while that Node reports v24.11.1.
+  - Two words carried two meanings in the delivery texts. `WIP` now marks checkpoints that have not passed their gate, the blockers that keep work off `main` are review blockers left after three rounds, and each commit before an outcome must belong to a finished outcome or be a plan or issue record.
+  - D015 said that outcomes on a shared branch reach `main` in the order they finish. They reach it in their order on the branch.
+  - The guide now says that the fallback's merge commit is the only commit that the configured identity does not make.
+  - The records presented keeping the automatic reviews as the owner's direction. It is main's default, which main told the owner at 03:00 UTC. The Authorization and D015 now say so.
+  - The guide recommended `pnpm test:contract` without saying that its history test runs the host's login profile. The table now says so and links the [login-shell issue](../../issues/2026-09-30-033836-contract-test-login-shell.md).
+  - The guide said that every Codex start writes into its home. With a home under `/tmp`, Codex wrote nothing, so the guide now says that a start may write there.
+  - The guide said that no Docker daemon had been started or tried in any cloud session. The evidence covers only the session that wrote it, and the guide now says so.
+  - D015 said that the owner reviewed pull request #4. GitHub records no review, only a merge under the owner's account, which the agents' GitHub connection also uses. D015 and this plan now state only what GitHub records. The round 1 record above keeps its earlier wording.
+  - D015 placed the decision card in a P036 planning thread. The card was posted in this project's thread during P035.
+- **Accepted in part:** a killed install gets the generic failure line, not the timeout line. `timeout` returns 137 when it must kill the install, and an out-of-memory kill returns the same status, so the hook keeps the generic line for 137. The hook's contract and the test's comment now say that the timeout line covers status 124 only.
+- **Declined:** calling the environment a virtual machine instead of a container. Claude Code's own description of the session calls it a container, and every claim about its lifetime holds either way.
+- **Recorded limit:** earlier versions of this plan, at `02da7cf`, `7101c7c` and `cbf00ee`, quoted the owner verbatim. Those commits are in `main`'s history since 06:09 UTC. Removing them would need a force-push to `main`, which the rules forbid. The current texts paraphrase.
+
+Evidence limits: neither reviewer saw Claude Code run the hook at session start, environment caching, a Codex command, `pnpm test:contract` or the delivery block. The provenance reviewer's settled-text checks passed against `f921f1f`'s plan. Against this revision, the checkout fails three of them until the fix round, and round 3 reruns them. That reviewer's `npm root -g`, run with the container's default home, wrote a 614-byte npm debug log, and its `node --import tsx` runs used the shared `/tmp/tsx-0` cache. Both are harmless and disappear with the container.
 
 ## Closing record
 
