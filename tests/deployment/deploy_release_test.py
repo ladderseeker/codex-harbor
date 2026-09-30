@@ -9,9 +9,11 @@ import json
 import os
 from pathlib import Path
 import shutil
+import ssl
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -57,6 +59,73 @@ def below(snapshot_keys, roots):
 
 def completed(args, stdout=''):
     return subprocess.CompletedProcess(args, 0, stdout=stdout, stderr='')
+
+
+# Small stand-ins for the four pinned bootstrap downloads, with the members that bootstrap reads.
+VENDOR = 'package/vendor/x86_64-unknown-linux-musl/'
+CODEX_PACKAGE = json.dumps({'layoutVersion': 1, 'version': '0.153.4', 'target': 'x86_64-unknown-linux-musl',
+                            'variant': 'codex', 'entrypoint': 'bin/codex', 'resourcesDir': 'codex-resources',
+                            'pathDir': 'codex-path'}).encode()
+NATIVE = {'bin/codex': 0o755, 'bin/codex-code-mode-host': 0o755, 'codex-resources/bwrap': 0o755,
+          'codex-resources/zsh/bin/zsh': 0o755, 'codex-path/rg': 0o755}
+PNPM_PACKAGE = {'package.json': (b'{"name": "pnpm", "version": "12.3.4"}\n', 0o644),
+                'dist/pnpm.cjs': (b'// pnpm\n', 0o644), 'dist/node-gyp-bin/node-gyp': (b'#!/bin/sh\n', 0o755),
+                'bin/pnpm.mjs': (b'// entry\n', 0o644)}
+
+
+def archive(entries, compression='gz'):
+    """A tar archive of (name, kind, value, mode) entries whose owner is a nonroot archive user."""
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode='w:' + compression) as stream:
+        for name, kind, value, mode in entries:
+            info = tarfile.TarInfo(name)
+            info.mode, info.uid, info.gid, info.uname = mode, 4321, 4321, 'builder'
+            if kind == 'file':
+                info.size = len(value)
+                stream.addfile(info, io.BytesIO(value))
+                continue
+            info.type = {'dir': tarfile.DIRTYPE, 'symlink': tarfile.SYMTYPE, 'hardlink': tarfile.LNKTYPE,
+                         'device': tarfile.CHRTYPE}[kind]
+            info.linkname = value or ''
+            stream.addfile(info)
+    return buffer.getvalue()
+
+
+def native_file(relative):
+    return ('#!/bin/sh\necho ' + relative + '\n').encode()
+
+
+def fake_downloads(codex_extra=(), node_binary=None):
+    """URL -> bytes for the four bootstrap inputs, and the constants that pin them."""
+    node = archive([('node-v24.11.1-linux-x64', 'dir', None, 0o755), ('node-v24.11.1-linux-x64/bin', 'dir', None, 0o755),
+                    node_binary or ('node-v24.11.1-linux-x64/bin/node', 'file', b'#!/bin/sh\necho v24.11.1\n', 0o755),
+                    ('node-v24.11.1-linux-x64/bin/npm', 'symlink', '../lib/node_modules/npm/bin/npm-cli.js', 0o777),
+                    ('node-v24.11.1-linux-x64/README.md', 'file', b'node\n', 0o644)], 'xz')
+    codex = archive([('package/package.json', 'file', b'{"name": "@openai/codex"}\n', 0o644),
+                     ('package/README.md', 'file', b'codex\n', 0o644),
+                     (VENDOR + 'codex-package.json', 'file', CODEX_PACKAGE, 0o644)]
+                    + [(VENDOR + relative, 'file', native_file(relative), mode) for relative, mode in NATIVE.items()]
+                    + [(VENDOR + 'codex-path/codex', 'symlink', '../bin/codex', 0o777)] + list(codex_extra))
+    pnpm = archive([('package/' + relative, 'file', data, mode) for relative, (data, mode) in PNPM_PACKAGE.items()])
+    native = archive([('package/package.json', 'file', b'{"name": "@pnpm/exe.linux-x64"}\n', 0o644),
+                      ('package/pnpm', 'file', b'#!/bin/sh\necho 12.3.4\n', 0o755),
+                      ('package/LICENSE', 'file', b'license\n', 0o644)])
+    served, pins = {}, {}
+    for key, name, data in (('NODE', 'node-v24.11.1-linux-x64.tar.xz', node), ('CODEX', 'codex-0.153.4-linux-x64.tgz', codex),
+                            ('PNPM', 'pnpm-12.3.4.tgz', pnpm), ('PNPM_EXE', 'exe.linux-x64-12.3.4.tgz', native)):
+        url = 'https://downloads.test/' + name
+        served[url] = data
+        pins[key + '_URL'], pins[key + '_SHA256'] = url, hashlib.sha256(data).hexdigest()
+    return served, pins
+
+
+class Response(io.BytesIO):
+    def __init__(self, data, url):
+        super().__init__(data)
+        self.url = url
+
+    def geturl(self):
+        return self.url
 
 
 class DeployReleaseTests(unittest.TestCase):
@@ -444,6 +513,287 @@ class DeployReleaseTests(unittest.TestCase):
         self.assertEqual(snapshot(staging, strict=True), before)
         self.assertEqual(sorted(p.name for p in self.releases.iterdir()), [staging.name, 'installed'])
         self.assertEqual(list((self.work / 'inputs').iterdir()), [])
+
+    def bootstrap_args(self, revision=REVISION):
+        bundle = self.base / 'harbor.bundle'
+        bundle.write_bytes(b'bundle')
+        return argparse.Namespace(bundle=str(bundle), revision=revision)
+
+    @contextlib.contextmanager
+    def downloads(self, served, pins):
+        """Serve the pinned downloads from memory and record each request."""
+        requests = []
+        def urlopen(url, timeout=None, context=None):
+            requests.append((url, timeout, context))
+            return Response(served[url], url)
+        with patch.multiple(deploy, **pins), patch.object(deploy.urllib.request, 'urlopen', side_effect=urlopen), \
+                patch.object(deploy.platform, 'system', return_value='Linux'), \
+                patch.object(deploy.platform, 'machine', return_value='x86_64'):
+            yield requests
+
+    def fresh_releases(self):
+        """A release root that does not exist yet, below an existing parent like /opt."""
+        (self.base / 'fresh-opt').mkdir()
+        return self.base / 'fresh-opt/harbor-personal/releases'
+
+    def installed_layout(self, root):
+        """An installed release holding the same pinned native files as fake_downloads, for native_inputs."""
+        release = root / 'release'
+        files = {'bin/node': (b'#!/bin/sh\necho v24.11.1\n', 0o755), 'codex-package.json': (CODEX_PACKAGE, 0o644),
+                 'toolchain/pnpm/pnpm-native': (b'#!/bin/sh\necho 12.3.4\n', 0o755),
+                 'apps/api/src/main.ts': (b'// api\n', 0o644), 'node_modules/tsx/package.json': (b'{}\n', 0o644),
+                 'bin/pnpm': (b'#!/bin/sh\n', 0o755), 'bin/pnpx': (b'#!/bin/sh\n', 0o755)}
+        files.update({relative: (native_file(relative), mode) for relative, mode in NATIVE.items()})
+        files.update({'toolchain/pnpm/' + relative: value for relative, value in PNPM_PACKAGE.items()})
+        for relative, (data, mode) in files.items():
+            (release / relative).parent.mkdir(parents=True, exist_ok=True)
+            (release / relative).write_bytes(data)
+            os.chmod(release / relative, mode)
+        (release / 'codex-path/codex').symlink_to('../bin/codex')
+        manifest = [[relative, hashlib.sha256(data).hexdigest()] for relative, (data, _) in sorted(files.items())]
+        (release / 'artifact.json').write_text(json.dumps({'profile': 'personal-vps', 'files': manifest}))
+        return release
+
+    def test_p037_01_bootstrap_inputs_take_the_installed_release_layout_from_verified_https_downloads(self):
+        served, pins = fake_downloads()
+        target = self.base / 'bootstrap-inputs'
+        target.mkdir()
+        with self.downloads(served, pins) as requests:
+            deploy.bootstrap_inputs(target)
+        self.assertEqual([url for url, _, _ in requests], [pins[k + '_URL'] for k in ('NODE', 'CODEX', 'PNPM', 'PNPM_EXE')])
+        for _, timeout, context in requests:
+            self.assertEqual(timeout, deploy.DOWNLOAD_TIMEOUT)
+            self.assertIsInstance(context, ssl.SSLContext)
+            self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
+            self.assertTrue(context.check_hostname)
+        expected = self.base / 'native-inputs'
+        expected.mkdir()
+        with patch.object(deploy.platform, 'machine', return_value='x86_64'):
+            deploy.native_inputs(self.installed_layout(self.base / 'installed-layout'), expected)
+        # The same layout, names, modes, contents and links; only each bin/pnpm names its own directory.
+        got, want = snapshot(target), snapshot(expected)
+        self.assertEqual({k: v for k, v in got.items() if k != 'bin/pnpm'}, {k: v for k, v in want.items() if k != 'bin/pnpm'})
+        self.assertEqual((target / 'bin/pnpm').read_text(), '#!/bin/sh\nexec ' + str(target / 'pnpm-native') + ' "$@"\n')
+        self.assertEqual(set(got), {'node', 'pnpm-native', 'bin', 'bin/node', 'bin/pnpm', 'vendor', 'vendor/bin',
+                                    'vendor/bin/codex', 'vendor/bin/codex-code-mode-host', 'vendor/codex-package.json',
+                                    'vendor/codex-resources', 'vendor/codex-resources/bwrap', 'vendor/codex-resources/zsh',
+                                    'vendor/codex-resources/zsh/bin', 'vendor/codex-resources/zsh/bin/zsh',
+                                    'vendor/codex-path', 'vendor/codex-path/rg', 'vendor/codex-path/codex',
+                                    'pnpm', 'pnpm/package.json', 'pnpm/dist', 'pnpm/dist/pnpm.cjs',
+                                    'pnpm/dist/node-gyp-bin', 'pnpm/dist/node-gyp-bin/node-gyp', 'pnpm/bin',
+                                    'pnpm/bin/pnpm.mjs'})
+        self.assertEqual(got['vendor/codex-path/codex'], ('link', '../bin/codex'))
+        self.assertEqual(got['pnpm/bin/pnpm.mjs'][1], 0o755)
+        self.assertEqual(got['vendor/codex-package.json'][1], 0o644)
+        for path in [target] + list(target.rglob('*')):
+            # The data filter drops the archive's owner; extraction leaves this run's identity.
+            self.assertEqual(os.lstat(path).st_uid, os.getuid(), path)
+
+    def test_p037_01_bootstrap_refuses_before_writing_anything(self):
+        served, pins = fake_downloads()
+        self.releases = self.fresh_releases()
+        name = 'bootstrap-' + REVISION[:12]
+        cases = [('Bootstrap requires root', {'geteuid': 1000}, REVISION),
+                 ('Linux x86_64 only', {'machine': 'aarch64'}, REVISION),
+                 ('Linux x86_64 only', {'system': 'Darwin'}, REVISION)]
+        cases += [('Full commit SHA required', {}, revision)
+                  for revision in (REVISION[:12], REVISION.upper(), REVISION + '0', REVISION[:-1] + 'g')]
+        args = self.bootstrap_args()
+        with self.downloads(served, pins) as requests, patch.object(deploy, 'RELEASES', self.releases), \
+                patch.object(deploy.subprocess, 'run', side_effect=AssertionError('no build may start')):
+            before = snapshot(self.base, strict=True)
+            for message, fault, revision in cases:
+                with self.subTest(message=message, fault=fault, revision=revision), \
+                        patch.object(deploy.os, 'geteuid', return_value=fault.get('geteuid', 0)), \
+                        patch.object(deploy.platform, 'machine', return_value=fault.get('machine', 'x86_64')), \
+                        patch.object(deploy.platform, 'system', return_value=fault.get('system', 'Linux')), \
+                        self.assertRaisesRegex(ValueError, message):
+                    deploy.bootstrap(argparse.Namespace(bundle=args.bundle, revision=revision))
+            with self.subTest('missing bundle'), self.assertRaisesRegex(ValueError, 'Source bundle not found'):
+                deploy.bootstrap(argparse.Namespace(bundle=str(self.base / 'missing.bundle'), revision=REVISION))
+            self.assertEqual(snapshot(self.base, strict=True), before)
+            # An installed instance, found as prune finds one.
+            self.configure('seekworld')
+            before = snapshot(self.base, strict=True)
+            with self.assertRaisesRegex(ValueError, r'instance configuration \(seekworld\); build its releases with build'):
+                deploy.bootstrap(args)
+            self.assertEqual(snapshot(self.base, strict=True), before)
+            shutil.rmtree(self.base / 'host')
+            # A staging directory from an earlier run is left for inspection.
+            staging = self.releases / ('.staging-' + name)
+            staging.mkdir(parents=True)
+            (staging / 'evidence').write_text('inspect me')
+            before = snapshot(self.base, strict=True)
+            with self.assertRaisesRegex(ValueError, 'Staging path exists; inspect it first: ' + str(staging)):
+                deploy.bootstrap(args)
+            self.assertEqual(snapshot(self.base, strict=True), before)
+            shutil.rmtree(self.releases.parent)
+            self.assertEqual(requests, [])
+
+    def test_p037_01_bootstrap_refuses_before_writing_when_space_is_short(self):
+        served, pins = fake_downloads()
+        self.releases = self.fresh_releases()
+        need, total = deploy.BOOTSTRAP_NEED, 100 * GIB
+        reserve = deploy.reserve(total)
+        args = self.bootstrap_args()
+        for free, refused in ((need + reserve - 1, True), (need + reserve, False)):
+            before = snapshot(self.base, strict=True)
+            with self.subTest(free=free), self.downloads(served, pins) as requests, \
+                    patch.object(deploy, 'RELEASES', self.releases), \
+                    patch.object(deploy.shutil, 'disk_usage', return_value=Usage(total, total - free, free)) as disk, \
+                    patch.object(deploy, 'bootstrap_inputs', side_effect=RuntimeError('stop after the check')) as inputs, \
+                    patch.object(deploy.subprocess, 'run') as run:
+                if refused:
+                    with self.assertRaises(ValueError) as caught:
+                        deploy.bootstrap(args)
+                    message = str(caught.exception)
+                    self.assertTrue(message.startswith('Bootstrap needs ' + str(need) + ' bytes plus a reserve of '
+                                                       + str(reserve) + ' bytes'), message)
+                    self.assertIn(str(free) + ' bytes free; nothing was changed', message)
+                    inputs.assert_not_called()
+                    self.assertEqual(snapshot(self.base, strict=True), before)
+                else:
+                    with self.assertRaisesRegex(RuntimeError, 'stop after the check'):
+                        deploy.bootstrap(args)
+                    inputs.assert_called_once()
+                    self.assertEqual(list((self.work / 'inputs').iterdir()), [])
+                # The build's locations: deploy work, the build unit's state and cache, and the release root.
+                self.assertEqual({Path(c.args[0]) for c in disk.call_args_list}, {self.base})
+                run.assert_not_called()
+                self.assertEqual(requests, [])
+        self.assertEqual(os.listdir(self.releases), [])
+
+    def test_p037_01_pinned_hash_mismatch_refuses_and_deletes_the_inputs(self):
+        served, pins = fake_downloads()
+        pins['CODEX_SHA256'] = hashlib.sha256(b'another file').hexdigest()
+        self.releases = self.fresh_releases()
+        with self.downloads(served, pins) as requests, patch.object(deploy, 'RELEASES', self.releases), \
+                patch.object(deploy, 'unpack', wraps=deploy.unpack) as unpack, \
+                patch.object(deploy.shutil, 'disk_usage', return_value=Usage(100 * GIB, 0, 100 * GIB)), \
+                patch.object(deploy.subprocess, 'run', side_effect=AssertionError('no build may start')):
+            with self.assertRaisesRegex(ValueError, r'Pinned SHA-256 mismatch for codex-0\.153\.4-linux-x64\.tgz'):
+                deploy.bootstrap(self.bootstrap_args())
+            unpack.assert_not_called()
+        self.assertEqual([url for url, _, _ in requests], [pins['NODE_URL'], pins['CODEX_URL']])
+        self.assertEqual(list((self.work / 'inputs').iterdir()), [])
+        self.assertFalse(os.path.lexists(self.build_state / 'harbor-deploy-build'))
+        self.assertEqual(os.listdir(self.releases), [])
+
+    def test_p037_01_archive_members_that_escape_are_refused(self):
+        outside = self.base / 'escaped'
+        variants = {
+            'parent directory': [(VENDOR + '../../escaped', 'file', b'x', 0o644)],
+            'symbolic link out of vendor': [(VENDOR + 'codex-path/out', 'symlink', '../../escaped', 0o777)],
+            'absolute symbolic link': [(VENDOR + 'codex-path/abs', 'symlink', str(outside), 0o777)],
+            'hard link out of vendor': [(VENDOR + 'bin/hard', 'hardlink', 'package/package.json', 0o644)],
+            'device': [(VENDOR + 'codex-resources/null', 'device', None, 0o666)],
+        }
+        for label, extra in variants.items():
+            served, pins = fake_downloads(codex_extra=extra)
+            target = self.base / ('inputs-' + label.replace(' ', '-'))
+            target.mkdir()
+            with self.subTest(label), self.downloads(served, pins), \
+                    self.assertRaisesRegex(ValueError, 'codex-0.153.4-linux-x64.tgz'):
+                deploy.bootstrap_inputs(target)
+            self.assertFalse(os.path.lexists(outside))
+            self.assertFalse(os.path.lexists(target / 'escaped'))
+        served, pins = fake_downloads(node_binary=('node-v24.11.1-linux-x64/bin/node', 'symlink', '/usr/bin/node', 0o777))
+        target = self.base / 'inputs-linked-node'
+        target.mkdir()
+        with self.downloads(served, pins), self.assertRaisesRegex(ValueError, 'bin/node must be a regular file'):
+            deploy.bootstrap_inputs(target)
+        self.assertFalse(os.path.lexists(target / 'node'))
+
+    def test_p037_01_bootstrap_stages_its_release_with_the_build_unit_and_properties(self):
+        calls = []
+        def record(args, **kwargs):
+            calls.append(args)
+            return self.fake_build_run(args, **kwargs)
+        with patch.object(deploy, 'verify_release', return_value={}), patch.object(deploy, 'native_inputs'), \
+                patch.object(deploy.shutil, 'disk_usage', return_value=Usage(100 * GIB, 0, 100 * GIB)), \
+                patch.object(deploy.os, 'lchown'), patch.object(deploy.subprocess, 'run', side_effect=record), \
+                contextlib.redirect_stdout(io.StringIO()):
+            deploy.build(self.build_args())
+        served, pins = fake_downloads()
+        self.releases = self.fresh_releases()
+        output = io.StringIO()
+        with self.downloads(served, pins), patch.object(deploy, 'RELEASES', self.releases), \
+                patch.object(deploy, 'verify_release', return_value={}) as verify, \
+                patch.object(deploy.shutil, 'disk_usage', return_value=Usage(100 * GIB, 0, 100 * GIB)), \
+                patch.object(deploy.os, 'lchown'), patch.object(deploy.subprocess, 'run', side_effect=record), \
+                contextlib.redirect_stdout(output):
+            deploy.bootstrap(self.bootstrap_args())
+        name = 'bootstrap-' + REVISION[:12]
+        release = self.releases / name
+        self.assertEqual(os.listdir(self.releases), [name])
+        self.assertEqual(os.readlink(release / 'bin/link'), 'node')
+        for directory in (self.releases.parent, self.releases):
+            self.assertEqual(stat.S_IMODE(os.lstat(directory).st_mode), 0o755, directory)
+        self.assertEqual([c.args for c in verify.call_args_list], [(self.releases / ('.staging-' + name), REVISION)])
+        result = json.loads(output.getvalue().splitlines()[-1])
+        self.assertEqual(set(result), {'release', 'revision', 'archiveSha256', 'fileCount', 'manifestSha256', 'reused'})
+        self.assertEqual((result['release'], result['revision'], result['reused']), (str(release), REVISION, False))
+        self.assertEqual(result['archiveSha256'], hashlib.sha256(b'archive').hexdigest())
+        self.assertEqual(list((self.work / 'inputs').iterdir()), [])
+        self.assertEqual(list((self.build_state / 'harbor-deploy-build').iterdir()), [])
+        # One build unit and property set for both commands; only the unit name and the run differ.
+        def normalized(args):
+            run_id = next(a for a in args if a.startswith('StateDirectory=')).split('/', 1)[1]
+            return [a.replace(run_id, 'RUN') for a in args if not a.startswith('--unit=')]
+        built, bootstrapped = calls
+        self.assertIn('--unit=harbor-deploy-build-' + REVISION[:12], built)
+        self.assertIn('--unit=harbor-deploy-build-bootstrap-' + REVISION[:12], bootstrapped)
+        self.assertEqual(normalized(built), normalized(bootstrapped))
+        self.assertTrue(normalized(built)[-1].startswith('set -eu; cd "$STATE_DIRECTORY"; git clone'))
+
+    def test_p037_01_bootstrap_failure_removes_its_inputs_and_build_state(self):
+        served, pins = fake_downloads()
+        self.releases = self.fresh_releases()
+        def fail(args, **kwargs):
+            self.fake_build_run(args, **kwargs)
+            raise subprocess.CalledProcessError(1, args)
+        with self.downloads(served, pins), patch.object(deploy, 'RELEASES', self.releases), \
+                patch.object(deploy.shutil, 'disk_usage', return_value=Usage(100 * GIB, 0, 100 * GIB)), \
+                patch.object(deploy.subprocess, 'run', side_effect=fail), self.assertRaises(subprocess.CalledProcessError):
+            deploy.bootstrap(self.bootstrap_args())
+        self.assertEqual(list((self.work / 'inputs').iterdir()), [])
+        self.assertEqual(list((self.build_state / 'harbor-deploy-build').iterdir()), [])
+        self.assertEqual(os.listdir(self.releases), [])
+
+    def test_p037_01_bootstrap_reuses_a_release_that_verifies_against_the_revision(self):
+        served, pins = fake_downloads()
+        self.releases = self.fresh_releases()
+        release = self.releases / ('bootstrap-' + REVISION[:12])
+        (release / 'bin').mkdir(parents=True)
+        args = self.bootstrap_args()
+        before = snapshot(self.base, strict=True)
+        output = io.StringIO()
+        with self.downloads(served, pins) as requests, patch.object(deploy, 'RELEASES', self.releases), \
+                patch.object(deploy, 'verify_release', return_value={}) as verify, \
+                patch.object(deploy.subprocess, 'run', side_effect=AssertionError('no build may start')), \
+                contextlib.redirect_stdout(output):
+            deploy.bootstrap(args)
+        verify.assert_called_once_with(release, REVISION)
+        self.assertEqual(output.getvalue().splitlines(), ['[deploy] Release already staged and verified: ' + str(release),
+                                                          json.dumps({'release': str(release), 'reused': True})])
+        with self.downloads(served, pins), patch.object(deploy, 'RELEASES', self.releases), \
+                patch.object(deploy, 'verify_release', side_effect=ValueError('Release revision mismatch')), \
+                patch.object(deploy.subprocess, 'run', side_effect=AssertionError('no build may start')), \
+                self.assertRaisesRegex(ValueError, 'Release revision mismatch'):
+            deploy.bootstrap(args)
+        self.assertEqual(snapshot(self.base, strict=True), before)
+        self.assertEqual(requests, [])
+
+    def test_p037_01_bootstrap_takes_a_bundle_and_revision_and_no_instance(self):
+        bundle = str(self.base / 'harbor.bundle')
+        with patch.object(deploy, 'bootstrap') as bootstrap, \
+                patch('sys.argv', ['deploy-release', 'bootstrap', '--bundle', bundle, '--revision', REVISION]):
+            deploy.main()
+        self.assertEqual(vars(bootstrap.call_args.args[0]), {'action': 'bootstrap', 'bundle': bundle, 'revision': REVISION})
+        with patch('sys.argv', ['deploy-release', 'bootstrap', '--instance', 'seekworld', '--bundle', bundle,
+                                '--revision', REVISION]), \
+                contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            deploy.main()
 
     def checkpoint_dir(self, name, receipt=None, raw=None):
         path = self.backups / name

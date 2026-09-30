@@ -6,25 +6,31 @@ Promotion changes only the selected instance's release path; configuration,
 secrets, site drop-ins, previews and state are preserved. Every promotion
 drains work and writes a private matched checkpoint first. Prune deletes old
 releases and checkpoints under a fixed retention rule, on single-instance
-hosts only.
+hosts only. Bootstrap builds the first release on a host without an instance,
+from pinned downloads instead of an installed release.
 """
 import argparse
+import copy
 import datetime
 import errno
 import hashlib
+import http.client
 import importlib.machinery
 import importlib.util
 import json
 import os
 from pathlib import Path
+import platform
 import re
 import shutil
 import ssl
 import stat
 import subprocess
 import sys
+import tarfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 # Never write __pycache__ beside this script: a release's manifest check refuses files it does not list.
@@ -51,6 +57,24 @@ BUSY = "('queued','dispatching','running','waiting_approval','waiting_input','un
 MIGRATIONS = 'packages/storage/src/migrations'
 RELEASE_ROOT_ENTRIES = {'apps', 'packages', 'infra', 'node_modules', 'toolchain', 'package.json',
                         'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'artifact.json'}
+# The first release's pinned downloads: each input's URL and the SHA-256 its file must have. The
+# hashes match Node's SHASUMS256.txt and the npm registry's SHA-512 integrity values. Tests may
+# replace them.
+NODE_URL = 'https://nodejs.org/dist/v24.11.1/node-v24.11.1-linux-x64.tar.xz'
+NODE_SHA256 = '60e3b0a8500819514aca603487c254298cd776de0698d3cd08f11dba5b8289a8'
+NODE_MEMBER = 'node-v24.11.1-linux-x64/bin/node'
+CODEX_URL = 'https://registry.npmjs.org/@openai/codex/-/codex-0.153.4-linux-x64.tgz'
+CODEX_SHA256 = '54818cb9fce3360cc6e44cfc5a96952cd5c1243efb43cbe488e11dda84663e08'
+CODEX_VENDOR = 'package/vendor/x86_64-unknown-linux-musl'
+PNPM_URL = 'https://registry.npmjs.org/pnpm/-/pnpm-12.3.4.tgz'
+PNPM_SHA256 = '08a3d2d539b377a6b7ea2469b612672255ca71c30a62698530582cb9d35c268f'
+PNPM_EXE_URL = 'https://registry.npmjs.org/@pnpm/exe.linux-x64/-/exe.linux-x64-12.3.4.tgz'
+PNPM_EXE_SHA256 = '9b1c95fc413600ca75a51ebe8332d7019dc3568fd4187f5a5f2df4a156efb65c'
+DOWNLOAD_TIMEOUT = 60  # Seconds a download may wait for the server before it fails.
+# Bootstrap has no installed release to measure, so its space need is fixed: four times the release
+# built from 9ba6d53 on 30 September 2026, rounded up to a whole GiB. That release allocated 830058496
+# bytes; four times is 3320233984 bytes, or 3.09 GiB, so the need is 4 GiB.
+BOOTSTRAP_NEED = 4 * GIB
 
 
 def log(message):
@@ -177,13 +201,86 @@ def native_inputs(current, target):
                 os.symlink(os.readlink(path), vendor / relative)
     shutil.copy2(current / 'bin/node', target / 'node')
     shutil.copy2(current / 'toolchain/pnpm/pnpm-native', target / 'pnpm-native')
+    finish_inputs(target)
+
+
+def finish_inputs(target):
+    """Complete native inputs that hold node, vendor/, pnpm/ and pnpm-native: the build's PATH and modes."""
     (target / 'bin').mkdir()
-    shutil.copy2(current / 'bin/node', target / 'bin/node')
+    shutil.copy2(target / 'node', target / 'bin/node')
     (target / 'bin/pnpm').write_text('#!/bin/sh\nexec ' + str(target / 'pnpm-native') + ' "$@"\n')
     for path in [target] + list(target.rglob('*')):
         if not path.is_symlink():
             path.chmod(0o755 if path.is_dir() or path.stat().st_mode & 0o111 or path.parent.name == 'bin' else 0o644)
-    installer.validate_native_distribution(vendor, require_root=False)
+    installer.validate_native_distribution(target / 'vendor', require_root=False)
+
+
+def download(url, directory, digest):
+    """Fetch url over verified HTTPS into a new file in directory and check it against its pinned SHA-256."""
+    name = Path(urllib.parse.urlsplit(url).path).name
+    require(url.startswith('https://') and name, 'Pinned downloads must use HTTPS: ' + url)
+    path = directory / name
+    log('Downloading ' + url)
+    try:
+        with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT, context=ssl.create_default_context()) as response:
+            require(response.geturl().startswith('https://'), 'Download of ' + name + ' left HTTPS')
+            with open(path, 'xb') as stream:
+                shutil.copyfileobj(response, stream, 1 << 20)
+    except (urllib.error.URLError, http.client.HTTPException, OSError) as error:
+        raise ValueError('Could not download ' + name + ': ' + (str(error) or type(error).__name__)) from None
+    # Nothing reads the file before this check.
+    actual = sha256(path)
+    require(actual == digest, 'Pinned SHA-256 mismatch for ' + name + ' (got ' + actual + '); this run\'s inputs are deleted')
+    log('Verified ' + name + ' SHA-256 ' + actual)
+    return path
+
+
+def unpack(archive, member, destination, tree):
+    """Extract one regular file, or with tree the directory below member, from archive as destination.
+
+    Only the named members are read, renamed relative to destination. tarfile's data filter refuses
+    absolute paths, parent-directory escapes, special files and links that leave destination."""
+    try:
+        with tarfile.open(archive) as stream:
+            if not tree:
+                entry = copy.copy(stream.getmember(member))
+                require(entry.isreg(), archive.name + ': ' + member + ' must be a regular file')
+                entry.name = destination.name
+                stream.extractall(destination.parent, members=[entry], filter='data')
+                return
+            entries = []
+            for found in stream.getmembers():
+                if not found.name.startswith(member + '/'):
+                    continue
+                entry = copy.copy(found)
+                entry.name = found.name[len(member) + 1:]
+                if found.islnk():
+                    require(found.linkname.startswith(member + '/'), archive.name + ': hard link leaves ' + member + ': ' + found.name)
+                    entry.linkname = found.linkname[len(member) + 1:]
+                entries.append(entry)
+            require(entries, archive.name + ' has no ' + member + '/')
+            destination.mkdir()
+            stream.extractall(destination, members=entries, filter='data')
+    except KeyError:
+        raise ValueError(archive.name + ' has no ' + member) from None
+    except tarfile.TarError as error:
+        raise ValueError('Refused ' + archive.name + ': ' + str(error)) from None
+
+
+def bootstrap_inputs(target):
+    """Download, check and unpack the pinned first-release inputs in the layout that native_inputs writes."""
+    downloads = target / 'downloads'
+    downloads.mkdir(mode=0o700)
+    node = download(NODE_URL, downloads, NODE_SHA256)
+    codex = download(CODEX_URL, downloads, CODEX_SHA256)
+    pnpm = download(PNPM_URL, downloads, PNPM_SHA256)
+    native = download(PNPM_EXE_URL, downloads, PNPM_EXE_SHA256)
+    unpack(node, NODE_MEMBER, target / 'node', tree=False)
+    unpack(codex, CODEX_VENDOR, target / 'vendor', tree=True)
+    unpack(pnpm, 'package', target / 'pnpm', tree=True)
+    unpack(native, 'package/pnpm', target / 'pnpm-native', tree=False)
+    shutil.rmtree(downloads)
+    finish_inputs(target)
 
 
 def allocated(path, seen=None):
@@ -280,21 +377,36 @@ def build_locations(releases=None, work=None, build_state=None, build_cache=None
             BUILD_CACHE if build_cache is None else Path(build_cache), RELEASES if releases is None else Path(releases)]
 
 
+def reuse(release, revision):
+    """Print the result for a release that is already staged, once it verifies against revision."""
+    verify_release(release, revision)
+    log('Release already staged and verified: ' + str(release))
+    print(json.dumps({'release': str(release), 'reused': True}))
+
+
 def build(args):
     c, _, _, _ = instance(args.instance)
     require(re.fullmatch(r'[0-9a-f]{40}', args.revision), 'Full commit SHA required')
     name = 'gha-' + args.revision[:12]
     release = RELEASES / name
     if release.exists():
-        verify_release(release, args.revision)
-        log('Release already staged and verified: ' + str(release))
-        print(json.dumps({'release': str(release), 'reused': True}))
+        reuse(release, args.revision)
         return
     current = Path(c['release'])
     verify_release(current)
     bundle = installer.absolute(args.bundle)
     # A build writes inputs, sources, dependencies, the package and the release: about four releases.
     require_space('Build', build_locations(), 4 * allocated(current))
+    build_and_stage(name, 'harbor-deploy-build-' + args.revision[:12], bundle, args.revision,
+                    lambda inputs: native_inputs(current, inputs))
+
+
+def build_and_stage(name, unit, bundle, revision, prepare):
+    """Build revision from bundle in the transient unprivileged unit and stage it as RELEASES/name.
+
+    prepare(inputs) writes the pinned native inputs. Inputs, build state and a staging directory that
+    this run created are removed on every exit; an existing staging directory is refused and left."""
+    release = RELEASES / name
     run_id = name + '-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     inputs = WORK / 'inputs' / run_id
     inputs.mkdir(parents=True, mode=0o755)
@@ -304,8 +416,8 @@ def build(args):
     state = BUILD_STATE / state_name
     staging = None  # Set only while this run owns a staging directory it created.
     try:
-        native_inputs(current, inputs)
-        log('Building ' + args.revision + ' as a transient unprivileged user')
+        prepare(inputs)
+        log('Building ' + revision + ' as a transient unprivileged user')
         script = ('set -eu; cd "$STATE_DIRECTORY"; '
                   'git clone -q --no-checkout "$BUNDLE" source; cd source; git checkout -q --detach "$REVISION"; '
                   'test "$(git rev-parse HEAD)" = "$REVISION"; '
@@ -314,14 +426,14 @@ def build(args):
                   '--vendor "$INPUTS/vendor" --pnpm-package "$INPUTS/pnpm" --pnpm-binary "$INPUTS/pnpm-native" '
                   '--output "$STATE_DIRECTORY/package"')
         subprocess.run(['/usr/bin/systemd-run', '--quiet', '--wait', '--pipe', '--collect',
-                        '--unit=harbor-deploy-build-' + args.revision[:12],
+                        '--unit=' + unit,
                         '-p', 'DynamicUser=yes', '-p', 'StateDirectory=' + state_name,
                         '-p', 'CacheDirectory=harbor-deploy-cache', '-p', 'NoNewPrivileges=yes',
                         '-p', 'MemoryMax=6G', '-p', 'RuntimeMaxSec=3600',
                         '--setenv=PATH=' + str(inputs / 'bin') + ':/usr/bin:/bin',
                         '--setenv=HOME=/var/lib/' + state_name, '--setenv=CI=true',
                         '--setenv=npm_config_store_dir=/var/cache/harbor-deploy-cache/pnpm-store',
-                        '--setenv=BUNDLE=' + str(bundle), '--setenv=REVISION=' + args.revision,
+                        '--setenv=BUNDLE=' + str(bundle), '--setenv=REVISION=' + revision,
                         '--setenv=INPUTS=' + str(inputs),
                         '/bin/sh', '-c', script], check=True)
         package = state / 'package'
@@ -335,12 +447,12 @@ def build(args):
         for directory, dirs, files in os.walk(staging):
             for entry in [Path(directory)] + [Path(directory) / n for n in dirs + files]:
                 os.lchown(entry, 0, 0)
-        verify_release(staging, args.revision)
+        verify_release(staging, revision)
         staging.rename(release)
         staging = None
         manifest_sha = sha256(release / 'artifact.json')
         log('Staged ' + str(release))
-        print(json.dumps({'release': str(release), 'revision': args.revision, 'archiveSha256': result['sha256'],
+        print(json.dumps({'release': str(release), 'revision': revision, 'archiveSha256': result['sha256'],
                           'fileCount': result['fileCount'], 'manifestSha256': manifest_sha, 'reused': False}))
     finally:
         if staging is not None:
@@ -349,6 +461,33 @@ def build(args):
                 log('Could not remove the partial staging directory ' + str(staging))
         shutil.rmtree(inputs, ignore_errors=True)
         shutil.rmtree(state, ignore_errors=True)
+
+
+def bootstrap(args):
+    """Build and stage the first release on a host without an instance, from pinned downloads."""
+    require(os.geteuid() == 0, 'Bootstrap requires root')
+    require(platform.system() == 'Linux' and platform.machine() == 'x86_64', 'Bootstrap supports Linux x86_64 only')
+    require(re.fullmatch(r'[0-9a-f]{40}', args.revision), 'Full commit SHA required')
+    configured = configured_instances()
+    require(not configured, 'This host has an instance configuration (' + ', '.join(configured)
+            + '); build its releases with build instead; nothing was changed')
+    name = 'bootstrap-' + args.revision[:12]
+    release = RELEASES / name
+    if release.exists():
+        reuse(release, args.revision)
+        return
+    staging = RELEASES / ('.staging-' + name)
+    require(not os.path.lexists(staging), 'Staging path exists; inspect it first: ' + str(staging))
+    bundle = installer.absolute(args.bundle)
+    require(bundle.is_file(), 'Source bundle not found: ' + str(bundle))
+    require_space('Bootstrap', build_locations(), BOOTSTRAP_NEED)
+    # The release parents, created root-owned and traversable as the installer requires.
+    for directory in (RELEASES.parent, RELEASES):
+        if not os.path.lexists(directory):
+            directory.mkdir(mode=0o755)
+            directory.chmod(0o755)
+    build_and_stage(name, 'harbor-deploy-build-bootstrap-' + args.revision[:12], bundle, args.revision,
+                    bootstrap_inputs)
 
 
 def switched_files(c, unit, etc):
@@ -870,9 +1009,13 @@ def main():
     sub.choices['promote'].add_argument('--release', required=True)
     sub.choices['promote'].add_argument('--allow-new-migrations', action='store_true')
     sub.choices['prune'].add_argument('--keep-checkpoints', type=int, default=KEEP_CHECKPOINTS)
+    first = sub.add_parser('bootstrap')
+    first.add_argument('--bundle', required=True)
+    first.add_argument('--revision', required=True)
     args = parser.parse_args()
     require(os.geteuid() == 0, 'Run as root on the VPS')
-    {'preflight': preflight, 'build': build, 'promote': promote, 'prune': prune}[args.action](args)
+    {'preflight': preflight, 'build': build, 'promote': promote, 'prune': prune,
+     'bootstrap': bootstrap}[args.action](args)
 
 
 if __name__ == '__main__':

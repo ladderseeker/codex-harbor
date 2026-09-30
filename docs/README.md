@@ -16,6 +16,7 @@ The sections below group the same guides and reports by audience. The deployed p
 ## Personal VPS and personal local profiles
 
 - [Personal VPS setup](developer/personal-vps.md): subscription/original-folder candidate commands and native trust limits.
+- [Fresh VPS installation](developer/fresh-vps-install.md): the step-by-step guide an agent follows to install the personal profile on an empty VPS.
 - [GitHub Actions deployment](developer/github-actions-deploy.md): the manual workflow that builds and promotes personal VPS releases from GitHub-hosted runners, its run history and current hazards.
 - [Personal local experience](developer/local-personal.md): explicit local Codex account startup and its verification limits.
 - [Attachment verification](developer/attachments.md): upload/draft persistence, Linux publication checks and the separate live gate.

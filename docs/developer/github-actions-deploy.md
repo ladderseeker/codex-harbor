@@ -2,6 +2,8 @@
 
 On 30 September 2026 the owner uninstalled Harbor from the VPS, so no instance is installed and the run and release records below are history. Added 25 September 2026. Cloud coding sessions have no SSH egress, so personal VPS updates run from GitHub-hosted runners through [deploy-vps.yml](../../.github/workflows/deploy-vps.yml). The runner uploads a Git bundle of the selected commit and runs [deploy-release](../../infra/personal-vps/deploy-release) as root on the VPS. The script codifies the build, stage and promotion procedure recorded in the [personal VPS guide](personal-vps.md#current-owner-installation) and the [P024 installed report](../reports/2026-09-21-p024-installed-attachment-fix.md#final-deployment-and-installed-acceptance). The earlier promotion helpers lived only in ignored run storage.
 
+The workflow updates an installed instance only. A first installation follows the [fresh VPS install guide](fresh-vps-install.md), whose `deploy-release bootstrap` builds the first release.
+
 Run history on 25 September 2026: [run 1](https://github.com/ladderseeker/codex-harbor/actions/runs/36178630130) at `a5e4a12` passed its preflight step, but its summary step failed; [#2](https://github.com/ladderseeker/codex-harbor/pull/2) fixed the step. [Run 2](https://github.com/ladderseeker/codex-harbor/actions/runs/36179135848) at `d0c505b` passed `preflight` end to end. `build` and `deploy` have not run against the live host yet. The installed release still matches the latest application source, because only deployment tooling has changed on `main` since `311f750`.
 
 ## One-time setup

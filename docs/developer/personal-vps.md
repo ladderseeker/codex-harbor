@@ -10,6 +10,8 @@ This profile serves owner-authenticated HTTPS and runs native Codex under a dedi
 
 ## Prerequisites and package
 
+For a first installation on an empty host, follow the [fresh VPS install guide](fresh-vps-install.md), which covers every step below with checks.
+
 Require Linux/systemd, Docker Compose for the private PostgreSQL service, Python 3, Git, make, a C++ compiler, Node 24.11.1, pnpm 12.3.4, Codex 0.153.4 and locked application dependencies. Build with `pnpm install --frozen-lockfile` and `pnpm build`. Assemble a root-owned release outside every editable project containing application packages, migrations, infra helpers, `apps/web/dist`, complete `node_modules`, and the pinned Node executable plus the complete official Codex vendor target layout. `bin/codex` alone is insufficient: preserve its sibling `bin/codex-code-mode-host`, `codex-package.json`, `codex-resources/` (including bwrap and zsh), and `codex-path/` (including rg). Preserve internal dependency links, and reject links outside the release. Record the source and artifact SHA256 before deployment. Do not serve a mutable source checkout as the installed release.
 
 Use the persistent packaging command after building, with the complete verified npm vendor target directory as input:
