@@ -2,11 +2,13 @@
 
 This guide takes an emptied Ubuntu 24.04 VPS to a running, verified instance of Harbor's personal profile, built from `main`. An agent on the owner's computer follows it one step at a time, and the owner does the parts marked for the owner. Once the instance runs, updates use [GitHub Actions deployment](github-actions-deploy.md) instead. The [personal VPS guide](personal-vps.md) explains the profile, its trust limits and the reasons behind these steps.
 
+Status, 30 September 2026: this guide has not yet run on a real host. Its first run is tracked in the [unverified gates issue](../../issues/2026-09-30-103814-p037-unverified-gates.md). Stop at the first mismatch.
+
 ## Who this is for
 
 - **The agent.** You run on the owner's computer, in the owner's clone of this repository. The owner's SSH alias `harbor-vps` reaches the VPS as root, as the [VPS SSH handoff](../../AGENTS.md#vps-ssh-handoff) describes.
 - **The owner.** The owner supervises the run, answers the questions in [What the owner prepares](#what-the-owner-prepares), and does every part that names the owner.
-- **The revision.** The guide installs the current `origin/main`, and you read the guide from that same revision, so that its commands match the scripts they run.
+- **The revision.** The guide installs the revision of `origin/main` that the block below saves, and you read the guide from that same revision, so that its commands match the scripts they run.
 
 Before step 1, run this block once, from the root of the owner's clone. It saves the guide and its revision in your log directory, `~/harbor-install-log`. It changes nothing in the clone except the remote-tracking branch `origin/main`:
 
@@ -14,24 +16,25 @@ Before step 1, run this block once, from the root of the owner's clone. It saves
 bash -euo pipefail -s <<'LOCAL'
 mkdir -p "$HOME/harbor-install-log"
 git fetch -q origin main </dev/null
-git show origin/main:docs/developer/fresh-vps-install.md > "$HOME/harbor-install-log/guide.md"
-git rev-parse origin/main > "$HOME/harbor-install-log/guide-revision.txt"
-echo "saved the guide from revision $(cat "$HOME/harbor-install-log/guide-revision.txt")"
+revision=$(git rev-parse origin/main)
+git show "$revision:docs/developer/fresh-vps-install.md" > "$HOME/harbor-install-log/guide.md"
+echo "$revision" > "$HOME/harbor-install-log/guide-revision.txt"
+echo "saved the guide from revision $revision"
 LOCAL
 ```
 
-Then follow `~/harbor-install-log/guide.md`. When you resume later, read that saved copy again, and do not run this block a second time. Step 5 stops if the guide on `origin/main` has changed since you saved it.
+Then follow `~/harbor-install-log/guide.md`. When you resume later, read that saved copy again, and do not run this block a second time. Step 5 builds the saved revision, even when `origin/main` has moved on since then, and stops if the saved revision is no longer `origin/main` or one of its ancestors.
 
 ## Rules for the agent
 
-1. **Where commands run.** Every block runs in Bash on your computer, from the root of the owner's clone. A command for the VPS goes through `ssh harbor-vps` to `bash -euo pipefail -s`, as a quoted here-document, so nothing in it expands on your computer, and it runs as root on the VPS. Run each block exactly as written, as one command, with a timeout of at least 10 minutes. Change only a value marked `CHANGE-ME`, and only where a step says so.
+1. **Where commands run.** Every block runs in Bash on your computer, from the root of the owner's clone. A command for the VPS goes through `ssh harbor-vps` to `bash -euo pipefail -s`, as a quoted here-document, so nothing in it expands on your computer, and it runs as root on the VPS. The options `ServerAliveInterval=30` and `ServerAliveCountMax=4` on `ssh` and `scp` end a dead connection within about two minutes. Run each block exactly as written, as one command, with a timeout of at least 10 minutes, or the longer timeout that a step names. Change only a value marked `CHANGE-ME`, and only where a step says so.
 2. **Stop rules.** Stop and report the step, the block and its output, with secrets removed, when:
    - a block exits nonzero or prints a line that starts with `STOP`;
    - an Expect line does not match;
    - a check fails;
    - the host differs from what this guide describes.
 
-   A block that checks for an expected refusal, such as a denied write, exits 0 only when the refusal happened, so a nonzero exit always means stop. A block that prints a line starting with `WAIT` is waiting for something that has not finished: run the same block again.
+   A block that checks for an expected refusal, such as a denied write, exits 0 only when the refusal happened, so a nonzero exit always means stop. A block that prints a line starting with `WAIT` is waiting for something that has not finished: run the same block again. While such a block waits, it prints a `still waiting` line at least once a minute. When the `ssh` of such a waiting block exits with status 255, the connection dropped: run the same block again, and stop if it cannot connect.
 3. **Never** improvise a command that changes the host, delete a path that this guide does not name, change a pinned version, hash or value to get past a failure, or edit or commit to the repository.
 4. **Secrets.** These files and texts hold secrets:
    - the Google client file and the client secret file;
@@ -43,7 +46,11 @@ Then follow `~/harbor-install-log/guide.md`. When you resume later, read that sa
    - SSH private keys.
 
    No block prints their contents, with two exceptions: step 8 prints the start URL and step 12 prints the device code, and you pass each only to the owner. Copy the Google client file to the VPS only with step 8's `scp`, and never display it. Keep secrets out of your log and your reports.
-5. **Homes.** Every command that may start Codex runs with `HOME` set to a root-only scratch home under `/var/lib/harbor-install`, which the step removes afterwards. The exceptions are the Codex login and the signed-in model list in step 12, which use the instance's own homes. The model listings also set `CODEX_HOME` and turn the plugins feature off, as Harbor's runtimes do.
+5. **Homes.** Every command in this guide that may start Codex runs with `HOME` set to a root-only scratch home under `/var/lib/harbor-install`, which the step removes afterwards. The exceptions are:
+   - the Codex login and the signed-in model list in step 12, which use the instance's own homes;
+   - the release check in `deploy-release`, which runs the release's `node`, `codex` and `pnpm` with `HOME=/nonexistent`, whenever `bootstrap` in step 5 or `preflight` in steps 14 and 15 runs. It creates a root-owned `/nonexistent` with `.codex` and `.local` in it, as the [release check issue](../../issues/2026-09-30-103816-release-check-home.md) records. Step 16 reports that tree and leaves it in place.
+
+   The model listings also set `CODEX_HOME` and turn the plugins feature off, as Harbor's runtimes do.
 6. **Long steps.** The first-release build and the Codex login run as transient systemd units that write to a log under `/var/lib/harbor-install`, so a dropped SSH connection does not stop them. Their wait blocks poll for at most eight minutes; run them again until they finish.
 7. **Resuming.** The VPS keeps `/var/lib/harbor-install/progress`, with one line for each finished step, such as `step 3 done 2026-10-01T09:30:00Z`. After an interruption, run the progress block below and continue at the first step that has no line. That step's Check says whether it was partly done. `install` and the owner enrollment cannot simply be repeated, so their steps say what a partial result looks like and when to stop for the owner.
 8. **Records.** Keep a step-by-step log in `~/harbor-install-log/log.md`, outside the repository. For each block, write the time, the step, the exit status and the output, with secrets removed. At the end, the VPS keeps a root-only record in `/var/lib/harbor-install/record.json`.
@@ -68,17 +75,18 @@ Every step has the same parts:
 
 The owner completes this checklist before the run, or when the named step reaches it:
 
-1. **Values.** Confirm the [values](#values), or tell the agent what to change, before step 1.
-2. **DNS record.** At the DNS provider for `seekworld.tech`, an A record for `harbor.seekworld.tech` that points at the VPS address `187.77.140.226`, and no AAAA record for that name. Step 2 checks it. The preview host is a `sslip.io` name, which resolves to the address it contains without any record.
-3. **Firewall.** In the hosting provider's panel, if it has a firewall for the VPS, allow inbound TCP 22, 80 and 443, before step 4.
-4. **Let's Encrypt email.** An email address for certificate notices, before step 1.
-5. **Google client.** In the Google Cloud console, under APIs & Services, then Credentials: an OAuth client of type Web application, whose authorized redirect URIs include exactly `https://harbor.seekworld.tech/auth/callback`. Save its client JSON on this computer, and give the agent the file's full path in step 8.
+1. **Host.** The VPS runs Ubuntu 24.04 on x86_64, with either no Docker or the Docker Engine packages from Docker's own repository: `docker-ce`, `docker-ce-cli`, `containerd.io` and `docker-compose-plugin`. Step 1 checks it, and stops for any other Docker installation, such as a snap or an incomplete set of packages.
+2. **Values.** Confirm the [values](#values), or tell the agent what to change, before step 1.
+3. **DNS record.** At the DNS provider for `seekworld.tech`, an A record for `harbor.seekworld.tech` that points at the VPS address `187.77.140.226`, and no AAAA record for that name. Step 2 checks it. The preview host is a `sslip.io` name, which resolves to the address it contains without any record.
+4. **Firewall.** In the hosting provider's panel, if it has a firewall for the VPS, allow inbound TCP 22, 80 and 443, before step 4.
+5. **Let's Encrypt email.** An email address for certificate notices, before step 1.
+6. **Google client.** In the Google Cloud console, under APIs & Services, then Credentials: an OAuth client of type Web application, whose authorized redirect URIs include exactly `https://harbor.seekworld.tech/auth/callback`. Save its client JSON on this computer, and give the agent the file's full path in step 8.
    - Reuse the existing client if there is one. Create a new client only if none exists.
    - Google shows a client secret only once. If the secret is lost, use **Add Secret** on the client page and download the JSON it offers. A client holds at most two secrets.
    - Harbor asks only for `openid`, and the enrollment only for `openid email`, so the consent screen can stay in Testing without a test-user list.
-6. **Owner email.** The Google account email that becomes Harbor's owner, before step 1.
-7. **Device code login.** In ChatGPT's security settings, turn on device code login for the ChatGPT account that Harbor will use, before step 12.
-8. **Time.** Be ready to open the enrollment link within 30 minutes in step 8, and to enter the Codex device code within 15 minutes in step 12.
+7. **Owner email.** The Google account email that becomes Harbor's owner, before step 1.
+8. **Device code login.** Before step 12, turn on device code login for the ChatGPT account that Harbor will use. For a personal account, the owner turns it on in ChatGPT's security settings. For a ChatGPT workspace account, a workspace admin turns on device code login in the workspace's permissions.
+9. **Time.** In step 8, open the enrollment link within about 25 minutes of receiving it, and finish signing in within 10 minutes of opening it. In step 12, enter the Codex device code within 15 minutes of receiving it.
 
 ## Values
 
@@ -136,7 +144,7 @@ ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vp
 **Block 2.** Report the host. This block is read-only:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 shopt -s nullglob
 . /etc/os-release
 init=$(ps -p 1 -o comm=)
@@ -156,6 +164,31 @@ if command -v docker >/dev/null; then
 else
   echo "docker: absent"
 fi
+owner() {
+  local path
+  path=$(command -v "$1" || true)
+  if [ -z "$path" ]; then echo none; return; fi
+  dpkg-query -S "$(readlink -f "$path")" 2>/dev/null | sed -n 's/^\([a-z0-9][a-z0-9+.-]*\)\(:[a-z0-9]*\)\{0,1\}: .*/\1/p' | sed -n 1p | grep . || echo "unowned:$path"
+}
+has() { [[ " $packages " == *" $1 "* ]]; }
+only() { local name; for name in $packages; do [[ " $* " == *" $name "* ]] || return 1; done; }
+packages=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' | awk 'substr($1, 2, 1) !~ /[nc]/ && $2 ~ /^(docker|moby-|containerd\.io$|podman-docker$)/ {print $2}' | sort | paste -sd ' ' -)
+docker_from=$(owner docker)
+dockerd_from=$(owner dockerd)
+if [ -e /snap/bin/docker ]; then
+  docker_case=other
+elif [ -z "$packages" ] && [ "$docker_from $dockerd_from" = "none none" ]; then
+  docker_case=none
+elif has docker.io && only docker.io docker-compose-v2 docker-buildx docker-doc && [ "$docker_from $dockerd_from" = "docker.io docker.io" ]; then
+  docker_case=ubuntu
+elif has docker-ce && has docker-ce-cli && has containerd.io && has docker-compose-plugin && only docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-buildx-plugin docker-ce-rootless-extras docker-model-plugin && [ "$docker_from $dockerd_from" = "docker-ce-cli docker-ce" ]; then
+  docker_case=docker-ce
+else
+  docker_case=other
+fi
+echo "Docker packages: ${packages:-none}"
+echo "docker from: $docker_from; dockerd from: $dockerd_from"
+echo "Docker case: $docker_case"
 echo "listeners on 80, 443, 3347, 3348, 3350 and 5548:"
 ss -Hltnp '( sport = :80 or sport = :443 or sport = :3347 or sport = :3348 or sport = :3350 or sport = :5548 )'
 echo "free space:"
@@ -195,6 +228,7 @@ problems=()
 [ "$(uname -m)" = x86_64 ] || problems+=("the architecture is not x86_64")
 [ "$init" = systemd ] || problems+=("PID 1 is not systemd")
 [ "$cgroup" = cgroup2fs ] || problems+=("the host does not use cgroup v2")
+[ "$docker_case" != other ] || problems+=("Docker is installed in a way that this guide does not handle")
 if [ "${#leftovers[@]}" -gt 0 ] && [ ! -f /var/lib/harbor-install/progress ]; then problems+=("leftovers exist and no progress file does"); fi
 if [ "${#problems[@]}" -gt 0 ]; then printf 'STOP: %s\n' "${problems[@]}"; exit 1; fi
 echo "HOST OK"
@@ -204,7 +238,7 @@ REMOTE
 **Block 3.** In this block, replace the two `CHANGE-ME` values with the owner's email addresses, and change any value the owner changed. Then run it. It creates `/var/lib/harbor-install` with mode `0700`, and writes the values and the progress file:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 if [ -e /var/lib/harbor-install/values.env ]; then echo "STOP: /var/lib/harbor-install/values.env already exists"; exit 1; fi
 install -d -m 0700 /var/lib/harbor-install
 cat > /var/lib/harbor-install/values.env.new <<'VALUES'
@@ -250,14 +284,18 @@ REMOTE
 **Expect:**
 
 - Block 1 prints `root` and `srv1464935`.
-- Block 2 shows Ubuntu 24.04 on `x86_64`, `init: systemd` and `cgroup filesystem: cgroup2fs`, and ends with `HOST OK`. Copy the whole report into your log: the kernel, the Docker and Compose versions or `absent`, the running containers, the listeners, the free space, `ufw`, and whether `/root/Projects` exists.
+- Block 2 shows Ubuntu 24.04 on `x86_64`, `init: systemd` and `cgroup filesystem: cgroup2fs`, and ends with `HOST OK`. Copy the whole report into your log: the kernel, the Docker and Compose versions or `absent`, the running containers, the Docker packages, where `docker` and `dockerd` come from, the listeners, the free space, `ufw`, and whether `/root/Projects` exists.
+- Block 2's `Docker case:` line is one of these, and step 3 acts on it:
+  - `none`: no Docker package is installed, and there is no `docker` or `dockerd` command;
+  - `ubuntu`: Ubuntu's `docker.io` supplies `docker` and `dockerd`, and the only other Docker packages are Ubuntu's `docker-compose-v2`, `docker-buildx` and `docker-doc`;
+  - `docker-ce`: Docker's own `docker-ce`, `docker-ce-cli`, `containerd.io` and `docker-compose-plugin` are all installed and supply `docker` and `dockerd`, and the only other Docker packages are Docker's `docker-buildx-plugin`, `docker-ce-rootless-extras` and `docker-model-plugin`.
 - Block 3 prints the values, with both email addresses filled in.
 
 **If not:**
 
 - If block 1 prints another hostname, stop: the owner confirms that the alias reaches the right VPS.
 - If SSH reports a changed host key, the VPS was probably reinstalled. Stop: the owner compares the new key with the one that the hosting provider's console shows, before updating `known_hosts`.
-- If block 2 prints `STOP`, stop. Leftovers from an earlier installation are the owner's decision, and this guide removes none of them.
+- If block 2 prints `STOP`, stop. Leftovers from an earlier installation are the owner's decision, and this guide removes none of them. So is a Docker installation of any other kind, such as a snap, an incomplete set of Docker's packages, or a mix of Ubuntu's and Docker's packages.
 
 ### Step 2. DNS
 
@@ -269,14 +307,23 @@ REMOTE
 
 ```bash
 bash -euo pipefail -s <<'LOCAL'
-vps() { ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s'; }
+vps() { ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s'; }
 command -v dig >/dev/null || { echo "STOP: dig is not installed on this computer"; exit 1; }
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 vps > "$work/values.env" <<'REMOTE'
 cat /var/lib/harbor-install/values.env
 REMOTE
-. "$work/values.env"
+value() {
+  [ "$(grep -c "^$1=" "$work/values.env")" = 1 ] || { echo "STOP: values.env must set $1 exactly once" >&2; return 1; }
+  found=$(sed -n "s/^$1='\(.*\)'\$/\1/p" "$work/values.env")
+  printf '%s\n' "$found" | grep -Eqx -e "$2" || { echo "STOP: $1 in values.env is not $3" >&2; return 1; }
+  printf '%s\n' "$found"
+}
+host='[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+'
+HOST=$(value HOST "$host" 'a host name') || exit 1
+PREVIEW_HOST=$(value PREVIEW_HOST "$host" 'a host name') || exit 1
+VPS_ADDRESS=$(value VPS_ADDRESS '([0-9]{1,3}\.){3}[0-9]{1,3}' 'an IPv4 address') || exit 1
 status=0
 for name in "$HOST" "$PREVIEW_HOST"; do
   a=$(dig +short A "$name" | grep -E '^[0-9.]+$' | sort -u | tr '\n' ' ' || true)
@@ -295,7 +342,7 @@ LOCAL
 
 **Expect:** `harbor.seekworld.tech: A 187.77.140.226 ; AAAA none`, the same line for the preview host, and `DNS OK`.
 
-**If not:** Stop for the owner, who fixes the DNS record. An AAAA record must be removed, or the owner must confirm that it points at this VPS, because Let's Encrypt may validate over IPv6. DNS changes can take time to spread; run the block again after the owner says the record is fixed.
+**If not:** Stop for the owner, who fixes the DNS record. Any AAAA record for the host must be removed, as the owner's checklist says, because Let's Encrypt may validate over IPv6. DNS changes can take time to spread; run the block again after the owner says the record is fixed.
 
 ### Step 3. Host packages
 
@@ -303,13 +350,49 @@ LOCAL
 
 **Check:** Run the progress block. If it lists `step 3 done`, go to step 4. The Run block is safe to run again.
 
-**Run:**
+**Run:** Run this block with a timeout of at least 20 minutes; its two package lock waits take at most three minutes each. The block finds out how Docker is installed, with the same test as step 1, and then installs the packages that the host lacks:
+
+- `none` or `ubuntu`: Ubuntu's `docker.io` and `docker-compose-v2`, with `git`, `python3`, `make`, `g++`, `acl`, `curl` and `ca-certificates`.
+- `docker-ce`: only `git`, `python3`, `make`, `g++`, `acl`, `curl` and `ca-certificates`. The block keeps Docker's own Docker Engine, because Ubuntu's Docker packages conflict with it: installing them would remove it and stop its containers.
+- `other`: nothing. The block stops for the owner.
+
+Ubuntu's Docker and Docker's own Docker Engine must pass the same version checks:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 export DEBIAN_FRONTEND=noninteractive
-apt-get -q -o DPkg::Lock::Timeout=300 update </dev/null
-apt-get -q -o DPkg::Lock::Timeout=300 install -y docker.io docker-compose-v2 git python3 make g++ acl curl ca-certificates </dev/null
+owner() {
+  local path
+  path=$(command -v "$1" || true)
+  if [ -z "$path" ]; then echo none; return; fi
+  dpkg-query -S "$(readlink -f "$path")" 2>/dev/null | sed -n 's/^\([a-z0-9][a-z0-9+.-]*\)\(:[a-z0-9]*\)\{0,1\}: .*/\1/p' | sed -n 1p | grep . || echo "unowned:$path"
+}
+has() { [[ " $packages " == *" $1 "* ]]; }
+only() { local name; for name in $packages; do [[ " $* " == *" $name "* ]] || return 1; done; }
+packages=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' | awk 'substr($1, 2, 1) !~ /[nc]/ && $2 ~ /^(docker|moby-|containerd\.io$|podman-docker$)/ {print $2}' | sort | paste -sd ' ' -)
+docker_from=$(owner docker)
+dockerd_from=$(owner dockerd)
+if [ -e /snap/bin/docker ]; then
+  docker_case=other
+elif [ -z "$packages" ] && [ "$docker_from $dockerd_from" = "none none" ]; then
+  docker_case=none
+elif has docker.io && only docker.io docker-compose-v2 docker-buildx docker-doc && [ "$docker_from $dockerd_from" = "docker.io docker.io" ]; then
+  docker_case=ubuntu
+elif has docker-ce && has docker-ce-cli && has containerd.io && has docker-compose-plugin && only docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-buildx-plugin docker-ce-rootless-extras docker-model-plugin && [ "$docker_from $dockerd_from" = "docker-ce-cli docker-ce" ]; then
+  docker_case=docker-ce
+else
+  docker_case=other
+fi
+echo "Docker packages: ${packages:-none}"
+echo "docker from: $docker_from; dockerd from: $dockerd_from"
+echo "Docker case: $docker_case"
+case "$docker_case" in
+  none|ubuntu) docker_packages='docker.io docker-compose-v2' ;;
+  docker-ce) docker_packages= ;;
+  *) echo "STOP: Docker is installed in a way that this guide does not handle"; exit 1 ;;
+esac
+apt-get -q -o DPkg::Lock::Timeout=180 update </dev/null
+apt-get -q -o DPkg::Lock::Timeout=180 install -y $docker_packages git python3 make g++ acl curl ca-certificates </dev/null
 systemctl enable --now docker.service
 server=$(docker version --format '{{.Server.Version}}')
 compose=$(docker compose version --short)
@@ -324,9 +407,9 @@ echo "step 3 done $(date -u +%FT%TZ)" >> /var/lib/harbor-install/progress
 REMOTE
 ```
 
-**Expect:** a line such as `docker 29.1.3, compose 2.40.3, apparmor_parser /usr/sbin/apparmor_parser`, with Docker 29 or later and Compose 2.40 or later. On 30 September 2026, Ubuntu's `noble-updates` had Docker 29.1.3 and Compose 2.40.3.
+**Expect:** `Docker case: none`, `ubuntu` or `docker-ce`, as step 1 described them. After `none`, a rerun of the block reports `ubuntu`. Then a line such as `docker 29.1.3, compose 2.40.3, apparmor_parser /usr/sbin/apparmor_parser`, with Docker 29 or later and Compose 2.40 or later. On 30 September 2026, Ubuntu's `noble-updates` had Docker 29.1.3 and Compose 2.40.3.
 
-**If not:** If `apt-get` reports that another process holds its lock, such as the automatic updates of a newly started VPS, wait five minutes and run the block again. Otherwise stop. Do not add another package source.
+**If not:** If `apt-get` reports that another process holds its lock, such as the automatic updates of a newly started VPS, wait five minutes and run the block again. If the block stops for the Docker case, or if Docker's own Docker Engine fails a version check, stop for the owner: this guide changes no other Docker installation. Otherwise stop. Do not add another package source.
 
 ### Step 4. Reverse proxy
 
@@ -335,46 +418,29 @@ REMOTE
 **Check:** Run the progress block. If it lists `step 4 done`, go to step 5. Otherwise, this read-only block shows what serves ports 80 and 443:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 echo "Traefik containers: $(docker ps --format '{{.Names}} {{.Image}}' | grep -i traefik || echo none)"
 echo "listeners on 80 and 443:"
 ss -Hltnp '( sport = :80 or sport = :443 )'
 echo "/opt/traefik: $([ -e /opt/traefik ] && echo exists || echo absent)"
+if [ -e /opt/traefik ]; then ls -la /opt/traefik; fi
 if command -v ufw >/dev/null; then ufw status; else echo "ufw: absent"; fi
 REMOTE
 ```
 
+- A Traefik container runs: block 1 keeps it and records the step, or, when it is the Traefik that this guide installed, says to run block 2.
+- No Traefik runs and `/opt/traefik` is absent: block 1 installs Traefik.
+- No Traefik runs and `/opt/traefik` exists: an earlier run of block 1 probably stopped before Traefik listened. When `/opt/traefik/compose.yaml` holds exactly the file that block 1 writes, with the pinned image and the owner's email, block 1 starts that Traefik again. In any other state, block 1 stops and describes what it found.
+
 **Run:**
 
-**Block 1.** Keep a running Traefik, or install the pinned one. The block keeps any running Traefik container and changes nothing else; step 8 proves that Traefik's route. When the running Traefik is the one that this guide installed, from an interrupted earlier run, the block says to run block 2. Otherwise it stops if something else listens on port 80 or 443, if `/opt/traefik` already exists, or if `ufw` is active without rules for ports 80 and 443. Then it writes `/opt/traefik/compose.yaml` with the pinned image and the owner's email, creates the certificate directory with mode `0700`, and starts Traefik:
+**Block 1.** Keep a running Traefik, or install the pinned one. The block keeps any running Traefik container and changes nothing else; step 8 proves that Traefik's route. When the running Traefik is the one that this guide installed, from an interrupted earlier run, the block says to run block 2. Otherwise it stops if something else listens on port 80 or 443, or if `ufw` is active without rules for ports 80 and 443. When `/opt/traefik` exists, the block starts Traefik again only if `/opt/traefik/compose.yaml` holds exactly the file that it writes, and stops otherwise. Else it writes `/opt/traefik/compose.yaml` with the pinned image and the owner's email, creates the certificate directory with mode `0700`, and starts Traefik:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
-traefik=$(docker ps --format '{{.Names}} {{.Image}}' | grep -i traefik || true)
-listeners=$(ss -Hltnp '( sport = :80 or sport = :443 )')
-ufw=$(ufw status 2>/dev/null || true)
-if grep -q '^Status: active' <<<"$ufw"; then
-  if ! grep -Eq '^80(/tcp)? .*ALLOW' <<<"$ufw" || ! grep -Eq '^443(/tcp)? .*ALLOW' <<<"$ufw"; then
-    echo "$ufw"
-    echo "STOP: ufw is active without rules that allow ports 80 and 443"
-    exit 1
-  fi
-fi
-if [ -n "$traefik" ]; then
-  if grep -qxF "    image: $TRAEFIK_IMAGE" /opt/traefik/compose.yaml 2>/dev/null && grep -qxF "      - --certificatesresolvers.letsencrypt.acme.email=$ACME_EMAIL" /opt/traefik/compose.yaml; then
-    echo "the Traefik that this guide installed runs; run block 2"
-    exit 0
-  fi
-  echo "keeping the running Traefik: $traefik"
-  echo "step 4 done $(date -u +%FT%TZ) existing Traefik kept" >> /var/lib/harbor-install/progress
-  exit 0
-fi
-if [ -n "$listeners" ]; then echo "$listeners"; echo "STOP: something other than Traefik listens on port 80 or 443"; exit 1; fi
-if [ -e /opt/traefik ]; then echo "STOP: /opt/traefik exists, but no Traefik runs"; exit 1; fi
-install -d -m 0755 /opt/traefik
-install -d -m 0700 /opt/traefik/letsencrypt
-cat > /opt/traefik/compose.yaml <<YAML
+traefik_file() {
+  cat <<YAML
 name: traefik
 services:
   traefik:
@@ -402,7 +468,45 @@ services:
         max-size: 10m
         max-file: "3"
 YAML
-chmod 0644 /opt/traefik/compose.yaml
+}
+traefik=$(docker ps --format '{{.Names}} {{.Image}}' | grep -i traefik || true)
+listeners=$(ss -Hltnp '( sport = :80 or sport = :443 )')
+ufw=$(ufw status 2>/dev/null || true)
+if grep -q '^Status: active' <<<"$ufw"; then
+  if ! grep -Eq '^80(/tcp)? .*ALLOW' <<<"$ufw" || ! grep -Eq '^443(/tcp)? .*ALLOW' <<<"$ufw"; then
+    echo "$ufw"
+    echo "STOP: ufw is active without rules that allow ports 80 and 443"
+    exit 1
+  fi
+fi
+if [ -n "$traefik" ]; then
+  if [ -f /opt/traefik/compose.yaml ] && cmp -s /opt/traefik/compose.yaml <(traefik_file); then
+    echo "the Traefik that this guide installed runs; run block 2"
+    exit 0
+  fi
+  echo "keeping the running Traefik: $traefik"
+  echo "step 4 done $(date -u +%FT%TZ) existing Traefik kept" >> /var/lib/harbor-install/progress
+  exit 0
+fi
+if [ -n "$listeners" ]; then echo "$listeners"; echo "STOP: something other than Traefik listens on port 80 or 443"; exit 1; fi
+if [ -e /opt/traefik ]; then
+  if [ ! -f /opt/traefik/compose.yaml ] || ! cmp -s /opt/traefik/compose.yaml <(traefik_file); then
+    ls -la /opt/traefik
+    if [ -f /opt/traefik/compose.yaml ]; then
+      echo "STOP: no Traefik runs, and /opt/traefik/compose.yaml differs from the file that this block writes"
+    else
+      echo "STOP: no Traefik runs, and /opt/traefik has no compose.yaml"
+    fi
+    exit 1
+  fi
+  echo "no Traefik runs; starting the Traefik that an earlier run of this block wrote to /opt/traefik"
+  install -d -m 0700 /opt/traefik/letsencrypt
+else
+  install -d -m 0755 /opt/traefik
+  install -d -m 0700 /opt/traefik/letsencrypt
+  traefik_file > /opt/traefik/compose.yaml
+  chmod 0644 /opt/traefik/compose.yaml
+fi
 docker compose -f /opt/traefik/compose.yaml config --quiet </dev/null
 docker compose -f /opt/traefik/compose.yaml up -d </dev/null
 ready=no
@@ -419,13 +523,19 @@ REMOTE
 
 ```bash
 bash -euo pipefail -s <<'LOCAL'
-vps() { ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s'; }
+vps() { ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s'; }
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 vps > "$work/values.env" <<'REMOTE'
 cat /var/lib/harbor-install/values.env
 REMOTE
-. "$work/values.env"
+value() {
+  [ "$(grep -c "^$1=" "$work/values.env")" = 1 ] || { echo "STOP: values.env must set $1 exactly once" >&2; return 1; }
+  found=$(sed -n "s/^$1='\(.*\)'\$/\1/p" "$work/values.env")
+  printf '%s\n' "$found" | grep -Eqx -e "$2" || { echo "STOP: $1 in values.env is not $3" >&2; return 1; }
+  printf '%s\n' "$found"
+}
+HOST=$(value HOST '[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+' 'a host name') || exit 1
 answer=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' "http://$HOST/")
 echo "http://$HOST/ answers: $answer"
 case "$answer" in
@@ -441,9 +551,9 @@ LOCAL
 
 The installed Traefik remains trusted with host-level power: a read-only mount of the Docker socket does not limit what Traefik can do through the Docker API, as the personal VPS guide already assumes. It has no API, dashboard or access log. With the access log off, the enrollment start URL and the sign-in callback stay out of the proxy's logs.
 
-**Expect:** Either `keeping the running Traefik:` with the container, or `Traefik listens on ports 80 and 443` followed by `http://harbor.seekworld.tech/ answers: 301 https://harbor.seekworld.tech/` (308 is also correct) and `REDIRECT OK`.
+**Expect:** Either `keeping the running Traefik:` with the container, or `Traefik listens on ports 80 and 443` followed by `http://harbor.seekworld.tech/ answers: 301 https://harbor.seekworld.tech/` (308 is also correct) and `REDIRECT OK`. When block 1 resumes an earlier run, it first prints `no Traefik runs; starting the Traefik that an earlier run of this block wrote to /opt/traefik`.
 
-**If not:** Stop. If `ufw` blocks the ports, the owner decides whether to allow them. If block 2 cannot connect, the owner checks the hosting firewall.
+**If not:** Stop. If `ufw` blocks the ports, the owner decides whether to allow them. If block 1 stops because `/opt/traefik` exists, it lists the directory and says whether `compose.yaml` is missing or differs; what happens to that directory is the owner's decision. If block 2 cannot connect, the owner checks the hosting firewall.
 
 ### Step 5. First release
 
@@ -452,63 +562,86 @@ The installed Traefik remains trusted with host-level power: a read-only mount o
 **Check:** Run the progress block. If it lists `step 5 done`, go to step 6. Otherwise, run this read-only block:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
-if [ -d /var/lib/harbor-deploy/incoming/bootstrap/tools ]; then echo "uploaded revision: $(git -C /var/lib/harbor-deploy/incoming/bootstrap/tools rev-parse HEAD)"; else echo "uploaded revision: none"; fi
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+set -a; . /var/lib/harbor-install/values.env; set +a
+incoming=/var/lib/harbor-deploy/incoming/bootstrap
+if [ ! -e "$incoming" ]; then
+  echo "upload: absent"
+elif [ -n "${REVISION:-}" ] && [ -s "$incoming/harbor.bundle" ] && [ "$(git -C "$incoming/tools" rev-parse HEAD 2>/dev/null)" = "$REVISION" ] && [ -z "$(git -C "$incoming/tools" --no-optional-locks status --porcelain 2>/dev/null || echo unknown)" ]; then
+  echo "upload: complete, revision $REVISION"
+else
+  echo "upload: incomplete"
+fi
 echo "build unit: $(systemctl show -p LoadState -p SubState -p ExecMainStatus harbor-install-bootstrap.service | tr '\n' ' ')"
 echo "releases: $(ls -A /opt/harbor-personal/releases 2>/dev/null | tr '\n' ' ')"
 REMOTE
 ```
 
-- `uploaded revision: none` and `LoadState=not-found`: run blocks 1, 2 and 3.
-- An uploaded revision and `LoadState=not-found`: run blocks 2 and 3.
+- `upload: absent` or `upload: incomplete`, and `LoadState=not-found`: run blocks 1, 2 and 3. Block 1 replaces an incomplete upload.
+- `upload: complete` and `LoadState=not-found`: run blocks 2 and 3.
 - `LoadState=loaded`: run block 3.
 - A `.staging-` entry under releases: stop for the owner.
 
 **Run:**
 
-**Block 1.** On your computer: fetch `origin/main`, check that its guide is the one you saved, and make a Git bundle of it in a temporary directory outside the repository. The bundle comes from a temporary bare repository, so the clone's branch, index and working tree stay as they are. The block then uploads the bundle and clones `tools` from it, with the deploy workflow's modes and commands:
+**Block 1.** On your computer: read the saved revision from `~/harbor-install-log/guide-revision.txt`, fetch `origin/main`, and stop unless the saved revision is `origin/main` or one of its ancestors. Then make a Git bundle of the saved revision in a temporary directory outside the repository. The bundle comes from a temporary bare repository whose `main` branch points at the saved revision, so the clone's branch, index and working tree stay as they are. On the VPS, the block stops if the build unit exists, and otherwise replaces any upload that an earlier run of this block left behind. It then uploads the bundle, clones `tools` from it with the deploy workflow's modes and commands, and records the revision in `values.env`:
 
 ```bash
 bash -euo pipefail -s <<'LOCAL'
-vps() { ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s'; }
+vps() { ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s'; }
 clone=$(git rev-parse --show-toplevel)
+saved="$HOME/harbor-install-log/guide-revision.txt"
+[ -f "$saved" ] || { echo "STOP: $saved is missing; the block before step 1 saves it"; exit 1; }
+revision=$(cat "$saved")
+printf '%s\n' "$revision" | grep -Eqx '[0-9a-f]{40}' || { echo "STOP: $saved does not hold a full commit SHA"; exit 1; }
+echo "saved revision: $revision"
 git -C "$clone" fetch -q origin main </dev/null
-revision=$(git -C "$clone" rev-parse origin/main)
-echo "revision: $revision"
+git -C "$clone" merge-base --is-ancestor "$revision" origin/main || { echo "STOP: the saved revision is not origin/main or one of its ancestors"; exit 1; }
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
-git -C "$clone" show "$revision:docs/developer/fresh-vps-install.md" > "$work/guide.md"
-if ! cmp -s "$work/guide.md" "$HOME/harbor-install-log/guide.md"; then echo "STOP: the guide on origin/main changed since you saved it"; exit 1; fi
 git init -q --bare "$work/source.git"
 git -C "$work/source.git" fetch -q --no-tags "$clone" "+refs/remotes/origin/main:refs/heads/main" </dev/null
+git -C "$work/source.git" update-ref refs/heads/main "$revision"
 git -C "$work/source.git" symbolic-ref HEAD refs/heads/main
 [ "$(git -C "$work/source.git" rev-parse HEAD)" = "$revision" ] || { echo "STOP: the bundle source is not $revision"; exit 1; }
 git -C "$work/source.git" bundle create "$work/harbor.bundle" HEAD main
 vps <<'REMOTE'
-if [ -e /var/lib/harbor-deploy/incoming/bootstrap ]; then echo "STOP: /var/lib/harbor-deploy/incoming/bootstrap already exists"; exit 1; fi
+unit=harbor-install-bootstrap.service
+incoming=/var/lib/harbor-deploy/incoming/bootstrap
+if [ "$(systemctl show -p LoadState --value "$unit")" != not-found ]; then echo "STOP: $unit exists, so the build has started; run block 3"; exit 1; fi
+sed -i '/^REVISION=/d' /var/lib/harbor-install/values.env
+if [ -e "$incoming" ]; then
+  echo "replacing the upload that an earlier run of this block left in $incoming"
+  rm -rf -- "$incoming"
+fi
 install -d -m 0755 /var/lib/harbor-deploy /var/lib/harbor-deploy/incoming && install -d -m 0755 /var/lib/harbor-deploy/incoming/bootstrap
 REMOTE
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'cat > /var/lib/harbor-deploy/incoming/bootstrap/harbor.bundle && chmod 0644 /var/lib/harbor-deploy/incoming/bootstrap/harbor.bundle' < "$work/harbor.bundle"
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps bash -euo pipefail -s "$revision" <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'cat > /var/lib/harbor-deploy/incoming/bootstrap/harbor.bundle && chmod 0644 /var/lib/harbor-deploy/incoming/bootstrap/harbor.bundle' < "$work/harbor.bundle"
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps bash -euo pipefail -s "$revision" <<'REMOTE'
 cd /var/lib/harbor-deploy/incoming/bootstrap
 git clone -q --no-checkout harbor.bundle tools
 git -C tools checkout -q --detach "$1"
 test "$(git -C tools rev-parse HEAD)" = "$1"
+[ -z "$(git -C tools status --porcelain)" ] || { echo "STOP: the tools checkout is not clean"; exit 1; }
+printf "REVISION='%s'\n" "$1" >> /var/lib/harbor-install/values.env
 REMOTE
 echo "UPLOADED $revision"
 LOCAL
 ```
 
-**Block 2.** On the VPS: record the revision, and start `deploy-release bootstrap` from the uploaded `tools` clone, in a transient unit that writes to `/var/lib/harbor-install/bootstrap.log`. `bootstrap` downloads the pinned Node, Codex and pnpm files, checks their SHA-256 values, builds the release as a transient unprivileged user, and stages it under `/opt/harbor-personal/releases`:
+**Block 2.** On the VPS: check that the upload is complete, at the revision that block 1 recorded, and start `deploy-release bootstrap` from the uploaded `tools` clone, in a transient unit that writes to `/var/lib/harbor-install/bootstrap.log`. `bootstrap` downloads the pinned Node, Codex and pnpm files, checks their SHA-256 values, builds the release as a transient unprivileged user, and stages it under `/opt/harbor-personal/releases`:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+set -a; . /var/lib/harbor-install/values.env; set +a
 unit=harbor-install-bootstrap.service
 incoming=/var/lib/harbor-deploy/incoming/bootstrap
 if [ "$(systemctl show -p LoadState --value "$unit")" != not-found ]; then echo "STOP: $unit already exists; run block 3"; exit 1; fi
-revision=$(git -C "$incoming/tools" rev-parse HEAD)
-sed -i '/^REVISION=/d' /var/lib/harbor-install/values.env
-printf "REVISION='%s'\n" "$revision" >> /var/lib/harbor-install/values.env
+revision=${REVISION:-}
+if [ -z "$revision" ] || [ ! -s "$incoming/harbor.bundle" ] || [ "$(git -C "$incoming/tools" rev-parse HEAD 2>/dev/null)" != "$revision" ] || [ -n "$(git -C "$incoming/tools" --no-optional-locks status --porcelain 2>/dev/null || echo unknown)" ]; then
+  echo "STOP: the upload is incomplete; run block 1 again"
+  exit 1
+fi
 systemd-run --unit="$unit" -p RemainAfterExit=yes -p StandardOutput=truncate:/var/lib/harbor-install/bootstrap.log /usr/bin/python3 "$incoming/tools/infra/personal-vps/deploy-release" bootstrap --bundle "$incoming/harbor.bundle" --revision "$revision"
 echo "started $unit for revision $revision"
 REMOTE
@@ -517,11 +650,15 @@ REMOTE
 **Block 3.** Wait for the build, which takes several minutes. Run this block again while it prints `WAIT`:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 unit=harbor-install-bootstrap.service
 log=/var/lib/harbor-install/bootstrap.log
 end=$((SECONDS + 480))
-while [ "$(systemctl show -p SubState --value "$unit")" = running ] && [ "$SECONDS" -lt "$end" ]; do sleep 15; done
+beat=$((SECONDS + 40))
+while [ "$(systemctl show -p SubState --value "$unit")" = running ] && [ "$SECONDS" -lt "$end" ]; do
+  sleep 15
+  if [ "$SECONDS" -ge "$beat" ]; then echo "still waiting after $SECONDS seconds: the build is running"; beat=$((SECONDS + 40)); fi
+done
 load=$(systemctl show -p LoadState --value "$unit")
 state=$(systemctl show -p SubState --value "$unit")
 status=$(systemctl show -p ExecMainStatus --value "$unit")
@@ -557,12 +694,12 @@ REMOTE
 
 **Expect:**
 
-- Block 1 ends with `UPLOADED` and the full SHA of `origin/main`, and block 2 prints the same revision.
+- Block 1 prints `saved revision:` with the revision in `~/harbor-install-log/guide-revision.txt`, and ends with `UPLOADED` and the same revision, even when `origin/main` has moved on since you saved the guide. When it finds an earlier upload, it also prints `replacing the upload that an earlier run of this block left`. Block 2 prints `started harbor-install-bootstrap.service for revision` with the same revision.
 - For a new build, block 3 prints four `Downloading` lines and four `Verified` lines, one each for `node-v24.11.1-linux-x64.tar.xz`, `codex-0.153.4-linux-x64.tgz`, `pnpm-12.3.4.tgz` and `exe.linux-x64-12.3.4.tgz`. Then it prints `Building` with the revision, and `Staged /opt/harbor-personal/releases/bootstrap-` followed by the first 12 characters of the revision. The JSON line has `release`, `revision`, `archiveSha256`, `fileCount`, `manifestSha256` and `"reused": false`.
 - When an earlier attempt already staged the release, `bootstrap` verifies it against the revision and reuses it, without downloading or building. Block 3 then prints one `[deploy]` line, `Release already staged and verified:` with the path, and the JSON line has only `release` and `"reused": true`.
 - The last line is `release /opt/harbor-personal/releases/bootstrap-` with the revision's first 12 characters, and the manifest SHA-256.
 
-**If not:** Stop. `bootstrap` refuses before it writes anything when the host has an instance configuration, when its staging directory exists, or when a filesystem that it writes to lacks space. [Recovery](#recovery) covers a refusal or a failed build.
+**If not:** Stop. If block 1 stops because the saved revision is not `origin/main` or one of its ancestors, `main` was rewritten after you saved the guide; the owner decides how to continue. `bootstrap` refuses before it writes anything when the host has an instance configuration, when its staging directory exists, or when a filesystem that it writes to lacks space. [Recovery](#recovery) covers a refusal or a failed build.
 
 ### Step 6. Service account
 
@@ -573,7 +710,7 @@ REMOTE
 **Run:**
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 getent passwd "$SERVICE_USER" >/dev/null || useradd --system --no-create-home --user-group --shell /usr/sbin/nologin "$SERVICE_USER"
 id "$SERVICE_USER"
@@ -596,7 +733,7 @@ REMOTE
 **Check:** Run the progress block. If it lists `step 7 done`, go to step 8. Otherwise, run this read-only block. It also prints the exact commands that the Run block runs:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 echo "$PROJECTS: $([ -d "$PROJECTS" ] && echo exists || echo missing)"
 echo "ACL backup: $([ -e /var/lib/harbor-install/root-acl-before.txt ] && echo exists || echo missing)"
@@ -618,7 +755,7 @@ REMOTE
 **Block 2.** After the owner's yes, apply the ACLs and check them as the service account:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 backup=/var/lib/harbor-install/root-acl-before.txt
 [ -d "$PROJECTS" ] || install -d -o root -g root -m 0700 "$PROJECTS"
@@ -661,7 +798,7 @@ To undo the ACL change later, the owner can run `setfacl --restore=/var/lib/harb
 **Check:** Run the progress block. If it lists `step 8 done`, go to step 9. Otherwise, run this read-only block:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 for path in /etc/harbor-personal-onboarding/google-client.json "$OIDC_SECRET_FILE" /etc/systemd/system/harbor-personal-enroll.service /var/lib/harbor-install/enroll-route.json /var/lib/harbor-personal-onboarding/owner.json /var/lib/harbor-install/owner.json; do
   echo "$path: $([ -e "$path" ] && echo present || echo absent)"
@@ -686,14 +823,14 @@ REMOTE
 ```bash
 bash -euo pipefail -s <<'LOCAL'
 CLIENT_JSON='CHANGE-ME'
-vps() { ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s'; }
+vps() { ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s'; }
 [ "$CLIENT_JSON" != CHANGE-ME ] || { echo "STOP: set CLIENT_JSON to the path that the owner gave"; exit 1; }
 case "$CLIENT_JSON" in "~/"*) CLIENT_JSON="$HOME/${CLIENT_JSON#"~/"}" ;; esac
 [ -f "$CLIENT_JSON" ] || { echo "STOP: $CLIENT_JSON is not a file"; exit 1; }
 vps <<'REMOTE'
 install -d -m 0700 /etc/harbor-personal-onboarding /etc/harbor-personal-oidc
 REMOTE
-scp -q -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes "$CLIENT_JSON" harbor-vps:/etc/harbor-personal-onboarding/google-client.json </dev/null
+scp -q -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 "$CLIENT_JSON" harbor-vps:/etc/harbor-personal-onboarding/google-client.json </dev/null
 vps <<'REMOTE'
 chmod 0600 /etc/harbor-personal-onboarding/google-client.json
 stat -c '%n %U %a %s bytes' /etc/harbor-personal-onboarding/google-client.json
@@ -704,7 +841,7 @@ LOCAL
 **Block 2.** On the VPS: check the client file without printing its secret, write the secret alone to the secret file, record the client ID, then pull PostgreSQL and record the image with its digest:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 python3 - <<'PY'
 import json
@@ -747,10 +884,10 @@ echo "postgres image $POSTGRES_TAG@$digest"
 REMOTE
 ```
 
-**Block 3.** Create the `harbor-enroll` account, the enrollment configuration, the temporary unit `harbor-personal-enroll.service` and the temporary route. Start the route, then the service, and wait up to three minutes for the route to answer with a verified certificate. When the service is not running, the block first removes a start URL that an earlier, stopped run left behind. The service runs the enrollment helper from the new release. Through `LoadCredential=`, systemd gives it read access to root-owned copies of its configuration and the client file, and it writes only to its private state directory. The route copies the installer's routing carrier, with its own Compose project and router, `harbor-enroll-seekworld`:
+**Block 3.** Create the `harbor-enroll` account, the enrollment configuration, the temporary unit `harbor-personal-enroll.service` and the temporary route. Start the route, then the service, and wait about three minutes, 36 attempts, for the route to answer over a verified certificate with the enrollment helper's own `404` and body `Not found`. Traefik's own `404 page not found` means that the route is not in place yet. When the service is not running, the block first removes a start URL that an earlier, stopped run left behind. The service runs the enrollment helper from the new release. Through `LoadCredential=`, systemd gives it read access to root-owned copies of its configuration and the client file, and it writes only to its private state directory. The route copies the installer's routing carrier, with its own Compose project and router, `harbor-enroll-seekworld`:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 [ ! -e /var/lib/harbor-personal-onboarding/owner.json ] || { echo "STOP: the enrollment already has a result; run block 5"; exit 1; }
 if [ "$(systemctl show -p SubState --value harbor-personal-enroll.service)" != running ]; then rm -f /var/lib/harbor-personal-onboarding/start-url; fi
@@ -815,42 +952,52 @@ systemctl daemon-reload
 docker compose -f /var/lib/harbor-install/enroll-route.json config --quiet </dev/null
 docker compose -f /var/lib/harbor-install/enroll-route.json up -d </dev/null
 systemctl start harbor-personal-enroll.service
-code=none
+answer=none
+beat=$((SECONDS + 40))
 for attempt in $(seq 1 36); do
-  code=$(curl -sS -o /dev/null -w '%{http_code}' "$ORIGIN/enroll/invalid" 2>/dev/null || true)
-  [ "$code" = 404 ] && break
+  answer=$(curl -sS --max-time 5 -w ' %{http_code}' "$ORIGIN/enroll/invalid" 2>/dev/null || true)
+  [ "$answer" = 'Not found 404' ] && break
   if [ "$(systemctl show -p SubState --value harbor-personal-enroll.service)" != running ]; then
     journalctl -u harbor-personal-enroll.service -n 20 --no-pager || true
     echo "STOP: the enrollment service is not running"
     exit 1
   fi
+  if [ "$SECONDS" -ge "$beat" ]; then echo "still waiting after $SECONDS seconds: the route answered '${answer:0:80}'"; beat=$((SECONDS + 40)); fi
   sleep 5
 done
-[ "$code" = 404 ] || { echo "STOP: $ORIGIN/enroll/invalid did not return 404 with a verified certificate (last answer: $code)"; exit 1; }
-echo "the enrollment route answers 404 with a verified certificate"
+[ "$answer" = 'Not found 404' ] || { echo "STOP: $ORIGIN/enroll/invalid did not answer 404 Not found over a verified certificate (last answer: '${answer:0:200}')"; exit 1; }
+echo "the enrollment route answers 404 Not found over a verified certificate"
 for attempt in $(seq 1 30); do [ -f /var/lib/harbor-personal-onboarding/start-url ] && break; sleep 2; done
 [ -f /var/lib/harbor-personal-onboarding/start-url ] || { echo "STOP: the enrollment service wrote no start URL"; exit 1; }
 echo "START URL, FOR THE OWNER ONLY: $(cat /var/lib/harbor-personal-onboarding/start-url)"
 REMOTE
 ```
 
-**Block 4, the owner.** Give the start URL only to the owner, and keep it out of your log. The owner opens it within 30 minutes and signs in with the Google account of `OWNER_EMAIL`. The page then says "Your account is verified. You can close this page; Harbor setup will continue."
+**Block 4, the owner.** Give the start URL only to the owner, and keep it out of your log. The owner opens it within about 25 minutes of receiving it, signs in with the Google account of `OWNER_EMAIL`, and finishes signing in within 10 minutes of opening it. The limits come from `infra/personal-vps/enroll-owner.ts`: the service's limit of 1800 seconds starts when the service starts, a few minutes before block 3 prints the link, and each sign-in attempt lasts 10 minutes. The page then says "Your account is verified. You can close this page; Harbor setup will continue."
 
 **Block 5.** Wait for the result. Run this block again while it prints `WAIT`:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 result=/var/lib/harbor-personal-onboarding/owner.json
 state() { systemctl show -p SubState --value harbor-personal-enroll.service; }
 end=$((SECONDS + 480))
-while [ ! -f "$result" ] && [ "$(state)" = running ] && [ "$SECONDS" -lt "$end" ]; do sleep 10; done
+beat=$((SECONDS + 40))
+while [ ! -f "$result" ] && [ "$(state)" = running ] && [ "$SECONDS" -lt "$end" ]; do
+  sleep 10
+  if [ "$SECONDS" -ge "$beat" ]; then echo "still waiting after $SECONDS seconds: the owner has not signed in yet"; beat=$((SECONDS + 40)); fi
+done
 if [ ! -f "$result" ]; then
   if [ "$(state)" = running ]; then echo "WAIT: the owner has not signed in yet; run this block again"; exit 0; fi
   echo "STOP: the enrollment service ended ($(state)) without a result; see Recovery"
   exit 1
 fi
-for attempt in $(seq 1 30); do [ "$(state)" != running ] && break; sleep 2; done
+for attempt in $(seq 1 30); do
+  [ "$(state)" != running ] && break
+  if [ "$SECONDS" -ge "$beat" ]; then echo "still waiting after $SECONDS seconds: the enrollment service is stopping after writing its result"; beat=$((SECONDS + 40)); fi
+  sleep 2
+done
 [ "$(state)" != running ] || { echo "STOP: the enrollment service still runs after writing its result"; exit 1; }
 python3 - <<'PY'
 import json
@@ -868,10 +1015,10 @@ REMOTE
 **Block 6.** Remove the temporary route, the unit, the `harbor-enroll` account and the enrollment files. The secret file keeps the only other copy of the client secret:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
-test -s /var/lib/harbor-install/owner.json
-test -s "$OIDC_SECRET_FILE"
+[ -s /var/lib/harbor-install/owner.json ] || { echo "STOP: /var/lib/harbor-install/owner.json is missing or empty; run block 5"; exit 1; }
+[ -s "$OIDC_SECRET_FILE" ] || { echo "STOP: $OIDC_SECRET_FILE is missing or empty"; exit 1; }
 [ -n "${OIDC_CLIENT_ID:-}" ] || { echo "STOP: the client ID is not recorded"; exit 1; }
 [ "$(systemctl show -p SubState --value harbor-personal-enroll.service)" != running ] || { echo "STOP: the enrollment service is running"; exit 1; }
 if [ -f /var/lib/harbor-install/enroll-route.json ]; then
@@ -892,7 +1039,7 @@ REMOTE
 
 - Block 1 prints `/etc/harbor-personal-onboarding/google-client.json root 600` and the file's size.
 - Block 2 prints `redirect URI https://harbor.seekworld.tech/auth/callback is listed in the file`, `secret file /etc/harbor-personal-oidc/seekworld.secret mode 0o600`, the client ID, and `postgres image postgres:17.6-bookworm@sha256:` followed by 64 hexadecimal characters. If the redirect URI is not listed, the file may be older than the URI: ask the owner to confirm that the client's authorized redirect URIs contain it exactly, then continue.
-- Block 3 prints `the enrollment route answers 404 with a verified certificate` and the start URL.
+- Block 3 prints `the enrollment route answers 404 Not found over a verified certificate` and the start URL. While it waits, a last answer of `000` means that no verified HTTPS connection was made yet.
 - Block 5 prints `enrolled`, the owner's email and `https://accounts.google.com`, then the copy line.
 - Block 6 prints the removal line.
 
@@ -907,7 +1054,7 @@ REMOTE
 **Run:** List the release's bundled models in a scratch home, record them, write the configuration with a short Python block, and validate it:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 cd /
 config=/var/lib/harbor-install/$INSTANCE.json
@@ -981,7 +1128,7 @@ REMOTE
 **Run:** Render the private bundle to `/var/lib/harbor-install/bundle`, unless an earlier attempt already rendered it. Then install, with a scratch home:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 cd /
 config=/var/lib/harbor-install/$INSTANCE.json
@@ -999,7 +1146,7 @@ echo "step 10 done $(date -u +%FT%TZ)" >> /var/lib/harbor-install/progress
 REMOTE
 ```
 
-**Expect:** `Rendered private candidate bundle. No host services changed.`, then `Fresh instance installed but not started. Complete native device login, then enable/start the three generated units.`
+**Expect:** `Rendered private candidate bundle. No host services changed.`, or, when an earlier attempt already rendered the bundle, `keeping the bundle that an earlier attempt rendered`. Then `Fresh instance installed but not started. Complete native device login, then enable/start the three generated units.`
 
 **If not:** Stop, and do not run the block again. A failed install leaves its paths for the owner; see [Recovery](#recovery).
 
@@ -1009,20 +1156,29 @@ REMOTE
 
 **Check:** Run the progress block. If it lists `step 11 done`, go to step 12. The Run block writes the same bytes each time, so it is safe to run again.
 
-**Run:** Write the two `20-project-writes.conf` drop-ins. They reset the writable paths of the API and the supervisor to the three private state directories and exactly `/root/Projects`. `ProtectHome=read-only` still comes from the generated units:
+**Run:** Write the two `20-project-writes.conf` drop-ins. They reset the writable paths of the API and the supervisor to the three private state directories and exactly `/root/Projects`. `ProtectHome=read-only` still comes from the generated units. With the previous installation's values, instance `seekworld` and `/root/Projects`, the block stops unless both files have that installation's SHA-256; no hash is recorded for other values:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 state=/var/lib/harbor-personal-$INSTANCE
 paths="$state/home $state/codex-home $state/control $PROJECTS"
+recorded=
+if [ "$INSTANCE" = seekworld ] && [ "$PROJECTS" = /root/Projects ]; then recorded=f4cc28a6d4a95d94026bd3e35ae7325bb1856384127de9488339abb2a205871d; fi
 for role in api supervisor; do
   directory=/etc/systemd/system/harbor-personal-$INSTANCE-$role.service.d
   install -d -m 0755 "$directory"
   printf '[Service]\nReadWritePaths=\nReadWritePaths=%s\n' "$paths" > "$directory/20-project-writes.conf"
   chmod 0644 "$directory/20-project-writes.conf"
-  echo "$(sha256sum < "$directory/20-project-writes.conf" | cut -d ' ' -f 1) $(wc -c < "$directory/20-project-writes.conf") bytes $directory/20-project-writes.conf"
+  hash=$(sha256sum < "$directory/20-project-writes.conf" | cut -d ' ' -f 1)
+  echo "$hash $(wc -c < "$directory/20-project-writes.conf") bytes $directory/20-project-writes.conf"
+  if [ -n "$recorded" ] && [ "$hash" != "$recorded" ]; then echo "STOP: the $role drop-in does not have the recorded SHA-256 $recorded"; exit 1; fi
 done
+if [ -n "$recorded" ]; then
+  echo "both drop-ins have the recorded SHA-256"
+else
+  echo "no SHA-256 is recorded for INSTANCE=$INSTANCE and PROJECTS=$PROJECTS; keep the hashes above in your log"
+fi
 systemctl daemon-reload
 for role in api supervisor; do
   shown=$(systemctl show -p ReadWritePaths "harbor-personal-$INSTANCE-$role.service")
@@ -1033,7 +1189,7 @@ echo "step 11 done $(date -u +%FT%TZ)" >> /var/lib/harbor-install/progress
 REMOTE
 ```
 
-**Expect:** Both files are 185 bytes, with SHA-256 `f4cc28a6d4a95d94026bd3e35ae7325bb1856384127de9488339abb2a205871d`, the hash of the previous installation's drop-ins. That hash holds for instance `seekworld` with `/root/Projects`. Both units show `ReadWritePaths=/var/lib/harbor-personal-seekworld/home /var/lib/harbor-personal-seekworld/codex-home /var/lib/harbor-personal-seekworld/control /root/Projects`.
+**Expect:** Both files are 185 bytes, with SHA-256 `f4cc28a6d4a95d94026bd3e35ae7325bb1856384127de9488339abb2a205871d`, the hash of the previous installation's drop-ins, and the block prints `both drop-ins have the recorded SHA-256`. That hash holds only for instance `seekworld` with `/root/Projects`; with other values, the block prints `no SHA-256 is recorded` and the new hashes instead. Both units show `ReadWritePaths=/var/lib/harbor-personal-seekworld/home /var/lib/harbor-personal-seekworld/codex-home /var/lib/harbor-personal-seekworld/control /root/Projects`.
 
 **If not:** Stop.
 
@@ -1044,7 +1200,7 @@ REMOTE
 **Check:** Run the progress block. If it lists `step 12 done`, go to step 13. Otherwise, run this read-only block:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 echo "auth.json: $([ -s "/var/lib/harbor-personal-$INSTANCE/codex-home/auth.json" ] && echo present || echo absent)"
 echo "login unit: $(systemctl show -p LoadState -p SubState -p ExecMainStatus harbor-install-login.service | tr '\n' ' ')"
@@ -1060,7 +1216,7 @@ REMOTE
 **Block 1.** Start `harbor-personal login` in a transient unit that writes to `/var/lib/harbor-install/login.log`, and print the device code:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 unit=harbor-install-login.service
 log=/var/lib/harbor-install/login.log
@@ -1082,13 +1238,17 @@ REMOTE
 **Block 3.** Wait for the login. Run this block again while it prints `WAIT`:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 unit=harbor-install-login.service
 log=/var/lib/harbor-install/login.log
 auth=/var/lib/harbor-personal-$INSTANCE/codex-home/auth.json
 end=$((SECONDS + 480))
-while [ "$(systemctl show -p SubState --value "$unit")" = running ] && [ "$SECONDS" -lt "$end" ]; do sleep 10; done
+beat=$((SECONDS + 40))
+while [ "$(systemctl show -p SubState --value "$unit")" = running ] && [ "$SECONDS" -lt "$end" ]; do
+  sleep 10
+  if [ "$SECONDS" -ge "$beat" ]; then echo "still waiting after $SECONDS seconds: the owner has not finished the login"; beat=$((SECONDS + 40)); fi
+done
 load=$(systemctl show -p LoadState --value "$unit")
 state=$(systemctl show -p SubState --value "$unit")
 status=$(systemctl show -p ExecMainStatus --value "$unit")
@@ -1112,7 +1272,7 @@ REMOTE
 **Block 4.** List the signed-in models as the service account, with the instance's homes, and stop if one of them is missing from the configuration. Then remove only the `plugins`, `plugins-clone-*` and `git-*` entries in `codex-home/.tmp`. The Codex login may leave them, and Harbor's runtimes never use them, because they turn the plugins feature off:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 cd /
 state=/var/lib/harbor-personal-$INSTANCE
@@ -1147,7 +1307,7 @@ REMOTE
 - Block 3 prints `Successfully logged in; auth.json: harbor-personal, mode 600,` and a size.
 - Block 4 prints the model lists without `STOP`, and the size of `codex-home` before and after.
 
-**If not:** Stop. If a signed-in model is missing from the configuration, the fix before the first start is a teardown and reinstall, which is the owner's decision. For an expired code, see [Recovery](#recovery). If Codex says that device code login is not enabled, the owner turns it on in ChatGPT's security settings; then follow the Recovery case for an expired code.
+**If not:** Stop. If a signed-in model is missing from the configuration, the fix before the first start is a teardown and reinstall, which is the owner's decision. For an expired code, see [Recovery](#recovery). If Codex says that device code login is not enabled, it must be turned on: for a personal account, the owner turns it on in ChatGPT's security settings; for a ChatGPT workspace account, a workspace admin turns on device code login in the workspace's permissions. Then follow the Recovery case for an expired code.
 
 ### Step 13. Start
 
@@ -1158,7 +1318,7 @@ REMOTE
 **Run:**
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 name=harbor-personal-$INSTANCE
 systemctl enable --now "$name-dependencies.service" "$name-api.service" "$name-supervisor.service"
@@ -1181,14 +1341,18 @@ REMOTE
 
 **Where:** the VPS, then the owner.
 
-**Check:** Run the progress block. If it lists `step 14 done`, go to step 15. The checks are read-only, apart from the canary folder, which block 1 creates once.
+**Check:** Run the progress block. If it lists `step 14 done`, go to step 15. The checks are not strictly read-only:
+
+- block 1 creates the canary folder once;
+- its `/auth/login` request adds a login state row to Harbor's database, which expires after 10 minutes;
+- `preflight` writes under `/nonexistent`, as rule 5 says.
 
 **Run:**
 
-**Block 1.** Check the instance, run the read-only `preflight`, and create a canary project folder:
+**Block 1.** Check the instance, run `preflight`, and create a canary project folder:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 cd /
 name=harbor-personal-$INSTANCE
@@ -1212,9 +1376,11 @@ anonymous=$(curl -sS -o /dev/null -w '%{http_code}' "$ORIGIN/")
 echo "anonymous /: $anonymous"
 [ "$anonymous" = 401 ] || { echo "STOP: an anonymous request was not refused with 401"; exit 1; }
 preview=none
+beat=$((SECONDS + 40))
 for attempt in $(seq 1 36); do
-  preview=$(curl -sS -o /dev/null -w '%{http_code}' "$PREVIEW_ORIGIN/" 2>/dev/null || true)
+  preview=$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' "$PREVIEW_ORIGIN/" 2>/dev/null || true)
   [ "$preview" = 403 ] && break
+  if [ "$SECONDS" -ge "$beat" ]; then echo "still waiting after $SECONDS seconds: the preview host answered $preview"; beat=$((SECONDS + 40)); fi
   sleep 5
 done
 echo "anonymous preview: $preview"
@@ -1269,7 +1435,7 @@ REMOTE
 **Block 3.** Check the canary. In this block, replace `CHANGE-ME` with the token that the owner reported, then run it:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 REPORTED='CHANGE-ME'
 canary=$PROJECTS/harbor-install-check
@@ -1308,13 +1474,19 @@ REMOTE
 
 ```bash
 bash -euo pipefail -s <<'LOCAL'
-vps() { ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s'; }
+vps() { ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s'; }
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 vps > "$work/values.env" <<'REMOTE'
 cat /var/lib/harbor-install/values.env
 REMOTE
-. "$work/values.env"
+value() {
+  [ "$(grep -c "^$1=" "$work/values.env")" = 1 ] || { echo "STOP: values.env must set $1 exactly once" >&2; return 1; }
+  found=$(sed -n "s/^$1='\(.*\)'\$/\1/p" "$work/values.env")
+  printf '%s\n' "$found" | grep -Eqx -e "$2" || { echo "STOP: $1 in values.env is not $3" >&2; return 1; }
+  printf '%s\n' "$found"
+}
+VPS_ADDRESS=$(value VPS_ADDRESS '([0-9]{1,3}\.){3}[0-9]{1,3}' 'an IPv4 address') || exit 1
 ssh-keygen -F "$VPS_ADDRESS" > "$work/known" || { echo "STOP: known_hosts has no line for $VPS_ADDRESS"; exit 1; }
 echo "known_hosts lines for $VPS_ADDRESS, for the VPS_KNOWN_HOSTS secret:"
 grep -v '^#' "$work/known"
@@ -1335,7 +1507,7 @@ LOCAL
 **Block 3.** Check the deploy key's line on the VPS without printing keys:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 keys=/root/.ssh/authorized_keys
 deploy=$(grep -c 'harbor-github-deploy' "$keys" || true)
 restricted=$(grep -c '^restrict .*harbor-github-deploy' "$keys" || true)
@@ -1346,13 +1518,15 @@ echo "DEPLOY KEY OK"
 REMOTE
 ```
 
-**Block 4.** Run the read-only `preflight` workflow, if the GitHub CLI is installed and signed in. Otherwise the block prints `OWNER`: ask the owner to run **Deploy personal VPS** with `preflight` from the Actions tab and to tell you the run's link and result, then record them in your log and run block 5. The block starts one run, keeps its ID in `~/harbor-install-log/preflight-run.txt`, and waits for it. Run the block again while it prints `WAIT`; it does not start a second run. A run whose status is `waiting` needs a reviewer: ask the owner to approve it.
+**Block 4.** Run the `preflight` workflow, if the GitHub CLI is installed and signed in. Otherwise the block prints `OWNER`: ask the owner to run **Deploy personal VPS** with `preflight` from the Actions tab and to tell you the run's link and result, then record them in your log and run block 5. The workflow uploads its own copy of the source and removes it afterwards; apart from that and the `/nonexistent` tree that rule 5 names, `preflight` changes nothing. The block starts one run, keeps its ID in `~/harbor-install-log/preflight-run.txt`, and waits for it. Run the block again while it prints `WAIT`; it does not start a second run. A run whose status is `waiting` needs a reviewer: ask the owner to approve it.
 
 ```bash
 bash -euo pipefail -s <<'LOCAL'
-vps() { ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s'; }
+vps() { ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s'; }
 record="$HOME/harbor-install-log/preflight-run.txt"
 if ! command -v gh >/dev/null || ! gh auth status >/dev/null 2>&1 </dev/null; then echo "OWNER: run the preflight action from the Actions tab"; exit 0; fi
+end=$((SECONDS + 480))
+beat=$((SECONDS + 40))
 if [ ! -s "$record" ]; then
   before=$(gh run list --workflow deploy-vps.yml --limit 1 --json databaseId --jq '.[0].databaseId // 0' </dev/null)
   gh workflow run deploy-vps.yml --ref main -f action=preflight </dev/null
@@ -1361,17 +1535,18 @@ if [ ! -s "$record" ]; then
     sleep 5
     run=$(gh run list --workflow deploy-vps.yml --event workflow_dispatch --limit 10 --json databaseId --jq "[.[] | select(.databaseId > $before)] | last | .databaseId // empty" </dev/null)
     [ -z "$run" ] || break
+    if [ "$SECONDS" -ge "$beat" ]; then echo "still waiting after $SECONDS seconds: the preflight run has not appeared yet"; beat=$((SECONDS + 40)); fi
   done
   [ -n "$run" ] || { echo "STOP: the preflight run did not appear within a minute"; exit 1; }
   echo "$run" > "$record"
 fi
 run=$(cat "$record")
 url=$(gh run view "$run" --json url --jq .url </dev/null)
-end=$((SECONDS + 480))
 status=$(gh run view "$run" --json status --jq .status </dev/null)
 while [ "$status" != completed ] && [ "$SECONDS" -lt "$end" ]; do
   sleep 15
   status=$(gh run view "$run" --json status --jq .status </dev/null)
+  if [ "$SECONDS" -ge "$beat" ]; then echo "still waiting after $SECONDS seconds: the preflight run is $status"; beat=$((SECONDS + 40)); fi
 done
 if [ "$status" != completed ]; then echo "WAIT: the preflight run $url is $status; run this block again"; exit 0; fi
 conclusion=$(gh run view "$run" --json conclusion --jq .conclusion </dev/null)
@@ -1386,7 +1561,7 @@ LOCAL
 **Block 5.** Only after the owner reported a successful preflight run from the Actions tab, record the step:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 echo "step 15 done $(date -u +%FT%TZ) preflight run by the owner" >> /var/lib/harbor-install/progress
 REMOTE
 ```
@@ -1403,12 +1578,18 @@ REMOTE
 
 **Run:**
 
-**Block 1.** Remove the rendered bundle, the uploaded source and any scratch home left behind, and write the record:
+**Block 1.** Remove the rendered bundle, the uploaded source and any scratch home left behind, report the `/nonexistent` tree that stays, and write the record:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 rm -rf -- /var/lib/harbor-install/bundle /var/lib/harbor-deploy/incoming/bootstrap /var/lib/harbor-install/scratch-home
+if [ -e /nonexistent ]; then
+  echo "left in place: /nonexistent, which the release check of deploy-release created:"
+  find /nonexistent -maxdepth 3 -printf '%M %u %p\n' | sort -k 3
+else
+  echo "no /nonexistent tree"
+fi
 python3 - <<'PY'
 import datetime
 import json
@@ -1451,10 +1632,11 @@ Fresh VPS install finished on DATE (UTC), from the guide at REVISION.
 - Steps 13 and 14: all checks passed, and preflight verified the release.
 - Owner checks: sign-in, project registration and the canary conversation passed.
 - GitHub Actions: the preflight run's link and result, or not run.
+- Left in place: /nonexistent, from the release check of deploy-release, as block 1 listed it.
 - Stops, deviations and anything left for the owner: none, or each one.
 ```
 
-**Expect:** The record, then a listing of `/var/lib/harbor-install` with `values.env`, `progress`, `record.json`, `seekworld.json`, `owner.json`, `root-acl-before.txt`, `ssh-acl-before.txt`, `preflight.json` and `bootstrap.log`, and no `bundle` or `scratch-home`. Keep these files: the ACL backup reverses step 7, and the rest records the installation.
+**Expect:** `left in place: /nonexistent` with its entries, root-owned, such as `.codex/tmp/arg0` and `.local/share/pnpm`; the guide does not remove this tree, as rule 5 says. Then the record, then a listing of `/var/lib/harbor-install` with `values.env`, `progress`, `record.json`, `seekworld.json`, `owner.json`, `root-acl-before.txt`, `ssh-acl-before.txt`, `preflight.json` and `bootstrap.log`, and no `bundle` or `scratch-home`. Keep these files: the ACL backup reverses step 7, and the rest records the installation.
 
 **If not:** Stop.
 
@@ -1462,12 +1644,12 @@ Fresh VPS install finished on DATE (UTC), from the guide at REVISION.
 
 A failed step leaves state behind. Removing an instance's paths is always the owner's decision, and this guide never removes instance state. Report what remains, and continue only after the owner decides.
 
-**The enrollment link expired.** The helper stops after 30 minutes and removes the start URL. Its unit, route and configuration remain, and no result exists. Run step 8's block 3 again: it starts the service, which writes a new link. If the owner signed in with another Google account, the page says that the sign-in could not be verified; the owner opens the same link again and chooses the enrolled account.
+**The enrollment link expired.** The helper stops 30 minutes after its service started, and removes the start URL. Its unit, route and configuration remain, and no result exists. Run step 8's block 3 again: it starts the service, which writes a new link. If the owner took more than 10 minutes to sign in, or signed in with another Google account, the page says that the sign-in could not be verified; while the service runs, the owner opens the same link again and signs in with the enrolled account.
 
 **The device code expired, or the login failed.** The code expires 15 minutes after Codex printed it. The failed login unit remains, and no `auth.json` exists. Clear the unit with this block, then run step 12's block 1 again for a new code:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 unit=harbor-install-login.service
 systemctl stop "$unit" 2>/dev/null || true
 systemctl reset-failed "$unit" 2>/dev/null || true
@@ -1481,7 +1663,7 @@ Expect `LoadState=not-found`.
 **The build failed.** `bootstrap` removes its staging directory, its inputs and its build state on every exit. If it could not remove the staging directory, its log names that directory after `Could not remove the partial staging directory`, and the directory is the owner's to inspect. A refusal before the build changes nothing. After the owner fixes the cause, such as free space or network access, clear the unit with this block, then run step 5's blocks 2 and 3 again:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 unit=harbor-install-bootstrap.service
 [ "$(systemctl show -p SubState --value "$unit")" != running ] || { echo "STOP: the build is still running; run step 5's block 3"; exit 1; }
 systemctl stop "$unit" 2>/dev/null || true
@@ -1496,9 +1678,9 @@ Expect `LoadState=not-found`, and no `.staging-` entry.
 **The install failed partway.** The installer refuses to overwrite its own paths, so a second attempt cannot repair a partial install. What remains may include `/etc/harbor-personal-seekworld`, `/var/lib/harbor-personal-seekworld`, the three unit files in `/etc/systemd/system`, and the AppArmor profile file in `/etc/apparmor.d` with its loaded profile. This read-only block lists them for the owner:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 shopt -s nullglob
-for path in /etc/harbor-personal-seekworld /var/lib/harbor-personal-seekworld /etc/systemd/system/harbor-personal-seekworld* /etc/apparmor.d/harbor-personal-seekworld*; do echo "remains: $path"; done
+for path in /etc/harbor-personal-seekworld /var/lib/harbor-personal-seekworld /etc/systemd/system/harbor-personal-seekworld* /etc/apparmor.d/harbor-personal-seekworld*; do if [ -e "$path" ]; then echo "remains: $path"; fi; done
 grep -h 'harbor-personal' /sys/kernel/security/apparmor/profiles || echo "no loaded Harbor AppArmor profile"
 REMOTE
 ```
@@ -1508,9 +1690,9 @@ Stop there. Whether to remove these paths is the owner's decision.
 **Let's Encrypt refused a certificate.** A route's HTTPS check fails because Traefik has no valid certificate for the host. Read the reason in Traefik's log. For the Traefik that step 4 installed:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
+ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 docker compose -f /opt/traefik/compose.yaml logs --tail 100 traefik </dev/null | grep -i -E 'acme|certificate|error' || echo "no certificate messages in the last 100 lines"
 REMOTE
 ```
 
-A kept Traefik that this guide did not install has its own log; ask the owner. Common causes are a DNS record that points elsewhere, an AAAA record, and a firewall that blocks port 80. After the owner fixes the cause, run the failed block again, once. Let's Encrypt allows only five failed validations per host name per hour, and five certificates for the same names per week, so wait out a limit instead of retrying in a loop. `/opt/traefik/letsencrypt` keeps issued certificates across retries.
+A kept Traefik that this guide did not install has its own log; ask the owner. Common causes are a DNS record that points elsewhere, an AAAA record, and a firewall that blocks port 80. After the owner fixes the cause, run the failed block again, once. Let's Encrypt's [rate limits](https://letsencrypt.org/docs/rate-limits/) allow five failed validations per host name per account per hour, and five certificates for the same set of names every seven days, counted across all accounts, so wait out a limit instead of retrying in a loop. `/opt/traefik/letsencrypt` keeps issued certificates across retries.

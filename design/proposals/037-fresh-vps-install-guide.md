@@ -99,7 +99,7 @@ These were checked on 30 September 2026:
   - A service built from the [Traefik reference](https://doc.traefik.io/traefik/reference/install-configuration/entrypoints/) parsed its flags, redirected port 80 and opened no dashboard port, in a loopback test with no Docker daemon.
 - **Docker.** Ubuntu 24.04's `noble-updates` has `docker.io` 29.1.3 and `docker-compose-v2` 2.40.3. Both put the Compose plugin where `/usr/bin/docker compose` finds it. `docker.io` only suggests Compose, so the guide installs both packages. Docker's own repository ships `docker-ce` 29.8.1 with Compose 5.5.1; its `docker-ce`, `docker-ce-cli` and `containerd.io` packages conflict with Ubuntu's, and both Compose packages ship the same plugin file, so installing Ubuntu's packages on such a host removes Docker's and fails. P037's design reviewer found this in the package indexes on 30 September 2026.
 - **Google.** Since November 2025, [Google shows a client secret only once](https://support.google.com/cloud/answer/15549257). A lost secret is replaced with **Add Secret**, and a client has at most two. Redirect URIs must match exactly. Harbor requests only `openid`, and enrollment only `openid email`. [Google exempts](https://support.google.com/cloud/answer/15549945) those scopes from the Testing status's test-user list.
-- **Codex login.** Device code login is in beta. It must be enabled in ChatGPT's security settings ([Codex authentication](https://learn.chatgpt.com/docs/auth)). The code expires after 15 minutes. The default credential store is a file, so `harbor-personal login` writes `codex-home/auth.json`.
+- **Codex login.** Device code login is in beta. It must be enabled in ChatGPT's security settings for a personal account, or by a workspace admin in the workspace's permissions for a workspace account ([Codex authentication](https://learn.chatgpt.com/docs/auth)). The code expires after 15 minutes. The default credential store is a file, so `harbor-personal login` writes `codex-home/auth.json`.
 - **Enrollment texts.** The earlier enrollment unit and its temporary route were never recorded; only prose describes them. This plan specifies both.
 
 ### Settled decisions
@@ -118,7 +118,7 @@ The owner can change any of these before running the guide. The guide lists them
    Sources: the personal VPS guide's installation history and the [candidate report](../../docs/reports/2026-09-13-personal-vps-candidate.md). The names of the browse root and the preview were not recorded; `VPS root` and `Development app` are new.
 2. **Reverse proxy.** Keep a running Traefik. Otherwise install the pinned Traefik above under `/opt/traefik`, with the HTTP-01 challenge and persisted ACME storage. The deployment design currently says the host's Traefik must be preserved. This plan changes that sentence: an existing Traefik is preserved, and a host without one gets the pinned one.
 3. **Docker.** On a host without Docker, use Ubuntu's `docker.io` and `docker-compose-v2` packages, which need no extra package source. Keep a Docker Engine installed from Docker's own repository (`docker-ce`, `docker-ce-cli`, `containerd.io` and `docker-compose-plugin`), because Ubuntu's packages conflict with it: installing them would remove it and stop its containers. It must pass the same version checks. Stop for the owner on any other Docker installation, such as a snap or an incomplete set of packages. Main amended this decision after review round 1.
-4. **First release.** Build it with `deploy-release bootstrap` from a Git bundle of `origin/main`, made on the owner's computer and uploaded like the workflow's bundle.
+4. **First release.** Build it with `deploy-release bootstrap` from a Git bundle of the `origin/main` revision from which the agent saved the guide, made on the owner's computer and uploaded like the workflow's bundle. Main amended this decision after review round 1.
 5. **Owner subject.** Run the existing enrollment helper from the new release, as a temporary system service with a temporary Traefik route. Remove both after enrollment.
 6. **Codex login.** Use device login through `harbor-personal login`. It runs in a transient unit, so that the agent can read the code, pass it to the owner and wait. Reusing another Codex login is not part of the guide.
 7. **Models.** Configure the bundled list from the release's own Codex. After login and before the first start, the guide compares it with the signed-in list and stops if a signed-in ID is missing.
@@ -196,7 +196,7 @@ The personal VPS guide already requires that conversation, because a version che
 - **Where commands run.** Every host command runs as root through the owner's `harbor-vps` SSH alias, as a quoted here-document to `bash -euo pipefail -s`, so that nothing expands locally. Commands for the owner's computer run in the owner's clone and never change its branch, index or working tree.
 - **Which scripts run.** `bootstrap` runs from a `tools` clone of the uploaded bundle, as the workflow runs `deploy-release`. Every later `harbor-personal` and `deploy-release` command runs from the new release, whose files its manifest covers.
 - **Homes.** Every command that may start Codex runs with `HOME` set to a root-only scratch home under `/var/lib/harbor-install`, which the step removes afterwards. That includes `install`, because it runs the release's `codex --version` with the caller's environment, and Codex may write into its home. The model listings also set `CODEX_HOME` and turn the plugins feature off, as Harbor's runtimes do. The exception is `deploy-release`'s release check, which sets `HOME=/nonexistent` itself and so leaves root-owned directories there; the guide names it, and the [release check issue](../../issues/2026-09-30-103816-release-check-home.md) tracks it.
-- **Long steps.** The first-release build and the Codex login run as transient systemd units that write to a log under `/var/lib/harbor-install`. A dropped SSH connection therefore does not stop them. The agent polls with a bounded loop.
+- **Long steps.** The first-release build and the Codex login run as transient systemd units that write to a log under `/var/lib/harbor-install`. A dropped SSH connection therefore does not stop them. The agent polls with a bounded loop that prints a line at least once a minute. SSH keepalives end a dead connection, and the agent then runs the same block again.
 - **Secrets.** The guide lists the files that hold secrets:
   - the Google client file and the secret file;
   - the rendered bundle;
@@ -255,13 +255,13 @@ The personal VPS guide already requires that conversation, because a version che
    - an email address for Let's Encrypt;
    - the Google web client with the exact redirect URI, and its client JSON saved on the owner's computer. A lost secret is replaced with Add Secret. A new client is created only if none exists;
    - the Google account email to enroll;
-   - device code login enabled in ChatGPT's security settings;
+   - device code login enabled, in ChatGPT's security settings for a personal account or by a workspace admin for a workspace account;
    - time to approve the device code and to open the enrollment link, each within its expiry.
-4. **Values.** One table: the name, value and source of every value used later. Each host step reads them from `/var/lib/harbor-install/values.env`, which step 1 writes. The file holds no secrets.
+4. **Values.** One table: the name, value and source of every value used later. Each host step reads them from `/var/lib/harbor-install/values.env`, which step 1 writes. The file holds no secrets. A block on the owner's computer copies the file and reads each value that it needs from that value's one `KEY='value'` line, checked against a pattern, and never sources the file.
 5. **Steps.** In this order:
    1. **Check the host.**
       - Run the SSH check from `AGENTS.md`. The checks in this step are read-only.
-      - Report: OS, kernel, architecture, cgroup v2, systemd, the AppArmor user-namespace restriction, Docker and Compose versions, running containers, listeners on ports 80, 443, 3347, 3348, 3350 and 5548, free disk space, `ufw` status and whether `/root/Projects` exists.
+      - Report: OS, kernel, architecture, cgroup v2, systemd, the AppArmor user-namespace restriction, Docker and Compose versions, the installed Docker packages and the packages that supply `docker` and `dockerd`, running containers, listeners on ports 80, 443, 3347, 3348, 3350 and 5548, free disk space, `ufw` status and whether `/root/Projects` exists.
       - Also report leftovers:
         - the `harbor-personal` and `harbor-enroll` accounts;
         - `/etc/harbor-personal-*`, `/var/lib/harbor-personal-*`, `/opt/harbor-personal` and `/var/lib/harbor-deploy`;
@@ -269,13 +269,14 @@ The personal VPS guide already requires that conversation, because a version che
         - AppArmor profiles;
         - Harbor containers;
         - ACL entries on `/root` and under `/root/Projects`.
-      - Stop if the host is not Ubuntu 24.04 on x86_64 with systemd and cgroup v2. Stop if any leftover exists and no progress file does; leftovers are the owner's decision.
+      - Stop if the host is not Ubuntu 24.04 on x86_64 with systemd and cgroup v2, or if Docker is installed other than as Ubuntu's `docker.io` or Docker's own Docker Engine packages, as decision 3 describes. Stop if any leftover exists and no progress file does; leftovers are the owner's decision.
       - Then create `/var/lib/harbor-install` with mode `0700`, and write `values.env` and the progress file.
-   2. **DNS (your computer).** Both hosts resolve to the VPS address. Otherwise stop for the owner.
+   2. **DNS (your computer).** Both hosts resolve to the VPS address and have no AAAA record. Otherwise stop for the owner.
    3. **Host packages.** Install `git`, `python3`, `make`, `g++`, `acl`, `curl` and `ca-certificates`. On a host without Docker or with Ubuntu's `docker.io`, also install `docker.io` and `docker-compose-v2`; keep Docker's own packages; stop for any other Docker. Enable Docker. Expect Docker 29 or later, Compose 2.40 or later, and `apparmor_parser`.
    4. **Reverse proxy.**
       - If a Traefik container runs, keep it. Its route is proved in step 8.
       - If something else listens on 80 or 443, stop.
+      - If no Traefik runs and `/opt/traefik` exists, start that Traefik again only when its `compose.yaml` is exactly the file that the guide writes; otherwise stop for the owner.
       - Otherwise:
         - write `/opt/traefik/compose.yaml` with the pinned image and the owner's email;
         - create the ACME directory with mode `0700`;
@@ -287,9 +288,10 @@ The personal VPS guide already requires that conversation, because a version che
         - `git fetch origin main`;
         - check that the revision saved with the guide is `origin/main` or its ancestor;
         - make a bundle of that revision in a temporary directory outside the repository;
-        - upload it to `/var/lib/harbor-deploy/incoming/bootstrap/` and clone `tools` from it there, with the workflow's modes and commands.
+        - upload it to `/var/lib/harbor-deploy/incoming/bootstrap/` and clone `tools` from it there, with the workflow's modes and commands, replacing an incomplete earlier upload unless the build unit exists;
+        - record the revision in `values.env` once the clean `tools` checkout matches it.
       - On the host:
-        - run `tools/infra/personal-vps/deploy-release bootstrap` in a transient unit that writes to a log under `/var/lib/harbor-install`;
+        - check that the upload is complete, then run `tools/infra/personal-vps/deploy-release bootstrap` in a transient unit that writes to a log under `/var/lib/harbor-install`;
         - poll until the unit ends;
         - expect the JSON line, and record the release path in `values.env`.
    6. **Service account.** `useradd --system --no-create-home --user-group --shell /usr/sbin/nologin harbor-personal`. Expect no supplementary groups.
@@ -313,8 +315,8 @@ The personal VPS guide already requires that conversation, because a version che
       - Write the client secret alone, as one line, to `/etc/harbor-personal-oidc/seekworld.secret` with mode `0600`, without printing it.
       - Pull `postgres:17.6-bookworm` and record its digest.
       - Create `harbor-enroll`, `enrollment.json`, the unit and the route. Start the route, then the service.
-      - Poll for up to three minutes until an HTTPS request for `/enroll/invalid` returns 404 with a verified certificate.
-      - Give the start URL only to the owner, who signs in with the enrolled email within 30 minutes.
+      - Poll for up to three minutes until an HTTPS request for `/enroll/invalid` returns the enrollment helper's own 404, with the body `Not found`, over a verified certificate. Traefik's own 404 does not count.
+      - Give the start URL only to the owner, who signs in with the enrolled email. The helper stops 1800 seconds after its service starts, and each sign-in attempt lasts 10 minutes, so the owner opens the link within about 25 minutes and finishes signing in within 10 minutes of opening it.
       - Poll until the result file exists and the service has stopped. Expect the Google issuer and the enrolled email in the result.
       - Copy the result to `/var/lib/harbor-install/owner.json` with mode `0600`. Then remove the route, the unit, the `harbor-enroll` account, `/var/lib/harbor-personal-onboarding` and `/etc/harbor-personal-onboarding`. The secret file keeps the only other copy of the secret.
    9. **Configuration.**
@@ -331,7 +333,7 @@ The personal VPS guide already requires that conversation, because a version che
    10. **Render and install.** Render to `/var/lib/harbor-install/bundle`, then install. Expect each command's success line. After a failed install, stop: its paths are left for the owner.
    11. **Drop-ins.**
        - Write both files with the exact 185 bytes.
-       - Expect SHA-256 `f4cc28a6…871d` for this instance.
+       - For instance `seekworld` with `/root/Projects`, stop unless both have SHA-256 `f4cc28a6…871d`. For other values, report their hashes.
        - Run `systemctl daemon-reload`.
        - Expect `systemctl show -p ReadWritePaths` to list the four paths.
    12. **Codex login.**
@@ -357,7 +359,7 @@ The personal VPS guide already requires that conversation, because a version che
        - The owner stores the secrets and variables.
        - The agent may then run the read-only `preflight` workflow.
    16. **Clean up and record.**
-       - Remove the rendered bundle, `/var/lib/harbor-deploy/incoming/bootstrap` and any scratch home left behind.
+       - Remove the rendered bundle, `/var/lib/harbor-deploy/incoming/bootstrap` and any scratch home left behind. Report the `/nonexistent` tree that the release check leaves, and keep it.
        - Keep the ACL backup, `owner.json`, the configuration, `values.env` and the progress file.
        - Write `record.json`.
        - Give the owner a summary to share in the project thread, so that this plan can record the first run.
@@ -553,6 +555,56 @@ Evidence limits:
 
 - The implementer's and reviewers' raw logs, the scratch releases and the research copies exist only in this cloud container.
 - `/nonexistent`, which this container's release checks created from 03:37 UTC onwards, remains in the container, because a safety check blocked its removal. It disappears with the container.
+
+### Fix round 1, 30 September 2026
+
+The implementer changed only the guide, in the same checkout. The guide now has SHA-256 `93552179…550` and 1,698 lines. The tracked diff against `9ba6d53` is still `4dd63dff…a3b`, so `deploy-release`, its tests and the aligned edits are the ones that round 1 reviewed.
+
+The fixes:
+
+- **Docker.** Step 1 reports the installed Docker packages and the packages that supply `docker` and `dockerd`, and names one of four cases. Step 3 repeats the test. With no Docker or with Ubuntu's `docker.io`, it installs `docker.io` and `docker-compose-v2`. With Docker's own Docker Engine, it installs only the other tools. Any other installation, such as a snap, a mix of both or an incomplete set, stops both steps before `apt-get` runs.
+- **Homes.** Rule 5 names the release check's `/nonexistent` exception. Step 16 reports that tree and keeps it.
+- **DNS.** Step 2 requires removing any AAAA record.
+- **Resuming.** Step 4 starts its own stopped Traefik again only when `compose.yaml` is exactly the file that it writes. Step 5 reports an absent, complete or incomplete upload, replaces an incomplete one unless the build unit exists, and records the revision only after the clean checkout matches it.
+- **Enrollment route.** Step 8 requires the helper's own `404` with the body `Not found`.
+- **Revision.** Step 5 builds the revision saved before step 1, and stops unless that revision is `origin/main` or one of its ancestors.
+- **Nits.**
+  - Every `ssh` and `scp` sets `ServerAliveInterval=30` and `ServerAliveCountMax=4`. Every waiting loop prints a line at least once a minute, and a dropped connection means running the block again.
+  - The owner's checklist gives the enrollment link's real limits and the workspace admin's setting for device code login.
+  - Blocks on the owner's computer read three values from a copy of `values.env` without sourcing it.
+  - Step 11 compares the drop-in hash inside its block. Step 3 names a 20-minute timeout.
+  - The guide has a dated status line and cites its Let's Encrypt limits.
+
+Main accepted three changes beyond its list:
+- a heartbeat in step 8's wait for the enrollment service to stop;
+- a heartbeat in step 15's wait for the preflight run to appear;
+- a Recovery listing that no longer prints paths that do not exist, which the new harness found.
+
+The implementer reported these results:
+
+- **P037-04.** A harness of 623 checks passed. It ran 40 of the guide's 42 Bash blocks whole: their exact text, with only `CHANGE-ME` values filled in and host paths moved under a scratch directory. Fakes stood in for `ssh`, `scp`, `docker`, `systemctl`, `apt-get`, `dpkg-query`, `curl`, `systemd-run`, `useradd`, `runuser` and the other host commands.
+  - Step 9 ran the pinned Codex and `harbor-personal validate` from the P037-03 release, in fresh homes, with the plugins feature off.
+  - Step 7's block 2, which sets the ACLs, and step 10's `install` were checked only for syntax and strings.
+  - The Docker test also ran against the container's real package database and reported `docker-ce`.
+  - `systemd-analyze` verified units built from the guide's two `systemd-run` lines, and the guide's one inline JSON object parsed.
+- **Gate.** `check-docs` passed over 204 files. `git diff --check` and `pnpm check` passed. The 34 unit tests passed.
+
+Main then:
+
+- recomputed the guide's and the tracked diff's SHA-256 values, and compared every fence file with the checkout;
+- reproduced the drop-in text's 185 bytes and its SHA-256;
+- checked in the source four limits: the helper answers an unknown enrollment path with `404` and `Not found`; its 1800 seconds start with the service; a sign-in attempt lasts 10 minutes; and a Harbor login state expires after 10 minutes;
+- checked the implementer's copies of the Let's Encrypt and `docker.io` package pages, and the Codex authentication page;
+- amended this plan to match the fixed guide: decision 4, the Codex login fact, the contracts for long steps and values, and the specification of the owner's checklist and steps 1, 2, 4, 5, 8, 11 and 16;
+- updated the [unverified gates issue](../../issues/2026-09-30-103814-p037-unverified-gates.md) with the blocks that still ran only as text;
+- reran `check-docs` over 204 files, `git diff --check`, the 34 unit tests and `pnpm check` on the result, with these records, and all passed.
+
+Corrections to the round 1 record:
+
+- Only the failed-validation limit applies per account and host name. The duplicate-certificate limit counts certificates from all accounts. The guide says so.
+- The implementer's round 0 report said that "no host" was touched. Its P037-03 builds' release checks added `.local/share/pnpm` and a `.codex/tmp/arg0` entry under this container's `/nonexistent`, as the release check issue records.
+
+In this round the pinned Codex ran only with fresh `HOME` and `CODEX_HOME` directories. The harness, its fixtures and logs, and the fetched pages exist only in this cloud container.
 
 ## Closing record
 
