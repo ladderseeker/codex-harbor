@@ -99,7 +99,7 @@ These were checked on 30 September 2026:
   - A service built from the [Traefik reference](https://doc.traefik.io/traefik/reference/install-configuration/entrypoints/) parsed its flags, redirected port 80 and opened no dashboard port, in a loopback test with no Docker daemon.
 - **Docker.** Ubuntu 24.04's `noble-updates` has `docker.io` 29.1.3 and `docker-compose-v2` 2.40.3. Both put the Compose plugin where `/usr/bin/docker compose` finds it. `docker.io` only suggests Compose, so the guide installs both packages. Docker's own repository ships `docker-ce` 29.8.1 with Compose 5.5.1; its `docker-ce`, `docker-ce-cli` and `containerd.io` packages conflict with Ubuntu's, and both Compose packages ship the same plugin file, so installing Ubuntu's packages on such a host removes Docker's and fails. P037's design reviewer found this in the package indexes on 30 September 2026.
 - **Google.** Since November 2025, [Google shows a client secret only once](https://support.google.com/cloud/answer/15549257). A lost secret is replaced with **Add Secret**, and a client has at most two. Redirect URIs must match exactly. Harbor requests only `openid`, and enrollment only `openid email`. [Google exempts](https://support.google.com/cloud/answer/15549945) those scopes from the Testing status's test-user list.
-- **Codex login.** Device code login is in beta. It must be enabled in ChatGPT's security settings for a personal account, or by a workspace admin in the workspace's permissions for a workspace account ([Codex authentication](https://learn.chatgpt.com/docs/auth)). The code expires after 15 minutes. The default credential store is a file, so `harbor-personal login` writes `codex-home/auth.json`.
+- **Codex login.** Device code login is in beta. It must be enabled in ChatGPT's security settings for a personal account, or by a workspace admin in the workspace's permissions for a workspace account ([Codex authentication](https://learn.chatgpt.com/docs/auth)). The pinned Codex 0.153.4 binary says that the code expires in 15 minutes. That page and Codex's configuration reference name no default credential store. The guide infers that the default is a file, so that `harbor-personal login`, which chooses no store, writes `codex-home/auth.json`, and step 12 stops if that file is missing or empty.
 - **Enrollment texts.** The earlier enrollment unit and its temporary route were never recorded; only prose describes them. This plan specifies both.
 
 ### Settled decisions
@@ -117,7 +117,7 @@ The owner can change any of these before running the guide. The guide lists them
 
    Sources: the personal VPS guide's installation history and the [candidate report](../../docs/reports/2026-09-13-personal-vps-candidate.md). The names of the browse root and the preview were not recorded; `VPS root` and `Development app` are new.
 2. **Reverse proxy.** Keep a running Traefik. Otherwise install the pinned Traefik above under `/opt/traefik`, with the HTTP-01 challenge and persisted ACME storage. The deployment design currently says the host's Traefik must be preserved. This plan changes that sentence: an existing Traefik is preserved, and a host without one gets the pinned one.
-3. **Docker.** On a host without Docker, use Ubuntu's `docker.io` and `docker-compose-v2` packages, which need no extra package source. Keep a Docker Engine installed from Docker's own repository (`docker-ce`, `docker-ce-cli`, `containerd.io` and `docker-compose-plugin`), because Ubuntu's packages conflict with it: installing them would remove it and stop its containers. It must pass the same version checks. Stop for the owner on any other Docker installation, such as a snap or an incomplete set of packages. Main amended this decision after review round 1.
+3. **Docker.** On a host without Docker or with Ubuntu's `docker.io`, use Ubuntu's `docker.io` and `docker-compose-v2` packages, which need no extra package source. Keep a Docker Engine installed from Docker's own repository (`docker-ce`, `docker-ce-cli`, `containerd.io` and `docker-compose-plugin`), because Ubuntu's packages conflict with it: installing them would remove it and stop its containers. It must pass the same version checks. Stop for the owner on any other Docker installation, such as a snap or an incomplete set of packages. Main amended this decision after review round 1.
 4. **First release.** Build it with `deploy-release bootstrap` from a Git bundle of the `origin/main` revision from which the agent saved the guide, made on the owner's computer and uploaded like the workflow's bundle. Main amended this decision after review round 1.
 5. **Owner subject.** Run the existing enrollment helper from the new release, as a temporary system service with a temporary Traefik route. Remove both after enrollment.
 6. **Codex login.** Use device login through `harbor-personal login`. It runs in a transient unit, so that the agent can read the code, pass it to the owner and wait. Reusing another Codex login is not part of the guide.
@@ -240,7 +240,7 @@ The personal VPS guide already requires that conversation, because a version che
 
 `docs/developer/fresh-vps-install.md` has these sections in this order.
 
-1. **Who this is for.** The guide is for an agent on the owner's computer with the `harbor-vps` alias, and for the owner supervising it. It installs the revision of `origin/main` from which the agent saved the guide, so that its commands match the scripts. Main changed this after review round 1: step 5 builds the saved revision, not a later `origin/main`.
+1. **Who this is for.** The guide is for an agent on the owner's computer with the `harbor-vps` alias, and for the owner supervising it. It installs the revision of `origin/main` from which the agent saved the guide, so that its commands match the scripts. Main changed this after review round 1: step 5 builds the saved revision, not a later `origin/main`. After review round 2, the block that saves the guide also refuses to run a second time.
 2. **Rules for the agent.** The stop rules, secrets list, homes, resuming rule and records from the contract above, as a short numbered list. Every step also has the same parts:
    - **Where:** your computer, the VPS or the owner;
    - **Check:** read-only; it says whether the step is already done;
@@ -249,7 +249,7 @@ The personal VPS guide already requires that conversation, because a version che
    - **If not:** stop and report, unless the step names a fix.
 3. **What the owner prepares.** A checklist the owner completes before or during the run, each with where to do it:
    - the values in the table, or changes to them;
-   - a VPS running Ubuntu 24.04 with either no Docker or Docker's own Docker Engine packages;
+   - a VPS running Ubuntu 24.04 with no Docker, Ubuntu's `docker.io` packages, or Docker's own Docker Engine packages;
    - a DNS A record for the host pointing at the VPS;
    - the hosting firewall allowing TCP 22, 80 and 443;
    - an email address for Let's Encrypt;
@@ -366,7 +366,7 @@ The personal VPS guide already requires that conversation, because a version che
 6. **Recovery.** What to do when a step fails partway:
    - the enrollment link expired: start the enrollment service again, which writes a new link;
    - the device code expired: run the login unit again;
-   - the build failed: `bootstrap` removes its staging directory, inputs and build state, or names a staging directory it could not remove, which is the owner's to inspect;
+   - the build failed: when its process exits, `bootstrap` removes its staging directory, inputs and build state, or names a staging directory it could not remove, which is the owner's to inspect. A reboot or a killed process leaves the inputs and build state, which step 5's Check and step 16 list for the owner;
    - the install failed partway;
    - Let's Encrypt refused a certificate: read Traefik's log, fix the cause, and wait out its rate limits instead of retrying in a loop.
 
@@ -438,7 +438,7 @@ Return any needed change to these texts, or any path outside the fence, to main 
 - `design/systems/004-deployment-and-profiles.md`
 - `design/proposals/037-fresh-vps-install-guide.md` (main only)
 - one new issue under `issues/` for the gates that cannot run here (main only)
-- two issues under `issues/` for unrelated findings that review round 1 raised (main only)
+- new issues under `issues/` for unrelated findings that the reviews raise (main only)
 
 Run-owned scratch, which main creates and removes:
 
@@ -605,6 +605,44 @@ Corrections to the round 1 record:
 - The implementer's round 0 report said that "no host" was touched. Its P037-03 builds' release checks added `.local/share/pnpm` and a `.codex/tmp/arg0` entry under this container's `/nonexistent`, as the release check issue records.
 
 In this round the pinned Codex ran only with fresh `HOME` and `CODEX_HOME` directories. The harness, its fixtures and logs, and the fetched pages exist only in this cloud container.
+
+### Round 2, 30 September 2026
+
+Two new reviewers, with fresh context, read commit `9ab88c6`, whose diff from `9ba6d53` has SHA-256 `bdac2b37…29e`. Neither reported a blocker or a major finding.
+
+- **Design review.** The design reviewer found every round 1 fix resolved. It also:
+  - reran the Docker test in 15 cases;
+  - reran the values parser with 13 inputs;
+  - followed step 5's block 1 through each point where it can be interrupted.
+
+  It reported two minor findings, five nits and one unrelated observation.
+- **Provenance review.** The provenance reviewer rechecked the identities and reran `check-docs`, `git diff --check` and the unit tests under Python 3.11.15 and 3.12.3. It also reran the P037-04 harness from a copy, with `systemd-analyze` replaced by a failing stub. 620 of the 623 checks passed, and the other three were the stubbed ones. It reported one minor finding and four nits.
+
+Main's dispositions:
+
+- **Accepted, for the implementer to fix in the guide:**
+  - The block before step 1 could run a second time and silently save a newer guide.
+  - A rerun of step 5's or step 12's wait block after a dropped connection could race the earlier remote run, which may keep going for minutes, and print a false STOP.
+  - The enrollment link can arrive up to about seven minutes into the helper's 30 minutes, so the advice to open it within about 25 minutes could run out.
+  - Two Expect lines left out outputs that the guide itself routes the agent through: step 4's line that says to run block 2, and step 9's line for a rerun.
+  - The owner's checklist left out Ubuntu's `docker.io`, which steps 1 and 3 accept. Main's round 1 fix brief had narrowed it. Main also corrected decision 3 and the checklist specification.
+  - Single `curl` calls had no time limit.
+  - Recovery said that `bootstrap` removes its inputs and build state on every exit. A reboot or a killed process prevents that.
+- **Recorded as an issue:** `build` leaves the same directories after a reboot or a kill. See the [interrupted build issue](../../issues/2026-09-30-125456-interrupted-build-leftovers.md).
+- **Accepted, and recorded here by main:**
+  - **Container changes.** The records of what the checks changed in this container were incomplete.
+    - `systemd-analyze verify` creates and updates the empty marker file `/run/systemd/systemd-units-load`. The implementer's round 0 probe created it at 08:24 UTC, and later harness and review runs updated it.
+    - The harness also wrote bytecode into the implementer's scratch checkout.
+    - The gate script staged the guide there as intent-to-add, then removed it from the index again.
+  - **Main's gate rerun.** Main's rerun of the gate after fix round 1 is only partly backed by kept logs. Main kept only the `pnpm check` log, and that run came before main's last edit of this plan. `pnpm check`'s TypeScript, OpenAPI and Prettier parts do not read that file. The provenance reviewer reran `check-docs`, `git diff --check` and the unit tests at `9ab88c6`, and all passed. From now on, main keeps each gate command's log with its exit code and revision.
+  - **The Codex login fact.** It cited a page for two claims that the page does not make. It now says that the 15-minute expiry comes from the pinned binary, whose text says so. It also marks the file credential store as an inference, which step 12 checks.
+  - **Python version.** The container's Python 3.11.15 is an alternatives-selected `python3.11`, not Ubuntu 24.04's default `python3`, which is 3.12.3. The round 1 record called it Ubuntu 24.04.4's.
+  - **Compile checks.** The implementer's round 1 report undercounted the harness's compile checks: all 10 Python here-documents compiled, not 8. No tracked record repeated the number.
+  - **Transcript search.** The implementer searched main's session transcript, read-only, for the text of four round 1 findings that its brief already quoted. Nothing from it reached a tracked file. The round 2 brief forbids such searches.
+  - **Mount attempts.** The provenance reviewer tried to run `systemd-analyze` without touching the real `/run/systemd`.
+    - It ran `unshare` with a private mount namespace. The tmpfs mount attempt created an empty directory, `/run/mount`, in this container.
+    - The session's permission checks denied the reviewer's removal of that directory and a later bind mount. The reviewer then used a stub.
+    - Main left the directory in place because the reviewer's removal had been denied. It disappears with the container.
 
 ## Closing record
 
