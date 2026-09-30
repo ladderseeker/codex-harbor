@@ -58,7 +58,7 @@ After this change:
    - When every mandatory gate passed, that record is the closing record and the proposal becomes Implemented. Otherwise it is a dated delivery entry, and the proposal stays Accepted, with its code on `main`, until the missing gates pass.
    - Work that still has blockers after the three review rounds stays off `main` until the owner decides.
    - An outcome is delivered only when every commit between `origin/main` and it is finished work or a plan or issue record.
-   - Where Git cannot push to `main`, as the Claude Code documentation says of cloud sessions, a pull request merged at once with a merge commit is the delivery step. It is not a review request.
+   - Where Git refuses the push to `main`, a pull request merged at once with a merge commit is the delivery step. It is not a review request.
    - Before delivery, main may commit coherent checkpoints to an assigned agent working branch and push them without asking. A checkpoint that has not passed its gate says `WIP`.
    - Until a plan that delivers CI/CD is Implemented and changes these rules, every deploy workflow run other than `preflight` needs the owner's go-ahead, and adding an automatic deploy trigger is the owner's decision. After that, finishing an outcome includes deploying it and checking the deployment.
    - The automatic design and provenance reviews stay, and they are now the only review before `main`. They start once every gate that can run is green.
