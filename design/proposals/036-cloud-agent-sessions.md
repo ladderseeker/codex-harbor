@@ -227,6 +227,7 @@ The [cloud session guide](../docs/developer/cloud-sessions.md#what-runs-here) li
 
 ### Other alignments
 
+- `README.md`: in the paragraph that begins "The [delivery workflow]", replace "and owner confirmation before committing." with "and direct delivery of finished work to `main`."
 - `design/decisions/013-evidence-based-delivery-workflow.md`: after the "Current contract" metadata bullet, add the bullet below. Leave the body unchanged.
 
   ```markdown
@@ -426,6 +427,7 @@ Return any needed change to settled text, or any path outside the fence, to main
 ## Exact file fence
 
 - `AGENTS.md`
+- `README.md`
 - `CLAUDE.md` (new)
 - `.claude/settings.json` (new)
 - `scripts/cloud-session-setup.sh` (new)
@@ -462,7 +464,7 @@ Main removes both after integration.
   - the proposal template;
   - the documentation index.
 
-  A search of current documents, excluding archives and dated reports, finds no requirement for per-commit owner confirmation or for the owner to review a pull request.
+  A search of current documents, excluding archives, dated reports and the body of D013, finds no requirement for per-commit owner confirmation or for the owner to review a pull request. D013's body keeps its original wording as decision history; its metadata says D015 amends it.
 - **P036-04:** The cloud session guide has the specified headings and content, and it dates its environment facts. Its commands match `package.json`, the pinned versions and the hook.
 - **P036-05:** The hook is verified in two ways.
   - The automated test's four cases pass.
