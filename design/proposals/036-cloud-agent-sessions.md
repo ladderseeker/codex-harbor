@@ -171,7 +171,7 @@ No browser page or public API changes.
 - **Session environment.** The script appends one `export PATH=...` line to `CLAUDE_ENV_FILE`, and only if that exact line is not already present. It never prints environment values, tokens or file contents.
 - **Failure behavior.** Every path exits 0 and prints at most one line. A failure line names the reason and the guide section.
 - **Commit identity.** Commits use the session's configured identity. The rules forbid using the owner's or another contributor's name or email.
-- **Codex state.** The guide tells agents to run Codex only with a run-owned `HOME` and `CODEX_HOME`, even for a version check, because every Codex start writes into its home and the default home may hold a login.
+- **Codex state.** The guide tells agents to run Codex only with a run-owned `HOME` and `CODEX_HOME`, even for a version check, because a Codex start may write into its home and the default home may hold a login.
 - **Unchanged.** Authentication, permissions, sandbox and isolation rules do not change. The new text forbids weakening them to make a check run.
 
 ## Settled text
@@ -205,8 +205,8 @@ Insert this section between Implementation and safety and VPS SSH handoff:
 
 - A cloud agent session, such as a Claude Code cloud session, runs in its own disposable Linux container with a fresh clone, HTTPS-only egress through a proxy and no SSH client. Anything not pushed, including `.test-runs/` evidence and any Codex login made there, is lost when the container is reclaimed. The [cloud session guide](docs/developer/cloud-sessions.md) records the checked environment, setup and commands; recheck it when the environment changes.
 - A Claude Code cloud session that starts in this repository runs its session-start hook, which installs the pinned Node 24.11.1 and the locked dependencies. A session with several repositories does not run it; prepare that session as the guide describes. Install Codex 0.153.4 only when a real-runtime contract needs it. Never loosen a pinned version, checksum or lockfile to make setup pass.
-- In the cloud sessions checked on 30 September 2026, `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:deployment:contract`, pinned-runtime contracts that do not launch a personal runtime, document checks and Playwright with the preinstalled Chromium all ran. No Docker daemon runs at session start, so lanes that need Docker, including real-stack `pnpm test:e2e`, have not run there. Personal runtime launches and the personal VPS Linux lanes need systemd and delegated cgroup v2, which those sessions lack, and nothing there can use SSH. Never weaken container, network or sandbox isolation to make a check run. Record a gate that cannot run as unverified with a linked issue; hosted CI or a supported Linux host supplies it.
-- Owner direction, 30 September 2026: agents plan, implement, test, review and deliver finished work to `main`, and may run the read-only deploy `preflight` through GitHub Actions. The owner does all SSH and host work and, until a plan that delivers CI/CD is Implemented, gives the go-ahead for every other deploy workflow run.
+- In the cloud session checked on 30 September 2026, `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:deployment:contract`, pinned-runtime contracts that do not launch a personal runtime, document checks and Playwright with the preinstalled Chromium all ran. No Docker daemon runs at session start, so lanes that need Docker, including real-stack `pnpm test:e2e`, have not run there. Personal runtime launches and the personal VPS Linux lanes need systemd and delegated cgroup v2, which those sessions lack, and nothing there can use SSH. Never weaken container, network or sandbox isolation to make a check run. Record a gate that cannot run as unverified with a linked issue; hosted CI or a supported Linux host supplies it.
+- Division of work in cloud sessions, 30 September 2026: agents plan, implement, test, review and deliver finished work to `main`, and may run the read-only deploy `preflight` through GitHub Actions. The owner does all SSH and host work and, until a plan that delivers CI/CD is Implemented, gives the go-ahead for every other deploy workflow run.
 - No standing authorization covers a Codex login made inside a container. Use one only with the owner's explicit permission for that use; then copy only the credential into run-owned state, delete the copy afterwards, and never commit, print or share it.
 ```
 
@@ -256,7 +256,7 @@ In Implementation and verification gate, in the paragraph that begins "Reuse evi
 Record the blocker in an issue, continue unaffected work, and name the missing gate wherever the result is reported. The result may still reach `main` under the [commit rules](#proposal-completion-and-archive), but it cannot reach Implemented while that mandatory gate remains missing. The [cloud session guide](../docs/developer/cloud-sessions.md#what-runs-here) lists which gates a cloud session can run.
 ```
 
-In Delegation and review, three replacements:
+In Delegation and review, four replacements:
 
 - Replace "Once the applicable combined gate is green, main automatically starts two independent review roles, without another permission request:" with:
 
@@ -268,6 +268,12 @@ In Delegation and review, three replacements:
 
   ```markdown
   When a required gate could not run, the reviews cover the result as it stands and say what they could not assess. Clear reviews then allow delivery to `main`, not completion. When the missing gate later runs, main records its result, and a failure becomes new work with its own gate and reviews.
+  ```
+
+- Replace "Stop early when the scoped gate and both reviews are clear." with:
+
+  ```markdown
+  Stop early when every gate that can run is green and both reviews are clear.
   ```
 
 - Replace "The proposal stays Accepted. Do not silently waive findings" with:
@@ -334,7 +340,7 @@ In Delegation and review, three replacements:
   - Replace "- Owner-facing uncommitted result for review and commit confirmation." with:
 
     ```markdown
-    - Delivery: the finished result is committed and pushed to `main` together with this record, under the [commit rules](workflow.md#proposal-completion-and-archive).
+    - Delivery: the commit that put the finished result on `main`, pushed together with this record or named in an earlier dated delivery entry, under the [commit rules](workflow.md#proposal-completion-and-archive).
     ```
 
 - `docs/README.md`: under Start here, after the Developer workflow line, add:
@@ -391,7 +397,7 @@ It has these sections:
   - Deployment stays manual, with the owner's go-ahead for every run other than `preflight`, until a plan that delivers CI/CD is Implemented and changes these rules. Adding an automatic deploy trigger is the owner's decision. After that, finishing an outcome includes deploying it and checking the deployment, as the owner directed.
 - **Consequences:**
   - `main` history includes the `WIP` checkpoints of each delivered outcome, but `main`'s tip only ever holds finished work.
-  - The automatic reviews are the only review before `main`, so they are never skipped. They start once every gate that can run is green.
+  - The automatic reviews are the only review before `main`, so main does not skip them unless the owner changes this rule. They start once every gate that can run is green.
   - A proposal can be on `main` while still Accepted, with a dated delivery entry, because a mandatory gate that could not run keeps it from Implemented.
   - Outcomes that share a working branch reach `main` in their order on the branch, because each waits for the outcomes below it, or from a branch cut from `origin/main` that holds only finished outcomes and records.
   - Reviewers get commit identities.
@@ -432,7 +438,7 @@ Required content for each section:
   - Record the results observed at `9231078`:
     - `pnpm test:deployment:contract` failed one managed-tooling test, `review_test.Review.test_actual_process_capture_limit_timeout_and_failure`. The [capture-limit issue](../../issues/2026-09-30-032022-deploy-run-capture-limit.md) records it. The script joins its Python and Node halves with `&&`, so that failure skips the Node half. Run the Node half separately: `node --import tsx --test tests/deployment/storage-transport.test.ts tests/deployment/probe.test.ts`.
     - `pnpm test:contract` with the pinned binary passed 23 of 28. Four of the five failures launch personal runtimes and need delegated cgroups. The fifth, the P024 attachment contract, needs a nonroot Linux user.
-  - The `pnpm test:contract` row also says that its history test runs the host's login profile, which rewrote `/opt/rbenv/shims` in the session that wrote this guide, and links the [login-shell issue](../../issues/2026-09-30-033836-contract-test-login-shell.md).
+  - The `pnpm test:contract` row also says that its history test rewrote `/opt/rbenv/shims` in the session that wrote this guide, apparently through the host's login profile, and links the [login-shell issue](../../issues/2026-09-30-033836-contract-test-login-shell.md).
   - The legend says that no Docker daemon was started in the session that wrote this guide, not in any cloud session.
 - **Gates that need another host.**
   - Open with "These gates did not run in the cloud session that wrote this guide." Then name, for each gate, the host or check it needs:
@@ -442,7 +448,7 @@ Required content for each section:
     - `node tests/egress/linux.mjs`: Docker and its built images;
     - `pnpm test:live`: dedicated credentials and the supported Linux execution profile;
     - anything over SSH.
-  - Keep the dated note about the blocked `dockerd` attempt, and say that the session that wrote this guide did not try a default daemon.
+  - Keep the dated note about the blocked `dockerd` attempt, and say that the session that wrote this guide started no daemon afterwards and did not try a default one.
   - Then say how to record them: unverified, with a linked issue. The result may still reach `main` with a dated delivery entry, and the proposal stays Accepted until the gate passes. They run in hosted CI once [P026](../../design/proposals/026-continuous-integration.md) delivers it, or on a supported Linux host run by the owner.
 - **Commits and delivery.** D015 in practice:
   - use the configured identity, which signs commits, and never the owner's or another contributor's name or email;
@@ -451,7 +457,7 @@ Required content for each section:
   - push each checkpoint to the session's branch;
   - implementers never commit, and a running implementer is told its diff base;
   - finished means what the workflow says: every gate that can run passed, apart from recorded baseline failures; every gate that cannot run is recorded as unverified with a linked issue; both reviews are clear; and the plan records the result, as a closing record or a dated delivery entry;
-  - work that still has blockers after three review rounds stays off `main` until the owner decides;
+  - work with review blockers left after three rounds stays off `main` until the owner decides;
   - deliver an outcome only when every commit between `origin/main` and it belongs to a finished outcome or is a plan or issue record; otherwise wait for the earlier outcome, or cut a branch from `origin/main` that holds only finished outcomes and records, and rerun the affected gate there;
   - deliver with `git push origin HEAD:main`. The Claude Code documentation, read on 30 September 2026, says a cloud session can push only to its own branch, but this project's session delivered P035 that way that day. If Git refuses the push, open a pull request from the session's branch and merge it at once with the GitHub tools, using a merge commit. The delivered commits and their signatures stay unchanged, and GitHub creates the merge commit under the account that the session's GitHub connection uses; it is the only commit that the configured identity does not make. That pull request is a delivery step, not a review request;
   - if `main` moved, merge `origin/main` into the branch, rerun the affected checks and deliver again, and never force-push `main`;
@@ -671,6 +677,33 @@ Main's dispositions:
 - **Recorded limit:** earlier versions of this plan, at `02da7cf`, `7101c7c` and `cbf00ee`, quoted the owner verbatim. Those commits are in `main`'s history since 06:09 UTC. Removing them would need a force-push to `main`, which the rules forbid. The current texts paraphrase.
 
 Evidence limits: neither reviewer saw Claude Code run the hook at session start, environment caching, a Codex command, `pnpm test:contract` or the delivery block. The provenance reviewer's settled-text checks passed against `f921f1f`'s plan. Against this revision, the checkout fails three of them until the fix round, and round 3 reruns them. That reviewer's `npm root -g`, run with the container's default home, wrote a 614-byte npm debug log, and its `node --import tsx` runs used the shared `/tmp/tsx-0` cache. Both are harmless and disappear with the container.
+
+### Fix round 2, 30 September 2026
+
+The implementer applied the round 2 texts at `c1cf7b9`, and then, at main's request, changed D015's Decision lead-in so that it no longer calls main's default an owner message. Its checks passed: `check-docs` over 199 files, `git diff --check` including the new files, the hook's four unit tests, `pnpm check`, and the guide's manual Node block with no cached Node, a working Node, stale Node directories, a failed download and a checksum mismatch. The working Node and a marker standing in for Codex stayed untouched. Main compared all 24 settled blocks with the checkout and found them verbatim.
+
+### Round 3, 30 September 2026
+
+Both reviewers read the checkout at `c1cf7b9`, whose tracked diff has SHA-256 `922faad5…cb75fb`, with the six new files, including D015 at `42de76c5…`. The design reviewer confirmed that the tracked files hold exactly the settled edits, ran the manual Node block offline, and reported one minor finding, five nits, two optional nits and three unrelated observations, none of which should block delivery. The provenance reviewer traced every claim that changed in round 2 to the session's transcript, GitHub or the source. It reran the documentation gate, the hook's unit tests, `pnpm check`, the manual Node block and its own settled-text check in a copy of the checkout, and reported a clear verdict with three nits.
+
+Main's dispositions:
+
+- **Accepted, and fixed in this plan's settled texts and specs:**
+  - `AGENTS.md` still called the cloud session division of work, which lists reviews, the owner's direction. The bullet now starts "Division of work in cloud sessions".
+  - D015 said that the reviews are never skipped, although it also says that main offered to skip them. It now says that main does not skip them unless the owner changes the rule.
+  - The guide said "blockers" where the other texts say "review blockers", and one Docker clause had no subject. Both now use the scoped wording.
+  - `AGENTS.md` spoke of the cloud sessions checked on 30 September 2026. One session was checked, and it now says so.
+  - The guide's table stated the login-shell cause as fact, while the issue infers it. The row now says "apparently".
+  - The workflow's early stop and the template's delivery line predate unverified gates. The workflow now stops early when every gate that can run is green and both reviews are clear. The template records the commit that put the result on `main`, whether it was pushed with the closing record or named in an earlier delivery entry.
+- **Fixed by main in its own records:**
+  - This plan's Codex state contract still said that every Codex start writes into its home. It now says that a start may.
+  - The round 2 record gave an inaccurate reason for keeping "container". Claude Code's documentation mostly calls the environment a virtual machine, and only the session's own description calls it a container. The decision stands, because every claim about the environment's lifetime holds either way.
+  - P027's draft named its future decision D015, which D015 now uses. It now says D016.
+- **Rejected with reason:**
+  - Draft plans P020, P025, P026 and P028 to P034 still start reviews after the green gate. Each draft is revised against the current workflow when it is selected, as Dependencies already records for P026.
+  - P035's Authorization keeps its paraphrase of the owner's earlier message, because it is P035's historical record.
+
+Evidence limits: the design brief abbreviated one file hash with a typo, so that reviewer matched the file to the plan's block and the implementer's log instead. Neither reviewer saw Claude Code run the hook at session start. The full deployment contract last ran at `49aad4b` and `f921f1f`; the test file has changed only in a comment since, and the delivery gate reruns it.
 
 ## Closing record
 

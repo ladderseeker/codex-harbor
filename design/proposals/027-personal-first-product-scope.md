@@ -59,7 +59,7 @@ No security boundary changes. Under 1A, the personal VPS keeps every D011, D012 
 
 ## Implementation brief
 
-After the owner decides, allocate the next available decision ID (provisionally D015) with the chosen options and, under 1A, the parking rule. Add dated notes to D009 and D013 that link to it, as the workflow requires for a decision that changes earlier ones. Audit and align the architecture, every current subsystem design, the systems index, developer gate guide, README and AGENTS.md with the selected options and explicit precedence; preserve mixed/personal obligations and historical documents. Under 2A, also update the workflow, the proposal template, the implementer brief and both reviewer briefs.
+After the owner decides, allocate the next available decision ID (provisionally D016, because D015 now records P036's delivery rules) with the chosen options and, under 1A, the parking rule. Add dated notes to D009 and D013 that link to it, as the workflow requires for a decision that changes earlier ones. Audit and align the architecture, every current subsystem design, the systems index, developer gate guide, README and AGENTS.md with the selected options and explicit precedence; preserve mixed/personal obligations and historical documents. Under 2A, also update the workflow, the proposal template, the implementer brief and both reviewer briefs.
 
 ## Exact file fence
 
@@ -90,7 +90,7 @@ The paths below are a prospective feature-implementation fence, not authorizatio
 
 ## Verification and acceptance
 
-- **P027-01:** D015 records the owner's options, the date and, under 1A, the parking rule, and D009 and D013 link to it with dated notes.
+- **P027-01:** D016 records the owner's options, the date and, under 1A, the parking rule, and D009 and D013 link to it with dated notes.
 - **P027-02:** Architecture, profile design and README name the personal VPS as the product under 1A, and the exact-fence consistency audit finds no conflicting mandate for managed feature expansion. Shared/mixed safety, compile/test, backup and reconfiguration obligations remain explicit.
 - **P027-03:** The developer guide states which lanes a personal-only change must run and when managed lanes still run.
 - **P027-04:** Under 2A, the workflow, template, implementer brief and reviewer briefs define narrow eligibility, the full path for mixed/policy/interaction/procedure changes, unchanged verification, rendered style evidence and the durable no-PR record consistently.
