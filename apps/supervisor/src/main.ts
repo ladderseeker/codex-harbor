@@ -8,6 +8,7 @@ import {
   repairReleasedPersonalSession,
 } from "../../../packages/storage/src/conversation-runtimes.ts";
 import { classifyIdle, capacityReason } from "./runtime-capacity.ts";
+import { discoveryDue, type DiscoveryAttempt } from "./discovery-schedule.ts";
 import {
   inspectRecoveredLocalRuntime,
   PersonalRuntimeNotStartedError,
@@ -372,7 +373,7 @@ async function clearNativeCredentials() {
   }
 }
 const closeCredentials = await serveCredentials(credentials, c);
-let lastDiscovery = 0;
+let lastDiscovery: DiscoveryAttempt | undefined;
 async function discover() {
   if (
     discovering ||
@@ -382,13 +383,29 @@ async function discover() {
   )
     return;
   discovering = true;
+  let attempt: DiscoveryAttempt | undefined,
+    refreshed = false;
   try {
+    const stored = (
+      await pool.query(
+        "SELECT extract(epoch from now()-updated_at)::float8 AS age,(data->'account'->>'authenticated')='true' AS authenticated FROM runtime_capabilities",
+      )
+    ).rows[0];
     if (
-      Date.now() - lastDiscovery < 60000 &&
-      (await pool.query("SELECT 1 FROM runtime_capabilities")).rowCount
+      !discoveryDue(
+        Date.now(),
+        lastDiscovery,
+        stored
+          ? {
+              ageSeconds: Number(stored.age),
+              authenticated: stored.authenticated === true,
+            }
+          : undefined,
+      )
     )
       return;
-    lastDiscovery = Date.now();
+    // Recorded as failed until the capability write and retirement succeed.
+    attempt = lastDiscovery = { at: Date.now(), failed: true };
     const project =
       (await pool.query("SELECT * FROM projects ORDER BY created_at LIMIT 1"))
         .rows[0] ??
@@ -456,11 +473,13 @@ async function discover() {
       if (!(await retire(probe)))
         throw Error("Discovery runtime termination unconfirmed");
     }
+    refreshed = true;
   } finally {
     // Initialization can fail before createRuntime returns its adapter. Keep the
     // onTransport capture owned through confirmed retirement in that case too.
     const transport = discoveryTransport;
-    if (transport) await retire(transport);
+    const retired = !transport || (await retire(transport));
+    if (attempt && refreshed && retired) attempt.failed = false;
     discovering = false;
     discoveryTransport = undefined;
   }

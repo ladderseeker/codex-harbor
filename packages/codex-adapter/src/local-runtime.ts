@@ -21,6 +21,18 @@ const inside = (root: string, candidate: string) => {
   return path === "" || (!path.startsWith("..") && !isAbsolute(path));
 };
 
+/** Exact native arguments of every personal runtime, local or VPS. */
+export const PERSONAL_RUNTIME_ARGS: readonly string[] = Object.freeze([
+  "-c",
+  'cli_auth_credentials_store="file"',
+  // Plugins stay off: Harbor has not assessed them, and the catalog sync leaves abandoned downloads when a runtime stops early.
+  "-c",
+  "features.plugins=false",
+  "app-server",
+  "--listen",
+  "stdio://",
+]);
+
 /** A live guardian signals its own group, never a recovered/stale PID. */
 const guardian = `
 const { spawn } = require('node:child_process');
@@ -29,7 +41,7 @@ process.on('SIGTERM', retire);
 process.on('SIGINT', retire);
 process.on('disconnect', retire);
 process.once('message', () => {
-const runtime = spawn(process.argv[1], ['-c', 'cli_auth_credentials_store="file"', 'app-server', '--listen', 'stdio://'], {
+const runtime = spawn(process.argv[1], ${JSON.stringify(PERSONAL_RUNTIME_ARGS)}, {
   stdio: [0, 1, 2], env: process.env,
 });
 runtime.on('error', retire);

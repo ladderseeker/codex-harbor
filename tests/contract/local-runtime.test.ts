@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { launchLocalRuntime } from "../../packages/codex-adapter/src/local-runtime.js";
+import {
+  launchLocalRuntime,
+  PERSONAL_RUNTIME_ARGS,
+} from "../../packages/codex-adapter/src/local-runtime.js";
 
 test("personal runtime requires explicit opt-in, private state and conversation purpose", async () => {
   const original = { ...process.env };
@@ -15,7 +18,7 @@ test("personal runtime requires explicit opt-in, private state and conversation 
   await mkdir(workspacePath);
   await writeFile(
     binary,
-    `#!${process.execPath}\nif (process.argv.includes('--version')) { console.log('codex-cli 0.153.4'); process.exit(0); }\nconsole.log(JSON.stringify({ home: process.env.CODEX_HOME, apiKey: process.env.OPENAI_API_KEY, inherited: process.env.HARBOR_SECRET }));\nrequire('node:child_process').spawn('/bin/sleep', ['300'], { stdio: 'ignore' });\nsetInterval(() => {}, 1000);\n`,
+    `#!${process.execPath}\nif (process.argv.includes('--version')) { console.log('codex-cli 0.153.4'); process.exit(0); }\nconsole.log(JSON.stringify({ home: process.env.CODEX_HOME, apiKey: process.env.OPENAI_API_KEY, inherited: process.env.HARBOR_SECRET, args: process.argv.slice(2) }));\nrequire('node:child_process').spawn('/bin/sleep', ['300'], { stdio: 'ignore' });\nsetInterval(() => {}, 1000);\n`,
     { mode: 0o700 },
   );
   const config = {
@@ -52,7 +55,11 @@ test("personal runtime requires explicit opt-in, private state and conversation 
         child.stdout.once("data", (data) => resolve(String(data)));
         child.once("error", reject);
       });
-      assert.deepEqual(JSON.parse(output), { home: await realpath(home) });
+      // P035-01: the guardian starts the native binary with exactly these arguments.
+      assert.deepEqual(JSON.parse(output), {
+        home: await realpath(home),
+        args: [...PERSONAL_RUNTIME_ARGS],
+      });
       let inspection;
       for (let attempt = 0; attempt < 100; attempt++) {
         inspection = await child.inspectOwned!();

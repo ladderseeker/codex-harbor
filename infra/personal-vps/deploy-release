@@ -8,6 +8,7 @@ and writes a private matched checkpoint first.
 """
 import argparse
 import datetime
+import errno
 import hashlib
 import importlib.machinery
 import importlib.util
@@ -17,6 +18,7 @@ from pathlib import Path
 import re
 import shutil
 import ssl
+import stat
 import subprocess
 import sys
 import time
@@ -32,7 +34,15 @@ require = installer.require
 RELEASES = Path('/opt/harbor-personal/releases')
 BACKUPS = Path('/var/lib/harbor-personal-backups')
 WORK = Path('/var/lib/harbor-deploy')
-BUSY = "('queued','dispatching','running','waiting_approval','waiting_input','uncertain')"
+# systemd keeps the DynamicUser build unit's state and cache directories below these.
+BUILD_STATE = Path('/var/lib/private')
+BUILD_CACHE = Path('/var/cache/private')
+GIB = 1 << 30
+KEEP_CHECKPOINTS = 2
+# The XDG data, state and config homes of a development project; the rest is cache.
+DEVELOPMENT_KEEP = ('config', 'data', 'state')
+STAMP = re.compile(r'[0-9]{8}T[0-9]{6}Z')
+BUSY ="('queued','dispatching','running','waiting_approval','waiting_input','uncertain')"
 MIGRATIONS = 'packages/storage/src/migrations'
 RELEASE_ROOT_ENTRIES = {'apps', 'packages', 'infra', 'node_modules', 'toolchain', 'package.json',
                         'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'artifact.json'}
@@ -171,6 +181,99 @@ def native_inputs(current, target):
     installer.validate_native_distribution(vendor, require_root=False)
 
 
+def allocated(path, seen=None):
+    """Allocated bytes of path and everything below it, from lstat block counts.
+
+    Symbolic links are never followed and each (device, inode) counts once, also
+    across calls that share `seen`."""
+    seen = set() if seen is None else seen
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return 0
+    total, pending = 0, [(os.fspath(path), info)]
+    while pending:
+        current, info = pending.pop()
+        key = (info.st_dev, info.st_ino)
+        if key in seen:
+            continue
+        seen.add(key)
+        total += info.st_blocks * 512
+        if not stat.S_ISDIR(info.st_mode):
+            continue
+        try:
+            fd = os.open(current, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        except OSError as error:
+            if error.errno in (errno.ENOENT, errno.ENOTDIR, errno.ELOOP):
+                continue  # Removed or replaced since it was listed.
+            raise
+        try:
+            opened = os.fstat(fd)
+            if (opened.st_dev, opened.st_ino) != key:
+                continue  # Replaced since it was listed; never measure through a link.
+            with os.scandir(fd) as entries:
+                for entry in entries:
+                    try:
+                        pending.append((current + '/' + entry.name, entry.stat(follow_symlinks=False)))
+                    except FileNotFoundError:
+                        continue
+        finally:
+            os.close(fd)
+    return total
+
+
+def reserve(total):
+    """Bytes a deploy step leaves free: the larger of 2 GiB and 5% of the filesystem."""
+    return max(2 * GIB, total // 20)
+
+
+def filesystem(path):
+    """The device and nearest existing ancestor of a location that a step writes to."""
+    path = Path(path)
+    while not path.exists():
+        path = path.parent
+    return os.stat(path).st_dev, path
+
+
+def mount_point(path):
+    path = Path(path)
+    device = os.stat(path).st_dev
+    while path != path.parent and os.stat(path.parent).st_dev == device:
+        path = path.parent
+    return path
+
+
+def filesystems(paths):
+    """Each filesystem holding one of paths, listed once with its free, total and reserve bytes."""
+    found = {}
+    for location in paths:
+        device, existing = filesystem(location)
+        if device not in found:
+            usage = shutil.disk_usage(existing)
+            found[device] = {'mount': str(mount_point(existing)), 'paths': [], 'freeBytes': usage.free,
+                             'totalBytes': usage.total, 'reserveBytes': reserve(usage.total)}
+        found[device]['paths'].append(str(location))
+    return found
+
+
+def shortfalls(paths, need):
+    """The filesystems among paths that would keep less than their reserve free after need more bytes."""
+    return [fs for fs in filesystems(paths).values() if fs['freeBytes'] < need + fs['reserveBytes']]
+
+
+def require_space(action, paths, need):
+    for fs in shortfalls(paths, need):
+        raise ValueError(action + ' needs ' + str(need) + ' bytes plus a reserve of ' + str(fs['reserveBytes'])
+                         + ' bytes on the filesystem mounted at ' + fs['mount'] + ', which has ' + str(fs['freeBytes'])
+                         + ' bytes free; nothing was changed')
+
+
+def build_locations(releases=None, work=None, build_state=None, build_cache=None):
+    """Every location a build writes to: native inputs, the build unit's state and cache, and the release."""
+    return [WORK if work is None else Path(work), BUILD_STATE if build_state is None else Path(build_state),
+            BUILD_CACHE if build_cache is None else Path(build_cache), RELEASES if releases is None else Path(releases)]
+
+
 def build(args):
     c, _, _, _ = instance(args.instance)
     require(re.fullmatch(r'[0-9a-f]{40}', args.revision), 'Full commit SHA required')
@@ -184,13 +287,16 @@ def build(args):
     current = Path(c['release'])
     verify_release(current)
     bundle = installer.absolute(args.bundle)
+    # A build writes inputs, sources, dependencies, the package and the release: about four releases.
+    require_space('Build', build_locations(), 4 * allocated(current))
     run_id = name + '-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     inputs = WORK / 'inputs' / run_id
     inputs.mkdir(parents=True, mode=0o755)
     for parent in (WORK, WORK / 'inputs'):
         parent.chmod(0o755)
     state_name = 'harbor-deploy-build/' + run_id
-    state = Path('/var/lib/private') / state_name
+    state = BUILD_STATE / state_name
+    staging = None  # Set only while this run owns a staging directory it created.
     try:
         native_inputs(current, inputs)
         log('Building ' + args.revision + ' as a transient unprivileged user')
@@ -215,19 +321,26 @@ def build(args):
         package = state / 'package'
         result = json.loads((package / 'package-result.json').read_text())
         require(sha256(result['archive']) == result['sha256'], 'Package archive hash mismatch')
-        staging = RELEASES / ('.staging-' + name)
-        require(not staging.exists(), 'Staging path exists; inspect it first: ' + str(staging))
-        shutil.copytree(package / 'release', staging, symlinks=True)
+        target = RELEASES / ('.staging-' + name)
+        require(not os.path.lexists(target), 'Staging path exists; inspect it first: ' + str(target))
+        target.mkdir(mode=0o700)
+        staging = target
+        shutil.copytree(package / 'release', staging, symlinks=True, dirs_exist_ok=True)
         for directory, dirs, files in os.walk(staging):
             for entry in [Path(directory)] + [Path(directory) / n for n in dirs + files]:
                 os.lchown(entry, 0, 0)
         verify_release(staging, args.revision)
         staging.rename(release)
+        staging = None
         manifest_sha = sha256(release / 'artifact.json')
         log('Staged ' + str(release))
         print(json.dumps({'release': str(release), 'revision': args.revision, 'archiveSha256': result['sha256'],
                           'fileCount': result['fileCount'], 'manifestSha256': manifest_sha, 'reused': False}))
     finally:
+        if staging is not None:
+            shutil.rmtree(staging, ignore_errors=True)
+            if os.path.lexists(staging):
+                log('Could not remove the partial staging directory ' + str(staging))
         shutil.rmtree(inputs, ignore_errors=True)
         shutil.rmtree(state, ignore_errors=True)
 
