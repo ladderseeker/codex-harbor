@@ -1315,12 +1315,13 @@ echo "Successfully logged in; auth.json: $(stat -c '%U, mode %a, %s bytes' "$aut
 REMOTE
 ```
 
-**Block 4.** List the signed-in models as the service account, with the instance's homes, and stop if one of them is missing from the configuration. Then remove only the `plugins`, `plugins-clone-*` and `git-*` entries in `codex-home/.tmp`. The Codex login may leave them, and Harbor's runtimes never use them, because they turn the plugins feature off:
+**Block 4.** First, silently remove `/var/lib/harbor-install/login.log`, which holds the used device code, in case a restart kept block 3 from removing it. Next, list the signed-in models as the service account, with the instance's homes, and stop if one of them is missing from the configuration. Then remove only the `plugins`, `plugins-clone-*` and `git-*` entries in `codex-home/.tmp`. The Codex login may leave them, and Harbor's runtimes never use them, because they turn the plugins feature off:
 
 ```bash
 ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 harbor-vps 'bash -euo pipefail -s' <<'REMOTE'
 set -a; . /var/lib/harbor-install/values.env; set +a
 cd /
+rm -f -- /var/lib/harbor-install/login.log
 state=/var/lib/harbor-personal-$INSTANCE
 runuser -u "$SERVICE_USER" -- /usr/bin/env -i PATH="$RELEASE/bin:/usr/bin:/bin" HOME="$state/home" CODEX_HOME="$state/codex-home" "$RELEASE/bin/codex" -c 'cli_auth_credentials_store="file"' -c features.plugins=false debug models </dev/null > /var/lib/harbor-install/signed-models.json
 python3 - <<'PY'
@@ -1448,11 +1449,17 @@ for role in api supervisor; do
   systemctl show -p DropInPaths -p ReadWritePaths -p ProtectHome -p ProtectSystem -p NoNewPrivileges -p PrivateTmp -p UMask -p Delegate "$name-$role.service"
   grep -q '20-project-writes.conf' <<<"$(systemctl show -p DropInPaths --value "$name-$role.service")" || { echo "STOP: the $role drop-in is not in effect"; exit 1; }
 done
-python3 "$RELEASE/infra/personal-vps/deploy-release" preflight --instance "$INSTANCE" </dev/null > /var/lib/harbor-install/preflight.json
-python3 - <<'PY'
+report=$(python3 "$RELEASE/infra/personal-vps/deploy-release" preflight --instance "$INSTANCE" </dev/null)
+PREFLIGHT_REPORT="$report" python3 - <<'PY'
 import json
 import os
-report = json.load(open('/var/lib/harbor-install/preflight.json'))
+import tempfile
+text = os.environ['PREFLIGHT_REPORT'] + '\n'
+fd, temporary = tempfile.mkstemp(prefix='preflight.json.', dir='/var/lib/harbor-install')
+with os.fdopen(fd, 'w') as stream:
+    stream.write(text)
+os.replace(temporary, '/var/lib/harbor-install/preflight.json')
+report = json.loads(text)
 services = report['services']
 print('preflight: release', report['release'], 'verified', report.get('releaseVerified'), 'services', services,
       'health', report['health'], 'drop-ins', len(report['dropIns']), 'drift', report['generatedFileDrift'])
@@ -1462,10 +1469,12 @@ if (report.get('releaseVerified') is not True or report['release'] != os.environ
     raise SystemExit('STOP: preflight does not match the expected installation')
 PY
 canary=$PROJECTS/harbor-install-check
-if [ ! -e "$canary" ]; then
-  mkdir "$canary"
+if made=$(mkdir "$canary" 2>&1); then
   printf 'canary token: %s\n' "$(python3 -c 'import secrets; print(secrets.token_hex(8))')" > "$canary/canary.txt"
   printf 'status: BEFORE\n' > "$canary/edit-me.txt"
+elif [ ! -d "$canary" ]; then
+  echo "STOP: $made"
+  exit 1
 fi
 echo "canary folder: $canary"
 echo "VERIFIED"

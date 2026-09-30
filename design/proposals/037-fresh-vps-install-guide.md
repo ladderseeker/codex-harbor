@@ -733,6 +733,58 @@ Main's dispositions:
 - Once, a `pgrep` pattern of the design reviewer matched the reviewer's own tool shell, and its `kill -9` ended that shell. The reviewer then identified its fixture's process through `/proc` and killed only that process.
 - Neither reviewer wrote outside its scratch directory, apart from the marker and a tool output file that the session's tool runner saved.
 
+### Fix round 3, 30 September 2026
+
+The implementer changed the guide and one docstring in `deploy-release`.
+
+- The guide now has SHA-256 `a457025e…4deb` and 1,759 lines.
+- `deploy-release` now has SHA-256 `ae4df89a…165d`. Without docstrings, its syntax tree is identical to the one at `a7cc8df`, so the earlier evidence for its behavior still applies.
+
+The fixes:
+
+- **Step 14's block 1.**
+  - Preflight's output goes into a shell variable. A Python block writes it to a temporary file in `/var/lib/harbor-install`, renames that file onto `preflight.json` and checks the same text. So a run never reads another run's report. `preflight.json` now has mode `0600`.
+  - The canary folder comes from one `mkdir`. When the folder already exists, the block goes on, and only the run whose `mkdir` succeeded writes the canary's files.
+  - Any other failure of that `mkdir` prints a `STOP` line with its message. That includes a file where the folder belongs, which the earlier text accepted.
+- **Step 12's block 4.** It first removes `login.log` silently, before it lists the models.
+- **`build_and_stage`'s docstring.** It says that the function removes its inputs, build state and staging directory when it returns or raises, and that a reboot or a killed process leaves them.
+
+No printed line, Expect text or If not text changed, apart from the new `STOP` line.
+
+The implementer reported these results:
+
+- **Harness.** The P037-04 harness now has 710 checks, and all passed. It still runs 40 of the guide's 42 Bash blocks whole.
+- **Overlap test.** Two whole runs of step 14's block 1 overlapped, set up so that the race had to happen:
+  - a stand-in `preflight` gave the two runs reports of different lengths and a fixed order of writes;
+  - a wrapper held both runs at `mkdir` until both had arrived.
+
+  Both runs printed `VERIFIED`. `preflight.json` held one run's complete report, and the canary held one token. The install directory held nothing else.
+- **Control.** The same test failed with `a7cc8df`'s text. The run whose `preflight` wrote second stopped with a JSON traceback and no `STOP` line, and in a second test one run's `mkdir` failed.
+- **Login log.** With and without a leftover `login.log`, step 12's block 4 printed the same output as before, and the log was gone before the models were listed.
+- **Gate.** Each command's log records its exit code, working directory and the changed files' SHA-256 values. These passed:
+  - `bash -n` on 94 scripts;
+  - `check-docs`;
+  - `git diff --check`;
+  - the 34 unit tests under Python 3.11.15 and 3.12.3;
+  - `pnpm check`.
+
+Main then:
+
+- read every changed line, recomputed the identities and compared `deploy-release`'s syntax trees without docstrings itself;
+- reran the P037-04 harness from a copy, against this commit's two changed files and a clean export of the rest.
+  - All 710 checks passed, with the same names in the same order, and the same 40 blocks ran whole.
+  - Main's first attempt failed 18 checks of steps 1 and 3 only because main had named the copy's fixture directory `root`, which the harness's relocation of `/root` rewrites. With another name, everything passed.
+- amended this plan's specification of steps 12 and 14 to match;
+- updated the [unverified gates issue](../../issues/2026-09-30-103814-p037-unverified-gates.md) with the new checks' limits;
+- reran `check-docs`, `git diff --check`, the 34 unit tests under both Python versions and `pnpm check` on this commit's final text, with logs.
+
+**Container changes.**
+
+- The harness runs updated `/run/systemd/systemd-units-load` again.
+- This round's gate did not write the implementer's index.
+- The pinned Codex ran only under the harness, with fresh `HOME` and `CODEX_HOME` directories.
+- The round 3 harness, its logs and main's logs exist only in this cloud container.
+
 ## Closing record
 
 Pending until the [completion conditions](../workflow.md#proposal-completion-and-archive) pass.

@@ -405,7 +405,9 @@ def build_and_stage(name, unit, bundle, revision, prepare):
     """Build revision from bundle in the transient unprivileged unit and stage it as RELEASES/name.
 
     prepare(inputs) writes the pinned native inputs. Inputs, build state and a staging directory that
-    this run created are removed on every exit; an existing staging directory is refused and left."""
+    this run created are removed when this function returns or raises. A reboot or a killed process
+    leaves the inputs and build state, and any staging directory that this run had created. An existing
+    staging directory is refused and left."""
     release = RELEASES / name
     run_id = name + '-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     inputs = WORK / 'inputs' / run_id
