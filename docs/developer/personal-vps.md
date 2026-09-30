@@ -85,6 +85,26 @@ Managed worktrees/copies, file-editor tools, standalone terminals, schedules, ma
 
 No automatic update/rollback or verified off-host backup is promised by this installer. Updates of an existing installation can run from GitHub Actions as described in [GitHub Actions deployment](github-actions-deploy.md). Preserve PostgreSQL and private native state before migrations; an older release must not open incompatible state. P009's separate managed restore gates remain open. Keep SSH administration available independently of Harbor.
 
+## Disk use
+
+Harbor starts every personal runtime, local or VPS, with Codex's plugin feature off (`-c features.plugins=false`). Harbor has not assessed plugins. With the feature on, Codex 0.153.4 syncs OpenAI's plugin catalog, about 98 MB, into `CODEX_HOME/.tmp` when a runtime starts with a missing or stale copy, and a runtime that stops first leaves its partial download behind.
+
+The supervisor refreshes the stored model list and account readiness with a short-lived read-only runtime. It starts one when no capability record exists, every minute while the account is not signed in, and every 30 minutes while it is. After a failed attempt it waits a full minute. Supervisor startup deletes the stored record, so readiness refreshes on the first tick after a restart, for example after device login. The API still treats a model list older than one hour as unavailable.
+
+The installer renders PostgreSQL's container log with Docker's `json-file` driver, limited to three files of 10 MB each. Promotion does not rewrite the installed Compose file, so an installation made before this limit existed keeps Docker's default log settings.
+
+The deploy workflow's `preflight` reports disk use, and its `prune` action deletes old releases and checkpoints; see [GitHub Actions deployment](github-actions-deploy.md#actions).
+
+A Codex home that an older release used may still hold abandoned `.tmp/plugins-clone-*` and `.tmp/git-*` directories. Remove them only while the supervisor is stopped, because a running Codex process may be using `.tmp`. Stopping the supervisor interrupts active work, as described above. Replace `INSTANCE` with the instance name:
+
+```sh
+sudo systemctl stop harbor-personal-INSTANCE-supervisor.service
+sudo find /var/lib/harbor-personal-INSTANCE/codex-home/.tmp -mindepth 1 -maxdepth 1 \( -name 'plugins-clone-*' -o -name 'git-*' \) -exec rm -rf -- {} +
+sudo systemctl start harbor-personal-INSTANCE-supervisor.service
+```
+
+`find` does not follow symbolic links, and `rm -rf` removes a matched link rather than its target.
+
 ## Verification
 
 `python3 -m unittest discover -s tests/deployment -p '*_test.py'` exercises renderer/installer contracts. `python3 tests/personal-vps/native-boundary.py --binary /absolute/path/to/pinned/codex` uses an owned nonroot systemd instance and disposable files to check actual native write restrictions without credentials or model requests. It needs administrator capabilities and cleans only its own resources. The exact results and outstanding browser/account/deployment gates belong in P015's report; a successful render or contract suite is not deployment acceptance.

@@ -134,6 +134,7 @@ def artifacts(c, password, oidc_secret):
         'healthcheck': {'test': ['CMD', 'pg_isready', '-U', 'harbor', '-d', 'harbor'], 'interval': '2s', 'timeout': '2s', 'retries': 30},
         'security_opt': ['no-new-privileges:true'], 'mem_limit': '512m', 'cpus': 1,
         'pids_limit': 256, 'labels': {'traefik.enable': 'false'},
+        'logging': {'driver': 'json-file', 'options': {'max-size': '10m', 'max-file': '3'}},
     }
     services = {'postgres': pg}
     if c['traefik']:

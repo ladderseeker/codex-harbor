@@ -42,7 +42,7 @@ KEEP_CHECKPOINTS = 2
 # The XDG data, state and config homes of a development project; the rest is cache.
 DEVELOPMENT_KEEP = ('config', 'data', 'state')
 STAMP = re.compile(r'[0-9]{8}T[0-9]{6}Z')
-BUSY ="('queued','dispatching','running','waiting_approval','waiting_input','uncertain')"
+BUSY = "('queued','dispatching','running','waiting_approval','waiting_input','uncertain')"
 MIGRATIONS = 'packages/storage/src/migrations'
 RELEASE_ROOT_ENTRIES = {'apps', 'packages', 'infra', 'node_modules', 'toolchain', 'package.json',
                         'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'artifact.json'}
@@ -424,32 +424,101 @@ def installed_check(c, unit, release):
         require(http_status(c['origin'] + path) == 401, 'Anonymous request was not refused: ' + path)
 
 
-def checkpoint(c, unit, etc, state, name):
+def real_directory(path):
+    return stat.S_ISDIR(os.lstat(path).st_mode)
+
+
+def checkpoint_plan(state):
+    """Relative directories to rebuild and entries to copy for a checkpoint of private state.
+
+    PostgreSQL data is dumped separately and Codex scratch (codex-home/.tmp) is left out. Of each
+    home/development/<project> directory only the XDG data, state and config homes are kept; the
+    rest is the project's XDG, npm and pnpm cache. Symbolic links are copied, never followed."""
+    rebuild, copies = [], []
+    for child in sorted(os.listdir(state)):
+        if child == 'postgres':
+            continue
+        if child == 'codex-home' and real_directory(state / child):
+            rebuild.append(child)
+            copies += [child + '/' + name for name in sorted(os.listdir(state / child)) if name != '.tmp']
+        elif child == 'home' and real_directory(state / child):
+            rebuild.append(child)
+            for name in sorted(os.listdir(state / child)):
+                entry = child + '/' + name
+                if name != 'development' or not real_directory(state / entry):
+                    copies.append(entry)
+                    continue
+                rebuild.append(entry)
+                for project in sorted(os.listdir(state / entry)):
+                    relative = entry + '/' + project
+                    if not real_directory(state / relative):
+                        copies.append(relative)
+                        continue
+                    rebuild.append(relative)
+                    copies += [relative + '/' + item for item in sorted(os.listdir(state / relative))
+                               if item in DEVELOPMENT_KEEP]
+        else:
+            copies.append(child)
+    return rebuild, copies
+
+
+def copy_state(state, target):
+    """Copy private state into the existing empty directory target, following checkpoint_plan."""
+    rebuild, copies = checkpoint_plan(state)
+    for relative in rebuild:
+        (target / relative).mkdir(mode=0o700)
+    for relative in copies:
+        subprocess.run(['/bin/cp', '-a', str(state / relative), str(target / relative)], check=True)
+    # Rebuilt directories take their source's owner, mode and timestamps once their content is in place.
+    for relative in reversed(rebuild):
+        source = os.lstat(state / relative)
+        os.chown(target / relative, source.st_uid, source.st_gid)
+        os.chmod(target / relative, stat.S_IMODE(source.st_mode))
+        os.utime(target / relative, ns=(source.st_atime_ns, source.st_mtime_ns))
+
+
+def checkpoint_need(c, etc, state):
+    """Estimated checkpoint bytes: the state it copies, the instance configuration and the database."""
+    rebuild, copies = checkpoint_plan(state)
+    seen = set()
+    need = sum(os.lstat(state / relative).st_blocks * 512 for relative in rebuild)
+    need += sum(allocated(state / relative, seen) for relative in copies)
+    need += allocated(etc, seen)
+    return need + int(psql(c, "SELECT pg_database_size('harbor')"))
+
+
+def checkpoint(c, unit, etc, state, name, backups=None):
+    backups = BACKUPS if backups is None else Path(backups)
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-    BACKUPS.mkdir(mode=0o700, exist_ok=True)
-    target = BACKUPS / (name + '-' + stamp)
+    backups.mkdir(mode=0o700, exist_ok=True)
+    target = backups / (name + '-' + stamp)
     target.mkdir(mode=0o700)
-    dump = target / 'database.dump'
-    with open(dump, 'wb') as stream:
-        subprocess.run(['/usr/bin/docker', 'compose', '-f', str(etc / 'compose.json'), 'exec', '-T', 'postgres',
-                        'pg_dump', '-U', 'harbor', '-d', 'harbor', '-Fc'], check=True, stdout=stream)
-    with open(dump, 'rb') as stream:
-        subprocess.run(['/usr/bin/docker', 'compose', '-f', str(etc / 'compose.json'), 'exec', '-T', 'postgres',
-                        'pg_restore', '--list'], check=True, stdin=stream, stdout=subprocess.DEVNULL)
-    subprocess.run(['/bin/cp', '-a', str(etc), str(target / 'etc')], check=True)
-    units = target / 'systemd'
-    units.mkdir()
-    for path in Path('/etc/systemd/system').glob(unit + '-*'):
-        subprocess.run(['/bin/cp', '-a', str(path), str(units / path.name)], check=True)
-    apparmor = Path('/etc/apparmor.d') / (unit + '.apparmor')
-    if apparmor.exists():
-        subprocess.run(['/bin/cp', '-a', str(apparmor), str(target / 'apparmor')], check=True)
-    (target / 'state').mkdir(mode=0o711)
-    for child in sorted(state.iterdir()):
-        if child.name != 'postgres':
-            subprocess.run(['/bin/cp', '-a', str(child), str(target / 'state' / child.name)], check=True)
-    receipt = {'release': c['release'], 'databaseSha256': sha256(dump), 'createdAt': stamp}
-    (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    try:
+        dump = target / 'database.dump'
+        with open(dump, 'wb') as stream:
+            subprocess.run(['/usr/bin/docker', 'compose', '-f', str(etc / 'compose.json'), 'exec', '-T', 'postgres',
+                            'pg_dump', '-U', 'harbor', '-d', 'harbor', '-Fc'], check=True, stdout=stream)
+        with open(dump, 'rb') as stream:
+            subprocess.run(['/usr/bin/docker', 'compose', '-f', str(etc / 'compose.json'), 'exec', '-T', 'postgres',
+                            'pg_restore', '--list'], check=True, stdin=stream, stdout=subprocess.DEVNULL)
+        subprocess.run(['/bin/cp', '-a', str(etc), str(target / 'etc')], check=True)
+        units = target / 'systemd'
+        units.mkdir()
+        for path in Path('/etc/systemd/system').glob(unit + '-*'):
+            subprocess.run(['/bin/cp', '-a', str(path), str(units / path.name)], check=True)
+        apparmor = Path('/etc/apparmor.d') / (unit + '.apparmor')
+        if apparmor.exists():
+            subprocess.run(['/bin/cp', '-a', str(apparmor), str(target / 'apparmor')], check=True)
+        (target / 'state').mkdir(mode=0o711)
+        copy_state(state, target / 'state')
+        receipt = {'release': c['release'], 'databaseSha256': sha256(dump), 'createdAt': stamp}
+        (target / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    except BaseException:
+        # This run created the target; a partial checkpoint is never left behind.
+        shutil.rmtree(target, ignore_errors=True)
+        if os.path.lexists(target):
+            log('Could not remove the partial checkpoint ' + str(target))
+        raise
     log('Checkpoint ' + str(target) + ' database SHA256 ' + receipt['databaseSha256'])
     return target
 
@@ -478,6 +547,7 @@ def promote(args):
     old_files, new_files = switched_files(c, unit, etc), switched_files(new_config, unit, etc)
     require(not generated_drift(old_files), 'Installed files differ from their generated form; refusing: ' + ', '.join(generated_drift(old_files)))
     sites = drop_ins(unit)
+    require_space('Promotion checkpoint', [BACKUPS], checkpoint_need(c, etc, state))
 
     counts = ownership(c)
     require(not any(v for k, v in counts.items() if k != 'idleRuntimes'), 'Work is active; nothing was changed. Counts: ' + json.dumps(counts))
@@ -523,6 +593,169 @@ def promote(args):
                       'addedMigrations': added}))
 
 
+def real_children(directory):
+    """Real directories directly below directory; symbolic links are never followed."""
+    try:
+        require(real_directory(directory), str(directory) + ' must be a real directory')
+    except FileNotFoundError:
+        return []
+    found = []
+    for name in sorted(os.listdir(directory)):
+        try:
+            if real_directory(directory / name):
+                found.append(directory / name)
+        except FileNotFoundError:
+            continue
+    return found
+
+
+def checkpoint_receipt(directory):
+    """The receipt of a checkpoint that deploy-release wrote, or None for any other directory."""
+    path = directory / 'receipt.json'
+    try:
+        info = os.lstat(path)
+        if not stat.S_ISREG(info.st_mode):
+            return None
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        return None
+    with os.fdopen(fd, 'rb') as stream:
+        opened = os.fstat(stream.fileno())
+        if not stat.S_ISREG(opened.st_mode) or (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino):
+            return None
+        try:
+            receipt = json.loads(stream.read(1 << 20))
+        except ValueError:
+            return None
+    if not isinstance(receipt, dict) or not all(isinstance(receipt.get(k), str) for k in ('release', 'databaseSha256', 'createdAt')):
+        return None
+    created = receipt['createdAt']
+    if not STAMP.fullmatch(created) or not directory.name.endswith('-' + created):
+        return None
+    try:
+        datetime.datetime.strptime(created, '%Y%m%dT%H%M%SZ')
+    except ValueError:
+        return None
+    return receipt
+
+
+def codex_scratch(checkpoint_directory):
+    """state/codex-home/.tmp of a checkpoint when every component is a real directory, else None."""
+    path = checkpoint_directory
+    for part in ('state', 'codex-home', '.tmp'):
+        path = path / part
+        try:
+            if not real_directory(path):
+                return None
+        except FileNotFoundError:
+            return None
+    return path
+
+
+def prune_plan(c, keep=KEEP_CHECKPOINTS, releases=None, backups=None):
+    """What prune keeps and removes among the direct children of the release and backup directories.
+
+    It keeps the installed release, releases a process runs from, the newest `keep` checkpoints that
+    deploy-release wrote and the releases their receipts name. It removes the other recognized
+    checkpoints and releases, and Codex scratch from every checkpoint it keeps. Unrecognized
+    checkpoints, names starting with a dot and symbolic links are left alone."""
+    releases = RELEASES if releases is None else Path(releases)
+    backups = BACKUPS if backups is None else Path(backups)
+    require(type(keep) is int and 1 <= keep <= 10, 'Keep between 1 and 10 checkpoints')
+    checkpoints, recognized = [], []
+    for directory in real_children(backups):
+        entry = {'name': directory.name, 'path': str(directory), 'bytes': allocated(directory)}
+        checkpoints.append(entry)
+        receipt = checkpoint_receipt(directory)
+        if receipt:
+            recognized.append((receipt['createdAt'], directory.name, receipt['release'], entry))
+        else:
+            entry.update(keep=True, reason='not a checkpoint written by deploy-release')
+    recognized.sort(key=lambda item: item[:2], reverse=True)
+    named = set()
+    for index, (_, _, release, entry) in enumerate(recognized):
+        if index < keep:
+            entry.update(keep=True, reason='one of the newest ' + str(keep) + ' checkpoints')
+            named.add(os.path.normpath(release))
+        else:
+            entry.update(keep=False, reason='older than the newest ' + str(keep) + ' checkpoints')
+    installed = os.path.normpath(c['release'])
+    listed = []
+    for directory in real_children(releases):
+        entry = {'name': directory.name, 'path': str(directory), 'bytes': allocated(directory)}
+        if directory.name.startswith('.'):
+            entry.update(keep=True, reason='staging or hidden directory')
+        elif str(directory) == installed:
+            entry.update(keep=True, reason='installed release')
+        elif processes_from(directory):
+            entry.update(keep=True, reason='a process runs from it')
+        elif str(directory) in named:
+            entry.update(keep=True, reason='named by a kept checkpoint')
+        else:
+            entry.update(keep=False, reason='not installed, running or named by a kept checkpoint')
+        listed.append(entry)
+    remove = [{'path': e['path'], 'kind': 'release', 'bytes': e['bytes']} for e in listed if not e['keep']]
+    remove += [{'path': e['path'], 'kind': 'checkpoint', 'bytes': e['bytes']} for e in checkpoints if not e['keep']]
+    for entry in checkpoints:
+        scratch = codex_scratch(Path(entry['path'])) if entry['keep'] else None
+        if scratch:
+            remove.append({'path': str(scratch), 'kind': 'codex-scratch', 'bytes': allocated(scratch)})
+    return {'releases': listed, 'checkpoints': checkpoints, 'remove': remove}
+
+
+def remove_contents(directory):
+    with os.scandir(directory) as entries:
+        names = [(entry.name, entry.is_dir(follow_symlinks=False)) for entry in entries]
+    for name, is_directory in names:
+        if is_directory:
+            child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+            try:
+                remove_contents(child)
+            finally:
+                os.close(child)
+            os.rmdir(name, dir_fd=directory)
+        else:
+            os.unlink(name, dir_fd=directory)
+
+
+def remove_tree(root, relative):
+    """Delete the real directory root/relative. No symbolic link is followed on the way or inside it."""
+    parts = Path(relative).parts
+    require(parts and not any(part in ('', '.', '..') or '/' in part for part in parts), 'Invalid removal path')
+    parent = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for part in parts[:-1]:
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+            os.close(parent)
+            parent = child
+        target = os.open(parts[-1], os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+        try:
+            remove_contents(target)
+        finally:
+            os.close(target)
+        os.rmdir(parts[-1], dir_fd=parent)
+    finally:
+        os.close(parent)
+
+
+def disk_report(c, etc, state, releases=None, backups=None, work=None, build_state=None, build_cache=None):
+    """Read-only disk use: filesystems, build and checkpoint needs, Codex scratch and what prune would do."""
+    releases = RELEASES if releases is None else Path(releases)
+    backups = BACKUPS if backups is None else Path(backups)
+    build_paths = build_locations(releases, work, build_state, build_cache)
+    build_need = 4 * allocated(Path(c['release']))
+    checkpoint_bytes = checkpoint_need(c, etc, state)
+    plan = prune_plan(c, KEEP_CHECKPOINTS, releases, backups)
+    summary = lambda entries: [{k: e[k] for k in ('name', 'bytes', 'keep', 'reason')} for e in entries]
+    return {'filesystems': list(filesystems([releases, backups, Path(state)] + build_paths[:3]).values()),
+            'buildNeedBytes': build_need, 'buildFits': not shortfalls(build_paths, build_need),
+            'checkpointNeedBytes': checkpoint_bytes, 'checkpointFits': not shortfalls([backups], checkpoint_bytes),
+            'codexScratchBytes': allocated(Path(state) / 'codex-home' / '.tmp'),
+            'releases': summary(plan['releases']), 'checkpoints': summary(plan['checkpoints']),
+            'pruneKeepCheckpoints': KEEP_CHECKPOINTS, 'pruneWouldRemove': [item['path'] for item in plan['remove']],
+            'pruneWouldFreeBytes': sum(item['bytes'] for item in plan['remove'])}
+
+
 def preflight(args):
     c, unit, etc, state = instance(args.instance)
     report = {'hostname': os.uname().nodename, 'release': c['release'],
@@ -531,25 +764,60 @@ def preflight(args):
               'ownership': ownership(c), 'dropIns': sorted(drop_ins(unit)),
               'generatedFileDrift': generated_drift(switched_files(c, unit, etc)),
               'freeBytes': shutil.disk_usage('/opt').free,
+              'disk': disk_report(c, etc, state),
               'health': http_status(c['origin'] + '/health')}
     verify_release(Path(c['release']))
     report['releaseVerified'] = True
     print(json.dumps(report, indent=2))
 
 
+def prune(args):
+    """Delete old releases and checkpoints under the fixed retention rule of prune_plan."""
+    require(os.geteuid() == 0, 'Prune requires root')
+    keep = args.keep_checkpoints
+    require(type(keep) is int and 1 <= keep <= 10, 'Keep between 1 and 10 checkpoints')
+    c, _, _, _ = instance(args.instance)
+    plan = prune_plan(c, keep)
+    result = {'keepCheckpoints': keep, 'removed': [], 'freedBytes': 0, 'skipped': []}
+    item = None
+    try:
+        for item in plan['remove']:
+            path = Path(item['path'])
+            if item['kind'] == 'release':
+                # Recheck immediately before deleting: a release may have been installed or started since.
+                installed = os.path.normpath(instance(args.instance)[0]['release'])
+                if str(path) == installed or processes_from(path):
+                    result['skipped'].append({'path': item['path'], 'reason': 'installed or running when rechecked'})
+                    continue
+                remove_tree(RELEASES, path.name)
+            else:
+                remove_tree(BACKUPS, str(path.relative_to(BACKUPS)))
+            result['removed'].append(item['path'])
+            result['freedBytes'] += item['bytes']
+            log('Removed ' + item['path'] + ' (' + str(item['bytes']) + ' bytes)')
+        item = None
+    except BaseException:
+        if item is not None:
+            result['failed'] = item['path']  # The item in progress; it may be partly deleted.
+        raise
+    finally:
+        print(json.dumps(result))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='action', required=True)
-    for action in ('preflight', 'build', 'promote'):
+    for action in ('preflight', 'build', 'promote', 'prune'):
         p = sub.add_parser(action)
         p.add_argument('--instance', required=True)
     sub.choices['build'].add_argument('--bundle', required=True)
     sub.choices['build'].add_argument('--revision', required=True)
     sub.choices['promote'].add_argument('--release', required=True)
     sub.choices['promote'].add_argument('--allow-new-migrations', action='store_true')
+    sub.choices['prune'].add_argument('--keep-checkpoints', type=int, default=KEEP_CHECKPOINTS)
     args = parser.parse_args()
     require(os.geteuid() == 0, 'Run as root on the VPS')
-    {'preflight': preflight, 'build': build, 'promote': promote}[args.action](args)
+    {'preflight': preflight, 'build': build, 'promote': promote, 'prune': prune}[args.action](args)
 
 
 if __name__ == '__main__':

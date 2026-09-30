@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "preflight = read-only check; build = stage a release only; deploy = build, drain, checkpoint and promote"
+        description: "preflight = read-only check and disk report; build = stage a release only; deploy = build, drain, checkpoint and promote; prune = delete releases and checkpoints that the retention rule does not keep"
         type: choice
-        options: [preflight, build, deploy]
+        options: [preflight, build, deploy, prune]
         default: preflight
       allow_new_migrations:
         description: "Permit a release that adds database migrations (review them first; rollback then needs the checkpoint)"
@@ -95,7 +95,7 @@ jobs:
         run: ssh harbor-vps "python3 '$INCOMING/tools/infra/personal-vps/deploy-release' preflight --instance '$INSTANCE'"
 
       - name: Build and stage release
-        if: env.ACTION != 'preflight'
+        if: env.ACTION == 'build' || env.ACTION == 'deploy'
         run: |
           ssh harbor-vps "python3 '$INCOMING/tools/infra/personal-vps/deploy-release' build --instance '$INSTANCE' --bundle '$INCOMING/harbor.bundle' --revision '$REVISION'" | tee build.log
           echo "RELEASE=/opt/harbor-personal/releases/gha-${REVISION:0:12}" >> "$GITHUB_ENV"
@@ -107,13 +107,19 @@ jobs:
           [ "$ALLOW_NEW_MIGRATIONS" = true ] && extra="--allow-new-migrations"
           ssh harbor-vps "python3 '$INCOMING/tools/infra/personal-vps/deploy-release' promote --instance '$INSTANCE' --release '$RELEASE' $extra" | tee promote.log
 
+      # Keeps the installed release, releases a process runs from, the newest two
+      # checkpoints and the releases they name; deletes the other releases and checkpoints.
+      - name: Prune releases and checkpoints
+        if: env.ACTION == 'prune'
+        run: ssh harbor-vps "python3 '$INCOMING/tools/infra/personal-vps/deploy-release' prune --instance '$INSTANCE'" | tee prune.log
+
       - name: Summary
         if: always()
         run: |
           {
             echo "### Harbor VPS ${ACTION}"
             echo "Revision: \`${REVISION}\`"
-            for f in build.log promote.log; do
+            for f in build.log promote.log prune.log; do
               if [ -f "$f" ]; then echo; echo "\`\`\`"; tail -n 5 "$f"; echo "\`\`\`"; fi
             done
           } >> "$GITHUB_STEP_SUMMARY"

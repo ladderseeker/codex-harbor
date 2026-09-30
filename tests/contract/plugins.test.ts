@@ -44,7 +44,11 @@ test(
       stdio: "pipe",
       detached: true,
     });
-    const exited = new Promise<void>((resolve) => child.once("exit", resolve));
+    // A failed spawn emits error without exit; either ends the wait.
+    const exited = new Promise<void>((resolve) => {
+      child.once("exit", () => resolve());
+      child.once("error", () => resolve());
+    });
     const adapter = new CodexAdapter(child);
     try {
       // initialize also sends the initialized notification.

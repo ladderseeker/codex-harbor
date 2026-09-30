@@ -84,6 +84,10 @@ class PersonalVpsTests(unittest.TestCase):
         files = personal.artifacts(self.c, 'a' * 64, None)
         compose = json.loads(files['compose.json'])
         self.assertEqual(compose['services']['postgres']['ports'], ['127.0.0.1:5544:5432'])
+        # P035-09: PostgreSQL's container log is bounded; the routing carrier is unchanged.
+        self.assertEqual(compose['services']['postgres']['logging'],
+                         {'driver': 'json-file', 'options': {'max-size': '10m', 'max-file': '3'}})
+        self.assertNotIn('logging', compose['services']['routing'])
         self.assertEqual(compose['services']['routing']['network_mode'], 'host')
         self.assertNotIn('volumes', compose['services']['routing'])
         for role in ('api', 'supervisor'):
