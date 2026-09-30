@@ -7,18 +7,19 @@
 - Priority: Not set by the owner. The owner asked for this on 30 September 2026, while P035 was executing.
 - Created: 2026-09-30
 - Owner: Main conversation. A fresh-context implementer does the implementation in a separate checkout.
-- Outcome: The repository's rules match how agents work in cloud sessions. They say:
-  - how an agent working branch is committed, pushed and reviewed;
+- Outcome: The repository's rules match how agents work for the owner, including in cloud sessions. They say:
+  - how agent work is committed, pushed and delivered straight to `main`;
   - what a cloud session can and cannot verify, and where the missing gates run;
   - how a session prepares its toolchain, now automated by a repository hook;
   - how work and evidence survive a disposable container.
 
   Claude Code loads the shared rules through a new `CLAUDE.md` that imports `AGENTS.md`.
-- Authorization: On 30 September 2026 the owner did two things:
+- Authorization: On 30 September 2026 the owner did three things:
   - They chose "Allow branch commits" on this thread's decision card: "I commit and push checkpoints to the Claude branch without asking; merging to main still waits for you."
   - They then wrote: "You should update the rules AGENTS.md and CLAUE.md base on the work you can do in this cloud enviroment. You can update all to make it follow our best work practice."
+  - At 02:54 UTC they wrote: "I don't need review, merge to main directly as this is my private work. Add this in the rule, whenever a task are finished, push to main directly. Later we finished CI CD, just make it like finish the deployment whenever you finish something"
 
-  Together these authorize this plan, its execution alongside P035 on disjoint files, and branch commits. Merging into `main`, and every VPS workflow run other than `preflight`, still need the owner.
+  Together these authorize this plan, its execution alongside P035 on disjoint files, branch commits and pushing finished work to `main`. The last message replaces the first choice's reservation about merging. Every VPS workflow run other than `preflight` still needs the owner's go-ahead until CI/CD exists.
 - Baseline: branch `claude/project-thread-ob9jjx` at `d35a225`. That commit is `main` at `9231078` plus P035's plan and a WIP checkpoint of P035. Neither touches this plan's files.
 - Dependencies: None blocking.
   - The hook's real download and install are verified in this thread's cloud container.
@@ -41,17 +42,19 @@ The rules assume a developer machine: the owner confirms every commit, ignored d
   - The environment's stop check asks, at the end of every turn, for work to be committed and pushed.
 - **A different toolchain.** Node 22 is on PATH, the repository requires Node 24.11.1, and Codex is not installed.
 - **Unavailable gates.** Several mandatory gates cannot run: the Docker daemon is not running, there is no systemd or delegated cgroup v2, and there is no SSH client.
-- **Branch reviews.** The owner reviews agent work as pull requests from the agent's branch, as with pull request #4, and has now allowed branch commits.
+- **Delivery.** The owner used to review agent work as pull requests from the agent's branch, as with pull request #4. On 30 September the owner allowed branch commits, then directed that finished work go straight to `main` without review, and that deployment become part of finishing once CI/CD exists.
 
 After this change:
 
-1. **Commits.**
-   - On an assigned agent working branch, main commits coherent checkpoints with the configured identity and pushes them without asking. A checkpoint that has not passed its gate says `WIP`.
+1. **Commits and delivery.**
    - Implementers never commit.
-   - Main never commits to or pushes `main`, and never merges.
-   - The owner reviews the gated and reviewed result in a pull request and merges it.
-   - Without an assigned working branch, the old rule stands: the owner confirms the commit.
-   - D015 (`design/decisions/015-agent-working-branches.md`) records the change.
+   - Main commits with the configured identity. When an outcome is finished, main pushes it directly to `main`, without a pull request or owner review.
+   - Finished means the gate ran, with every gate that cannot run in the environment recorded as unverified, and the review rounds and closing record are complete. A proposal with an unverified mandatory gate stays Accepted until that gate passes, even though its code is on `main`.
+   - Only commits whose whole content is finished reach `main`.
+   - Before that, main may commit coherent checkpoints to an assigned agent working branch and push them without asking. A checkpoint that has not passed its gate says `WIP`.
+   - Until CI/CD exists, every deploy workflow run other than `preflight` needs the owner's go-ahead. Once it exists, finishing an outcome includes deploying it and checking the deployment.
+   - The automatic design and provenance reviews stay. They are now the only review before `main`.
+   - D015 (`design/decisions/015-direct-delivery-and-cloud-sessions.md`) records the change.
 2. **Cloud sessions in AGENTS.md.** A short section covers:
    - the environment and its setup;
    - what can and cannot be verified there;
@@ -74,7 +77,7 @@ After this change:
    - the environment facts checked on 30 September 2026;
    - how to prepare a session;
    - a table of gates;
-   - commits and pull requests;
+   - commits and delivery to `main`;
    - how to keep evidence;
    - the Codex account;
    - VPS work;
@@ -98,7 +101,9 @@ Excluded:
 
 ## Dependencies and current design
 
-The [workflow](../workflow.md#proposal-completion-and-archive) and [D013](../decisions/013-evidence-based-delivery-workflow.md) say that the owner confirms each commit. The owner's 30 September choice changes that for agent working branches. A focused decision records the change, D015 (`design/decisions/015-agent-working-branches.md`), with a reciprocal metadata link from D013. D013's other rules and its history stay unchanged.
+The [workflow](../workflow.md#proposal-completion-and-archive) and [D013](../decisions/013-evidence-based-delivery-workflow.md) say that the owner confirms each commit. The owner's 30 September directions replace that: agents commit checkpoints on working branches and push finished work straight to `main`, with no owner confirmation or review. A focused decision records the change, D015 (`design/decisions/015-direct-delivery-and-cloud-sessions.md`), with a reciprocal metadata link from D013. D013's other rules, including the automatic reviews, and its history stay unchanged.
+
+[P026](026-continuous-integration.md) plans hosted CI. The owner's direction that deployment follow each finished outcome applies once CI and deployment automation exist; the plan that delivers them updates the deploy rules then.
 
 The gate rules stay the same: a missing credential, runtime or infrastructure makes a gate unverified, never passed. The new text only says which gates a cloud session cannot run and where they run instead.
 
@@ -131,7 +136,7 @@ No browser page or public API changes.
   - what to commit and when;
   - what they can verify;
   - how to record the gates they cannot run.
-- **The owner** reviews each outcome as a pull request. The owner may add the optional setup script to the cloud environment to cache Node and Codex.
+- **The owner** finds each finished outcome on `main`, with a summary in the thread that produced it. The owner may add the optional setup script to the cloud environment to cache Node and Codex.
 
 ## Contracts, state and security
 
@@ -153,7 +158,7 @@ The implementer applies these texts verbatim. It may adjust only a link path, an
 Replace the Delivery and delegation bullet that begins "Implementers never commit." with:
 
 ```markdown
-- Implementers never commit. On an assigned agent working branch, such as a cloud session's `claude/...` branch, main commits coherent checkpoints with the session's configured identity and pushes them without asking, marking unverified checkpoints `WIP`. Main never commits to or pushes `main` and never merges. The owner reviews the gated and reviewed result in a pull request and merges it ([D015](design/decisions/015-agent-working-branches.md)). Without an assigned working branch, main presents the reviewed result and the owner confirms the commit. Do not deploy without applicable authorization.
+- Implementers never commit. Main commits with the configured identity and pushes finished work directly to `main`, without a pull request or owner review ([D015](design/decisions/015-direct-delivery-and-cloud-sessions.md)). Work is finished when its gate ran, with gates that cannot run recorded as unverified, and its review rounds and closing record are complete; only commits whose whole content is finished reach `main`. Before that, main may push checkpoints to an assigned agent working branch, such as a cloud session's `claude/...` branch, without asking, marking unverified ones `WIP`. Until CI/CD exists, deploy only with the owner's go-ahead for that run; once it exists, finishing an outcome includes deploying it and checking the deployment.
 ```
 
 Replace the Implementation and safety bullet that begins "Keep enduring work and evidence" with:
@@ -170,7 +175,7 @@ Insert this section between Implementation and safety and VPS SSH handoff:
 - A cloud agent session, such as a Claude Code cloud session, runs in its own disposable Linux container with a fresh clone, HTTPS-only egress through a proxy and no SSH client. Anything not pushed, including `.test-runs/` evidence and any Codex login made there, is lost when the container is reclaimed. The [cloud session guide](docs/developer/cloud-sessions.md) records the checked environment, setup and commands; recheck it when the environment changes.
 - In Claude Code cloud sessions, the repository's session-start hook installs the pinned Node 24.11.1 and the locked dependencies. Install Codex 0.153.4 only when a real-runtime contract needs it. Never loosen a pinned version, checksum or lockfile to make setup pass.
 - Cloud sessions can run `pnpm build`, `pnpm check`, `pnpm test`, `pnpm test:deployment:contract`, pinned-runtime contracts that do not launch a personal runtime, document checks and Playwright with the preinstalled Chromium. They cannot run real-stack `pnpm test:e2e` without a running Docker daemon, personal runtime launches or the personal VPS Linux lanes without systemd and delegated cgroup v2, the managed Linux isolation lanes, or anything over SSH. Never weaken container, network or sandbox isolation to make a check run. Record such gates as unverified with a linked issue; hosted CI or a supported Linux host supplies them.
-- Owner direction, 30 September 2026: agents plan, implement, test and review, and may run the read-only deploy `preflight` through GitHub Actions. The owner does all SSH and host work, merges pull requests and gives the go-ahead for every other deploy workflow run.
+- Owner direction, 30 September 2026: agents plan, implement, test, review and push finished work to `main`, and may run the read-only deploy `preflight` through GitHub Actions. The owner does all SSH and host work and, until CI/CD exists, gives the go-ahead for every other deploy workflow run.
 - Use a Codex login made inside a container for tests only as the owner has authorized: copy only the credential into run-owned state, delete the copy afterwards, and never commit, print or share it.
 ```
 
@@ -194,8 +199,8 @@ Create `CLAUDE.md` with exactly this content:
 These notes add Claude Code specifics to the shared rules above. Where they seem to conflict with `AGENTS.md` or the [delivery workflow](design/workflow.md), those win; report the conflict.
 
 - **Session setup.** In cloud sessions, the SessionStart hook in `.claude/settings.json` runs `scripts/cloud-session-setup.sh` and prints one status line. If that line reports a failure, follow [Prepare a session](docs/developer/cloud-sessions.md#prepare-a-session) before running checks.
-- **Git.** Work only on the branch the session assigns. Commit with the configured Git identity, which signs commits in cloud sessions, and never with the owner's or another contributor's name or email. End commit messages and pull request descriptions with the attribution lines the session asks for. The environment's stop check reports uncommitted or unpushed work at the end of each turn: commit and push a checkpoint, marked `WIP` when unverified.
-- **GitHub.** Use the built-in GitHub tools; the `gh` CLI may be missing. After the gate and reviews, open or update the pull request for the owner's review, and never merge it.
+- **Git.** Commit with the configured Git identity, which signs commits in cloud sessions, and never with the owner's or another contributor's name or email. End commit messages and pull request descriptions with the attribution lines the session asks for. Push checkpoints to the branch the session assigns. The environment's stop check reports uncommitted or unpushed work at the end of each turn: commit and push a checkpoint, marked `WIP` when unverified. Deliver finished work to `main` as [Commits and delivery](docs/developer/cloud-sessions.md#commits-and-delivery) describes.
+- **GitHub.** Use the built-in GitHub tools; the `gh` CLI may be missing. Never open a pull request to ask the owner for review; one serves only as a way to deliver finished work to `main` when Git cannot push there.
 - **Roles.** Run the implementer and each reviewer as a fresh-context subagent whose self-contained brief names its role document. Subagents never commit. When a checkpoint commit includes a running implementer's files, tell the implementer which commit to diff against.
 - **Parallel work.** Give concurrent implementers disjoint file fences. Put a second implementer in its own worktree outside the repository directory, so that document checks do not scan another worker's unfinished files.
 ```
@@ -205,7 +210,7 @@ These notes add Claude Code specifics to the shared rules above. Where they seem
 In Proposal completion and archive, replace the paragraph that begins "Main presents the coherent uncommitted result" with:
 
 ```markdown
-Implementers never commit. When main works on an assigned agent working branch, such as a cloud session's branch, it commits coherent checkpoints there with the session's configured identity and pushes them without further confirmation; a checkpoint that has not passed its gate says `WIP` in its subject. Main never commits to or pushes the default branch and never merges. Once the gate and review rounds finish, main presents the result, validation, review rounds and remaining issues in a pull request from the working branch, and the owner reviews it and decides the merge. A draft pull request may exist earlier. Without an assigned working branch, main presents the coherent uncommitted result and commits only after the owner confirms, using the configured or owner-provided identity. Deployment follows its own applicable authorization. Reconcile staged, unstaged and untracked contents and owned stashes with each commit; identify deferred work and its owner. [D015](decisions/015-agent-working-branches.md) records this rule.
+Implementers never commit. Main commits with the configured or owner-provided identity and pushes finished work directly to the default branch, `main`, without a pull request or owner review. Work is finished when its gate ran, with any gate that cannot run in the environment recorded as unverified, and its review rounds and closing record are complete. A proposal with an unverified mandatory gate stays Accepted until that gate passes, even though its code is on `main`. Only commits whose whole content is finished reach `main`, so outcomes that share a working branch are delivered in the order they finish. Before that, main may commit coherent checkpoints to an assigned agent working branch, such as a cloud session's branch, and push them there without further confirmation; a checkpoint that has not passed its gate says `WIP` in its subject. Main then reports the outcome, validation, review rounds and remaining issues to the owner. Until continuous integration and deployment automation exist, every deploy workflow run other than the read-only `preflight` needs the owner's go-ahead; once they exist, finishing an outcome includes deploying it and checking the deployment. Reconcile staged, unstaged and untracked contents and owned stashes with each commit; identify deferred work and its owner. [D015](decisions/015-direct-delivery-and-cloud-sessions.md) records this rule.
 ```
 
 In Evidence and provenance, after the sentence "Keep evidence that must survive interruption in persistent ignored storage and record ownership/recovery for unfinished changes and test resources.", insert:
@@ -225,13 +230,13 @@ The [cloud session guide](../docs/developer/cloud-sessions.md#what-runs-here) li
 - `design/decisions/013-evidence-based-delivery-workflow.md`: after the "Current contract" metadata bullet, add the bullet below. Leave the body unchanged.
 
   ```markdown
-  - Amended by: [D015](015-agent-working-branches.md) on 30 September 2026, for commits on agent working branches and evidence in ephemeral environments.
+  - Amended by: [D015](015-direct-delivery-and-cloud-sessions.md) on 30 September 2026, for agent commits, direct delivery to `main` and evidence in ephemeral environments.
   ```
 
 - `design/README.md`: after the D014 line, add:
 
   ```markdown
-  - [D015 — Agent working branches and cloud sessions](decisions/015-agent-working-branches.md).
+  - [D015 — Direct delivery and cloud sessions](decisions/015-direct-delivery-and-cloud-sessions.md).
   ```
 
 - `docs/developer/development.md`, four edits:
@@ -247,7 +252,7 @@ The [cloud session guide](../docs/developer/cloud-sessions.md#what-runs-here) li
     The [cloud session guide](cloud-sessions.md#what-runs-here) says which of them run in a cloud session.
     ```
 
-  - In Delivering a feature, replace "the three-round cap and owner confirmation before a commit." with "the three-round cap and the commit and pull request rules."
+  - In Delivering a feature, replace "the three-round cap and owner confirmation before a commit." with "the three-round cap and the commit and delivery rules."
   - In the next paragraph, after "OS temporary storage is for recreatable scratch.", add:
 
     ```markdown
@@ -257,43 +262,49 @@ The [cloud session guide](../docs/developer/cloud-sessions.md#what-runs-here) li
 - `docs/developer/agents/implementer.md`: replace "main presents the reviewed result for owner commit confirmation." with:
 
   ```markdown
-  main commits and presents the reviewed result under the [workflow's commit rules](../../../design/workflow.md#proposal-completion-and-archive).
+  main commits the reviewed result and delivers it to `main` under the [workflow's commit rules](../../../design/workflow.md#proposal-completion-and-archive).
   ```
 
-- `design/proposal-template.md`: replace "- Owner-facing uncommitted result for review and commit confirmation." with "- How the result reaches the owner: a pull request from the agent working branch, or the uncommitted result for commit confirmation."
+- `design/proposal-template.md`: replace "- Owner-facing uncommitted result for review and commit confirmation." with:
+
+  ```markdown
+  - Delivery: the finished result is committed and pushed to `main` together with this record, under the [commit rules](workflow.md#proposal-completion-and-archive).
+  ```
+
 - `docs/README.md`: under Start here, after the Developer workflow line, add:
 
   ```markdown
-  - [Cloud agent sessions](developer/cloud-sessions.md): setup, what a cloud session can verify, commits and pull requests, and where the other gates run.
+  - [Cloud agent sessions](developer/cloud-sessions.md): setup, what a cloud session can verify, commits and delivery to `main`, and where the other gates run.
   ```
 
 ### D015
 
-Write `design/decisions/015-agent-working-branches.md`, titled "D015 — Agent working branches and cloud sessions", in the form of D013 and D014.
+Write `design/decisions/015-direct-delivery-and-cloud-sessions.md`, titled "D015 — Direct delivery and cloud sessions", in the form of D013 and D014.
 
 It has these metadata bullets:
 
-- **Decision:** Accepted on 30 September 2026, quoting the owner's card choice and request above.
+- **Decision:** Accepted on 30 September 2026, quoting the owner's card choice, request and 02:54 direction above.
 - **Changes:** collaboration rules only.
-- **Amends:** D013's rule that the owner confirms each commit. The amendment covers assigned agent working branches only.
-- **Retains:** the rest of D013; the owner's authority over merges, deployment and credentials; every gate.
+- **Amends:** D013's rule that the owner confirms each commit. Agents push finished work straight to `main`, with no owner confirmation or review.
+- **Retains:** the rest of D013, including the automatic design and provenance reviews; the owner's authority over deployment until CI/CD exists, and over credentials and host work; every gate.
 - **Execution record:** this plan.
 - **Current contract:** the workflow section, `AGENTS.md` and the cloud session guide.
 
 It has these sections:
 
-- **Context.** Disposable containers, the stop check, per-commit confirmation stalling every turn, and pull request review already being the owner's practice.
+- **Context.** Harbor is the owner's private work. Cloud containers are disposable, the stop check asks for pushed work every turn, and per-commit confirmation stalled every turn. The owner first reviewed pull requests, then found that review unnecessary.
 - **Options and decision.** Three options:
   - Keep per-commit confirmation. This loses work when a container is reclaimed and blocks every turn.
-  - Commit on working branches and have the owner review at the pull request. This option is selected.
-  - Let agents merge after a green gate. This is rejected because the owner reviews everything before it reaches `main`.
+  - Commit on working branches and have the owner review each pull request. The owner chose this first, then rejected it on 30 September: "I don't need review, merge to main directly as this is my private work."
+  - Commit checkpoints on working branches and push finished work straight to `main`. This option is selected.
 
-  The section also states the gate routing: unavailable gates stay unverified, hosted CI or a supported host supplies them, and isolation is never weakened.
+  The section also states two more rules. Unavailable gates stay unverified, hosted CI or a supported host supplies them, and isolation is never weakened. Once CI/CD exists, finishing an outcome includes deploying it, as the owner directed: "Later we finished CI CD, just make it like finish the deployment whenever you finish something".
 - **Consequences:**
-  - Working branches may contain `WIP` commits, which the owner may squash at merge.
+  - `main` history includes the `WIP` checkpoints that led to each finished outcome, but `main` itself only ever holds finished work.
+  - The automatic reviews are the only review before `main`, so they are never skipped.
+  - A proposal can be on `main` while still Accepted, because a mandatory gate that could not run keeps it from Implemented.
   - Reviewers get commit identities.
   - Evidence that must survive goes into tracked records.
-  - A checkout without an assigned working branch keeps the old rule.
 
 ### Cloud session guide
 
@@ -304,7 +315,7 @@ It has these sections:
 - `## Prepare a session`
 - `## What runs here`
 - `## Gates that need another host`
-- `## Commits and pull requests`
+- `## Commits and delivery`
 - `## Keep evidence`
 - `## Codex account`
 - `## VPS work`
@@ -329,13 +340,15 @@ Required content for each section:
   - anything over SSH.
 
   Then say how to record them: unverified, with a linked issue. They run in hosted CI once [P026](../../design/proposals/026-continuous-integration.md) delivers it, or on a supported Linux host run by the owner.
-- **Commits and pull requests.** D015 in practice:
+- **Commits and delivery.** D015 in practice:
   - use the configured identity, which signs commits;
   - include the attribution lines;
   - mark unverified checkpoints `WIP`;
-  - push after each checkpoint;
+  - push each checkpoint to the session's branch;
   - implementers never commit, and a running implementer is told its diff base;
-  - use a pull request for review; the owner merges; nothing is pushed to `main`.
+  - when an outcome is finished, push it to `main` with `git push origin HEAD:main`; where Git may push only to the session's branch, open a pull request from that branch and merge it at once with the GitHub tools, as a delivery step and not a review request;
+  - push to `main` only commits whose whole content is finished, delivering outcomes that share a branch in the order they finish;
+  - until CI/CD exists, deploy workflow runs other than `preflight` need the owner's go-ahead.
 - **Keep evidence.** Ignored and scratch storage disappear with the container. Commit evidence records, and mark raw logs unavailable once they are gone.
 - **Codex account.**
   - A login made with `codex login --device-auth` exists only in that container.
@@ -343,7 +356,7 @@ Required content for each section:
   - Never commit, print or share it.
 - **VPS work.**
   - Use the GitHub Actions workflow.
-  - `preflight` is read-only; every other action needs the owner's go-ahead for that run.
+  - `preflight` is read-only; until CI/CD exists, every other action needs the owner's go-ahead for that run.
   - The owner does all SSH and host work.
   - Link the [GitHub Actions deployment guide](../../docs/developer/github-actions-deploy.md) and the [personal VPS guide](../../docs/developer/personal-vps.md).
 - **Optional environment setup script.** Give an owner-pasteable Bash script for the cloud environment's Setup script field. The script does four things:
@@ -419,7 +432,7 @@ Return any needed change to settled text, or any path outside the fence, to main
 - `tests/deployment/cloud_session_setup_test.py` (new)
 - `docs/developer/cloud-sessions.md` (new)
 - `design/workflow.md`
-- `design/decisions/015-agent-working-branches.md` (new)
+- `design/decisions/015-direct-delivery-and-cloud-sessions.md` (new)
 - `design/decisions/013-evidence-based-delivery-workflow.md`
 - `design/README.md`
 - `docs/developer/development.md`
@@ -449,7 +462,7 @@ Main removes both after integration.
   - the proposal template;
   - the documentation index.
 
-  A search of current documents, excluding archives and dated reports, finds no requirement for per-commit owner confirmation on an agent working branch.
+  A search of current documents, excluding archives and dated reports, finds no requirement for per-commit owner confirmation or for the owner to review a pull request.
 - **P036-04:** The cloud session guide has the specified headings and content, and it dates its environment facts. Its commands match `package.json`, the pinned versions and the hook.
 - **P036-05:** The hook is verified in two ways.
   - The automated test's four cases pass.
@@ -474,7 +487,7 @@ No application behavior changes, so no application suite beyond these is claimed
 
 ## Rollout and recovery
 
-- The rules and the hook take effect in sessions that start from a branch containing them. After the owner merges, that means every new cloud session on `main`.
+- The rules and the hook take effect in sessions that start from a branch containing them. Once they are on `main`, that means every new cloud session.
 - Adding the optional setup script is the owner's choice.
 - Reverting the commit restores the previous rules. The hook leaves only the Node copy under `~/.cache` in disposable containers.
 

@@ -13,7 +13,7 @@
   - removes its own partial copies when a step fails;
   - reports disk use;
   - on explicit request, prunes old checkpoints and releases under a fixed retention rule.
-- Authorization: On 30 September 2026 the owner reported that the VPS disk had filled, asked for this analysis, and chose "Disk fix first" on the thread's decision card: "I plan and build the leak fix now; CI (P026) and clean shutdown (P025) follow it." That choice authorizes this plan and its implementation in the repository. Commits, pushes and every VPS workflow run still need the owner's separate confirmation. The owner has since uninstalled Harbor from the VPS, so this plan changes no installed instance.
+- Authorization: On 30 September 2026 the owner reported that the VPS disk had filled, asked for this analysis, and chose "Disk fix first" on the thread's decision card: "I plan and build the leak fix now; CI (P026) and clean shutdown (P025) follow it." That choice authorizes this plan and its implementation in the repository. Later that day the owner allowed branch commits, then directed that finished work go straight to `main` without review; [P036](036-cloud-agent-sessions.md) records that rule. Every VPS workflow run other than `preflight` still needs the owner's go-ahead. The owner has since uninstalled Harbor from the VPS, so this plan changes no installed instance.
 - Baseline: `main` at `92310786d8c502e3dec4a6a45188a488fa969356`. See [Baseline checks](#baseline-checks) for what ran on it.
 - Dependencies: Nothing blocks execution. Three gates need infrastructure or permission that this thread's container lacks, and they block completion:
   - The real-stack end-to-end suite needs a Docker engine with Compose. Starting a Docker daemon in this container was refused.
