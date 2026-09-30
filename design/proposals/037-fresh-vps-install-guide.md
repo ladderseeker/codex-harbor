@@ -785,6 +785,43 @@ Main then:
 - The pinned Codex ran only under the harness, with fresh `HOME` and `CODEX_HOME` directories.
 - The round 3 harness, its logs and main's logs exist only in this cloud container.
 
+### Delivery, 30 September 2026
+
+This entry goes to `main` with the source at `7a45b9b`. The round 3 reviewers read `a7cc8df`, and main verified the fixes made after that round, as Fix round 3 records. The proposal stays Accepted, because P037-07 and the Linux gates could not run.
+
+- **Environment:** a Claude Code cloud container running Ubuntu 24.04.4 as root, with cgroup v1, no systemd as PID 1, no Docker daemon, no SSH client and no macOS. It has Node 24.11.1, pnpm 12.3.4, Python 3.11.15 and 3.12.3, and the pinned Codex 0.153.4.
+- **Gate results for `7a45b9b`:**
+  - `check-docs` passed over 205 files, and `git diff --check` passed from `9ba6d53`.
+  - `bash -n` passed on the 94 scripts in the guide's 42 blocks.
+  - The 34 unit tests passed under Python 3.11.15 and 3.12.3, and `pnpm check` exited 0.
+  - In main's rerun from a copy, the P037-04 harness passed 710 of 710.
+  - `pnpm build`, `pnpm test` and `pnpm test:deployment:contract` passed in round 0, apart from the latter's recorded baseline failure. Nothing they cover has changed since. The only later change to code is `deploy-release`'s docstring, and its syntax tree without docstrings is unchanged.
+- **Acceptance:**
+  - P037-01 to P037-06 are met.
+  - P037-07 is unverified: the guide on the VPS, with the owner's browser checks.
+  - These gates are also unverified:
+    - the transient-unit build;
+    - `pnpm test:e2e`;
+    - the personal VPS Linux lanes;
+    - the blocks for the owner's computer on macOS.
+
+  The [unverified gates issue](../../issues/2026-09-30-103814-p037-unverified-gates.md) records them with their recheck.
+- **Reviews:** three rounds, each with a fresh design reviewer and a fresh provenance reviewer.
+  - No round found a blocker.
+  - Every finding has a disposition above.
+  - The three fixes accepted after round 3 were verified by main.
+- **Issues for unrelated findings:**
+  - the [pnpm store issue](../../issues/2026-09-30-103815-deploy-build-pnpm-store.md);
+  - the [release check issue](../../issues/2026-09-30-103816-release-check-home.md);
+  - the [interrupted build issue](../../issues/2026-09-30-125456-interrupted-build-leftovers.md).
+- **Evidence limits:**
+  - These exist only in this cloud container, and they become unavailable when it is reclaimed:
+    - the implementer's and reviewers' raw logs;
+    - the harness and its fixtures;
+    - the scratch releases;
+    - main's gate logs.
+  - `/nonexistent` and `/run/mount` remain in this container only.
+
 ## Closing record
 
 Pending until the [completion conditions](../workflow.md#proposal-completion-and-archive) pass.
