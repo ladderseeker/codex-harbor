@@ -13,13 +13,14 @@
   - removes its own partial copies when a step fails;
   - reports disk use;
   - on explicit request, prunes old checkpoints and releases under a fixed retention rule.
-- Authorization: On 30 September 2026 the owner reported that the VPS disk had filled, asked for this analysis, and chose "Disk fix first" on the thread's decision card: "I plan and build the leak fix now; CI (P026) and clean shutdown (P025) follow it." That choice authorizes this plan and its implementation in the repository. Later that day the owner allowed branch commits, then directed that finished work go straight to `main` without review; [P036](036-cloud-agent-sessions.md) records that rule. Every VPS workflow run other than `preflight` still needs the owner's go-ahead. The owner has since uninstalled Harbor from the VPS, so this plan changes no installed instance.
+- Authorization: On 30 September 2026 the owner reported that the VPS disk had filled, asked for this analysis, and chose "Disk fix first" on the thread's decision card: "I plan and build the leak fix now; CI (P026) and clean shutdown (P025) follow it." That choice authorizes this plan and its implementation in the repository. Later that day the owner allowed branch commits, then directed that finished work go straight to `main` without a pull request or owner review; [P036](036-cloud-agent-sessions.md) records that rule, and the automatic reviews still run. Every VPS workflow run other than `preflight` still needs the owner's go-ahead. The owner has since uninstalled Harbor from the VPS, so this plan changes no installed instance.
 - Baseline: `main` at `92310786d8c502e3dec4a6a45188a488fa969356`. See [Baseline checks](#baseline-checks) for what ran on it.
-- Dependencies: Nothing blocks execution. Three gates need infrastructure or permission that this thread's container lacks, and they block completion:
+- Dependencies: Nothing blocks execution. Two gates need infrastructure that this thread's container lacks, and they block completion:
   - The real-stack end-to-end suite needs a Docker engine with Compose. Starting a Docker daemon in this container was refused.
   - The personal VPS Linux lane needs systemd and a delegated cgroup v2 subtree. This container has neither, so the personal runtime launch contracts fail here with "Personal cgroup delegation unavailable".
-  - A bounded live smoke needs a signed-in Codex account in run-owned state. That requires the owner's permission to copy this container's ChatGPT credential; without it, the gate stays unverified.
-  - [P026](026-continuous-integration.md) or another supported Linux host supplies the first two. They stay open until then.
+  - [P026](026-continuous-integration.md) or another supported Linux host supplies them. They stay open until then.
+
+  The bounded live smoke needed the owner's permission to copy this container's ChatGPT credential. The owner gave it on 30 September 2026, and the smoke ran; see [Review and findings](#review-and-findings).
 - Source issues: [Personal VPS disk growth](../../issues/2026-09-30-015210-personal-vps-disk-growth.md).
 - Design references:
   - [official foundation](../architecture.md#official-foundation-and-compatibility-boundary);
@@ -36,7 +37,7 @@
 
 The [source issue](../../issues/2026-09-30-015210-personal-vps-disk-growth.md) records how the owner's 80 GB VPS disk filled. Two runtime problems combine:
 
-- Codex 0.153.4 syncs OpenAI's plugin catalog, about 98 MB, into `CODEX_HOME/.tmp` whenever an app-server starts with a missing or stale copy, and it abandons the partial download when the process ends first.
+- Codex 0.153.4 syncs OpenAI's plugin catalog, about 100 MB on disk, into `CODEX_HOME/.tmp` whenever an app-server starts with a missing or stale copy, and it abandons the partial download when the process ends first.
 - Harbor starts and retires a short-lived Codex runtime every minute to refresh model and account capabilities, and on every dispatch tick while no capability record exists.
 
 On an instance with no conversation running, the result is one abandoned download a minute. Deploys then multiply the waste: every promotion copies all native state, the waste included, into a checkpoint that is never deleted. Staged releases are never deleted either, and no deploy step checks free space.
@@ -130,7 +131,7 @@ The [disk growth issue](../../issues/2026-09-30-015210-personal-vps-disk-growth.
 | Disk use not shown to the owner | P035-08 |
 | PostgreSQL container log without limits | P035-09 |
 
-The issue keeps four observations: the pg-boss wake-up volume, Codex SQLite growth per start, the managed launcher and disk-threshold turn admission. So the transfer is partial and the issue stays in the inbox.
+The issue keeps five observations: the pg-boss wake-up volume, Codex SQLite growth per start, the managed launcher, disk-threshold turn admission, and the deploy build cache with leftover upload directories. So the transfer is partial and the issue stays in the inbox.
 
 ## User and API flows
 
@@ -253,7 +254,7 @@ Run-owned scratch goes under `.test-runs/p035-*`, which Git ignores, or the OS t
   - it is killed after two seconds;
   - it leaves no `plugins`, `plugins-clone-*` or `git-*` entry under `.tmp`.
 
-  In addition, `codex -c features.plugins=false features list` reports `plugins` false, while `codex features list` reports it true. The test is skipped when `HARBOR_LOCAL_CONTRACT_BINARY` is unset. For evidence that the negative assertion discriminates, the source issue records the same kill without the flag, and without network access, leaving `git-*` directories.
+  In addition, `codex -c features.plugins=false features list` reports `plugins` false, while `codex features list` reports it true. The test is skipped when `HARBOR_LOCAL_CONTRACT_BINARY` is unset. For evidence that the negative assertion discriminates, the source issue records flagless starts that leave `plugins*` and `git-*` entries, and a check with Harbor's arguments minus the flag that leaves `.tmp/plugins`, `plugins.sha` and `plugins.sync.lock`.
 - **P035-03:** `discoveryDue` returns the documented result for each case:
   - no record, with no attempt, a recent successful attempt, a recent failed attempt, and an old failed attempt;
   - a fresh signed-in record;
