@@ -404,8 +404,6 @@ async function discover() {
       )
     )
       return;
-    // Recorded as failed until the capability write and retirement succeed.
-    attempt = lastDiscovery = { at: Date.now(), failed: true };
     const project =
       (await pool.query("SELECT * FROM projects ORDER BY created_at LIMIT 1"))
         .rows[0] ??
@@ -413,6 +411,8 @@ async function discover() {
         ? { id: randomUUID(), relative_path: null }
         : undefined);
     if (!project) return;
+    // Recorded as failed until the capability write and retirement succeed.
+    attempt = lastDiscovery = { at: Date.now(), failed: true };
     await pool.query(
       "INSERT INTO runtime_bootstrap(id,runtime_id) VALUES(true,$1) ON CONFLICT DO NOTHING",
       [randomUUID()],

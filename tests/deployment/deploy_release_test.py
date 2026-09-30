@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -653,6 +654,19 @@ class DeployReleaseTests(unittest.TestCase):
         self.assertFalse(disk['buildFits'])
         self.assertTrue(disk['checkpointFits'])
         self.assertEqual(disk['pruneWouldRemove'], [])
+
+    def test_running_the_script_from_a_release_writes_no_bytecode(self):
+        # A release holds infra/personal-vps without bytecode, and its manifest check refuses unlisted files.
+        release = self.base / 'release'
+        shutil.copytree(SCRIPT.parent, release / 'infra/personal-vps', ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+        # A separate interpreter, since loading the script here already turned bytecode off in this process.
+        # -E ignores PYTHONDONTWRITEBYTECODE and PYTHONPYCACHEPREFIX, so only the script decides.
+        run = REAL_RUN([sys.executable, '-E', str(release / 'infra/personal-vps/deploy-release'), 'prune', '--help'],
+                       cwd=self.base, env={'PATH': os.environ.get('PATH', '/usr/bin:/bin')},
+                       capture_output=True, text=True, check=True)
+        self.assertIn('--keep-checkpoints', run.stdout)
+        self.assertEqual([str(p.relative_to(release)) for p in release.rglob('*')
+                          if p.name == '__pycache__' or p.suffix == '.pyc'], [])
 
 
 if __name__ == '__main__':
